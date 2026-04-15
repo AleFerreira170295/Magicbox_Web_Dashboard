@@ -32,7 +32,7 @@ export function GamesTable() {
       <SectionHeader
         eyebrow="Exploración"
         title="Partidas"
-        description="Vista base sobre `game-data`. En la siguiente fase se enriquecerá con vínculo a raw payloads, contexto pedagógico y reconstrucción lossless completa."
+        description="Vista base sobre `game-data`, incluyendo partidas con jugadores registrados, manuales o mixtos. En la siguiente fase se enriquecerá con vínculo a raw payloads, contexto pedagógico y reconstrucción lossless completa."
         actions={<Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Filtrar por mazo, gameId o dispositivo" className="w-80" />}
       />
 
@@ -65,18 +65,29 @@ export function GamesTable() {
                   </TableRow>
                 ) : (
                   filtered.map((game) => (
-                    <TableRow key={game.id}>
-                      <TableCell className="font-medium">{game.gameId || "-"}</TableCell>
-                      <TableCell>{game.deckName || "-"}</TableCell>
-                      <TableCell className="font-mono text-xs">{game.bleDeviceId || "-"}</TableCell>
-                      <TableCell>
-                        <Badge variant="secondary">{game.players.length || game.totalPlayers || 0}</Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline">{game.turns.length}</Badge>
-                      </TableCell>
-                      <TableCell>{formatDateTime(game.startDate)}</TableCell>
-                    </TableRow>
+                    (() => {
+                      const registeredCount = game.players.filter((player) => player.playerSource !== "manual").length;
+                      const manualCount = game.players.filter((player) => player.playerSource === "manual").length;
+
+                      return (
+                        <TableRow key={game.id}>
+                          <TableCell className="font-medium">{game.gameId || "-"}</TableCell>
+                          <TableCell>{game.deckName || "-"}</TableCell>
+                          <TableCell className="font-mono text-xs">{game.bleDeviceId || "-"}</TableCell>
+                          <TableCell>
+                            <div className="flex flex-wrap items-center gap-2">
+                              <Badge variant="secondary">{game.players.length || game.totalPlayers || 0}</Badge>
+                              {registeredCount > 0 ? <Badge variant="outline">registrados {registeredCount}</Badge> : null}
+                              {manualCount > 0 ? <Badge variant="success">manuales {manualCount}</Badge> : null}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="outline">{game.turns.length}</Badge>
+                          </TableCell>
+                          <TableCell>{formatDateTime(game.startDate)}</TableCell>
+                        </TableRow>
+                      );
+                    })()
                   ))
                 )}
               </TableBody>

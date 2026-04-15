@@ -15,6 +15,7 @@ function normalizeParticipant(input: unknown): SyncParticipant {
     id: (record.id as string | undefined) || null,
     profileId: (record.profile_id as string | undefined) || null,
     profileName: (record.profile_name as string | undefined) || null,
+    playerName: (record.player_name as string | undefined) || null,
     cardUid: (record.card_uid as string | undefined) || null,
     position: typeof record.position === "number" ? record.position : Number(record.position || 0),
     studentId: (record.student_id as string | undefined) || null,

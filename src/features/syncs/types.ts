@@ -29,6 +29,7 @@ export interface SyncParticipant {
   id?: string | null;
   profileId?: string | null;
   profileName?: string | null;
+  playerName?: string | null;
   cardUid?: string | null;
   position?: number | null;
   studentId?: string | null;
