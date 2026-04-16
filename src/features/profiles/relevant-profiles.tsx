@@ -1,16 +1,16 @@
 "use client";
 
-import { useMemo } from "react";
-import { Building2, ShieldCheck, UserRound, Users } from "lucide-react";
-import { ApiError } from "@/lib/api/fetcher";
+import { type ComponentType, useMemo, useState } from "react";
+import { BadgeCheck, CreditCard, Search, UserRound, Users, Waves } from "lucide-react";
 import { SectionHeader } from "@/components/section-header";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useAuth } from "@/features/auth/auth-context";
-import { useUsers } from "@/features/users/api";
-import { getErrorMessage } from "@/lib/utils";
+import { useProfilesOverview } from "@/features/profiles/api";
+import { cn, formatDateTime, getErrorMessage } from "@/lib/utils";
 
 function SummaryCard({
   label,
@@ -21,7 +21,7 @@ function SummaryCard({
   label: string;
   value: string;
   hint: string;
-  icon: React.ComponentType<{ className?: string }>;
+  icon: ComponentType<{ className?: string }>;
 }) {
   return (
     <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
@@ -42,200 +42,256 @@ function SummaryCard({
 }
 
 export function RelevantProfiles() {
-  const { tokens, user } = useAuth();
-  const usersQuery = useUsers(tokens?.accessToken);
+  const { tokens } = useAuth();
+  const [query, setQuery] = useState("");
+  const [institutionFilter, setInstitutionFilter] = useState<string>("");
+  const [activityFilter, setActivityFilter] = useState<"all" | "active" | "inactive">("all");
+  const [selectedProfileId, setSelectedProfileId] = useState<string | null>(null);
 
-  const backendUnavailable =
-    usersQuery.error instanceof ApiError && [404, 405].includes(usersQuery.error.status);
+  const profilesQuery = useProfilesOverview(tokens?.accessToken);
+  const profiles = useMemo(() => profilesQuery.data || [], [profilesQuery.data]);
+
+  const institutions = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const profile of profiles) {
+      if (profile.educationalCenterId && profile.educationalCenterName) {
+        map.set(profile.educationalCenterId, profile.educationalCenterName);
+      }
+    }
+    return Array.from(map.entries()).map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name));
+  }, [profiles]);
+
+  const filtered = useMemo(() => {
+    const normalized = query.trim().toLowerCase();
+
+    return profiles.filter((profile) => {
+      if (institutionFilter && profile.educationalCenterId !== institutionFilter) return false;
+      if (activityFilter === "active" && !profile.isActive) return false;
+      if (activityFilter === "inactive" && profile.isActive) return false;
+      if (!normalized) return true;
+
+      return [
+        profile.displayName,
+        profile.userName,
+        profile.userEmail,
+        profile.educationalCenterName,
+        ...profile.cardUids,
+        ...profile.boundDevices.map((device) => device.name || device.deviceId || device.id),
+      ]
+        .filter(Boolean)
+        .some((value) => String(value).toLowerCase().includes(normalized));
+    });
+  }, [activityFilter, institutionFilter, profiles, query]);
+
+  const selectedProfile = useMemo(
+    () => filtered.find((profile) => profile.id === selectedProfileId) || profiles.find((profile) => profile.id === selectedProfileId) || null,
+    [filtered, profiles, selectedProfileId],
+  );
 
   const metrics = useMemo(() => {
-    const users = usersQuery.data?.data || [];
-    const adminProfiles = users.filter((item) => item.roles.includes("admin")).length;
-    const linkedToInstitution = users.filter((item) => item.educationalCenterId).length;
-    const withoutExplicitPermissions = users.filter((item) => item.permissions.length === 0).length;
+    const activeProfiles = profiles.filter((profile) => profile.isActive).length;
+    const withBindings = profiles.filter((profile) => profile.activeBindingCount > 0).length;
+    const withSessions = profiles.filter((profile) => profile.sessionCount > 0).length;
+    const institutionLinked = profiles.filter((profile) => Boolean(profile.educationalCenterId)).length;
 
     return {
-      totalProfiles: usersQuery.data?.total || users.length,
-      adminProfiles,
-      linkedToInstitution,
-      withoutExplicitPermissions,
-      spotlightProfiles: users.filter((item) => item.roles.includes("admin") || item.permissions.length > 0).slice(0, 8),
+      total: profiles.length,
+      activeProfiles,
+      withBindings,
+      withSessions,
+      institutionLinked,
     };
-  }, [usersQuery.data]);
+  }, [profiles]);
 
   return (
     <div className="space-y-6">
       <SectionHeader
-        eyebrow="Superadmin"
-        title="Perfiles relevantes"
-        description="Una lectura más curada que la tabla de usuarios: foco en perfiles clave, vínculos institucionales y señales de configuración que conviene revisar."
+        eyebrow="Perfiles Home"
+        title="Profiles"
+        description="Vista operativa real de perfiles Home, con ownership, bindings y actividad de sesiones. Ya no usa `users` como proxy del módulo."
+        actions={
+          <div className="flex flex-col items-stretch gap-3 md:flex-row md:items-center">
+            <div className="relative min-w-72">
+              <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="Filtrar por perfil, owner, institución, tarjeta o dispositivo"
+                className="pl-9"
+              />
+            </div>
+            <select
+              value={institutionFilter}
+              onChange={(event) => setInstitutionFilter(event.target.value)}
+              className="h-10 min-w-48 rounded-md border border-input bg-background px-3 text-sm"
+            >
+              <option value="">Todas las instituciones</option>
+              {institutions.map((institution) => (
+                <option key={institution.id} value={institution.id}>
+                  {institution.name}
+                </option>
+              ))}
+            </select>
+            <select
+              value={activityFilter}
+              onChange={(event) => setActivityFilter(event.target.value as "all" | "active" | "inactive")}
+              className="h-10 min-w-40 rounded-md border border-input bg-background px-3 text-sm"
+            >
+              <option value="all">Todos</option>
+              <option value="active">Activos</option>
+              <option value="inactive">Inactivos</option>
+            </select>
+          </div>
+        }
       />
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        {usersQuery.isLoading ? (
-          Array.from({ length: 4 }).map((_, index) => <Skeleton key={index} className="h-32 rounded-2xl" />)
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+        {profilesQuery.isLoading ? (
+          Array.from({ length: 5 }).map((_, index) => <Skeleton key={index} className="h-32 rounded-2xl" />)
         ) : (
           <>
-            <SummaryCard
-              label="Perfiles visibles"
-              value={backendUnavailable ? "Pendiente" : String(metrics.totalProfiles)}
-              hint="Base inicial para identificar actores clave del sistema."
-              icon={Users}
-            />
-            <SummaryCard
-              label="Perfiles admin"
-              value={backendUnavailable ? "Pendiente" : String(metrics.adminProfiles)}
-              hint="Perfiles con mayor impacto operativo sobre la plataforma." 
-              icon={ShieldCheck}
-            />
-            <SummaryCard
-              label="Vinculados a institución"
-              value={backendUnavailable ? "Pendiente" : String(metrics.linkedToInstitution)}
-              hint="Ayuda a detectar si el mapa institucional está bien asociado." 
-              icon={Building2}
-            />
-            <SummaryCard
-              label="Sin permisos explícitos"
-              value={backendUnavailable ? "Pendiente" : String(metrics.withoutExplicitPermissions)}
-              hint="Útil para revisar herencia de roles y huecos de configuración." 
-              icon={UserRound}
-            />
+            <SummaryCard label="Perfiles" value={String(metrics.total)} hint="Perfiles Home visibles en el alcance actual." icon={Users} />
+            <SummaryCard label="Activos" value={String(metrics.activeProfiles)} hint="Perfiles no archivados y operativamente vigentes." icon={BadgeCheck} />
+            <SummaryCard label="Con tarjeta" value={String(metrics.withBindings)} hint="Perfiles con bindings activos a cards." icon={CreditCard} />
+            <SummaryCard label="Con sesiones" value={String(metrics.withSessions)} hint="Perfiles que ya aparecen en historial de juego." icon={Waves} />
+            <SummaryCard label="Institucionales" value={String(metrics.institutionLinked)} hint="Perfiles cuyos owners ya están ligados a una institución." icon={UserRound} />
           </>
         )}
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-[1fr_0.95fr]">
+      <div className="grid gap-6 xl:grid-cols-[1.2fr_1fr]">
         <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
           <CardHeader>
-            <CardTitle>Qué entendemos por perfil relevante</CardTitle>
+            <CardTitle>Listado de perfiles</CardTitle>
             <CardDescription>
-              No todos los usuarios importan por igual para operación. Esta vista quiere resaltar los que conviene mirar primero.
+              Seleccioná un perfil para revisar ownership, tarjetas, dispositivos vinculados y actividad reciente.
             </CardDescription>
           </CardHeader>
-          <CardContent className="grid gap-3">
-            <div className="rounded-2xl bg-white/80 p-4">
-              <p className="text-sm font-medium text-foreground">Perfiles con acceso alto</p>
-              <p className="mt-1 text-sm leading-6 text-muted-foreground">Admins y perfiles con permisos explícitos que modifican la operación.</p>
-            </div>
-            <div className="rounded-2xl bg-white/80 p-4">
-              <p className="text-sm font-medium text-foreground">Perfiles institucionales críticos</p>
-              <p className="mt-1 text-sm leading-6 text-muted-foreground">Usuarios clave para entender propiedad, alcance y responsabilidades por cliente.</p>
-            </div>
-            <div className="rounded-2xl bg-white/80 p-4">
-              <p className="text-sm font-medium text-foreground">Huecos de configuración</p>
-              <p className="mt-1 text-sm leading-6 text-muted-foreground">Usuarios sin institución, sin permisos o con combinaciones que merecen revisión.</p>
-            </div>
+          <CardContent className="overflow-x-auto p-0">
+            {profilesQuery.isLoading ? (
+              <div className="p-6">
+                <Skeleton className="h-72 w-full rounded-none" />
+              </div>
+            ) : profilesQuery.error ? (
+              <div className="p-6 text-sm text-destructive">{getErrorMessage(profilesQuery.error)}</div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Perfil</TableHead>
+                    <TableHead>Owner</TableHead>
+                    <TableHead>Institución</TableHead>
+                    <TableHead>Tarjetas</TableHead>
+                    <TableHead>Sesiones</TableHead>
+                    <TableHead>Última sesión</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filtered.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={6} className="py-10 text-center text-sm text-muted-foreground">
+                        No hay perfiles para mostrar.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    filtered.map((profile) => (
+                      <TableRow
+                        key={profile.id}
+                        className={cn("cursor-pointer", selectedProfileId === profile.id && "bg-primary/5")}
+                        onClick={() => setSelectedProfileId(profile.id)}
+                      >
+                        <TableCell>
+                          <div>
+                            <p className="font-medium text-foreground">{profile.displayName}</p>
+                            <p className="text-xs text-muted-foreground">{profile.ageCategory || "sin categoría"}</p>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div>
+                            <p className="text-sm text-foreground">{profile.userName || "sin owner"}</p>
+                            <p className="text-xs text-muted-foreground">{profile.userEmail || "-"}</p>
+                          </div>
+                        </TableCell>
+                        <TableCell>{profile.educationalCenterName || profile.educationalCenterId || "-"}</TableCell>
+                        <TableCell>
+                          <div className="flex flex-wrap gap-2">
+                            <Badge variant={profile.activeBindingCount > 0 ? "success" : "outline"}>{profile.activeBindingCount}</Badge>
+                          </div>
+                        </TableCell>
+                        <TableCell>{profile.sessionCount}</TableCell>
+                        <TableCell>{formatDateTime(profile.lastSessionAt)}</TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            )}
           </CardContent>
         </Card>
 
         <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
           <CardHeader>
-            <CardTitle>Perfil autenticado actual</CardTitle>
+            <CardTitle>Detalle de perfil</CardTitle>
             <CardDescription>
-              Sigue siendo útil dejar visible el punto de vista real desde el que estás navegando el sistema.
+              Resumen rápido del perfil, su owner y señales de uso relevantes para operación.
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="rounded-2xl bg-white/80 p-4">
-              <p className="text-sm font-medium text-foreground">{user?.fullName || "Sin nombre"}</p>
-              <p className="mt-1 text-sm text-muted-foreground">{user?.email || "Sin email"}</p>
-            </div>
-            <div>
-              <p className="text-sm font-medium text-foreground">Roles</p>
-              <div className="mt-2 flex flex-wrap gap-2">
-                {user?.roles.length ? user.roles.map((role) => (
-                  <Badge key={role} variant={role === "admin" ? "warning" : "secondary"}>{role}</Badge>
-                )) : <Badge variant="outline">sin roles</Badge>}
+          <CardContent className="space-y-5">
+            {!selectedProfile ? (
+              <div className="rounded-2xl bg-background/70 p-4 text-sm text-muted-foreground">
+                Elegí un perfil para revisar su detalle operativo.
               </div>
-            </div>
-            <div>
-              <p className="text-sm font-medium text-foreground">Permisos</p>
-              <div className="mt-2 flex flex-wrap gap-2">
-                {user?.permissions.length ? user.permissions.map((permission) => (
-                  <Badge key={permission} variant="outline">{permission}</Badge>
-                )) : <Badge variant="outline">sin permisos explícitos</Badge>}
-              </div>
-            </div>
+            ) : (
+              <>
+                <div className="rounded-2xl bg-background/70 p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-semibold text-foreground">{selectedProfile.displayName}</p>
+                      <p className="mt-1 text-xs text-muted-foreground">Owner {selectedProfile.userName || selectedProfile.userEmail || selectedProfile.userId}</p>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <Badge variant={selectedProfile.isActive ? "success" : "outline"}>{selectedProfile.isActive ? "activo" : "inactivo"}</Badge>
+                      <Badge variant="outline">{selectedProfile.sessionCount} sesiones</Badge>
+                    </div>
+                  </div>
+                  <div className="mt-3 grid gap-2 text-xs text-muted-foreground sm:grid-cols-2">
+                    <p>Institución: {selectedProfile.educationalCenterName || selectedProfile.educationalCenterId || "-"}</p>
+                    <p>Categoría: {selectedProfile.ageCategory || "sin categoría"}</p>
+                    <p>Edad: {selectedProfile.age ?? "sin edad"}</p>
+                    <p>Última sesión: {formatDateTime(selectedProfile.lastSessionAt)}</p>
+                  </div>
+                </div>
+
+                <div>
+                  <p className="text-sm font-medium text-foreground">Tarjetas vinculadas</p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {selectedProfile.cardUids.length === 0 ? (
+                      <Badge variant="outline">sin cards activas</Badge>
+                    ) : (
+                      selectedProfile.cardUids.map((cardUid) => (
+                        <Badge key={cardUid} variant="outline">{cardUid}</Badge>
+                      ))
+                    )}
+                  </div>
+                </div>
+
+                <div>
+                  <p className="text-sm font-medium text-foreground">Dispositivos vinculados</p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {selectedProfile.boundDevices.length === 0 ? (
+                      <Badge variant="outline">sin dispositivo asociado</Badge>
+                    ) : (
+                      selectedProfile.boundDevices.map((device) => (
+                        <Badge key={device.id} variant="secondary">{device.name || device.deviceId || device.id}</Badge>
+                      ))
+                    )}
+                  </div>
+                </div>
+              </>
+            )}
           </CardContent>
         </Card>
       </div>
-
-      <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
-        <CardHeader>
-          <CardTitle>Perfiles destacados para revisión</CardTitle>
-          <CardDescription>
-            Priorizamos admins y usuarios con permisos explícitos porque suelen ser los más sensibles desde el punto de vista operativo.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="overflow-x-auto p-0">
-          {usersQuery.isLoading ? (
-            <div className="p-6">
-              <Skeleton className="h-72 w-full rounded-none" />
-            </div>
-          ) : backendUnavailable ? (
-            <div className="space-y-3 p-6 text-sm leading-6 text-muted-foreground">
-              <p className="font-medium text-foreground">El backend todavía no expone el listado de usuarios necesario para construir esta vista viva.</p>
-              <p>
-                Aun así, la estructura ya quedó montada para que puedas navegar el módulo, validar la jerarquía del front y probar el comportamiento por rol.
-              </p>
-            </div>
-          ) : usersQuery.error ? (
-            <div className="p-6 text-sm text-destructive">{getErrorMessage(usersQuery.error)}</div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Perfil</TableHead>
-                  <TableHead>Roles</TableHead>
-                  <TableHead>Permisos</TableHead>
-                  <TableHead>Institución</TableHead>
-                  <TableHead>Tipo</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {metrics.spotlightProfiles.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={5} className="py-10 text-center text-sm text-muted-foreground">
-                      No hay perfiles destacados para mostrar todavía.
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  metrics.spotlightProfiles.map((item) => (
-                    <TableRow key={item.id}>
-                      <TableCell>
-                        <div>
-                          <p className="font-medium text-foreground">{item.fullName}</p>
-                          <p className="text-xs text-muted-foreground">{item.email}</p>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex flex-wrap gap-2">
-                          {item.roles.length ? item.roles.map((role) => (
-                            <Badge key={role} variant={role === "admin" ? "warning" : "secondary"}>{role}</Badge>
-                          )) : <Badge variant="outline">sin rol</Badge>}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        {item.permissions.length ? (
-                          <div className="flex flex-wrap gap-2">
-                            {item.permissions.map((permission) => (
-                              <Badge key={permission} variant="outline">{permission}</Badge>
-                            ))}
-                          </div>
-                        ) : (
-                          <Badge variant="outline">sin permisos explícitos</Badge>
-                        )}
-                      </TableCell>
-                      <TableCell>{item.educationalCenterId || "-"}</TableCell>
-                      <TableCell>{item.userType || "-"}</TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
     </div>
   );
 }

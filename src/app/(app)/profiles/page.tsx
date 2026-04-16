@@ -3,7 +3,7 @@ import { RelevantProfiles } from "@/features/profiles/relevant-profiles";
 
 export default function ProfilesPage() {
   return (
-    <RoleGuard allowedRoles={["admin"]}>
+    <RoleGuard allowedRoles={["admin", "institution-admin", "director"]}>
       <RelevantProfiles />
     </RoleGuard>
   );

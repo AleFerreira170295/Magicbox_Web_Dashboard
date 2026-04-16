@@ -32,6 +32,9 @@ export const apiEndpoints = {
     list: "/game-data/",
     byId: (id: string) => `/game-data/${id}`,
   },
+  profiles: {
+    overview: "/home/profiles/overview",
+  },
   syncs: {
     list: "/sync-sessions",
     byId: (id: string) => `/sync-sessions/${id}`,

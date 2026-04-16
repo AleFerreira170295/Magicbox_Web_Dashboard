@@ -41,6 +41,11 @@ Ruta base de prueba para desarrollo cruzado entre dashboard y backend local.
    - métricas operativas de partidas, jugadores y turnos
    - filtro por institución y modo de jugadores
    - panel de detalle con últimos turnos y composición manual/registrada
+12. Ir a `Profiles`.
+13. Verificar:
+   - listado real de perfiles Home, no usuarios proxy
+   - owner, institución, bindings y sesiones por perfil
+   - panel de detalle con tarjetas y dispositivos vinculados
 
 ## Estado esperado actual de `Praecepta Education`
 
@@ -161,6 +166,34 @@ Semántica esperada:
 - la tabla debe enriquecer contexto mostrando institución y dispositivo a partir de los catálogos ya cargados en dashboard
 - el panel de detalle debe resumir jugadores, turnos recientes y tasa de éxito sin depender de inspección raw
 
+### Listado operativo de perfiles Home
+
+```bash
+TOKEN="<pegar access_token>"
+curl 'http://127.0.0.1:3000/api/v1.0/home/profiles/overview' \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+Campos esperados por item en este slice:
+
+- `display_name`
+- `user_name`
+- `user_email`
+- `educational_center_id`
+- `educational_center_name`
+- `binding_count`
+- `active_binding_count`
+- `card_uids`
+- `bound_devices`
+- `session_count`
+- `last_session_at`
+
+Semántica esperada:
+
+- `Profiles` debe usar perfiles Home reales y no reutilizar el padrón `/user` como proxy
+- sin ACL global/scoped de `user:read`, el overview debe caer a perfiles propios del actor autenticado
+- con ACL global/scoped de `user:read`, el overview debe abrirse a visibilidad operativa respetando alcance institucional cuando corresponda
+
 ### Listado operativo de syncs
 
 ```bash
@@ -199,3 +232,4 @@ Usarla como smoke test después de cambios en:
 - contrato, edición mínima y pantalla de `Dispositivos`
 - visibilidad operativa y pantalla de `Syncs`
 - pantalla operativa de `Partidas`
+- vista operativa real de `Profiles`
