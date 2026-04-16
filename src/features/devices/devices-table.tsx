@@ -1,17 +1,30 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Home, Search, ShieldCheck, Smartphone, University, UserRound, Wifi } from "lucide-react";
 import { SectionHeader } from "@/components/section-header";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useAuth } from "@/features/auth/auth-context";
-import { useDevices } from "@/features/devices/api";
+import { updateDevice, useDevices } from "@/features/devices/api";
+import type { DeviceRecord, UpdateDevicePayload } from "@/features/devices/types";
 import { useInstitutions } from "@/features/institutions/api";
+import { useUsers } from "@/features/users/api";
 import { cn, formatDateTime, getErrorMessage } from "@/lib/utils";
+
+type DeviceFormState = {
+  name: string;
+  assignmentScope: "home" | "institution";
+  educationalCenterId: string;
+  ownerUserId: string;
+  firmwareVersion: string;
+  status: string;
+};
 
 function SummaryCard({
   label,
@@ -48,10 +61,7 @@ function statusLabel(status?: string | null) {
 }
 
 function scopeBadge(device: { assignmentScope: "home" | "institution"; educationalCenterName?: string | null }) {
-  if (device.assignmentScope === "home") {
-    return <Badge variant="secondary">Home</Badge>;
-  }
-
+  if (device.assignmentScope === "home") return <Badge variant="secondary">Home</Badge>;
   return <Badge variant="outline">{device.educationalCenterName || "Institución"}</Badge>;
 }
 
@@ -64,6 +74,222 @@ function locationLabel(device: {
   return device.educationalCenterName || device.educationalCenterId || "Institución";
 }
 
+function buildFormState(device: DeviceRecord | null, scopedInstitutionId?: string | null): DeviceFormState {
+  if (!device) {
+    return {
+      name: "",
+      assignmentScope: scopedInstitutionId ? "institution" : "home",
+      educationalCenterId: scopedInstitutionId || "",
+      ownerUserId: "",
+      firmwareVersion: "",
+      status: "",
+    };
+  }
+
+  return {
+    name: device.name,
+    assignmentScope: device.assignmentScope,
+    educationalCenterId: device.educationalCenterId || scopedInstitutionId || "",
+    ownerUserId: device.ownerUserId || "",
+    firmwareVersion: device.firmwareVersion || "",
+    status: device.status || "",
+  };
+}
+
+function DeviceEditorPanel({
+  selectedDevice,
+  scopedInstitutionId,
+  institutions,
+  users,
+  token,
+  onUpdated,
+}: {
+  selectedDevice: DeviceRecord;
+  scopedInstitutionId?: string | null;
+  institutions: Array<{ id: string; name: string }>;
+  users: Array<{ id: string; fullName: string; email: string; educationalCenterId?: string | null }>;
+  token?: string;
+  onUpdated: (deviceId: string) => void;
+}) {
+  const queryClient = useQueryClient();
+  const [formState, setFormState] = useState<DeviceFormState>(() => buildFormState(selectedDevice, scopedInstitutionId));
+  const [feedback, setFeedback] = useState<{ tone: "error" | "success"; text: string } | null>(null);
+
+  const assignmentLockedToInstitution = Boolean(scopedInstitutionId);
+  const availableOwners = useMemo(() => {
+    if (formState.assignmentScope === "home") return users;
+    if (!formState.educationalCenterId) return users;
+    return users.filter((user) => !user.educationalCenterId || user.educationalCenterId === formState.educationalCenterId);
+  }, [formState.assignmentScope, formState.educationalCenterId, users]);
+
+  const updateDeviceMutation = useMutation({
+    mutationFn: async (payload: UpdateDevicePayload) => {
+      if (!token || !selectedDevice) throw new Error("No hay dispositivo seleccionado.");
+      return updateDevice(token, selectedDevice.id, payload);
+    },
+    onSuccess: async (updatedDevice) => {
+      setFeedback({ tone: "success", text: "Dispositivo actualizado correctamente." });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["devices"] }),
+        queryClient.invalidateQueries({ queryKey: ["institutions"] }),
+      ]);
+      onUpdated(updatedDevice.id);
+    },
+    onError: (error) => {
+      setFeedback({ tone: "error", text: getErrorMessage(error) });
+    },
+  });
+
+  const handleFieldChange = <K extends keyof DeviceFormState>(key: K, value: DeviceFormState[K]) => {
+    setFormState((current) => ({ ...current, [key]: value }));
+  };
+
+  const handleSubmit = async () => {
+    if (!selectedDevice) {
+      setFeedback({ tone: "error", text: "Seleccioná un dispositivo primero." });
+      return;
+    }
+
+    if (!formState.name.trim()) {
+      setFeedback({ tone: "error", text: "El nombre es obligatorio." });
+      return;
+    }
+
+    if (formState.assignmentScope === "institution" && !formState.educationalCenterId) {
+      setFeedback({ tone: "error", text: "Elegí una institución para el dispositivo." });
+      return;
+    }
+
+    await updateDeviceMutation.mutateAsync({
+      name: formState.name.trim(),
+      educationalCenterId: formState.assignmentScope === "home" ? null : formState.educationalCenterId,
+      ownerUserId: formState.ownerUserId || null,
+      firmwareVersion: formState.firmwareVersion || null,
+      status: formState.status || null,
+    });
+  };
+
+  return (
+    <>
+      <div className="rounded-2xl bg-background/70 p-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="text-sm font-semibold text-foreground">{selectedDevice.name}</p>
+            <p className="mt-1 font-mono text-xs text-muted-foreground">{selectedDevice.deviceId}</p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {scopeBadge(selectedDevice)}
+            <Badge variant={selectedDevice.status ? "secondary" : "outline"}>{statusLabel(selectedDevice.status)}</Badge>
+          </div>
+        </div>
+        <div className="mt-3 grid gap-2 text-xs text-muted-foreground sm:grid-cols-2">
+          <p>
+            Ubicación actual: {selectedDevice.assignmentScope === "home" ? "Home, sin centro educativo asociado" : locationLabel(selectedDevice)}
+          </p>
+          <p>Actualizado: {formatDateTime(selectedDevice.updatedAt)}</p>
+          <p>Owner actual: {selectedDevice.ownerUserName || selectedDevice.ownerUserEmail || "sin owner"}</p>
+          <p>Firmware actual: {selectedDevice.firmwareVersion || "sin firmware"}</p>
+        </div>
+      </div>
+
+      {feedback ? (
+        <div
+          className={cn(
+            "rounded-2xl px-4 py-3 text-sm",
+            feedback.tone === "error" ? "bg-destructive/10 text-destructive" : "bg-emerald-500/10 text-emerald-700",
+          )}
+        >
+          {feedback.text}
+        </div>
+      ) : null}
+
+      <div className="grid gap-4 md:grid-cols-2">
+        <div className="space-y-2 md:col-span-2">
+          <label className="text-sm font-medium text-foreground">Nombre</label>
+          <Input value={formState.name} onChange={(event) => handleFieldChange("name", event.target.value)} />
+        </div>
+
+        <div className="space-y-2">
+          <label className="text-sm font-medium text-foreground">Alcance</label>
+          <select
+            value={formState.assignmentScope}
+            onChange={(event) => handleFieldChange("assignmentScope", event.target.value as "home" | "institution")}
+            disabled={assignmentLockedToInstitution}
+            className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+          >
+            <option value="home">Home</option>
+            <option value="institution">Institución</option>
+          </select>
+          {assignmentLockedToInstitution ? (
+            <p className="text-xs text-muted-foreground">Tu vista está anclada a una única institución, así que no podés mover este dispositivo a Home desde aquí.</p>
+          ) : null}
+        </div>
+
+        <div className="space-y-2">
+          <label className="text-sm font-medium text-foreground">Institución</label>
+          <select
+            value={formState.educationalCenterId}
+            onChange={(event) => handleFieldChange("educationalCenterId", event.target.value)}
+            disabled={formState.assignmentScope === "home"}
+            className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+          >
+            <option value="">Seleccionar institución</option>
+            {institutions.map((institution) => (
+              <option key={institution.id} value={institution.id}>
+                {institution.name}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="space-y-2">
+          <label className="text-sm font-medium text-foreground">Responsable</label>
+          <select
+            value={formState.ownerUserId}
+            onChange={(event) => handleFieldChange("ownerUserId", event.target.value)}
+            className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+          >
+            <option value="">Sin owner</option>
+            {availableOwners.map((user) => (
+              <option key={user.id} value={user.id}>
+                {user.fullName} · {user.email}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="space-y-2">
+          <label className="text-sm font-medium text-foreground">Status</label>
+          <Input value={formState.status} onChange={(event) => handleFieldChange("status", event.target.value)} placeholder="online, offline, active..." />
+        </div>
+
+        <div className="space-y-2 md:col-span-2">
+          <label className="text-sm font-medium text-foreground">Firmware</label>
+          <Input value={formState.firmwareVersion} onChange={(event) => handleFieldChange("firmwareVersion", event.target.value)} placeholder="V2.2" />
+        </div>
+      </div>
+
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-background/70 p-4 text-sm text-muted-foreground">
+        <div>
+          {formState.assignmentScope === "home"
+            ? "Home es un caso válido. El dispositivo quedará sin centro educativo asociado."
+            : "En modo institución, el dispositivo debe quedar asociado a un centro concreto."}
+        </div>
+        <Button onClick={handleSubmit} disabled={updateDeviceMutation.isPending}>
+          {updateDeviceMutation.isPending ? "Guardando..." : "Guardar cambios"}
+        </Button>
+      </div>
+
+      <div>
+        <p className="text-sm font-medium text-foreground">Metadata cruda</p>
+        <div className="mt-3 rounded-2xl bg-slate-950 p-4 text-xs text-slate-100">
+          <pre className="overflow-x-auto whitespace-pre-wrap">{JSON.stringify(selectedDevice.deviceMetadata || {}, null, 2)}</pre>
+        </div>
+      </div>
+    </>
+  );
+}
+
 export function DevicesTable() {
   const { tokens, user: currentUser } = useAuth();
   const [query, setQuery] = useState("");
@@ -73,9 +299,11 @@ export function DevicesTable() {
 
   const devicesQuery = useDevices(tokens?.accessToken);
   const institutionsQuery = useInstitutions(tokens?.accessToken);
+  const usersQuery = useUsers(tokens?.accessToken);
 
   const devices = useMemo(() => devicesQuery.data?.data || [], [devicesQuery.data]);
   const institutions = useMemo(() => institutionsQuery.data?.data || [], [institutionsQuery.data]);
+  const users = useMemo(() => usersQuery.data?.data || [], [usersQuery.data]);
 
   const scopedInstitutionId = institutions.length === 1 ? institutions[0]?.id || null : null;
   const scopedInstitutionName = scopedInstitutionId ? institutions[0]?.name || scopedInstitutionId : null;
@@ -140,7 +368,7 @@ export function DevicesTable() {
         title="Dispositivos"
         description={
           isInstitutionScopedView
-            ? `Vista operativa de hardware para ${scopedInstitutionName}, con semántica explícita para dispositivos Home.`
+            ? `Vista operativa de hardware para ${scopedInstitutionName}, con edición controlada para ownership, alcance y estado.`
             : "Pantalla operativa de hardware conectada al contrato real de /ble-device, distinguiendo dispositivos Home y de institución."
         }
         actions={
@@ -189,9 +417,10 @@ export function DevicesTable() {
                 {isInstitutionScopedView ? "institution-admin" : "multi-institución / global"}
               </Badge>
               <Badge variant="secondary">Home explícito</Badge>
+              <Badge variant="outline">mutaciones reales</Badge>
             </div>
             <p className="mt-2 text-sm text-muted-foreground">
-              El contrato de `/ble-device` ahora distingue explícitamente entre dispositivos <strong>Home</strong> y dispositivos de institución. Un `null` en centro educativo deja de verse como dato roto y pasa a leerse como caso esperado de Home.
+              Además de distinguir Home vs institución, ahora esta pantalla puede persistir nombre, owner, firmware, estado y cambio de alcance cuando el backend lo permite.
             </p>
           </div>
           {scopedInstitutionName ? <Badge variant="outline">Institución activa: {scopedInstitutionName}</Badge> : null}
@@ -213,12 +442,12 @@ export function DevicesTable() {
         )}
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-[1.25fr_0.95fr]">
+      <div className="grid gap-6 xl:grid-cols-[1.15fr_1.05fr]">
         <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
           <CardHeader>
             <CardTitle>Parque de dispositivos</CardTitle>
             <CardDescription>
-              Seleccioná un dispositivo para revisar si opera en modo Home o institucional, junto con su ownership, firmware, status y metadata útil para soporte manual.
+              Seleccioná un dispositivo para revisar y editar su alcance, ownership y estado operativo.
             </CardDescription>
           </CardHeader>
           <CardContent className="overflow-x-auto p-0">
@@ -276,72 +505,31 @@ export function DevicesTable() {
 
         <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
           <CardHeader>
-            <CardTitle>Detalle operativo</CardTitle>
+            <CardTitle>Detalle y edición</CardTitle>
             <CardDescription>
-              Este panel usa la nueva semántica de `/ble-device` para distinguir Home de institución sin tratar el caso Home como observación o dato incompleto.
+              Este panel usa mutaciones reales sobre <code>/ble-device/&lt;id&gt;</code> para persistir cambios operativos mínimos sin inventar un flujo paralelo.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-5">
             {!selectedDevice ? (
               <div className="rounded-2xl bg-background/70 p-4 text-sm text-muted-foreground">
-                Elegí un dispositivo para revisar su contexto operativo.
+                Elegí un dispositivo para revisar y editar su contexto operativo.
               </div>
             ) : (
-              <>
-                <div className="rounded-2xl bg-background/70 p-4">
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div>
-                      <p className="text-sm font-semibold text-foreground">{selectedDevice.name}</p>
-                      <p className="mt-1 font-mono text-xs text-muted-foreground">{selectedDevice.deviceId}</p>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      {scopeBadge(selectedDevice)}
-                      <Badge variant={selectedDevice.status ? "secondary" : "outline"}>{statusLabel(selectedDevice.status)}</Badge>
-                    </div>
-                  </div>
-                  <div className="mt-3 grid gap-2 text-xs text-muted-foreground sm:grid-cols-2">
-                    <p>
-                      Ubicación: {selectedDevice.assignmentScope === "home" ? "Home, sin centro educativo asociado" : locationLabel(selectedDevice)}
-                    </p>
-                    <p>Firmware: {selectedDevice.firmwareVersion || "sin firmware"}</p>
-                    <p>Responsable: {selectedDevice.ownerUserName || "sin responsable"}</p>
-                    <p>Actualizado: {formatDateTime(selectedDevice.updatedAt)}</p>
-                  </div>
-                </div>
-
-                <div>
-                  <p className="text-sm font-medium text-foreground">Ownership</p>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {selectedDevice.ownerUserName ? <Badge variant="secondary">{selectedDevice.ownerUserName}</Badge> : <Badge variant="outline">sin owner asignado</Badge>}
-                    {selectedDevice.ownerUserEmail ? <Badge variant="outline">{selectedDevice.ownerUserEmail}</Badge> : null}
-                  </div>
-                </div>
-
-                <div>
-                  <p className="text-sm font-medium text-foreground">Asignación</p>
-                  <div className="mt-3 rounded-2xl bg-background/70 p-4 text-sm text-muted-foreground">
-                    {selectedDevice.assignmentScope === "home"
-                      ? "Este dispositivo está en alcance Home. Es correcto que no tenga centro educativo asociado."
-                      : `Este dispositivo está asignado a ${locationLabel(selectedDevice)}.`}
-                  </div>
-                </div>
-
-                <div>
-                  <p className="text-sm font-medium text-foreground">Metadata cruda</p>
-                  <div className="mt-3 rounded-2xl bg-slate-950 p-4 text-xs text-slate-100">
-                    <pre className="overflow-x-auto whitespace-pre-wrap">{JSON.stringify(selectedDevice.deviceMetadata || {}, null, 2)}</pre>
-                  </div>
-                </div>
-
-                <div>
-                  <p className="text-sm font-medium text-foreground">Firmware y telemetría</p>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    <Badge variant="outline">Firmware: {selectedDevice.firmwareVersion || "sin firmware"}</Badge>
-                    <Badge variant="outline">Status: {statusLabel(selectedDevice.status)}</Badge>
-                    <Badge variant="outline">Metadata keys: {String(Object.keys(selectedDevice.deviceMetadata || {}).length)}</Badge>
-                  </div>
-                </div>
-              </>
+              <DeviceEditorPanel
+                key={`${selectedDevice.id}:${scopedInstitutionId || "global"}`}
+                selectedDevice={selectedDevice}
+                scopedInstitutionId={scopedInstitutionId}
+                institutions={institutions.map((institution) => ({ id: institution.id, name: institution.name }))}
+                users={users.map((user) => ({
+                  id: user.id,
+                  fullName: user.fullName,
+                  email: user.email,
+                  educationalCenterId: user.educationalCenterId,
+                }))}
+                token={tokens?.accessToken}
+                onUpdated={(deviceId) => setSelectedDeviceId(deviceId)}
+              />
             )}
           </CardContent>
         </Card>

@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { apiEndpoints } from "@/lib/api/endpoints";
 import { apiRequest } from "@/lib/api/fetcher";
 import type { JsonObject, PaginatedResponse } from "@/lib/api/types";
-import type { DeviceRecord } from "@/features/devices/types";
+import type { DeviceRecord, UpdateDevicePayload } from "@/features/devices/types";
 
 function asRecord(value: unknown): JsonObject {
   if (value && typeof value === "object" && !Array.isArray(value)) return value as JsonObject;
@@ -40,6 +40,22 @@ export async function listDevices(token: string) {
     ...response,
     data: response.data.map(normalizeDevice),
   } as PaginatedResponse<DeviceRecord>;
+}
+
+export async function updateDevice(token: string, deviceId: string, payload: UpdateDevicePayload) {
+  const response = await apiRequest<unknown>(apiEndpoints.devices.byId(deviceId), {
+    method: "PATCH",
+    token,
+    body: {
+      ...(payload.name !== undefined ? { name: payload.name } : {}),
+      ...(payload.educationalCenterId !== undefined ? { educational_center_id: payload.educationalCenterId } : {}),
+      ...(payload.ownerUserId !== undefined ? { owner_user_id: payload.ownerUserId } : {}),
+      ...(payload.firmwareVersion !== undefined ? { firmware_version: payload.firmwareVersion } : {}),
+      ...(payload.status !== undefined ? { status: payload.status } : {}),
+    },
+  });
+
+  return normalizeDevice(response);
 }
 
 export function useDevices(token?: string) {

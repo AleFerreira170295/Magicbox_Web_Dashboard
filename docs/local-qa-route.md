@@ -99,6 +99,17 @@ curl http://127.0.0.1:3000/api/v1.0/ble-device \
   -H "Authorization: Bearer $TOKEN"
 ```
 
+### Patch operativo de dispositivo
+
+```bash
+TOKEN="<pegar access_token>"
+DEVICE_ID="<pegar id>"
+curl -X PATCH http://127.0.0.1:3000/api/v1.0/ble-device/$DEVICE_ID \
+  -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{"name":"<nombre>","status":"active"}'
+```
+
 Campos esperados por item en este slice:
 
 - `assignment_scope` (`home` | `institution`)
@@ -114,6 +125,7 @@ Semántica esperada:
 
 - si `assignment_scope = "home"`, el dispositivo debe tratarse como Home y no como dato faltante
 - en la UI `Dispositivos`, los casos Home deben verse con badge `Home` y copy explícito de que no requieren centro educativo
+- la pantalla debe permitir editar nombre, owner, firmware, status y alcance (Home/institución) cuando el backend lo autoriza
 
 ## Cuándo usar esta ruta
 
@@ -125,4 +137,4 @@ Usarla como smoke test después de cambios en:
 - listado/detalle de instituciones
 - previews de usuarios/dispositivos/grupos
 - UX del dashboard en `Instituciones`
-- contrato y pantalla de `Dispositivos`
+- contrato, edición mínima y pantalla de `Dispositivos`

@@ -18,3 +18,11 @@ export interface DeviceRecord {
   deletedAt?: string | null;
   raw: JsonObject;
 }
+
+export interface UpdateDevicePayload {
+  name?: string;
+  educationalCenterId?: string | null;
+  ownerUserId?: string | null;
+  firmwareVersion?: string | null;
+  status?: string | null;
+}
