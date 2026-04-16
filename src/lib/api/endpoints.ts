@@ -6,8 +6,8 @@ export const apiEndpoints = {
     refresh: "/auth/refresh-token",
   },
   users: {
-    list: "/users",
-    byId: (id: string) => `/users/${id}`,
+    list: "/user",
+    byId: (id: string) => `/user/${id}`,
   },
   institutions: {
     list: "/institutions",
