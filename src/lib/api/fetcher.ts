@@ -1,6 +1,13 @@
 import { appConfig } from "@/lib/api/config";
 import type { ApiErrorPayload, QueryParams } from "@/lib/api/types";
 
+type ApiEnvelope<T> = {
+  status?: string;
+  code?: number;
+  data?: T;
+  timestamp?: string;
+};
+
 export class ApiError extends Error {
   status: number;
   payload?: ApiErrorPayload;
@@ -69,6 +76,15 @@ export async function apiRequest<T>(
 
   if (!isJson) {
     return undefined as T;
+  }
+
+  if (
+    payload &&
+    typeof payload === "object" &&
+    "data" in payload &&
+    "status" in payload
+  ) {
+    return (payload as ApiEnvelope<T>).data as T;
   }
 
   return payload as T;
