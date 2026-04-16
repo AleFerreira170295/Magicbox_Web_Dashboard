@@ -37,3 +37,16 @@ export interface CreatePermissionPayload {
   actionId: string;
   educationalCenterId?: string | null;
 }
+
+export interface AccessAuditEventRecord {
+  id: string;
+  targetUserId: string;
+  actorUserId?: string | null;
+  entityType: string;
+  entityId?: string | null;
+  eventType: string;
+  educationalCenterId?: string | null;
+  payload: Record<string, unknown>;
+  createdAt?: string | null;
+  raw: JsonObject;
+}

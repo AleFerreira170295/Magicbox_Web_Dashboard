@@ -5,6 +5,7 @@ import type { JsonObject, PaginatedResponse } from "@/lib/api/types";
 import type {
   AccessActionRecord,
   AccessFeatureRecord,
+  AccessAuditEventRecord,
   CreatePermissionPayload,
   PermissionRecord,
 } from "@/features/access-control/types";
@@ -89,6 +90,26 @@ function normalizePermission(input: unknown): PermissionRecord {
   };
 }
 
+function normalizeAuditEvent(input: unknown): AccessAuditEventRecord {
+  const record = asRecord(input);
+  return {
+    id: readString(record, "id"),
+    targetUserId: readString(record, "target_user_id", "targetUserId"),
+    actorUserId: readString(record, "actor_user_id", "actorUserId") || null,
+    entityType: readString(record, "entity_type", "entityType") || "unknown",
+    entityId: readString(record, "entity_id", "entityId") || null,
+    eventType: readString(record, "event_type", "eventType") || "unknown",
+    educationalCenterId: readString(record, "educational_center_id", "educationalCenterId") || null,
+    payload: (record.payload && typeof record.payload === "object" && !Array.isArray(record.payload)
+      ? (record.payload as Record<string, unknown>)
+      : record.payload_json && typeof record.payload_json === "object" && !Array.isArray(record.payload_json)
+        ? (record.payload_json as Record<string, unknown>)
+        : {}),
+    createdAt: readString(record, "created_at", "createdAt") || null,
+    raw: record,
+  };
+}
+
 export async function listAccessActions(token: string) {
   const response = await apiRequest<unknown>(apiEndpoints.accessControl.actions, {
     token,
@@ -138,6 +159,15 @@ export async function deletePermission(token: string, permissionId: string) {
   });
 }
 
+export async function listAccessAuditEvents(token: string, userId: string, limit = 25) {
+  const response = await apiRequest<unknown>(apiEndpoints.accessControl.auditEvents, {
+    token,
+    searchParams: { user_id: userId, limit },
+  });
+
+  return Array.isArray(response) ? response.map(normalizeAuditEvent) : [];
+}
+
 export function useAccessActions(token?: string) {
   return useQuery({
     queryKey: ["access-actions", token],
@@ -159,5 +189,13 @@ export function usePermissions(token?: string) {
     queryKey: ["access-permissions", token],
     queryFn: () => listPermissions(token as string),
     enabled: Boolean(token),
+  });
+}
+
+export function useAccessAuditEvents(token?: string, userId?: string, limit = 25) {
+  return useQuery({
+    queryKey: ["access-audit-events", token, userId, limit],
+    queryFn: () => listAccessAuditEvents(token as string, userId as string, limit),
+    enabled: Boolean(token && userId),
   });
 }

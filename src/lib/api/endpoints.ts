@@ -22,6 +22,7 @@ export const apiEndpoints = {
     actionById: (id: string) => `/access-control/action/${id}`,
     permissions: "/access-control/permission",
     permissionById: (id: string) => `/access-control/permission/${id}`,
+    auditEvents: "/access-control/audit-event",
   },
   devices: {
     list: "/ble-device",

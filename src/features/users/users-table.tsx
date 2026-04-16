@@ -15,6 +15,7 @@ import {
   createPermission as createPermissionRequest,
   deletePermission as deletePermissionRequest,
   useAccessActions,
+  useAccessAuditEvents,
   useAccessFeatures,
   usePermissions,
 } from "@/features/access-control/api";
@@ -312,6 +313,8 @@ export function UsersTable() {
   const [permissionBusy, setPermissionBusy] = useState(false);
   const [aclScope, setAclScope] = useState<string>(GLOBAL_SCOPE);
 
+  const auditEventsQuery = useAccessAuditEvents(tokens?.accessToken, selectedUserId || undefined, 20);
+
   const rawUsers = useMemo(() => usersQuery.data?.data ?? [], [usersQuery.data?.data]);
   const institutions = useMemo(() => institutionsQuery.data?.data ?? [], [institutionsQuery.data?.data]);
   const permissions = useMemo(() => permissionsQuery.data?.data ?? [], [permissionsQuery.data?.data]);
@@ -454,7 +457,10 @@ export function UsersTable() {
   const createUserMutation = useMutation({
     mutationFn: (payload: CreateUserPayload) => createUser(tokens?.accessToken as string, payload),
     onSuccess: async (createdUser) => {
-      await queryClient.invalidateQueries({ queryKey: ["users"] });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["users"] }),
+        queryClient.invalidateQueries({ queryKey: ["access-audit-events"] }),
+      ]);
       setFeedback({ type: "success", message: "Usuario creado correctamente." });
       setMode("edit");
       setSelectedUserId(createdUser.id);
@@ -469,7 +475,10 @@ export function UsersTable() {
     mutationFn: ({ userId, payload }: { userId: string; payload: UpdateUserPayload }) =>
       updateUser(tokens?.accessToken as string, userId, payload),
     onSuccess: async (updatedUser) => {
-      await queryClient.invalidateQueries({ queryKey: ["users"] });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["users"] }),
+        queryClient.invalidateQueries({ queryKey: ["access-audit-events"] }),
+      ]);
       setFeedback({ type: "success", message: "Usuario actualizado correctamente." });
       setSelectedUserId(updatedUser.id);
       setForm(formFromUser(updatedUser));
@@ -538,6 +547,18 @@ export function UsersTable() {
     return institutionsById.get(educationalCenterId) || educationalCenterId;
   }
 
+  function formatAuditEventLabel(eventType: string) {
+    const labels: Record<string, string> = {
+      "role.assigned": "Rol asignado",
+      "role.removed": "Rol removido",
+      "permission.created": "Permiso creado",
+      "permission.updated": "Permiso actualizado",
+      "permission.deleted": "Permiso eliminado",
+      "permission.restored": "Permiso restaurado",
+    };
+    return labels[eventType] || eventType;
+  }
+
   function selectUser(user: UserRow) {
     setMode("edit");
     setSelectedUserId(user.id);
@@ -567,6 +588,7 @@ export function UsersTable() {
   async function refreshAclQueries() {
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: ["access-permissions"] }),
+      queryClient.invalidateQueries({ queryKey: ["access-audit-events"] }),
       queryClient.invalidateQueries({ queryKey: ["users"] }),
     ]);
   }
@@ -1101,6 +1123,9 @@ export function UsersTable() {
                         <p className="text-sm text-muted-foreground">
                           Aplicar un bundle agrega permisos base dentro del scope elegido.
                         </p>
+                        <div className="mt-2">
+                          <Badge variant="outline">Bundle target: {resolveScopeLabel(aclScope === GLOBAL_SCOPE ? null : aclScope)}</Badge>
+                        </div>
                       </div>
                       <div className="space-y-2">
                         <Label>Scope ACL</Label>
@@ -1177,6 +1202,53 @@ export function UsersTable() {
                     </div>
                   </div>
                 </>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
+            <CardHeader>
+              <CardTitle>Historial de acceso</CardTitle>
+              <CardDescription>
+                Últimos cambios de roles y permisos del usuario seleccionado.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {!selectedUser ? (
+                <div className="rounded-2xl bg-background/70 p-4 text-sm text-muted-foreground">
+                  Seleccioná un usuario para revisar el historial de ACL.
+                </div>
+              ) : auditEventsQuery.isLoading ? (
+                <div className="space-y-3">
+                  <Skeleton className="h-16 rounded-2xl" />
+                  <Skeleton className="h-16 rounded-2xl" />
+                </div>
+              ) : auditEventsQuery.error ? (
+                <div className="rounded-2xl border border-destructive/20 bg-destructive/5 p-4 text-sm text-destructive">
+                  {getErrorMessage(auditEventsQuery.error)}
+                </div>
+              ) : !auditEventsQuery.data || auditEventsQuery.data.length === 0 ? (
+                <div className="rounded-2xl bg-background/70 p-4 text-sm text-muted-foreground">
+                  Todavía no hay eventos auditados para este usuario.
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {auditEventsQuery.data.map((event) => (
+                    <div key={event.id} className="rounded-2xl border border-border bg-white/80 p-4">
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-medium text-foreground">{formatAuditEventLabel(event.eventType)}</p>
+                          <p className="text-xs text-muted-foreground">{formatDateTime(event.createdAt)}</p>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          <Badge variant="outline">{event.entityType}</Badge>
+                          <Badge variant="outline">{resolveScopeLabel(event.educationalCenterId)}</Badge>
+                          {event.entityId ? <Badge variant="outline">{event.entityId}</Badge> : null}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               )}
             </CardContent>
           </Card>
