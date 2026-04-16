@@ -422,13 +422,16 @@ Roles objetivo:
 - director
 - familia
 - investigador
-- administrador
+- administrador institucional
+- superadmin MagicBox
 
 Reglas:
 - aislamiento por institución
 - filtrado por grupo y estudiante
 - familia solo ve su/s estudiante/s
 - investigador accede a datasets anonimizados o pseudonimizados
+- administrador institucional gestiona su propia institución sin acceder a otras
+- superadmin MagicBox puede administrar usuarios, instituciones, permisos, perfiles operativos y estado global de dispositivos
 - exportaciones con plantillas de anonimización
 - minimizar PII en vistas analíticas por defecto
 - logs y exports auditados
@@ -445,6 +448,8 @@ Reglas:
 5. endpoint `GET /sync-sessions`
 6. exponer roles/permisos en `/auth/me`
 7. dashboard web base + módulos navegación
+8. definir separación explícita entre experiencia institución y consola superadmin
+9. diseñar módulos iniciales de usuarios, permisos e instituciones para superadmin
 
 ### P1
 8. exports raw/canonical/analytics
@@ -522,6 +527,11 @@ Implementado en este repo:
 - módulo base de partidas
 - módulo base de dispositivos
 - tipos TypeScript y API clients preparados para raw + normalized
+
+Nueva dirección confirmada de producto:
+- este frontend no será solo una vista para clientes o instituciones
+- también debe funcionar como consola de superadmin para alta de usuarios, permisos, instituciones, perfiles relevantes y monitoreo global de dispositivos/sincronización
+- la arquitectura y la navegación futura deben contemplar ambas capas desde el principio
 
 Limitaciones transparentes en esta iteración:
 - el backend actual aún no expone raw ingestion/query endpoints para la web

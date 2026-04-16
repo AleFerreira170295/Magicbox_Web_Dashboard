@@ -1,6 +1,6 @@
 # MagicBox Web Dashboard
 
-Plataforma web de MagicBox para explorar, auditar y analizar sincronizaciones, partidas y dispositivos sin perder trazabilidad del payload original.
+Plataforma web de MagicBox para explorar, auditar y analizar sincronizaciones, partidas y dispositivos sin perder trazabilidad del payload original. Además de la experiencia para clientes e instituciones, esta web también debe evolucionar como consola de superadmin para gestión operativa de usuarios, permisos, instituciones, perfiles y estado del parque de dispositivos.
 
 ## Estado de este primer entregable
 
@@ -78,6 +78,23 @@ Eso está documentado para ser reemplazado por claims/permisos reales del backen
 
 - `docs/architecture-blueprint.md`, diagnóstico, arquitectura end-to-end, modelo de datos, endpoints, compatibilidad, testing e implementación priorizada.
 
+## Alcance de producto que guía el diseño
+
+La web ya no debe pensarse solo como un dashboard para clientes. A partir de ahora el producto tiene dos capas claras:
+
+1. **Vista cliente / institución**
+   - seguimiento de datos, partidas, sincronizaciones y dispositivos
+   - lectura pedagógica e institucional
+   - acceso restringido por institución, grupo y perfil
+
+2. **Vista superadmin / operación MagicBox**
+   - alta y gestión de usuarios
+   - gestión de permisos y roles
+   - alta, edición y seguimiento de instituciones
+   - acceso a perfiles relevantes y metadata operativa
+   - monitoreo de estado de dispositivos y salud de sincronización
+   - panel global con métricas agregadas y alertas
+
 ## Módulos implementados
 
 - `/dashboard`
@@ -99,10 +116,20 @@ Esta versión ya consume o prepara consumo de:
 
 ## Próximo paso recomendado
 
-Implementar la capa backend lossless mínima:
+Además de completar la capa backend lossless mínima, la siguiente iteración de frontend debería separar explícitamente la navegación de institución y la navegación de superadmin.
+
+Backend / datos:
 
 1. `raw_ingestion_records`
 2. `raw_ingestion_fragments`
 3. `sync_sessions` canónica multi-origen
 4. endpoint de ingestión lossless idempotente
 5. endpoint de consultas de sincronización para web
+
+Frontend / producto:
+
+6. home de superadmin con métricas globales
+7. módulo de usuarios y permisos
+8. módulo de instituciones
+9. módulo de perfiles relevantes
+10. módulo de salud de dispositivos y sincronización
