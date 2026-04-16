@@ -46,6 +46,11 @@ Ruta base de prueba para desarrollo cruzado entre dashboard y backend local.
    - listado real de perfiles Home, no usuarios proxy
    - owner, institución, bindings y sesiones por perfil
    - panel de detalle con tarjetas y dispositivos vinculados
+14. Ir a `Health`.
+15. Verificar:
+   - estado real de `/health`, `/health/ready` y `/health/live`
+   - checks técnicos de readiness
+   - síntesis operativa combinando dispositivos, syncs, games y profiles
 
 ## Estado esperado actual de `Praecepta Education`
 
@@ -166,6 +171,26 @@ Semántica esperada:
 - la tabla debe enriquecer contexto mostrando institución y dispositivo a partir de los catálogos ya cargados en dashboard
 - el panel de detalle debe resumir jugadores, turnos recientes y tasa de éxito sin depender de inspección raw
 
+### Health técnico real del backend
+
+```bash
+curl http://127.0.0.1:3000/health
+curl http://127.0.0.1:3000/health/ready
+curl http://127.0.0.1:3000/health/live
+```
+
+Campos esperados en este slice:
+
+- `/health`: `status`, `service`, `version`, `environment`, `timestamp`
+- `/health/ready`: `status`, `checks`, `service`, `version`, `environment`, `timestamp`
+- `/health/live`: `status`, `uptime`, `service`, `version`, `timestamp`
+
+Semántica esperada:
+
+- la pantalla `Health` debe usar los endpoints de health reales del backend, no solo inferencias desde otros módulos
+- la UI debe combinar ese estado técnico con señales operativas ya visibles en dashboard
+- readiness degradado o checks no saludables deben verse como primera señal de alerta blanda
+
 ### Listado operativo de perfiles Home
 
 ```bash
@@ -233,3 +258,4 @@ Usarla como smoke test después de cambios en:
 - visibilidad operativa y pantalla de `Syncs`
 - pantalla operativa de `Partidas`
 - vista operativa real de `Profiles`
+- dashboard técnico-operativo de `Health`
