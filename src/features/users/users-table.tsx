@@ -277,16 +277,19 @@ function SelectField({
   value,
   onChange,
   children,
+  disabled = false,
 }: {
   value: string;
   onChange: (value: string) => void;
   children: React.ReactNode;
+  disabled?: boolean;
 }) {
   return (
     <select
       value={value}
+      disabled={disabled}
       onChange={(event) => onChange(event.target.value)}
-      className="flex h-10 w-full rounded-lg border border-input bg-white px-3 py-2 text-sm text-foreground shadow-sm outline-none transition focus-visible:ring-2 focus-visible:ring-ring"
+      className="flex h-10 w-full rounded-lg border border-input bg-white px-3 py-2 text-sm text-foreground shadow-sm outline-none transition focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60"
     >
       {children}
     </select>
@@ -329,6 +332,30 @@ export function UsersTable() {
   const scopedInstitutionId = institutions.length === 1 ? institutions[0]?.id || null : null;
   const scopedInstitutionName = scopedInstitutionId ? institutionsById.get(scopedInstitutionId) || scopedInstitutionId : null;
   const isInstitutionAdminView = Boolean(scopedInstitutionId && currentUser?.educationalCenterId === scopedInstitutionId);
+  const currentPermissionKeys = useMemo(() => new Set(currentUser?.permissions || []), [currentUser?.permissions]);
+  const hasGlobalAdminRole = currentUser?.roles.includes("admin") || false;
+  const hasResolvedCapabilities = hasGlobalAdminRole || currentPermissionKeys.size > 0;
+
+  function hasAnyPermission(...keys: string[]) {
+    if (hasGlobalAdminRole) return true;
+    if (!hasResolvedCapabilities) return true;
+    return keys.some((key) => currentPermissionKeys.has(key));
+  }
+
+  const canCreateUsers = hasAnyPermission("user:create");
+  const canUpdateUsers = hasAnyPermission("user:update");
+  const canDeleteUsers = hasAnyPermission("user:delete");
+  const canReadAcl = hasAnyPermission("access_control:read", "access-control:read");
+  const canManageAcl = hasAnyPermission(
+    "access_control:create",
+    "access_control:update",
+    "access_control:delete",
+    "access-control:create",
+    "access-control:update",
+    "access-control:delete",
+  );
+  const canApplyBundles = canUpdateUsers && canManageAcl;
+  const canSubmitForm = mode === "create" ? canCreateUsers : canUpdateUsers;
 
   const actionsById = useMemo(() => new Map(actions.map((action) => [action.id, action])), [actions]);
   const featuresById = useMemo(() => new Map(features.map((feature) => [feature.id, feature])), [features]);
@@ -538,6 +565,10 @@ export function UsersTable() {
 
   async function persistUserRoles(user: UserRow, roles: string[]) {
     if (!tokens?.accessToken) return;
+    if (!canUpdateUsers) {
+      setFeedback({ type: "error", message: "Tu acceso actual no permite persistir roles de usuario." });
+      return;
+    }
 
     await updateUserMutation.mutateAsync({
       userId: user.id,
@@ -613,6 +644,10 @@ export function UsersTable() {
 
   async function togglePermission(user: UserRow, featureCode: string, actionCode: string, scope: string = GLOBAL_SCOPE) {
     if (!tokens?.accessToken) return;
+    if (!canManageAcl) {
+      setFeedback({ type: "error", message: "Tu acceso actual no permite editar permisos ACL." });
+      return;
+    }
 
     const permissionEntries = getPermissionEntries(user, featureCode, actionCode, scope);
     const catalogEntry = catalogByKey.get(`${featureCode}:${actionCode}`);
@@ -651,6 +686,10 @@ export function UsersTable() {
 
   async function applyBundle(user: UserRow, bundle: (typeof roleBundles)[number], scope: string = GLOBAL_SCOPE) {
     if (!tokens?.accessToken) return;
+    if (!canApplyBundles) {
+      setFeedback({ type: "error", message: "Necesitás permiso para actualizar usuarios y ACL antes de aplicar bundles." });
+      return;
+    }
 
     const missingKeys = bundle.permissionKeys.filter((key) => !user.explicitPermissionKeys.includes(key));
     const nextRoles = Array.from(new Set([...user.roles, bundle.role])).sort();
@@ -696,6 +735,14 @@ export function UsersTable() {
     event.preventDefault();
     setFeedback(null);
 
+    if (!canSubmitForm) {
+      setFeedback({
+        type: "error",
+        message: mode === "create" ? "Tu acceso actual no permite crear usuarios." : "Tu acceso actual no permite editar usuarios.",
+      });
+      return;
+    }
+
     const result = buildPayload(form, mode);
     if (!result.payload) {
       setFeedback({ type: "error", message: result.error || "No se pudo preparar el payload." });
@@ -720,6 +767,10 @@ export function UsersTable() {
 
   async function handleDelete() {
     if (!selectedUser) return;
+    if (!canDeleteUsers) {
+      setFeedback({ type: "error", message: "Tu acceso actual no permite eliminar usuarios." });
+      return;
+    }
     if (!globalThis.confirm(`¿Eliminar a ${selectedUser.fullName}?`)) return;
     setFeedback(null);
     await deleteUserMutation.mutateAsync(selectedUser.id);
@@ -748,6 +799,7 @@ export function UsersTable() {
             </div>
             <Button
               type="button"
+              disabled={!canCreateUsers}
               onClick={() => {
                 setMode("create");
                 setSelectedUserId(null);
@@ -760,7 +812,7 @@ export function UsersTable() {
               }}
             >
               <UserPlus className="size-4" />
-              Nuevo usuario
+              {canCreateUsers ? "Nuevo usuario" : "Alta no disponible"}
             </Button>
           </div>
         }
@@ -780,6 +832,16 @@ export function UsersTable() {
                 ? `Estás operando sobre ${scopedInstitutionName}. El filtro, el alta y el scope ACL se anclan a esa institución para evitar desbordes.`
                 : "Cuando el backend devuelve un único alcance institucional, el módulo se adapta para trabajar dentro de ese perímetro."}
             </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Badge variant={canCreateUsers ? "secondary" : "outline"}>{canCreateUsers ? "alta habilitada" : "sin alta"}</Badge>
+              <Badge variant={canUpdateUsers ? "secondary" : "outline"}>{canUpdateUsers ? "edición habilitada" : "solo lectura"}</Badge>
+              <Badge variant={canManageAcl ? "secondary" : "outline"}>{canManageAcl ? "ACL editable" : "ACL bloqueada"}</Badge>
+            </div>
+            {!hasResolvedCapabilities ? (
+              <p className="mt-2 text-xs text-muted-foreground">
+                El perfil autenticado todavía no expone permisos detallados en `/auth/me`. La UI mantiene los controles visibles para no bloquear el flujo.
+              </p>
+            ) : null}
           </div>
           {scopedInstitutionName ? <Badge variant="outline">Institución activa: {scopedInstitutionName}</Badge> : null}
         </CardContent>
@@ -957,8 +1019,12 @@ export function UsersTable() {
               <CardTitle>{mode === "create" ? "Alta de usuario" : "Editar usuario"}</CardTitle>
               <CardDescription>
                 {mode === "create"
-                  ? "Alta inicial conectada al backend real."
-                  : "Datos base del usuario, vínculo institucional y tipo de acceso."}
+                  ? canCreateUsers
+                    ? "Alta inicial conectada al backend real."
+                    : "Tu perfil actual puede consultar usuarios, pero no dar de alta nuevos registros."
+                  : canUpdateUsers
+                    ? "Datos base del usuario, vínculo institucional y tipo de acceso."
+                    : "Vista de solo lectura para datos base del usuario y su contexto institucional."}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-5">
@@ -1009,29 +1075,29 @@ export function UsersTable() {
                     <div className="grid gap-4 md:grid-cols-2">
                       <div className="space-y-2">
                         <Label htmlFor="firstName">Nombre</Label>
-                        <Input id="firstName" value={form.firstName} onChange={(event) => updateFormField("firstName", event.target.value)} />
+                        <Input id="firstName" disabled={!canSubmitForm} value={form.firstName} onChange={(event) => updateFormField("firstName", event.target.value)} />
                       </div>
                       <div className="space-y-2">
                         <Label htmlFor="lastName">Apellido</Label>
-                        <Input id="lastName" value={form.lastName} onChange={(event) => updateFormField("lastName", event.target.value)} />
+                        <Input id="lastName" disabled={!canSubmitForm} value={form.lastName} onChange={(event) => updateFormField("lastName", event.target.value)} />
                       </div>
                       <div className="space-y-2 md:col-span-2">
                         <Label htmlFor="email">Email</Label>
-                        <Input id="email" type="email" value={form.email} onChange={(event) => updateFormField("email", event.target.value)} />
+                        <Input id="email" disabled={!canSubmitForm} type="email" value={form.email} onChange={(event) => updateFormField("email", event.target.value)} />
                       </div>
                       {mode === "create" ? (
                         <div className="space-y-2 md:col-span-2">
                           <Label htmlFor="password">Contraseña inicial</Label>
-                          <Input id="password" type="password" value={form.password} onChange={(event) => updateFormField("password", event.target.value)} />
+                          <Input id="password" disabled={!canSubmitForm} type="password" value={form.password} onChange={(event) => updateFormField("password", event.target.value)} />
                         </div>
                       ) : null}
                       <div className="space-y-2">
                         <Label htmlFor="phoneNumber">Teléfono</Label>
-                        <Input id="phoneNumber" value={form.phoneNumber} onChange={(event) => updateFormField("phoneNumber", event.target.value)} />
+                        <Input id="phoneNumber" disabled={!canSubmitForm} value={form.phoneNumber} onChange={(event) => updateFormField("phoneNumber", event.target.value)} />
                       </div>
                       <div className="space-y-2">
                         <Label htmlFor="userType">Tipo de usuario</Label>
-                        <SelectField value={form.userType} onChange={(value) => updateFormField("userType", value as UserFormState["userType"])}>
+                        <SelectField disabled={!canSubmitForm} value={form.userType} onChange={(value) => updateFormField("userType", value as UserFormState["userType"])}>
                           {userTypeOptions.map((option) => (
                             <option key={option.value} value={option.value}>
                               {option.label}
@@ -1050,6 +1116,7 @@ export function UsersTable() {
                                 type="button"
                                 size="sm"
                                 variant={active ? "default" : "outline"}
+                                disabled={!canUpdateUsers}
                                 onClick={() => toggleFormRole(bundle.role)}
                               >
                                 {bundle.label}
@@ -1063,7 +1130,7 @@ export function UsersTable() {
                       </div>
                       <div className="space-y-2 md:col-span-2">
                         <Label htmlFor="educationalCenterId">Institución</Label>
-                        <SelectField value={form.educationalCenterId} onChange={(value) => updateFormField("educationalCenterId", value)}>
+                        <SelectField disabled={!canSubmitForm} value={form.educationalCenterId} onChange={(value) => updateFormField("educationalCenterId", value)}>
                           {!scopedInstitutionId ? <option value="">Sin institución</option> : null}
                           {institutions.map((institution) => (
                             <option key={institution.id} value={institution.id}>
@@ -1079,7 +1146,7 @@ export function UsersTable() {
                       </div>
                       <div className="space-y-2 md:col-span-2">
                         <Label htmlFor="imageUrl">URL de imagen</Label>
-                        <Input id="imageUrl" value={form.imageUrl} onChange={(event) => updateFormField("imageUrl", event.target.value)} placeholder="https://..." />
+                        <Input id="imageUrl" disabled={!canSubmitForm} value={form.imageUrl} onChange={(event) => updateFormField("imageUrl", event.target.value)} placeholder="https://..." />
                       </div>
                     </div>
 
@@ -1088,34 +1155,34 @@ export function UsersTable() {
                       <div className="grid gap-4 md:grid-cols-2">
                         <div className="space-y-2 md:col-span-2">
                           <Label htmlFor="addressFirstLine">Calle</Label>
-                          <Input id="addressFirstLine" value={form.addressFirstLine} onChange={(event) => updateFormField("addressFirstLine", event.target.value)} />
+                          <Input id="addressFirstLine" disabled={!canSubmitForm} value={form.addressFirstLine} onChange={(event) => updateFormField("addressFirstLine", event.target.value)} />
                         </div>
                         <div className="space-y-2 md:col-span-2">
                           <Label htmlFor="addressSecondLine">Complemento</Label>
-                          <Input id="addressSecondLine" value={form.addressSecondLine} onChange={(event) => updateFormField("addressSecondLine", event.target.value)} />
+                          <Input id="addressSecondLine" disabled={!canSubmitForm} value={form.addressSecondLine} onChange={(event) => updateFormField("addressSecondLine", event.target.value)} />
                         </div>
                         <div className="space-y-2">
                           <Label htmlFor="city">Ciudad</Label>
-                          <Input id="city" value={form.city} onChange={(event) => updateFormField("city", event.target.value)} />
+                          <Input id="city" disabled={!canSubmitForm} value={form.city} onChange={(event) => updateFormField("city", event.target.value)} />
                         </div>
                         <div className="space-y-2">
                           <Label htmlFor="countryCode">País (código)</Label>
-                          <Input id="countryCode" value={form.countryCode} onChange={(event) => updateFormField("countryCode", event.target.value)} placeholder="UY" maxLength={2} />
+                          <Input id="countryCode" disabled={!canSubmitForm} value={form.countryCode} onChange={(event) => updateFormField("countryCode", event.target.value)} placeholder="UY" maxLength={2} />
                         </div>
                         <div className="space-y-2">
                           <Label htmlFor="state">Departamento / estado</Label>
-                          <Input id="state" value={form.state} onChange={(event) => updateFormField("state", event.target.value)} />
+                          <Input id="state" disabled={!canSubmitForm} value={form.state} onChange={(event) => updateFormField("state", event.target.value)} />
                         </div>
                         <div className="space-y-2">
                           <Label htmlFor="postalCode">Código postal</Label>
-                          <Input id="postalCode" value={form.postalCode} onChange={(event) => updateFormField("postalCode", event.target.value)} />
+                          <Input id="postalCode" disabled={!canSubmitForm} value={form.postalCode} onChange={(event) => updateFormField("postalCode", event.target.value)} />
                         </div>
                       </div>
                     </div>
 
                     <div className="flex flex-wrap gap-3">
-                      <Button type="submit" disabled={isSaving || !tokens?.accessToken}>
-                        {mode === "create" ? "Crear usuario" : "Guardar cambios"}
+                      <Button type="submit" disabled={isSaving || !tokens?.accessToken || !canSubmitForm}>
+                        {mode === "create" ? (canCreateUsers ? "Crear usuario" : "Alta bloqueada") : canUpdateUsers ? "Guardar cambios" : "Edición bloqueada"}
                       </Button>
                       {mode === "create" ? (
                         <Button
@@ -1129,11 +1196,13 @@ export function UsersTable() {
                         >
                           Cancelar
                         </Button>
-                      ) : (
+                      ) : canDeleteUsers ? (
                         <Button type="button" variant="destructive" disabled={isSaving || !selectedUser} onClick={handleDelete}>
                           <Trash2 className="size-4" />
                           Eliminar
                         </Button>
+                      ) : (
+                        <Badge variant="outline">Sin permiso para eliminar</Badge>
                       )}
                     </div>
                   </form>
@@ -1153,6 +1222,10 @@ export function UsersTable() {
               {!selectedUser ? (
                 <div className="rounded-2xl bg-background/70 p-4 text-sm text-muted-foreground">
                   Seleccioná un usuario para revisar o ajustar sus permisos.
+                </div>
+              ) : !canReadAcl && !canManageAcl ? (
+                <div className="rounded-2xl bg-background/70 p-4 text-sm text-muted-foreground">
+                  Tu acceso actual permite revisar el padrón, pero no consultar ni editar ACL detallada.
                 </div>
               ) : aclUnavailable ? (
                 <div className="rounded-2xl border border-destructive/20 bg-destructive/5 p-4 text-sm text-destructive">
@@ -1179,7 +1252,7 @@ export function UsersTable() {
                       </div>
                       <div className="space-y-2">
                         <Label>Scope ACL</Label>
-                        <SelectField value={aclScope} onChange={setAclScope}>
+                        <SelectField disabled={!canManageAcl} value={aclScope} onChange={setAclScope}>
                           {!scopedInstitutionId ? <option value={GLOBAL_SCOPE}>Global</option> : null}
                           {institutions.map((institution) => (
                             <option key={institution.id} value={institution.id}>
@@ -1196,7 +1269,7 @@ export function UsersTable() {
                           type="button"
                           size="sm"
                           variant={hasBundle(selectedUser, bundle, aclScope) ? "default" : "outline"}
-                          disabled={permissionBusy}
+                          disabled={permissionBusy || !canApplyBundles}
                           onClick={() => applyBundle(selectedUser, bundle, aclScope)}
                         >
                           {bundle.label}
@@ -1238,7 +1311,7 @@ export function UsersTable() {
                                     <input
                                       type="checkbox"
                                       checked={checked}
-                                      disabled={permissionBusy}
+                                      disabled={permissionBusy || !canManageAcl}
                                       onChange={() => togglePermission(selectedUser, feature.featureCode, action.code, aclScope)}
                                     />
                                     <span>{action.code}</span>
