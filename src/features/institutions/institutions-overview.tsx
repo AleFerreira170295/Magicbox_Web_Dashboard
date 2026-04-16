@@ -76,6 +76,8 @@ type InstitutionFormState = {
 type InstitutionRow = InstitutionRecord & {
   userCount: number;
   deviceCount: number;
+  classGroupCount: number;
+  studentCount: number;
   linkedUserNames: string[];
   linkedDeviceNames: string[];
   needsReview: boolean;
@@ -236,12 +238,18 @@ export function InstitutionsOverview() {
     return institutions.map((institution) => {
       const linkedUserNames = usersByInstitutionId.get(institution.id) || [];
       const linkedDeviceNames = devicesByInstitutionId.get(institution.id) || [];
-      const needsReview = !institution.url || !institution.phoneNumber || !institution.address?.addressFirstLine;
+      const userCount = institution.operationalSummary?.userCount ?? linkedUserNames.length;
+      const deviceCount = institution.operationalSummary?.deviceCount ?? linkedDeviceNames.length;
+      const classGroupCount = institution.operationalSummary?.classGroupCount ?? 0;
+      const studentCount = institution.operationalSummary?.studentCount ?? 0;
+      const needsReview = institution.operationalSummary?.needsReview ?? (!institution.url || !institution.phoneNumber || !institution.address?.addressFirstLine);
 
       return {
         ...institution,
-        userCount: linkedUserNames.length,
-        deviceCount: linkedDeviceNames.length,
+        userCount,
+        deviceCount,
+        classGroupCount,
+        studentCount,
         linkedUserNames,
         linkedDeviceNames,
         needsReview,
@@ -279,6 +287,8 @@ export function InstitutionsOverview() {
       totalInstitutions: institutionRows.length,
       totalUsersLinked: institutionRows.reduce((acc, item) => acc + item.userCount, 0),
       totalDevicesLinked: institutionRows.reduce((acc, item) => acc + item.deviceCount, 0),
+      totalClassesLinked: institutionRows.reduce((acc, item) => acc + item.classGroupCount, 0),
+      totalStudentsLinked: institutionRows.reduce((acc, item) => acc + item.studentCount, 0),
       reviewInstitutions: institutionRows.filter((item) => item.needsReview).length,
     };
   }, [institutionRows]);
@@ -404,7 +414,7 @@ export function InstitutionsOverview() {
         </CardContent>
       </Card>
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
         {institutionsQuery.isLoading ? (
           Array.from({ length: 4 }).map((_, index) => <Skeleton key={index} className="h-32 rounded-2xl" />)
         ) : (
@@ -426,6 +436,18 @@ export function InstitutionsOverview() {
               value={String(metrics.totalDevicesLinked)}
               hint="Ayuda a leer despliegue físico y cobertura operativa por cliente."
               icon={Smartphone}
+            />
+            <SummaryCard
+              label="Grupos vinculados"
+              value={String(metrics.totalClassesLinked)}
+              hint="Ahora sale del backend compartido, útil para leer profundidad pedagógica por institución."
+              icon={Building2}
+            />
+            <SummaryCard
+              label="Estudiantes vinculados"
+              value={String(metrics.totalStudentsLinked)}
+              hint="También viene consolidado desde el backend para no depender solo del dashboard."
+              icon={Users}
             />
             <SummaryCard
               label="Necesitan revisión"
@@ -560,6 +582,8 @@ export function InstitutionsOverview() {
                       <div className="mt-3 grid gap-2 text-xs text-muted-foreground sm:grid-cols-2">
                         <p>Usuarios vinculados: {selectedInstitution.userCount}</p>
                         <p>Dispositivos vinculados: {selectedInstitution.deviceCount}</p>
+                        <p>Grupos vinculados: {selectedInstitution.classGroupCount}</p>
+                        <p>Estudiantes vinculados: {selectedInstitution.studentCount}</p>
                         <p>Creada: {formatDateTime(selectedInstitution.createdAt)}</p>
                         <p>Actualizada: {formatDateTime(selectedInstitution.updatedAt)}</p>
                       </div>
@@ -711,6 +735,19 @@ export function InstitutionsOverview() {
                       ) : (
                         <Badge variant="outline">sin dispositivos vinculados</Badge>
                       )}
+                    </div>
+                  </div>
+
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="rounded-2xl bg-background/70 p-4">
+                      <p className="text-xs uppercase tracking-[0.24em] text-muted-foreground">grupos</p>
+                      <p className="mt-2 text-2xl font-semibold text-foreground">{selectedInstitution.classGroupCount}</p>
+                      <p className="mt-1 text-sm text-muted-foreground">Conteo expuesto por el backend compartido.</p>
+                    </div>
+                    <div className="rounded-2xl bg-background/70 p-4">
+                      <p className="text-xs uppercase tracking-[0.24em] text-muted-foreground">estudiantes</p>
+                      <p className="mt-2 text-2xl font-semibold text-foreground">{selectedInstitution.studentCount}</p>
+                      <p className="mt-1 text-sm text-muted-foreground">Sirve para entender el peso real de la institución.</p>
                     </div>
                   </div>
                 </>

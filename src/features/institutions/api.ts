@@ -5,6 +5,7 @@ import type { JsonObject, PaginatedResponse } from "@/lib/api/types";
 import type {
   CreateInstitutionPayload,
   InstitutionAddress,
+  InstitutionOperationalSummary,
   InstitutionRecord,
   UpdateInstitutionPayload,
 } from "@/features/institutions/types";
@@ -53,6 +54,20 @@ function serializeAddress(address: InstitutionAddress) {
   };
 }
 
+function normalizeOperationalSummary(value: unknown): InstitutionOperationalSummary | null {
+  const record = asRecord(value);
+  const entries = Object.keys(record);
+  if (entries.length === 0) return null;
+
+  return {
+    userCount: Number(record.user_count ?? record.userCount ?? 0),
+    deviceCount: Number(record.device_count ?? record.deviceCount ?? 0),
+    classGroupCount: Number(record.class_group_count ?? record.classGroupCount ?? 0),
+    studentCount: Number(record.student_count ?? record.studentCount ?? 0),
+    needsReview: Boolean(record.needs_review ?? record.needsReview ?? false),
+  };
+}
+
 function normalizeInstitution(input: unknown): InstitutionRecord {
   const record = asRecord(input);
   const name =
@@ -61,6 +76,11 @@ function normalizeInstitution(input: unknown): InstitutionRecord {
   const address = normalizeAddress(record.address);
   const deletedAt = readString(record, "deleted_at", "deletedAt") || null;
   const email = readString(record, "email", "contact_email", "contactEmail") || "sin-email";
+  const operationalSummary =
+    normalizeOperationalSummary(record.operational_summary) ||
+    normalizeOperationalSummary(record.operationalSummary) ||
+    normalizeOperationalSummary(record.summary) ||
+    normalizeOperationalSummary(record.stats);
 
   return {
     id: readString(record, "id", "institution_id", "educational_center_id") || name,
@@ -78,6 +98,7 @@ function normalizeInstitution(input: unknown): InstitutionRecord {
     createdAt: readString(record, "created_at", "createdAt") || null,
     updatedAt: readString(record, "updated_at", "updatedAt") || null,
     deletedAt,
+    operationalSummary,
     raw: record,
   };
 }

@@ -9,6 +9,14 @@ export interface InstitutionAddress {
   postalCode?: string | null;
 }
 
+export interface InstitutionOperationalSummary {
+  userCount: number;
+  deviceCount: number;
+  classGroupCount: number;
+  studentCount: number;
+  needsReview: boolean;
+}
+
 export interface InstitutionRecord {
   id: string;
   name: string;
@@ -25,6 +33,7 @@ export interface InstitutionRecord {
   createdAt?: string | null;
   updatedAt?: string | null;
   deletedAt?: string | null;
+  operationalSummary?: InstitutionOperationalSummary | null;
   raw: JsonObject;
 }
 
