@@ -7,7 +7,7 @@ import { useAuth } from "@/features/auth/auth-context";
 export function DashboardHome() {
   const { user } = useAuth();
 
-  if (user?.roles.includes("admin")) {
+  if (user?.roles.includes("admin") || user?.roles.includes("institution-admin") || user?.roles.includes("director")) {
     return <SuperadminDashboard />;
   }
 

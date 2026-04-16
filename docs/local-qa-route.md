@@ -19,40 +19,45 @@ Ruta base de prueba para desarrollo cruzado entre dashboard y backend local.
 
 1. Abrir `http://127.0.0.1:3001/login`
 2. Iniciar sesión con el usuario QA principal.
-3. Ir a `Instituciones`.
-4. Abrir `Praecepta Education`.
-5. Verificar:
+3. Ir a `Dashboard`.
+4. Verificar:
+   - resumen operativo real de usuarios, instituciones, devices, syncs, games y health
+   - accesos rápidos a módulos ya aterrizados
+   - foco de revisión con señales blandas (instituciones con review, devices sin estado, syncs sin raw, profiles sin binding)
+5. Ir a `Instituciones`.
+6. Abrir `Praecepta Education`.
+7. Verificar:
    - summary institucional
    - previews de usuarios
    - previews de dispositivos
    - previews de grupos
-6. Ir a `Dispositivos`.
-7. Verificar:
+8. Ir a `Dispositivos`.
+9. Verificar:
    - tabla operativa con institución, owner y status
    - selección de detalle operativo
    - metadata cruda por dispositivo
-8. Ir a `Syncs`.
-9. Verificar:
+10. Ir a `Syncs`.
+11. Verificar:
    - tabla operativa con sesiones visibles para dashboard
    - selección de detalle de sync
    - payload raw más reciente y participantes proyectados
-10. Ir a `Partidas`.
-11. Verificar:
+12. Ir a `Partidas`.
+13. Verificar:
    - métricas operativas de partidas, jugadores y turnos
    - filtro por institución y modo de jugadores
    - panel de detalle con últimos turnos y composición manual/registrada
-12. Ir a `Profiles`.
-13. Verificar:
+14. Ir a `Profiles`.
+15. Verificar:
    - listado real de perfiles Home, no usuarios proxy
    - owner, institución, bindings y sesiones por perfil
    - panel de detalle con tarjetas y dispositivos vinculados
-14. Ir a `Health`.
-15. Verificar:
+16. Ir a `Health`.
+17. Verificar:
    - estado real de `/health`, `/health/ready` y `/health/live`
    - checks técnicos de readiness
    - síntesis operativa combinando dispositivos, syncs, games y profiles
-16. Ir a `Settings`.
-17. Verificar:
+18. Ir a `Settings`.
+19. Verificar:
    - runtime real del backend y entorno actual
    - catálogo ACL real de features y actions
    - política OTA efectiva leída desde backend
@@ -176,6 +181,14 @@ Semántica esperada:
 - la tabla debe enriquecer contexto mostrando institución y dispositivo a partir de los catálogos ya cargados en dashboard
 - el panel de detalle debe resumir jugadores, turnos recientes y tasa de éxito sin depender de inspección raw
 
+### Home operativa del dashboard
+
+Semántica esperada en este slice:
+
+- `/dashboard` ya no debe hablar de módulos "próximos" que hoy ya existen
+- debe resumir datos reales de users, institutions, devices, syncs, games, profiles y health
+- institution-admin y director deben caer en esta home operativa, no en la home docente
+
 ### Settings read-only con configuración efectiva
 
 ```bash
@@ -287,3 +300,4 @@ Usarla como smoke test después de cambios en:
 - vista operativa real de `Profiles`
 - dashboard técnico-operativo de `Health`
 - centro read-only real de `Settings`
+- home operativa real de `/dashboard`
