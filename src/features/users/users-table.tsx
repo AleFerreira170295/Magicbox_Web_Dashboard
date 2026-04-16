@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { KeyRound, Phone, Search, ShieldCheck, Trash2, UserPlus, Users } from "lucide-react";
 import { SectionHeader } from "@/components/section-header";
@@ -294,7 +294,7 @@ function SelectField({
 }
 
 export function UsersTable() {
-  const { tokens } = useAuth();
+  const { tokens, user: currentUser } = useAuth();
   const queryClient = useQueryClient();
   const usersQuery = useUsers(tokens?.accessToken);
   const institutionsQuery = useInstitutions(tokens?.accessToken);
@@ -325,6 +325,10 @@ export function UsersTable() {
     () => new Map(institutions.map((institution) => [institution.id, institution.name])),
     [institutions],
   );
+
+  const scopedInstitutionId = institutions.length === 1 ? institutions[0]?.id || null : null;
+  const scopedInstitutionName = scopedInstitutionId ? institutionsById.get(scopedInstitutionId) || scopedInstitutionId : null;
+  const isInstitutionAdminView = Boolean(scopedInstitutionId && currentUser?.educationalCenterId === scopedInstitutionId);
 
   const actionsById = useMemo(() => new Map(actions.map((action) => [action.id, action])), [actions]);
   const featuresById = useMemo(() => new Map(features.map((feature) => [feature.id, feature])), [features]);
@@ -390,6 +394,20 @@ export function UsersTable() {
     () => users.find((item) => item.id === selectedUserId) || null,
     [selectedUserId, users],
   );
+
+  useEffect(() => {
+    if (!scopedInstitutionId) return;
+    setInstitutionFilter((current) => current || scopedInstitutionId);
+    setAclScope((current) => (current === GLOBAL_SCOPE ? scopedInstitutionId : current || scopedInstitutionId));
+    setForm((current) =>
+      current.educationalCenterId
+        ? current
+        : {
+            ...current,
+            educationalCenterId: scopedInstitutionId,
+          },
+    );
+  }, [scopedInstitutionId]);
 
   const availableRoles = useMemo(
     () => Array.from(new Set(users.flatMap((user) => user.inferredRoles))).sort(),
@@ -562,7 +580,7 @@ export function UsersTable() {
   function selectUser(user: UserRow) {
     setMode("edit");
     setSelectedUserId(user.id);
-    setAclScope(user.educationalCenterId || GLOBAL_SCOPE);
+    setAclScope(user.educationalCenterId || scopedInstitutionId || GLOBAL_SCOPE);
     setForm(formFromUser(user));
     setFeedback(null);
   }
@@ -710,9 +728,13 @@ export function UsersTable() {
   return (
     <div className="space-y-6">
       <SectionHeader
-        eyebrow="Superadmin"
+        eyebrow={isInstitutionAdminView ? "Institution admin" : "Superadmin"}
         title="Usuarios"
-        description="La vista ahora conecta usuarios, roles persistidos y permisos ACL explícitos desde el backend real." 
+        description={
+          isInstitutionAdminView
+            ? `La vista quedó adaptada a operación institution-admin sobre ${scopedInstitutionName}. Los listados y acciones ya respetan el scope backend.`
+            : "La vista ahora conecta usuarios, roles persistidos y permisos ACL explícitos desde el backend real."
+        }
         actions={
           <div className="flex flex-col items-stretch gap-3 md:flex-row md:items-center">
             <div className="relative min-w-64">
@@ -729,8 +751,11 @@ export function UsersTable() {
               onClick={() => {
                 setMode("create");
                 setSelectedUserId(null);
-                setAclScope(GLOBAL_SCOPE);
-                setForm(emptyFormState());
+                setAclScope(scopedInstitutionId || GLOBAL_SCOPE);
+                setForm({
+                  ...emptyFormState(),
+                  educationalCenterId: scopedInstitutionId || "",
+                });
                 setFeedback(null);
               }}
             >
@@ -740,6 +765,25 @@ export function UsersTable() {
           </div>
         }
       />
+
+      <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
+        <CardContent className="flex flex-wrap items-center justify-between gap-4 p-5">
+          <div>
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="text-sm font-medium text-foreground">Alcance operativo</p>
+              <Badge variant={isInstitutionAdminView ? "secondary" : "outline"}>
+                {isInstitutionAdminView ? "institution-admin" : "multi-institución / global"}
+              </Badge>
+            </div>
+            <p className="mt-2 text-sm text-muted-foreground">
+              {isInstitutionAdminView && scopedInstitutionName
+                ? `Estás operando sobre ${scopedInstitutionName}. El filtro, el alta y el scope ACL se anclan a esa institución para evitar desbordes.`
+                : "Cuando el backend devuelve un único alcance institucional, el módulo se adapta para trabajar dentro de ese perímetro."}
+            </p>
+          </div>
+          {scopedInstitutionName ? <Badge variant="outline">Institución activa: {scopedInstitutionName}</Badge> : null}
+        </CardContent>
+      </Card>
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         {usersQuery.isLoading ? (
@@ -779,7 +823,7 @@ export function UsersTable() {
           <div className="space-y-2">
             <Label>Institución</Label>
             <SelectField value={institutionFilter} onChange={setInstitutionFilter}>
-              <option value="">Todas</option>
+              {!scopedInstitutionId ? <option value="">Todas</option> : null}
               {institutions.map((institution) => (
                 <option key={institution.id} value={institution.id}>
                   {institution.name}
@@ -810,7 +854,7 @@ export function UsersTable() {
               type="button"
               variant="outline"
               onClick={() => {
-                setInstitutionFilter("");
+                setInstitutionFilter(scopedInstitutionId || "");
                 setRoleFilter("");
                 setReviewOnly(false);
                 setQuery("");
@@ -1020,13 +1064,18 @@ export function UsersTable() {
                       <div className="space-y-2 md:col-span-2">
                         <Label htmlFor="educationalCenterId">Institución</Label>
                         <SelectField value={form.educationalCenterId} onChange={(value) => updateFormField("educationalCenterId", value)}>
-                          <option value="">Sin institución</option>
+                          {!scopedInstitutionId ? <option value="">Sin institución</option> : null}
                           {institutions.map((institution) => (
                             <option key={institution.id} value={institution.id}>
                               {institution.name}
                             </option>
                           ))}
                         </SelectField>
+                        <p className="text-xs text-muted-foreground">
+                          {scopedInstitutionName
+                            ? `En este modo, las altas y ediciones quedan ancladas a ${scopedInstitutionName}.`
+                            : "Podés dejar el usuario sin institución o asignarlo explícitamente."}
+                        </p>
                       </div>
                       <div className="space-y-2 md:col-span-2">
                         <Label htmlFor="imageUrl">URL de imagen</Label>
@@ -1123,14 +1172,15 @@ export function UsersTable() {
                         <p className="text-sm text-muted-foreground">
                           Aplicar un bundle agrega permisos base dentro del scope elegido.
                         </p>
-                        <div className="mt-2">
+                        <div className="mt-2 flex flex-wrap gap-2">
                           <Badge variant="outline">Bundle target: {resolveScopeLabel(aclScope === GLOBAL_SCOPE ? null : aclScope)}</Badge>
+                          {isInstitutionAdminView ? <Badge variant="secondary">Scope bloqueado a institución</Badge> : null}
                         </div>
                       </div>
                       <div className="space-y-2">
                         <Label>Scope ACL</Label>
                         <SelectField value={aclScope} onChange={setAclScope}>
-                          <option value={GLOBAL_SCOPE}>Global</option>
+                          {!scopedInstitutionId ? <option value={GLOBAL_SCOPE}>Global</option> : null}
                           {institutions.map((institution) => (
                             <option key={institution.id} value={institution.id}>
                               {institution.name}
