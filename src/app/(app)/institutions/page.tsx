@@ -3,7 +3,7 @@ import { InstitutionsOverview } from "@/features/institutions/institutions-overv
 
 export default function InstitutionsPage() {
   return (
-    <RoleGuard allowedRoles={["admin"]}>
+    <RoleGuard allowedRoles={["admin", "institution-admin", "director"]}>
       <InstitutionsOverview />
     </RoleGuard>
   );

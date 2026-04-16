@@ -10,8 +10,8 @@ export const apiEndpoints = {
     byId: (id: string) => `/user/${id}`,
   },
   institutions: {
-    list: "/institutions",
-    byId: (id: string) => `/institutions/${id}`,
+    list: "/educational-center",
+    byId: (id: string) => `/educational-center/${id}`,
   },
   features: {
     list: "/feature",
