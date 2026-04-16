@@ -31,6 +31,11 @@ Ruta base de prueba para desarrollo cruzado entre dashboard y backend local.
    - tabla operativa con institución, owner y status
    - selección de detalle operativo
    - metadata cruda por dispositivo
+8. Ir a `Syncs`.
+9. Verificar:
+   - tabla operativa con sesiones visibles para dashboard
+   - selección de detalle de sync
+   - payload raw más reciente y participantes proyectados
 
 ## Estado esperado actual de `Praecepta Education`
 
@@ -127,6 +132,31 @@ Semántica esperada:
 - en la UI `Dispositivos`, los casos Home deben verse con badge `Home` y copy explícito de que no requieren centro educativo
 - la pantalla debe permitir editar nombre, owner, firmware, status y alcance (Home/institución) cuando el backend lo autoriza
 
+### Listado operativo de syncs
+
+```bash
+TOKEN="<pegar access_token>"
+curl 'http://127.0.0.1:3000/api/v1.0/sync-sessions?page=1&limit=5' \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+Campos esperados por item en este slice:
+
+- `user_id`
+- `sync_id`
+- `ble_device_id`
+- `device_id`
+- `firmware_version`
+- `raw_record_count`
+- `participants`
+- `raw_payload`
+
+Semántica esperada:
+
+- si el actor tiene permisos globales sobre `ble_device:read`, `GET /sync-sessions` debe comportarse como vista operativa amplia y no solo como historial propio
+- si el actor solo tiene alcance institucional, la lista debe quedar limitada a syncs de dispositivos dentro de sus instituciones permitidas
+- la UI `Syncs` debe permitir buscar por sync, dispositivo, origen o usuario y mostrar un panel de detalle con participantes y raw reciente
+
 ## Cuándo usar esta ruta
 
 Usarla como smoke test después de cambios en:
@@ -138,3 +168,4 @@ Usarla como smoke test después de cambios en:
 - previews de usuarios/dispositivos/grupos
 - UX del dashboard en `Instituciones`
 - contrato, edición mínima y pantalla de `Dispositivos`
+- visibilidad operativa y pantalla de `Syncs`

@@ -39,6 +39,7 @@ export interface SyncParticipant {
 
 export interface SyncSessionRecord {
   id: string;
+  userId?: string | null;
   syncId?: string | null;
   source?: string | null;
   sourceType?: SyncSourceType | null;
@@ -46,6 +47,9 @@ export interface SyncSessionRecord {
   status?: string | null;
   bleDeviceId?: string | null;
   deviceId?: string | null;
+  firmwareVersion?: string | null;
+  appVersion?: string | null;
+  payloadSchemaVersion?: string | null;
   gameId?: string | number | null;
   deckName?: string | null;
   totalCards?: number | null;
@@ -60,8 +64,14 @@ export interface SyncSessionRecord {
   capturedAt?: string | null;
   participants: SyncParticipant[];
   rawRecordIds: string[];
+  rawRecordCount?: number | null;
+  lastRawRecordId?: string | null;
   rawPayload?: JsonObject | null;
   fragmentCount?: number | null;
+  rawFragmentCount?: number | null;
   additionalFields: JsonObject;
+  receivedAt?: string | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
   raw: JsonObject;
 }
