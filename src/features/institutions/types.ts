@@ -17,6 +17,31 @@ export interface InstitutionOperationalSummary {
   needsReview: boolean;
 }
 
+export interface InstitutionUserPreview {
+  id: string;
+  fullName: string;
+  email: string;
+  userType: string;
+}
+
+export interface InstitutionDevicePreview {
+  id: string;
+  deviceId: string;
+  name: string;
+}
+
+export interface InstitutionClassGroupPreview {
+  id: string;
+  name: string;
+  code: string;
+}
+
+export interface InstitutionOperationalPreview {
+  users: InstitutionUserPreview[];
+  devices: InstitutionDevicePreview[];
+  classGroups: InstitutionClassGroupPreview[];
+}
+
 export interface InstitutionRecord {
   id: string;
   name: string;
@@ -34,6 +59,7 @@ export interface InstitutionRecord {
   updatedAt?: string | null;
   deletedAt?: string | null;
   operationalSummary?: InstitutionOperationalSummary | null;
+  operationalPreview?: InstitutionOperationalPreview | null;
   raw: JsonObject;
 }
 

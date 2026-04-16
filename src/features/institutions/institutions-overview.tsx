@@ -17,6 +17,7 @@ import {
   createInstitution,
   deleteInstitution,
   updateInstitution,
+  useInstitutionById,
   useInstitutions,
 } from "@/features/institutions/api";
 import type {
@@ -143,15 +144,17 @@ function buildPayload(form: InstitutionFormState) {
 export function InstitutionsOverview() {
   const { tokens, user: currentUser } = useAuth();
   const queryClient = useQueryClient();
-  const institutionsQuery = useInstitutions(tokens?.accessToken);
-  const usersQuery = useUsers(tokens?.accessToken);
-  const devicesQuery = useDevices(tokens?.accessToken);
 
   const [query, setQuery] = useState("");
   const [mode, setMode] = useState<FormMode>("edit");
   const [selectedInstitutionId, setSelectedInstitutionId] = useState<string | null>(null);
   const [form, setForm] = useState<InstitutionFormState>(emptyFormState);
   const [feedback, setFeedback] = useState<FeedbackState>(null);
+
+  const institutionsQuery = useInstitutions(tokens?.accessToken);
+  const institutionDetailQuery = useInstitutionById(tokens?.accessToken, selectedInstitutionId);
+  const usersQuery = useUsers(tokens?.accessToken);
+  const devicesQuery = useDevices(tokens?.accessToken);
 
   const institutions = useMemo(() => institutionsQuery.data?.data ?? [], [institutionsQuery.data?.data]);
   const users = useMemo(() => usersQuery.data?.data ?? [], [usersQuery.data?.data]);
@@ -261,6 +264,10 @@ export function InstitutionsOverview() {
     () => institutionRows.find((item) => item.id === selectedInstitutionId) || null,
     [institutionRows, selectedInstitutionId],
   );
+  const selectedInstitutionDetail = institutionDetailQuery.data || null;
+  const previewUsers = selectedInstitutionDetail?.operationalPreview?.users || [];
+  const previewDevices = selectedInstitutionDetail?.operationalPreview?.devices || [];
+  const previewClassGroups = selectedInstitutionDetail?.operationalPreview?.classGroups || [];
 
   const filtered = useMemo(() => {
     const normalized = query.trim().toLowerCase();
@@ -715,7 +722,11 @@ export function InstitutionsOverview() {
                   <div>
                     <p className="text-sm font-medium text-foreground">Usuarios vinculados</p>
                     <div className="mt-3 flex flex-wrap gap-2">
-                      {selectedInstitution.linkedUserNames.length > 0 ? (
+                      {previewUsers.length > 0 ? (
+                        previewUsers.map((user) => (
+                          <Badge key={user.id} variant="secondary">{user.fullName}</Badge>
+                        ))
+                      ) : selectedInstitution.linkedUserNames.length > 0 ? (
                         selectedInstitution.linkedUserNames.slice(0, 8).map((name) => (
                           <Badge key={name} variant="secondary">{name}</Badge>
                         ))
@@ -728,12 +739,29 @@ export function InstitutionsOverview() {
                   <div>
                     <p className="text-sm font-medium text-foreground">Dispositivos vinculados</p>
                     <div className="mt-3 flex flex-wrap gap-2">
-                      {selectedInstitution.linkedDeviceNames.length > 0 ? (
+                      {previewDevices.length > 0 ? (
+                        previewDevices.map((device) => (
+                          <Badge key={device.id} variant="outline">{device.name}</Badge>
+                        ))
+                      ) : selectedInstitution.linkedDeviceNames.length > 0 ? (
                         selectedInstitution.linkedDeviceNames.slice(0, 8).map((name) => (
                           <Badge key={name} variant="outline">{name}</Badge>
                         ))
                       ) : (
                         <Badge variant="outline">sin dispositivos vinculados</Badge>
+                      )}
+                    </div>
+                  </div>
+
+                  <div>
+                    <p className="text-sm font-medium text-foreground">Grupos vinculados</p>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {previewClassGroups.length > 0 ? (
+                        previewClassGroups.map((classGroup) => (
+                          <Badge key={classGroup.id} variant="outline">{classGroup.name}</Badge>
+                        ))
+                      ) : (
+                        <Badge variant="outline">sin grupos vinculados</Badge>
                       )}
                     </div>
                   </div>

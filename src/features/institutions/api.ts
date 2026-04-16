@@ -5,6 +5,7 @@ import type { JsonObject, PaginatedResponse } from "@/lib/api/types";
 import type {
   CreateInstitutionPayload,
   InstitutionAddress,
+  InstitutionOperationalPreview,
   InstitutionOperationalSummary,
   InstitutionRecord,
   UpdateInstitutionPayload,
@@ -54,6 +55,54 @@ function serializeAddress(address: InstitutionAddress) {
   };
 }
 
+function normalizeOperationalPreview(value: unknown): InstitutionOperationalPreview | null {
+  const record = asRecord(value);
+  const users = Array.isArray(record.users)
+    ? record.users.map((entry) => {
+        const user = asRecord(entry);
+        return {
+          id: readString(user, "id") || "sin-id",
+          fullName: readString(user, "full_name", "fullName") || "Sin nombre",
+          email: readString(user, "email") || "sin-email",
+          userType: readString(user, "user_type", "userType") || "-",
+        };
+      })
+    : [];
+  const devices = Array.isArray(record.devices)
+    ? record.devices.map((entry) => {
+        const device = asRecord(entry);
+        return {
+          id: readString(device, "id") || "sin-id",
+          deviceId: readString(device, "device_id", "deviceId") || "sin-device-id",
+          name: readString(device, "name") || "Sin nombre",
+        };
+      })
+    : [];
+  const classGroups = Array.isArray(record.class_groups)
+    ? record.class_groups.map((entry) => {
+        const classGroup = asRecord(entry);
+        return {
+          id: readString(classGroup, "id") || "sin-id",
+          name: readString(classGroup, "name") || "Sin nombre",
+          code: readString(classGroup, "code") || "sin-codigo",
+        };
+      })
+    : Array.isArray(record.classGroups)
+      ? record.classGroups.map((entry) => {
+          const classGroup = asRecord(entry);
+          return {
+            id: readString(classGroup, "id") || "sin-id",
+            name: readString(classGroup, "name") || "Sin nombre",
+            code: readString(classGroup, "code") || "sin-codigo",
+          };
+        })
+      : [];
+
+  if (users.length === 0 && devices.length === 0 && classGroups.length === 0) return null;
+
+  return { users, devices, classGroups };
+}
+
 function normalizeOperationalSummary(value: unknown): InstitutionOperationalSummary | null {
   const record = asRecord(value);
   const entries = Object.keys(record);
@@ -81,6 +130,9 @@ function normalizeInstitution(input: unknown): InstitutionRecord {
     normalizeOperationalSummary(record.operationalSummary) ||
     normalizeOperationalSummary(record.summary) ||
     normalizeOperationalSummary(record.stats);
+  const operationalPreview =
+    normalizeOperationalPreview(record.operational_preview) ||
+    normalizeOperationalPreview(record.operationalPreview);
 
   return {
     id: readString(record, "id", "institution_id", "educational_center_id") || name,
@@ -99,6 +151,7 @@ function normalizeInstitution(input: unknown): InstitutionRecord {
     updatedAt: readString(record, "updated_at", "updatedAt") || null,
     deletedAt,
     operationalSummary,
+    operationalPreview,
     raw: record,
   };
 }
@@ -157,6 +210,14 @@ export async function createInstitution(token: string, payload: CreateInstitutio
   return normalizeInstitution(response);
 }
 
+export async function getInstitutionById(token: string, institutionId: string) {
+  const response = await apiRequest<unknown>(apiEndpoints.institutions.byId(institutionId), {
+    token,
+  });
+
+  return normalizeInstitution(response);
+}
+
 export async function updateInstitution(token: string, institutionId: string, payload: UpdateInstitutionPayload) {
   const response = await apiRequest<unknown>(apiEndpoints.institutions.byId(institutionId), {
     method: "PATCH",
@@ -177,6 +238,14 @@ export async function deleteInstitution(token: string, institutionId: string) {
   return apiRequest(apiEndpoints.institutions.byId(institutionId), {
     method: "DELETE",
     token,
+  });
+}
+
+export function useInstitutionById(token?: string, institutionId?: string | null) {
+  return useQuery({
+    queryKey: ["institutions", "detail", token, institutionId],
+    queryFn: () => getInstitutionById(token as string, institutionId as string),
+    enabled: Boolean(token && institutionId),
   });
 }
 
