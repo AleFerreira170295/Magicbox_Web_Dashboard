@@ -93,6 +93,7 @@ type UserFormState = {
   password: string;
   phoneNumber: string;
   userType: CreateUserPayload["userType"];
+  roles: string[];
   educationalCenterId: string;
   imageUrl: string;
   addressFirstLine: string;
@@ -126,6 +127,7 @@ function emptyFormState(): UserFormState {
     password: "",
     phoneNumber: "",
     userType: "web",
+    roles: [],
     educationalCenterId: "",
     imageUrl: "",
     addressFirstLine: "",
@@ -145,6 +147,7 @@ function formFromUser(user: UserRecord): UserFormState {
     password: "",
     phoneNumber: user.phoneNumber || "",
     userType: user.userType === "mobile" || user.userType === "web|mobile" ? user.userType : "web",
+    roles: user.roles || [],
     educationalCenterId: user.educationalCenterId || "",
     imageUrl: user.imageUrl || "",
     addressFirstLine: user.address?.addressFirstLine || "",
@@ -184,6 +187,7 @@ function buildPayload(form: UserFormState, mode: FormMode) {
     email: form.email.trim().toLowerCase(),
     phoneNumber: form.phoneNumber.trim(),
     userType: form.userType,
+    roles: Array.from(new Set(form.roles)).sort(),
     educationalCenterId: form.educationalCenterId.trim() || null,
     imageUrl: form.imageUrl.trim() || null,
     address: addressTouched
@@ -494,6 +498,34 @@ export function UsersTable() {
     setForm((current) => ({ ...current, [field]: value }));
   }
 
+  function toggleFormRole(role: string) {
+    setForm((current) => ({
+      ...current,
+      roles: current.roles.includes(role)
+        ? current.roles.filter((item) => item !== role)
+        : [...current.roles, role].sort(),
+    }));
+  }
+
+  async function persistUserRoles(user: UserRow, roles: string[]) {
+    if (!tokens?.accessToken) return;
+
+    await updateUserMutation.mutateAsync({
+      userId: user.id,
+      payload: {
+        firstName: user.firstName || "",
+        lastName: user.lastName || "",
+        email: user.email,
+        phoneNumber: user.phoneNumber || "",
+        userType: user.userType === "mobile" || user.userType === "web|mobile" ? user.userType : "web",
+        roles,
+        educationalCenterId: user.educationalCenterId || null,
+        imageUrl: user.imageUrl || null,
+        address: user.address || null,
+      },
+    });
+  }
+
   function resolveInstitutionLabel(user: UserRecord) {
     if (!user.educationalCenterId) return "Sin institución";
     return institutionsById.get(user.educationalCenterId) || user.educationalCenterId;
@@ -507,7 +539,7 @@ export function UsersTable() {
   }
 
   function hasBundle(user: UserRow, bundle: (typeof roleBundles)[number]) {
-    return bundle.permissionKeys.every((key) => user.explicitPermissionKeys.includes(key));
+    return user.roles.includes(bundle.role) && bundle.permissionKeys.every((key) => user.explicitPermissionKeys.includes(key));
   }
 
   function getPermissionEntries(user: UserRow, featureCode: string, actionCode: string) {
@@ -559,7 +591,8 @@ export function UsersTable() {
     if (!tokens?.accessToken) return;
 
     const missingKeys = bundle.permissionKeys.filter((key) => !user.explicitPermissionKeys.includes(key));
-    if (missingKeys.length === 0) {
+    const nextRoles = Array.from(new Set([...user.roles, bundle.role])).sort();
+    if (missingKeys.length === 0 && user.roles.includes(bundle.role)) {
       setFeedback({ type: "success", message: `El bundle ${bundle.label} ya está completo.` });
       return;
     }
@@ -578,10 +611,16 @@ export function UsersTable() {
         });
         applied += 1;
       }
+      if (!user.roles.includes(bundle.role)) {
+        await persistUserRoles(user, nextRoles);
+        if (selectedUserId === user.id) {
+          setForm((current) => ({ ...current, roles: nextRoles }));
+        }
+      }
       await refreshAclQueries();
       setFeedback({
         type: "success",
-        message: `Bundle ${bundle.label} aplicado. Se agregaron ${applied} permisos base.`,
+        message: `Bundle ${bundle.label} aplicado. Se agregaron ${applied} permisos base y se persistió el rol.`,
       });
     } catch (error) {
       setFeedback({ type: "error", message: getErrorMessage(error) });
@@ -628,7 +667,7 @@ export function UsersTable() {
       <SectionHeader
         eyebrow="Superadmin"
         title="Usuarios"
-        description="Ahora la vista conecta el padrón de usuarios con permisos explícitos por ACL. Como el backend todavía no modela roles persistentes, los roles se infieren y también se pueden aplicar como bundles operativos." 
+        description="La vista ahora conecta usuarios, roles persistidos y permisos ACL explícitos desde el backend real." 
         actions={
           <div className="flex flex-col items-stretch gap-3 md:flex-row md:items-center">
             <div className="relative min-w-64">
@@ -644,6 +683,7 @@ export function UsersTable() {
               type="button"
               onClick={() => {
                 setMode("create");
+                setSelectedUserId(null);
                 setForm(emptyFormState());
                 setFeedback(null);
               }}
@@ -741,7 +781,7 @@ export function UsersTable() {
           <CardHeader>
             <CardTitle>Padrón de usuarios</CardTitle>
             <CardDescription>
-              La tabla ya muestra rol inferido, cantidad de permisos explícitos y señales de revisión. Seleccioná un usuario para editar sus datos y su ACL.
+              La tabla muestra roles efectivos, cantidad de permisos explícitos y señales de revisión. Seleccioná un usuario para editar sus datos y su ACL.
             </CardDescription>
           </CardHeader>
           <CardContent className="overflow-x-auto p-0">
@@ -910,6 +950,28 @@ export function UsersTable() {
                         </SelectField>
                       </div>
                       <div className="space-y-2 md:col-span-2">
+                        <Label>Roles persistidos</Label>
+                        <div className="flex flex-wrap gap-2 rounded-2xl border border-border bg-background/70 p-3">
+                          {roleBundles.map((bundle) => {
+                            const active = form.roles.includes(bundle.role);
+                            return (
+                              <Button
+                                key={bundle.role}
+                                type="button"
+                                size="sm"
+                                variant={active ? "default" : "outline"}
+                                onClick={() => toggleFormRole(bundle.role)}
+                              >
+                                {bundle.label}
+                              </Button>
+                            );
+                          })}
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          Estos roles se guardan en backend. Los permisos finos se ajustan abajo desde ACL.
+                        </p>
+                      </div>
+                      <div className="space-y-2 md:col-span-2">
                         <Label htmlFor="educationalCenterId">Institución</Label>
                         <SelectField value={form.educationalCenterId} onChange={(value) => updateFormField("educationalCenterId", value)}>
                           <option value="">Sin institución</option>
@@ -989,7 +1051,7 @@ export function UsersTable() {
             <CardHeader>
               <CardTitle>Roles y permisos</CardTitle>
               <CardDescription>
-                Bundles operativos para aplicar permisos base y matriz ACL para ajuste fino por feature y acción.
+                Roles persistidos para cada usuario, bundles operativos y matriz ACL para ajuste fino por feature y acción.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-5">

@@ -37,6 +37,7 @@ export interface UserMutationPayload {
   email: string;
   phoneNumber: string;
   userType: "web" | "mobile" | "web|mobile";
+  roles: string[];
   educationalCenterId?: string | null;
   imageUrl?: string | null;
   address?: UserAddress | null;
