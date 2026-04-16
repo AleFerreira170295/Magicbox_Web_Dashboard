@@ -5,7 +5,10 @@ export interface DeviceRecord {
   deviceId: string;
   name: string;
   educationalCenterId?: string | null;
+  educationalCenterName?: string | null;
   ownerUserId?: string | null;
+  ownerUserName?: string | null;
+  ownerUserEmail?: string | null;
   firmwareVersion?: string | null;
   status?: string | null;
   deviceMetadata: JsonObject;

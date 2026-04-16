@@ -26,6 +26,11 @@ Ruta base de prueba para desarrollo cruzado entre dashboard y backend local.
    - previews de usuarios
    - previews de dispositivos
    - previews de grupos
+6. Ir a `Dispositivos`.
+7. Verificar:
+   - tabla operativa con institución, owner y status
+   - selección de detalle operativo
+   - metadata cruda por dispositivo
 
 ## Estado esperado actual de `Praecepta Education`
 
@@ -86,6 +91,24 @@ curl http://127.0.0.1:3000/api/v1.0/educational-center/$CENTER_ID \
   -H "Authorization: Bearer $TOKEN"
 ```
 
+### Listado de dispositivos enriquecido
+
+```bash
+TOKEN="<pegar access_token>"
+curl http://127.0.0.1:3000/api/v1.0/ble-device \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+Campos esperados por item en este slice:
+
+- `educational_center_name`
+- `owner_user_id`
+- `owner_user_name`
+- `owner_user_email`
+- `firmware_version`
+- `status`
+- `device_metadata`
+
 ## Cuándo usar esta ruta
 
 Usarla como smoke test después de cambios en:
@@ -96,3 +119,4 @@ Usarla como smoke test después de cambios en:
 - listado/detalle de instituciones
 - previews de usuarios/dispositivos/grupos
 - UX del dashboard en `Instituciones`
+- contrato y pantalla de `Dispositivos`
