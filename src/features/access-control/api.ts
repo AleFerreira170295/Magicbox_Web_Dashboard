@@ -81,6 +81,7 @@ function normalizePermission(input: unknown): PermissionRecord {
     userId: readString(record, "user_id", "userId"),
     featureId: readString(record, "feature_id", "featureId"),
     actionId: readString(record, "action_id", "actionId"),
+    educationalCenterId: readString(record, "educational_center_id", "educationalCenterId") || null,
     createdAt: readString(record, "created_at", "createdAt") || null,
     updatedAt: readString(record, "updated_at", "updatedAt") || null,
     deletedAt: readString(record, "deleted_at", "deletedAt") || null,
@@ -123,6 +124,7 @@ export async function createPermission(token: string, payload: CreatePermissionP
       user_id: payload.userId,
       feature_id: payload.featureId,
       action_id: payload.actionId,
+      educational_center_id: payload.educationalCenterId || null,
     },
   });
 

@@ -32,6 +32,7 @@ const userTypeOptions = [
 ] as const;
 
 const actionOrder = ["read", "create", "update", "delete"];
+const GLOBAL_SCOPE = "__global__";
 
 const roleBundles = [
   {
@@ -309,6 +310,7 @@ export function UsersTable() {
   const [form, setForm] = useState<UserFormState>(emptyFormState);
   const [feedback, setFeedback] = useState<FeedbackState>(null);
   const [permissionBusy, setPermissionBusy] = useState(false);
+  const [aclScope, setAclScope] = useState<string>(GLOBAL_SCOPE);
 
   const rawUsers = useMemo(() => usersQuery.data?.data ?? [], [usersQuery.data?.data]);
   const institutions = useMemo(() => institutionsQuery.data?.data ?? [], [institutionsQuery.data?.data]);
@@ -531,19 +533,35 @@ export function UsersTable() {
     return institutionsById.get(user.educationalCenterId) || user.educationalCenterId;
   }
 
+  function resolveScopeLabel(educationalCenterId?: string | null) {
+    if (!educationalCenterId) return "Global";
+    return institutionsById.get(educationalCenterId) || educationalCenterId;
+  }
+
   function selectUser(user: UserRow) {
     setMode("edit");
     setSelectedUserId(user.id);
+    setAclScope(user.educationalCenterId || GLOBAL_SCOPE);
     setForm(formFromUser(user));
     setFeedback(null);
   }
 
-  function hasBundle(user: UserRow, bundle: (typeof roleBundles)[number]) {
-    return user.roles.includes(bundle.role) && bundle.permissionKeys.every((key) => user.explicitPermissionKeys.includes(key));
+  function hasBundle(user: UserRow, bundle: (typeof roleBundles)[number], scope: string = GLOBAL_SCOPE) {
+    const scopedKeys = new Set(
+      user.explicitPermissions
+        .filter((item) => (scope === GLOBAL_SCOPE ? !item.educationalCenterId : item.educationalCenterId === scope))
+        .map((item) => item.key),
+    );
+    return user.roles.includes(bundle.role) && bundle.permissionKeys.every((key) => scopedKeys.has(key));
   }
 
-  function getPermissionEntries(user: UserRow, featureCode: string, actionCode: string) {
-    return user.explicitPermissions.filter((item) => item.featureCode === featureCode && item.actionCode === actionCode);
+  function getPermissionEntries(user: UserRow, featureCode: string, actionCode: string, scope: string = GLOBAL_SCOPE) {
+    return user.explicitPermissions.filter(
+      (item) =>
+        item.featureCode === featureCode &&
+        item.actionCode === actionCode &&
+        (scope === GLOBAL_SCOPE ? !item.educationalCenterId : item.educationalCenterId === scope),
+    );
   }
 
   async function refreshAclQueries() {
@@ -553,10 +571,10 @@ export function UsersTable() {
     ]);
   }
 
-  async function togglePermission(user: UserRow, featureCode: string, actionCode: string) {
+  async function togglePermission(user: UserRow, featureCode: string, actionCode: string, scope: string = GLOBAL_SCOPE) {
     if (!tokens?.accessToken) return;
 
-    const permissionEntries = getPermissionEntries(user, featureCode, actionCode);
+    const permissionEntries = getPermissionEntries(user, featureCode, actionCode, scope);
     const catalogEntry = catalogByKey.get(`${featureCode}:${actionCode}`);
     if (!catalogEntry) {
       setFeedback({ type: "error", message: `No encontré el catálogo para ${featureCode}:${actionCode}.` });
@@ -576,8 +594,12 @@ export function UsersTable() {
           userId: user.id,
           featureId: catalogEntry.featureId,
           actionId: catalogEntry.actionId,
+          educationalCenterId: scope === GLOBAL_SCOPE ? null : scope,
         });
-        setFeedback({ type: "success", message: `Permiso ${featureCode}:${actionCode} agregado.` });
+        setFeedback({
+          type: "success",
+          message: `Permiso ${featureCode}:${actionCode} agregado en scope ${resolveScopeLabel(scope === GLOBAL_SCOPE ? null : scope)}.`,
+        });
       }
       await refreshAclQueries();
     } catch (error) {
@@ -587,7 +609,7 @@ export function UsersTable() {
     }
   }
 
-  async function applyBundle(user: UserRow, bundle: (typeof roleBundles)[number]) {
+  async function applyBundle(user: UserRow, bundle: (typeof roleBundles)[number], scope: string = GLOBAL_SCOPE) {
     if (!tokens?.accessToken) return;
 
     const missingKeys = bundle.permissionKeys.filter((key) => !user.explicitPermissionKeys.includes(key));
@@ -608,6 +630,7 @@ export function UsersTable() {
           userId: user.id,
           featureId: catalogEntry.featureId,
           actionId: catalogEntry.actionId,
+          educationalCenterId: scope === GLOBAL_SCOPE ? null : scope,
         });
         applied += 1;
       }
@@ -620,7 +643,7 @@ export function UsersTable() {
       await refreshAclQueries();
       setFeedback({
         type: "success",
-        message: `Bundle ${bundle.label} aplicado. Se agregaron ${applied} permisos base y se persistió el rol.`,
+        message: `Bundle ${bundle.label} aplicado en ${resolveScopeLabel(scope === GLOBAL_SCOPE ? null : scope)}. Se agregaron ${applied} permisos base y se persistió el rol.`,
       });
     } catch (error) {
       setFeedback({ type: "error", message: getErrorMessage(error) });
@@ -684,6 +707,7 @@ export function UsersTable() {
               onClick={() => {
                 setMode("create");
                 setSelectedUserId(null);
+                setAclScope(GLOBAL_SCOPE);
                 setForm(emptyFormState());
                 setFeedback(null);
               }}
@@ -1071,33 +1095,48 @@ export function UsersTable() {
               ) : (
                 <>
                   <div className="space-y-3 rounded-2xl bg-background/70 p-4">
-                    <p className="text-sm font-medium text-foreground">Bundles disponibles</p>
+                    <div className="grid gap-3 md:grid-cols-[1fr_220px] md:items-end">
+                      <div>
+                        <p className="text-sm font-medium text-foreground">Bundles disponibles</p>
+                        <p className="text-sm text-muted-foreground">
+                          Aplicar un bundle agrega permisos base dentro del scope elegido.
+                        </p>
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Scope ACL</Label>
+                        <SelectField value={aclScope} onChange={setAclScope}>
+                          <option value={GLOBAL_SCOPE}>Global</option>
+                          {institutions.map((institution) => (
+                            <option key={institution.id} value={institution.id}>
+                              {institution.name}
+                            </option>
+                          ))}
+                        </SelectField>
+                      </div>
+                    </div>
                     <div className="flex flex-wrap gap-2">
                       {roleBundles.map((bundle) => (
                         <Button
                           key={bundle.role}
                           type="button"
                           size="sm"
-                          variant={hasBundle(selectedUser, bundle) ? "default" : "outline"}
+                          variant={hasBundle(selectedUser, bundle, aclScope) ? "default" : "outline"}
                           disabled={permissionBusy}
-                          onClick={() => applyBundle(selectedUser, bundle)}
+                          onClick={() => applyBundle(selectedUser, bundle, aclScope)}
                         >
                           {bundle.label}
                         </Button>
                       ))}
                     </div>
-                    <p className="text-sm text-muted-foreground">
-                      Aplicar un bundle agrega sus permisos base. Después podés ajustar fino desde la matriz.
-                    </p>
                   </div>
 
                   <div>
                     <p className="text-sm font-medium text-foreground">Permisos explícitos actuales</p>
                     <div className="mt-3 flex flex-wrap gap-2">
-                      {selectedUser.explicitPermissionKeys.length > 0 ? (
-                        selectedUser.explicitPermissionKeys.map((key) => (
-                          <Badge key={key} variant="outline">
-                            {key}
+                      {selectedUser.explicitPermissions.length > 0 ? (
+                        selectedUser.explicitPermissions.map((permission) => (
+                          <Badge key={permission.id} variant="outline">
+                            {permission.key} · {resolveScopeLabel(permission.educationalCenterId)}
                           </Badge>
                         ))
                       ) : (
@@ -1118,14 +1157,14 @@ export function UsersTable() {
                             </div>
                             <div className="flex flex-wrap gap-3">
                               {feature.actions.map((action) => {
-                                const checked = getPermissionEntries(selectedUser, feature.featureCode, action.code).length > 0;
+                                const checked = getPermissionEntries(selectedUser, feature.featureCode, action.code, aclScope).length > 0;
                                 return (
                                   <label key={action.id} className="inline-flex items-center gap-2 text-sm text-foreground">
                                     <input
                                       type="checkbox"
                                       checked={checked}
                                       disabled={permissionBusy}
-                                      onChange={() => togglePermission(selectedUser, feature.featureCode, action.code)}
+                                      onChange={() => togglePermission(selectedUser, feature.featureCode, action.code, aclScope)}
                                     />
                                     <span>{action.code}</span>
                                   </label>
