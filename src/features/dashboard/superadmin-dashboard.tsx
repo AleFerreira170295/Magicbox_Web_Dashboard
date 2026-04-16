@@ -244,7 +244,8 @@ export function SuperadminDashboard() {
           title="Permisos"
           description="Vista clara de roles, permisos efectivos, excepciones y auditoría de cambios."
           icon={KeyRound}
-          status="next"
+          href="/permissions"
+          status="live"
         />
         <ModuleCard
           title="Instituciones"
