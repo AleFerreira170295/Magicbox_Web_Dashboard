@@ -276,6 +276,13 @@ export function SuperadminDashboard() {
           status="live"
         />
         <ModuleCard
+          title="Perfiles relevantes"
+          description="Lectura curada de perfiles críticos, roles altos y señales de configuración a revisar."
+          icon={Users}
+          href="/profiles"
+          status="live"
+        />
+        <ModuleCard
           title="Partidas y datos"
           description="Acceso transversal a la información visible actual para auditoría y soporte."
           icon={Database}
