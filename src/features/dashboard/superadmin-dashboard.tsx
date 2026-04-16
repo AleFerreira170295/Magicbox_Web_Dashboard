@@ -269,6 +269,13 @@ export function SuperadminDashboard() {
           status="live"
         />
         <ModuleCard
+          title="Salud operativa"
+          description="Vista unificada de dispositivos, sincronización y señales tempranas de soporte."
+          icon={Layers3}
+          href="/health"
+          status="live"
+        />
+        <ModuleCard
           title="Partidas y datos"
           description="Acceso transversal a la información visible actual para auditoría y soporte."
           icon={Database}
