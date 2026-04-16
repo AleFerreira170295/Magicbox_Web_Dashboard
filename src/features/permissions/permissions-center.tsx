@@ -1,14 +1,16 @@
 "use client";
 
 import { useMemo } from "react";
-import { Building2, KeyRound, Layers3, ShieldCheck, ShieldEllipsis, Users } from "lucide-react";
-import { ApiError } from "@/lib/api/fetcher";
+import type { ComponentType } from "react";
+import { AlertTriangle, KeyRound, Layers3, ShieldCheck, ShieldEllipsis, UserRound } from "lucide-react";
 import { SectionHeader } from "@/components/section-header";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { useAccessActions, useAccessFeatures, usePermissions } from "@/features/access-control/api";
 import { useAuth } from "@/features/auth/auth-context";
+import { useInstitutions } from "@/features/institutions/api";
 import { useUsers } from "@/features/users/api";
 import { getErrorMessage } from "@/lib/utils";
 
@@ -21,7 +23,7 @@ function SummaryCard({
   label: string;
   value: string;
   hint: string;
-  icon: React.ComponentType<{ className?: string }>;
+  icon: ComponentType<{ className?: string }>;
 }) {
   return (
     <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
@@ -41,194 +43,201 @@ function SummaryCard({
   );
 }
 
-const permissionBundles = [
-  {
-    role: "admin",
-    scope: "global",
-    capabilities: ["usuarios", "permisos", "instituciones", "salud", "configuración"],
-    emphasis: "warning" as const,
-  },
-  {
-    role: "director",
-    scope: "institución",
-    capabilities: ["lectura institucional", "usuarios de su institución", "dispositivos", "syncs"],
-    emphasis: "secondary" as const,
-  },
-  {
-    role: "teacher",
-    scope: "aula / grupo",
-    capabilities: ["dashboard pedagógico", "partidas", "dispositivos asignados"],
-    emphasis: "secondary" as const,
-  },
-  {
-    role: "family",
-    scope: "perfil asociado",
-    capabilities: ["lectura restringida", "seguimiento básico"],
-    emphasis: "outline" as const,
-  },
-  {
-    role: "researcher",
-    scope: "datasets controlados",
-    capabilities: ["analytics", "consultas acotadas", "anonimización"],
-    emphasis: "outline" as const,
-  },
-];
-
-const capabilitiesMatrix = [
-  {
-    capability: "Gestionar usuarios",
-    roles: ["admin"],
-  },
-  {
-    capability: "Gestionar permisos",
-    roles: ["admin"],
-  },
-  {
-    capability: "Ver instituciones",
-    roles: ["admin", "director"],
-  },
-  {
-    capability: "Ver salud operativa global",
-    roles: ["admin"],
-  },
-  {
-    capability: "Ver datos pedagógicos",
-    roles: ["admin", "director", "teacher", "researcher"],
-  },
-  {
-    capability: "Acceder a datos familiares",
-    roles: ["family"],
-  },
-];
-
-const permissionLayers = [
-  {
-    title: "Rol base",
-    description: "El primer nivel de acceso. Define el paquete de capacidades esperables por tipo de perfil.",
-    icon: ShieldCheck,
-  },
-  {
-    title: "Scope institucional",
-    description: "Restringe o amplía alcance según cliente, institución o contexto operativo asociado.",
-    icon: Building2,
-  },
-  {
-    title: "Permisos explícitos",
-    description: "Permiten ajustes finos por usuario cuando el bundle por rol no alcanza.",
-    icon: KeyRound,
-  },
-  {
-    title: "Overrides y auditoría",
-    description: "Excepciones controladas y trazables para resolver situaciones operativas sin perder gobernanza.",
-    icon: ShieldEllipsis,
-  },
-];
+function formatScopeLabel(scopeId: string | null | undefined, institutionName?: string | null) {
+  if (!scopeId) return "Global";
+  return institutionName?.trim() || scopeId;
+}
 
 export function PermissionsCenter() {
   const { tokens, user } = useAuth();
+
+  const actionsQuery = useAccessActions(tokens?.accessToken);
+  const featuresQuery = useAccessFeatures(tokens?.accessToken);
+  const permissionsQuery = usePermissions(tokens?.accessToken);
   const usersQuery = useUsers(tokens?.accessToken);
+  const institutionsQuery = useInstitutions(tokens?.accessToken);
 
-  const backendUnavailable =
-    usersQuery.error instanceof ApiError && [404, 405].includes(usersQuery.error.status);
+  const actions = useMemo(() => actionsQuery.data?.data || [], [actionsQuery.data]);
+  const features = useMemo(() => featuresQuery.data?.data || [], [featuresQuery.data]);
+  const permissions = useMemo(() => permissionsQuery.data?.data || [], [permissionsQuery.data]);
+  const users = useMemo(() => usersQuery.data?.data || [], [usersQuery.data]);
+  const institutions = useMemo(() => institutionsQuery.data?.data || [], [institutionsQuery.data]);
 
-  const metrics = useMemo(() => {
-    const users = usersQuery.data?.data || [];
-    const explicitPermissionsUsers = users.filter((item) => item.permissions.length > 0).length;
-    const institutionsReferenced = new Set(
-      users.map((item) => item.educationalCenterId).filter(Boolean),
-    ).size;
-    const adminsWithoutInstitution = users.filter(
-      (item) => item.roles.includes("admin") && !item.educationalCenterId,
+  const loading =
+    actionsQuery.isLoading ||
+    featuresQuery.isLoading ||
+    permissionsQuery.isLoading ||
+    usersQuery.isLoading ||
+    institutionsQuery.isLoading;
+
+  const fatalError =
+    actionsQuery.error ||
+    featuresQuery.error ||
+    permissionsQuery.error ||
+    usersQuery.error ||
+    institutionsQuery.error;
+
+  const model = useMemo(() => {
+    const userById = new Map(users.map((item) => [item.id, item]));
+    const featureById = new Map(features.map((item) => [item.id, item]));
+    const actionById = new Map(actions.map((item) => [item.id, item]));
+    const institutionById = new Map(institutions.map((item) => [item.id, item]));
+
+    const explicitPermissionUsers = new Set(permissions.map((item) => item.userId)).size;
+    const scopedPermissions = permissions.filter((item) => item.educationalCenterId).length;
+    const globalPermissions = permissions.length - scopedPermissions;
+    const missingReferences = permissions.filter(
+      (item) => !userById.has(item.userId) || !featureById.has(item.featureId) || !actionById.has(item.actionId),
     ).length;
-    const usersWithoutRoles = users.filter((item) => item.roles.length === 0).length;
+
+    const permissionRows = permissions.map((item) => {
+      const actor = userById.get(item.userId);
+      const feature = featureById.get(item.featureId);
+      const action = actionById.get(item.actionId);
+      const institution = item.educationalCenterId
+        ? institutionById.get(item.educationalCenterId)
+        : undefined;
+
+      return {
+        id: item.id,
+        userName: actor?.fullName || "Usuario no resuelto",
+        userEmail: actor?.email || item.userId,
+        roleSummary: actor?.roles.length ? actor.roles.join(", ") : "sin rol",
+        featureCode: feature?.code || item.featureId,
+        actionCode: action?.code || item.actionId,
+        scopeLabel: formatScopeLabel(item.educationalCenterId, institution?.name),
+        createdAt: item.createdAt || null,
+        hasReferenceGap: !actor || !feature || !action,
+      };
+    });
+
+    const reviewProfiles = users
+      .filter((item) => item.roles.length === 0 || item.permissions.length > 0)
+      .map((item) => ({
+        id: item.id,
+        fullName: item.fullName,
+        email: item.email,
+        institutionLabel: formatScopeLabel(
+          item.educationalCenterId,
+          item.educationalCenterId ? institutionById.get(item.educationalCenterId)?.name : undefined,
+        ),
+        roles: item.roles,
+        permissions: item.permissions,
+        signal:
+          item.roles.length === 0
+            ? "sin rol"
+            : item.permissions.length > 0
+              ? "override explícito"
+              : "revisar",
+      }))
+      .slice(0, 12);
 
     return {
-      totalRolesModeled: permissionBundles.length,
-      currentPermissions: user?.permissions.length || 0,
-      explicitPermissionsUsers,
-      institutionsReferenced,
-      adminsWithoutInstitution,
-      usersWithoutRoles,
-      reviewProfiles: users
-        .filter(
-          (item) => item.roles.includes("admin") || item.permissions.length > 0 || item.roles.length === 0,
-        )
-        .slice(0, 10),
+      explicitPermissionUsers,
+      scopedPermissions,
+      globalPermissions,
+      missingReferences,
+      permissionRows,
+      reviewProfiles,
     };
-  }, [user?.permissions.length, usersQuery.data]);
+  }, [actions, features, institutions, permissions, users]);
 
   return (
     <div className="space-y-6">
       <SectionHeader
         eyebrow="Superadmin"
         title="Permisos"
-        description="Esta versión ya piensa los permisos como un sistema de gobernanza: bundles por rol, herencia por scope, permisos explícitos y perfiles que necesitan revisión."
+        description="Esta pantalla ya dejó de ser conceptual. Ahora usa el catálogo real de actions, features y permisos explícitos para leer la gobernanza efectiva del sistema."
       />
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        {usersQuery.isLoading ? (
+        {loading ? (
           Array.from({ length: 4 }).map((_, index) => <Skeleton key={index} className="h-32 rounded-2xl" />)
         ) : (
           <>
             <SummaryCard
-              label="Bundles modelados"
-              value={String(metrics.totalRolesModeled)}
-              hint="Roles base que organizan la gobernanza inicial del sistema."
-              icon={ShieldCheck}
-            />
-            <SummaryCard
-              label="Permisos de tu sesión"
-              value={String(metrics.currentPermissions)}
-              hint="Permisos explícitos visibles en la cuenta autenticada actual."
+              label="Actions activas"
+              value={String(actions.length)}
+              hint="Catálogo operativo disponible para construir permisos explícitos."
               icon={KeyRound}
             />
             <SummaryCard
-              label="Usuarios con permisos explícitos"
-              value={backendUnavailable ? "Pendiente" : String(metrics.explicitPermissionsUsers)}
-              hint="Se completa automáticamente cuando el backend expone `/users`."
-              icon={Users}
+              label="Features modeladas"
+              value={String(features.length)}
+              hint="Superficies del backend que hoy pueden participar en ACL."
+              icon={Layers3}
             />
             <SummaryCard
-              label="Admins sin institución"
-              value={backendUnavailable ? "Pendiente" : String(metrics.adminsWithoutInstitution)}
-              hint="Un buen detector de cuentas globales o huecos de configuración."
-              icon={Building2}
+              label="Permisos explícitos"
+              value={String(permissions.length)}
+              hint="Overrides vigentes detectados por la API real de access-control."
+              icon={ShieldEllipsis}
+            />
+            <SummaryCard
+              label="Usuarios con override"
+              value={String(model.explicitPermissionUsers)}
+              hint="Cuentas con personalización explícita por fuera del bundle de rol."
+              icon={UserRound}
             />
           </>
         )}
       </div>
 
+      {fatalError ? (
+        <Card className="border-destructive/30 bg-destructive/5 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
+          <CardHeader>
+            <CardTitle className="text-destructive">No pudimos cargar la gobernanza ACL real</CardTitle>
+            <CardDescription>{getErrorMessage(fatalError)}</CardDescription>
+          </CardHeader>
+        </Card>
+      ) : null}
+
       <div className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
         <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
           <CardHeader>
-            <CardTitle>Capas del modelo de permisos</CardTitle>
+            <CardTitle>Catálogo ACL operativo</CardTitle>
             <CardDescription>
-              La clave es que la pantalla ya explique cómo se construye el acceso efectivo, no solo qué rol tiene cada usuario.
+              Acciones, features y volumen real de overrides. Esto sirve para validar si el backend expone la base mínima que la UI necesita.
             </CardDescription>
           </CardHeader>
           <CardContent className="grid gap-3">
-            {permissionLayers.map((layer) => {
-              const Icon = layer.icon;
-              return (
-                <div key={layer.title} className="rounded-2xl bg-white/80 p-4">
-                  <div className="flex items-center gap-2">
-                    <div className="rounded-xl bg-primary/12 p-2 text-primary">
-                      <Icon className="size-4" />
-                    </div>
-                    <p className="text-sm font-medium text-foreground">{layer.title}</p>
-                  </div>
-                  <p className="mt-2 text-sm leading-6 text-muted-foreground">{layer.description}</p>
-                </div>
-              );
-            })}
+            <div className="rounded-2xl bg-white/80 p-4">
+              <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+                <ShieldCheck className="size-4 text-primary" />
+                Actions disponibles
+              </div>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {actions.length ? actions.map((action) => (
+                  <Badge key={action.id} variant="secondary">{action.code}</Badge>
+                )) : <Badge variant="outline">sin actions</Badge>}
+              </div>
+            </div>
+
+            <div className="rounded-2xl bg-white/80 p-4">
+              <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+                <Layers3 className="size-4 text-primary" />
+                Features disponibles
+              </div>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {features.length ? features.map((feature) => (
+                  <Badge key={feature.id} variant="outline">{feature.code}</Badge>
+                )) : <Badge variant="outline">sin features</Badge>}
+              </div>
+            </div>
+
+            <div className="rounded-2xl bg-background/70 p-4 text-sm leading-6 text-muted-foreground">
+              {permissions.length === 0
+                ? "Todavía no hay permisos explícitos activos. El sistema está apoyándose sobre roles base y alcance implícito."
+                : `Hoy vemos ${model.globalPermissions} overrides globales y ${model.scopedPermissions} overrides con scope institucional.`}
+            </div>
           </CardContent>
         </Card>
 
         <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
           <CardHeader>
-            <CardTitle>Sesión actual y lectura rápida</CardTitle>
+            <CardTitle>Sesión actual y señales de revisión</CardTitle>
             <CardDescription>
-              Mantener visible tu contexto actual ayuda a probar la UX y también a interpretar el resto del módulo.
+              Lectura rápida del actor autenticado y de los desvíos que conviene revisar primero.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -236,24 +245,40 @@ export function PermissionsCenter() {
               <p className="text-sm font-medium text-foreground">{user?.fullName || "Sin nombre"}</p>
               <p className="mt-1 text-sm text-muted-foreground">{user?.email || "Sin email"}</p>
             </div>
+
             <div>
-              <p className="text-sm font-medium text-foreground">Roles</p>
+              <p className="text-sm font-medium text-foreground">Roles efectivos</p>
               <div className="mt-2 flex flex-wrap gap-2">
                 {user?.roles.length ? user.roles.map((role) => (
                   <Badge key={role} variant={role === "admin" ? "warning" : "secondary"}>{role}</Badge>
                 )) : <Badge variant="outline">sin roles</Badge>}
               </div>
             </div>
+
             <div>
-              <p className="text-sm font-medium text-foreground">Permisos explícitos</p>
+              <p className="text-sm font-medium text-foreground">Permisos explícitos visibles</p>
               <div className="mt-2 flex flex-wrap gap-2">
                 {user?.permissions.length ? user.permissions.map((permission) => (
                   <Badge key={permission} variant="outline">{permission}</Badge>
                 )) : <Badge variant="outline">sin permisos explícitos</Badge>}
               </div>
             </div>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="rounded-2xl bg-white/80 p-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">Perfiles sin rol</p>
+                <p className="mt-2 text-2xl font-semibold text-foreground">
+                  {loading ? "-" : String(users.filter((item) => item.roles.length === 0).length)}
+                </p>
+              </div>
+              <div className="rounded-2xl bg-white/80 p-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">Referencias rotas</p>
+                <p className="mt-2 text-2xl font-semibold text-foreground">{loading ? "-" : String(model.missingReferences)}</p>
+              </div>
+            </div>
+
             <div className="rounded-2xl bg-background/70 p-4 text-sm leading-6 text-muted-foreground">
-              Esta pantalla ya está preparada para evolucionar a un verdadero editor de políticas, con scopes por institución y overrides por usuario.
+              La pantalla ya sirve para validar el contrato ACL compartido, no solo para explicar el modelo en abstracto.
             </div>
           </CardContent>
         </Card>
@@ -261,74 +286,108 @@ export function PermissionsCenter() {
 
       <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
         <CardHeader>
-          <CardTitle>Bundles por rol</CardTitle>
+          <CardTitle>Catálogo de actions</CardTitle>
           <CardDescription>
-            Una primera tabla de paquetes de acceso para que la gobernanza sea entendible incluso antes de tener un backend fino de permisos.
+            El endpoint real de actions ahora queda visible en la UI y deja de ser una dependencia implícita del módulo.
           </CardDescription>
         </CardHeader>
         <CardContent className="overflow-x-auto p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Rol</TableHead>
-                <TableHead>Scope</TableHead>
-                <TableHead>Capacidades principales</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {permissionBundles.map((bundle) => (
-                <TableRow key={bundle.role}>
-                  <TableCell>
-                    <Badge variant={bundle.emphasis}>{bundle.role}</Badge>
-                  </TableCell>
-                  <TableCell>{bundle.scope}</TableCell>
-                  <TableCell>
-                    <div className="flex flex-wrap gap-2">
-                      {bundle.capabilities.map((capability) => (
-                        <Badge key={capability} variant="outline">{capability}</Badge>
-                      ))}
-                    </div>
-                  </TableCell>
+          {loading ? (
+            <div className="p-6">
+              <Skeleton className="h-60 w-full rounded-none" />
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Action</TableHead>
+                  <TableHead>Nombre</TableHead>
+                  <TableHead>Descripción</TableHead>
+                  <TableHead>Actualizada</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {actions.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={4} className="py-10 text-center text-sm text-muted-foreground">
+                      No hay actions cargadas.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  actions.map((action) => (
+                    <TableRow key={action.id}>
+                      <TableCell><Badge variant="secondary">{action.code}</Badge></TableCell>
+                      <TableCell className="font-medium text-foreground">{action.name}</TableCell>
+                      <TableCell>{action.description || "-"}</TableCell>
+                      <TableCell>{action.updatedAt || action.createdAt || "-"}</TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          )}
         </CardContent>
       </Card>
 
       <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
         <CardHeader>
-          <div className="flex items-center gap-2">
-            <Layers3 className="size-5 text-primary" />
-            <CardTitle>Matriz base de capacidades</CardTitle>
-          </div>
+          <CardTitle>Overrides explícitos vigentes</CardTitle>
           <CardDescription>
-            Un paso más allá del badge de rol: qué capacidades se esperan para cada bundle principal.
+            Una tabla operativa para cruzar usuario, feature, action y scope institucional sin salir del dashboard.
           </CardDescription>
         </CardHeader>
         <CardContent className="overflow-x-auto p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Capacidad</TableHead>
-                <TableHead>Roles esperados</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {capabilitiesMatrix.map((row) => (
-                <TableRow key={row.capability}>
-                  <TableCell className="font-medium">{row.capability}</TableCell>
-                  <TableCell>
-                    <div className="flex flex-wrap gap-2">
-                      {row.roles.map((role) => (
-                        <Badge key={role} variant={role === "admin" ? "warning" : "secondary"}>{role}</Badge>
-                      ))}
-                    </div>
-                  </TableCell>
+          {loading ? (
+            <div className="p-6">
+              <Skeleton className="h-72 w-full rounded-none" />
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Usuario</TableHead>
+                  <TableHead>Feature</TableHead>
+                  <TableHead>Action</TableHead>
+                  <TableHead>Scope</TableHead>
+                  <TableHead>Señal</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {model.permissionRows.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={5} className="py-10 text-center text-sm text-muted-foreground">
+                      No hay permisos explícitos activos para mostrar.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  model.permissionRows.map((row) => (
+                    <TableRow key={row.id}>
+                      <TableCell>
+                        <div>
+                          <p className="font-medium text-foreground">{row.userName}</p>
+                          <p className="text-xs text-muted-foreground">{row.userEmail}</p>
+                          <p className="text-xs text-muted-foreground">{row.roleSummary}</p>
+                        </div>
+                      </TableCell>
+                      <TableCell><Badge variant="outline">{row.featureCode}</Badge></TableCell>
+                      <TableCell><Badge variant="secondary">{row.actionCode}</Badge></TableCell>
+                      <TableCell>{row.scopeLabel}</TableCell>
+                      <TableCell>
+                        {row.hasReferenceGap ? (
+                          <Badge variant="warning" className="gap-1">
+                            <AlertTriangle className="size-3" />
+                            referencia incompleta
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline">vigente</Badge>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          )}
         </CardContent>
       </Card>
 
@@ -336,84 +395,61 @@ export function PermissionsCenter() {
         <CardHeader>
           <CardTitle>Perfiles que conviene revisar</CardTitle>
           <CardDescription>
-            Esta parte hace que el módulo empiece a ser operativo: no solo muestra modelo, también señala dónde mirar primero.
+            Usuarios sin rol o con overrides explícitos, para que el módulo también sirva como cola de revisión y no solo como catálogo.
           </CardDescription>
         </CardHeader>
         <CardContent className="overflow-x-auto p-0">
-          {usersQuery.isLoading ? (
+          {loading ? (
             <div className="p-6">
               <Skeleton className="h-72 w-full rounded-none" />
             </div>
-          ) : backendUnavailable ? (
-            <div className="space-y-3 p-6 text-sm leading-6 text-muted-foreground">
-              <p className="font-medium text-foreground">El backend todavía no expone el listado de usuarios para construir una revisión viva de perfiles.</p>
-              <p>
-                Igual la estructura ya quedó lista para integrar revisiones operativas por rol, scope institucional y permisos explícitos apenas exista el endpoint.
-              </p>
-            </div>
-          ) : usersQuery.error ? (
-            <div className="p-6 text-sm text-destructive">{getErrorMessage(usersQuery.error)}</div>
           ) : (
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Usuario</TableHead>
+                  <TableHead>Institución</TableHead>
                   <TableHead>Roles</TableHead>
                   <TableHead>Permisos</TableHead>
-                  <TableHead>Institución</TableHead>
                   <TableHead>Señal</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {metrics.reviewProfiles.length === 0 ? (
+                {model.reviewProfiles.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={5} className="py-10 text-center text-sm text-muted-foreground">
-                      No hay perfiles a revisar todavía.
+                      No hay perfiles marcados para revisión ahora mismo.
                     </TableCell>
                   </TableRow>
                 ) : (
-                  metrics.reviewProfiles.map((item) => {
-                    const signal = item.roles.length === 0
-                      ? "sin rol"
-                      : item.roles.includes("admin") && !item.educationalCenterId
-                        ? "admin global o sin scope"
-                        : item.permissions.length > 0
-                          ? "permiso explícito"
-                          : "revisar";
-
-                    return (
-                      <TableRow key={item.id}>
-                        <TableCell>
-                          <div>
-                            <p className="font-medium text-foreground">{item.fullName}</p>
-                            <p className="text-xs text-muted-foreground">{item.email}</p>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex flex-wrap gap-2">
-                            {item.roles.length ? item.roles.map((role) => (
-                              <Badge key={role} variant={role === "admin" ? "warning" : "secondary"}>{role}</Badge>
-                            )) : <Badge variant="outline">sin rol</Badge>}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          {item.permissions.length ? (
-                            <div className="flex flex-wrap gap-2">
-                              {item.permissions.map((permission) => (
-                                <Badge key={permission} variant="outline">{permission}</Badge>
-                              ))}
-                            </div>
-                          ) : (
-                            <Badge variant="outline">sin permisos explícitos</Badge>
-                          )}
-                        </TableCell>
-                        <TableCell>{item.educationalCenterId || "-"}</TableCell>
-                        <TableCell>
-                          <Badge variant="secondary">{signal}</Badge>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })
+                  model.reviewProfiles.map((item) => (
+                    <TableRow key={item.id}>
+                      <TableCell>
+                        <div>
+                          <p className="font-medium text-foreground">{item.fullName}</p>
+                          <p className="text-xs text-muted-foreground">{item.email}</p>
+                        </div>
+                      </TableCell>
+                      <TableCell>{item.institutionLabel}</TableCell>
+                      <TableCell>
+                        <div className="flex flex-wrap gap-2">
+                          {item.roles.length ? item.roles.map((role) => (
+                            <Badge key={role} variant={role === "admin" ? "warning" : "secondary"}>{role}</Badge>
+                          )) : <Badge variant="outline">sin rol</Badge>}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex flex-wrap gap-2">
+                          {item.permissions.length ? item.permissions.map((permission) => (
+                            <Badge key={permission} variant="outline">{permission}</Badge>
+                          )) : <Badge variant="outline">sin permisos explícitos</Badge>}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={item.signal === "sin rol" ? "warning" : "secondary"}>{item.signal}</Badge>
+                      </TableCell>
+                    </TableRow>
+                  ))
                 )}
               </TableBody>
             </Table>
