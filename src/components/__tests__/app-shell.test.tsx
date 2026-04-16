@@ -40,6 +40,7 @@ describe("AppShell navigation", () => {
         fullName: "Ana Admin",
         email: "ana@example.com",
         roles: ["institution-admin"],
+        permissions: [],
       },
       logout: vi.fn(),
     });
@@ -55,5 +56,21 @@ describe("AppShell navigation", () => {
     expect(screen.queryByText("Permisos")).not.toBeInTheDocument();
     expect(screen.queryByText("Configuración")).not.toBeInTheDocument();
     expect(screen.queryByText("Salud")).not.toBeInTheDocument();
+  });
+
+  it("shows permissions navigation for institution-admin sessions with ACL read access", () => {
+    useAuthMock.mockReturnValue({
+      user: {
+        fullName: "Ana Admin",
+        email: "ana@example.com",
+        roles: ["institution-admin"],
+        permissions: ["access_control:read", "feature:read"],
+      },
+      logout: vi.fn(),
+    });
+
+    renderShell();
+
+    expect(screen.getAllByText("Permisos").length).toBeGreaterThan(0);
   });
 });

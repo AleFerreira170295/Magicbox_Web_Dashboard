@@ -1,18 +1,20 @@
 "use client";
 
-import { useMemo } from "react";
-import type { ComponentType } from "react";
-import { AlertTriangle, KeyRound, Layers3, ShieldCheck, ShieldEllipsis, UserRound } from "lucide-react";
+import { useMemo, useState } from "react";
+import type { ComponentType, SelectHTMLAttributes } from "react";
+import { AlertTriangle, KeyRound, Layers3, Search, ShieldCheck, ShieldEllipsis, UserRound } from "lucide-react";
 import { SectionHeader } from "@/components/section-header";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useAccessActions, useAccessFeatures, usePermissions } from "@/features/access-control/api";
 import { useAuth } from "@/features/auth/auth-context";
 import { useInstitutions } from "@/features/institutions/api";
 import { useUsers } from "@/features/users/api";
-import { getErrorMessage } from "@/lib/utils";
+import { cn, getErrorMessage } from "@/lib/utils";
 
 function SummaryCard({
   label,
@@ -43,19 +45,60 @@ function SummaryCard({
   );
 }
 
+function SelectField(props: SelectHTMLAttributes<HTMLSelectElement>) {
+  return (
+    <select
+      {...props}
+      className={cn(
+        "flex h-10 w-full rounded-lg border border-input bg-white px-3 py-2 text-sm text-foreground shadow-sm outline-none transition focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50",
+        props.className,
+      )}
+    />
+  );
+}
+
 function formatScopeLabel(scopeId: string | null | undefined, institutionName?: string | null) {
   if (!scopeId) return "Global";
   return institutionName?.trim() || scopeId;
 }
 
+function hasAnyPermission(grantedPermissions: string[] | undefined, ...keys: string[]) {
+  const granted = new Set(grantedPermissions || []);
+  return keys.some((key) => granted.has(key));
+}
+
 export function PermissionsCenter() {
   const { tokens, user } = useAuth();
+  const [query, setQuery] = useState("");
+  const [featureFilter, setFeatureFilter] = useState("all");
+  const [actionFilter, setActionFilter] = useState("all");
+  const [scopeFilter, setScopeFilter] = useState("all");
+  const [signalFilter, setSignalFilter] = useState("all");
 
-  const actionsQuery = useAccessActions(tokens?.accessToken);
-  const featuresQuery = useAccessFeatures(tokens?.accessToken);
-  const permissionsQuery = usePermissions(tokens?.accessToken);
-  const usersQuery = useUsers(tokens?.accessToken);
-  const institutionsQuery = useInstitutions(tokens?.accessToken);
+  const currentPermissions = user?.permissions || [];
+  const isAdminView = user?.roles.includes("admin") || false;
+  const isInstitutionAdminView = !isAdminView && (user?.roles.includes("institution-admin") || false);
+
+  const canReadAcl =
+    isAdminView || hasAnyPermission(currentPermissions, "access_control:read", "access-control:read");
+  const canReadFeatureCatalog =
+    isAdminView || hasAnyPermission(currentPermissions, "feature:read", "feature:read:any");
+  const canReadUsers = isAdminView || hasAnyPermission(currentPermissions, "user:read");
+  const canReadInstitutions =
+    isAdminView ||
+    hasAnyPermission(
+      currentPermissions,
+      "educational_center:read",
+      "educational-center:read",
+      "educational_center:read:any",
+      "educational-center:read:any",
+    );
+
+  const actionsQuery = useAccessActions(canReadAcl ? tokens?.accessToken : undefined);
+  const featuresQuery = useAccessFeatures(canReadFeatureCatalog ? tokens?.accessToken : undefined);
+  const permissionsQuery = usePermissions(canReadAcl ? tokens?.accessToken : undefined);
+  const usersQuery = useUsers(canReadUsers ? tokens?.accessToken : undefined);
+  const institutionsQuery = useInstitutions(canReadInstitutions ? tokens?.accessToken : undefined);
 
   const actions = useMemo(() => actionsQuery.data?.data || [], [actionsQuery.data]);
   const features = useMemo(() => featuresQuery.data?.data || [], [featuresQuery.data]);
@@ -64,11 +107,11 @@ export function PermissionsCenter() {
   const institutions = useMemo(() => institutionsQuery.data?.data || [], [institutionsQuery.data]);
 
   const loading =
-    actionsQuery.isLoading ||
-    featuresQuery.isLoading ||
-    permissionsQuery.isLoading ||
-    usersQuery.isLoading ||
-    institutionsQuery.isLoading;
+    (canReadAcl && actionsQuery.isLoading) ||
+    (canReadFeatureCatalog && featuresQuery.isLoading) ||
+    (canReadAcl && permissionsQuery.isLoading) ||
+    (canReadUsers && usersQuery.isLoading) ||
+    (canReadInstitutions && institutionsQuery.isLoading);
 
   const fatalError =
     actionsQuery.error ||
@@ -78,25 +121,19 @@ export function PermissionsCenter() {
     institutionsQuery.error;
 
   const model = useMemo(() => {
+    const normalizedQuery = query.trim().toLowerCase();
     const userById = new Map(users.map((item) => [item.id, item]));
     const featureById = new Map(features.map((item) => [item.id, item]));
     const actionById = new Map(actions.map((item) => [item.id, item]));
     const institutionById = new Map(institutions.map((item) => [item.id, item]));
 
-    const explicitPermissionUsers = new Set(permissions.map((item) => item.userId)).size;
-    const scopedPermissions = permissions.filter((item) => item.educationalCenterId).length;
-    const globalPermissions = permissions.length - scopedPermissions;
-    const missingReferences = permissions.filter(
-      (item) => !userById.has(item.userId) || !featureById.has(item.featureId) || !actionById.has(item.actionId),
-    ).length;
-
     const permissionRows = permissions.map((item) => {
       const actor = userById.get(item.userId);
       const feature = featureById.get(item.featureId);
       const action = actionById.get(item.actionId);
-      const institution = item.educationalCenterId
-        ? institutionById.get(item.educationalCenterId)
-        : undefined;
+      const institution = item.educationalCenterId ? institutionById.get(item.educationalCenterId) : undefined;
+      const scopeLabel = formatScopeLabel(item.educationalCenterId, institution?.name);
+      const signal = !actor || !feature || !action ? "referencia incompleta" : item.educationalCenterId ? "scope institucional" : "global";
 
       return {
         id: item.id,
@@ -105,50 +142,125 @@ export function PermissionsCenter() {
         roleSummary: actor?.roles.length ? actor.roles.join(", ") : "sin rol",
         featureCode: feature?.code || item.featureId,
         actionCode: action?.code || item.actionId,
-        scopeLabel: formatScopeLabel(item.educationalCenterId, institution?.name),
-        createdAt: item.createdAt || null,
+        scopeId: item.educationalCenterId || null,
+        scopeLabel,
+        signal,
         hasReferenceGap: !actor || !feature || !action,
+        searchText: [
+          actor?.fullName,
+          actor?.email,
+          feature?.code,
+          action?.code,
+          scopeLabel,
+          signal,
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase(),
       };
+    });
+
+    const filteredPermissionRows = permissionRows.filter((item) => {
+      if (normalizedQuery && !item.searchText.includes(normalizedQuery)) return false;
+      if (featureFilter !== "all" && item.featureCode !== featureFilter) return false;
+      if (actionFilter !== "all" && item.actionCode !== actionFilter) return false;
+      if (scopeFilter === "global" && item.scopeId) return false;
+      if (scopeFilter !== "all" && scopeFilter !== "global" && item.scopeId !== scopeFilter) return false;
+      if (signalFilter !== "all" && item.signal !== signalFilter) return false;
+      return true;
     });
 
     const reviewProfiles = users
       .filter((item) => item.roles.length === 0 || item.permissions.length > 0)
-      .map((item) => ({
-        id: item.id,
-        fullName: item.fullName,
-        email: item.email,
-        institutionLabel: formatScopeLabel(
-          item.educationalCenterId,
-          item.educationalCenterId ? institutionById.get(item.educationalCenterId)?.name : undefined,
-        ),
-        roles: item.roles,
-        permissions: item.permissions,
-        signal:
-          item.roles.length === 0
-            ? "sin rol"
-            : item.permissions.length > 0
-              ? "override explícito"
-              : "revisar",
-      }))
+      .map((item) => {
+        const institution = item.educationalCenterId ? institutionById.get(item.educationalCenterId) : undefined;
+        const signal = item.roles.length === 0 ? "sin rol" : item.permissions.length > 0 ? "override explícito" : "revisar";
+        return {
+          id: item.id,
+          fullName: item.fullName,
+          email: item.email,
+          institutionLabel: formatScopeLabel(item.educationalCenterId, institution?.name),
+          roles: item.roles,
+          permissions: item.permissions,
+          signal,
+          searchText: [item.fullName, item.email, institution?.name, item.roles.join(" "), item.permissions.join(" "), signal]
+            .filter(Boolean)
+            .join(" ")
+            .toLowerCase(),
+        };
+      });
+
+    const filteredReviewProfiles = reviewProfiles
+      .filter((item) => {
+        if (normalizedQuery && !item.searchText.includes(normalizedQuery)) return false;
+        if (scopeFilter === "global" && item.institutionLabel !== "Global") return false;
+        if (scopeFilter !== "all" && scopeFilter !== "global") {
+          const institution = institutionById.get(scopeFilter);
+          if (item.institutionLabel !== formatScopeLabel(scopeFilter, institution?.name)) return false;
+        }
+        if (signalFilter === "sin rol" && item.signal !== "sin rol") return false;
+        if (signalFilter === "override explícito" && item.signal !== "override explícito") return false;
+        return true;
+      })
       .slice(0, 12);
 
     return {
-      explicitPermissionUsers,
-      scopedPermissions,
-      globalPermissions,
-      missingReferences,
-      permissionRows,
-      reviewProfiles,
+      explicitPermissionUsers: new Set(permissions.map((item) => item.userId)).size,
+      scopedPermissions: permissions.filter((item) => item.educationalCenterId).length,
+      globalPermissions: permissions.filter((item) => !item.educationalCenterId).length,
+      missingReferences: permissionRows.filter((item) => item.hasReferenceGap).length,
+      permissionRows: filteredPermissionRows,
+      reviewProfiles: filteredReviewProfiles,
+      allPermissionRows: permissionRows,
+      availableScopes: [
+        { value: "global", label: "Global" },
+        ...institutions.map((item) => ({ value: item.id, label: item.name })),
+      ],
+      availableSignals: Array.from(new Set(permissionRows.map((item) => item.signal))),
     };
-  }, [actions, features, institutions, permissions, users]);
+  }, [actions, featureFilter, features, institutions, permissions, query, scopeFilter, signalFilter, actionFilter, users]);
+
+  const canRenderGovernance = canReadAcl && canReadFeatureCatalog;
 
   return (
     <div className="space-y-6">
       <SectionHeader
-        eyebrow="Superadmin"
+        eyebrow={isInstitutionAdminView ? "Institution admin" : "Superadmin"}
         title="Permisos"
-        description="Esta pantalla ya dejó de ser conceptual. Ahora usa el catálogo real de actions, features y permisos explícitos para leer la gobernanza efectiva del sistema."
+        description={
+          isInstitutionAdminView
+            ? "Vista acotada por alcance institucional. Lee el catálogo ACL disponible para tu sesión y muestra overrides dentro del alcance que el backend te expone."
+            : "Esta pantalla ya usa el catálogo real de actions, features y permisos explícitos para leer la gobernanza efectiva del sistema."
+        }
       />
+
+      <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
+        <CardContent className="flex flex-wrap items-center gap-3 p-5 text-sm text-muted-foreground">
+          <Badge variant={isInstitutionAdminView ? "secondary" : "warning"}>
+            {isInstitutionAdminView ? "lectura institucional" : "gobernanza global"}
+          </Badge>
+          <Badge variant={canReadAcl ? "secondary" : "outline"}>{canReadAcl ? "ACL legible" : "ACL bloqueada"}</Badge>
+          <Badge variant={canReadFeatureCatalog ? "secondary" : "outline"}>
+            {canReadFeatureCatalog ? "features legibles" : "features bloqueadas"}
+          </Badge>
+          <span>
+            {isInstitutionAdminView
+              ? "Si tu sesión no recibe permisos ACL/feature de lectura, el módulo queda visible pero no intenta pedir datos fuera de alcance."
+              : "La pantalla ya está consolidada como lectura operativa del contrato ACL compartido entre dashboard y backend."}
+          </span>
+        </CardContent>
+      </Card>
+
+      {!canRenderGovernance ? (
+        <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
+          <CardHeader>
+            <CardTitle>Lectura ACL no disponible para esta sesión</CardTitle>
+            <CardDescription>
+              Esta vista necesita al menos lectura sobre access-control y feature. El módulo quedó preparado para institution-admin, pero solo se activa cuando el backend expone esos permisos en la sesión actual.
+            </CardDescription>
+          </CardHeader>
+        </Card>
+      ) : null}
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         {loading ? (
@@ -197,7 +309,7 @@ export function PermissionsCenter() {
           <CardHeader>
             <CardTitle>Catálogo ACL operativo</CardTitle>
             <CardDescription>
-              Acciones, features y volumen real de overrides. Esto sirve para validar si el backend expone la base mínima que la UI necesita.
+              Acciones, features y volumen real de overrides. Esto ya sirve para validar el backend, no solo para explicar el modelo.
             </CardDescription>
           </CardHeader>
           <CardContent className="grid gap-3">
@@ -258,7 +370,7 @@ export function PermissionsCenter() {
             <div>
               <p className="text-sm font-medium text-foreground">Permisos explícitos visibles</p>
               <div className="mt-2 flex flex-wrap gap-2">
-                {user?.permissions.length ? user.permissions.map((permission) => (
+                {currentPermissions.length ? currentPermissions.map((permission) => (
                   <Badge key={permission} variant="outline">{permission}</Badge>
                 )) : <Badge variant="outline">sin permisos explícitos</Badge>}
               </div>
@@ -268,7 +380,7 @@ export function PermissionsCenter() {
               <div className="rounded-2xl bg-white/80 p-4">
                 <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">Perfiles sin rol</p>
                 <p className="mt-2 text-2xl font-semibold text-foreground">
-                  {loading ? "-" : String(users.filter((item) => item.roles.length === 0).length)}
+                  {loading || !canReadUsers ? "-" : String(users.filter((item) => item.roles.length === 0).length)}
                 </p>
               </div>
               <div className="rounded-2xl bg-white/80 p-4">
@@ -276,13 +388,75 @@ export function PermissionsCenter() {
                 <p className="mt-2 text-2xl font-semibold text-foreground">{loading ? "-" : String(model.missingReferences)}</p>
               </div>
             </div>
-
-            <div className="rounded-2xl bg-background/70 p-4 text-sm leading-6 text-muted-foreground">
-              La pantalla ya sirve para validar el contrato ACL compartido, no solo para explicar el modelo en abstracto.
-            </div>
           </CardContent>
         </Card>
       </div>
+
+      <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
+        <CardHeader>
+          <CardTitle>Filtros operativos</CardTitle>
+          <CardDescription>
+            Primero filtros, después lectura acotada. Así la pantalla empieza a servir como mesa de trabajo real sobre ACL.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+          <div className="space-y-2 xl:col-span-2">
+            <Label htmlFor="permissions-query">Buscar</Label>
+            <div className="relative">
+              <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                id="permissions-query"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="Usuario, feature, action, scope o señal"
+                className="pl-9"
+              />
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="permissions-feature-filter">Feature</Label>
+            <SelectField id="permissions-feature-filter" value={featureFilter} onChange={(event) => setFeatureFilter(event.target.value)}>
+              <option value="all">Todas</option>
+              {features.map((feature) => (
+                <option key={feature.id} value={feature.code}>{feature.code}</option>
+              ))}
+            </SelectField>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="permissions-action-filter">Action</Label>
+            <SelectField id="permissions-action-filter" value={actionFilter} onChange={(event) => setActionFilter(event.target.value)}>
+              <option value="all">Todas</option>
+              {actions.map((action) => (
+                <option key={action.id} value={action.code}>{action.code}</option>
+              ))}
+            </SelectField>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="permissions-scope-filter">Scope</Label>
+            <SelectField id="permissions-scope-filter" value={scopeFilter} onChange={(event) => setScopeFilter(event.target.value)}>
+              <option value="all">Todos</option>
+              {model.availableScopes.map((scope) => (
+                <option key={scope.value} value={scope.value}>{scope.label}</option>
+              ))}
+            </SelectField>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="permissions-signal-filter">Señal</Label>
+            <SelectField id="permissions-signal-filter" value={signalFilter} onChange={(event) => setSignalFilter(event.target.value)}>
+              <option value="all">Todas</option>
+              <option value="sin rol">sin rol</option>
+              <option value="override explícito">override explícito</option>
+              {model.availableSignals.map((signal) => (
+                <option key={signal} value={signal}>{signal}</option>
+              ))}
+            </SelectField>
+          </div>
+        </CardContent>
+      </Card>
 
       <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
         <CardHeader>
@@ -333,7 +507,7 @@ export function PermissionsCenter() {
         <CardHeader>
           <CardTitle>Overrides explícitos vigentes</CardTitle>
           <CardDescription>
-            Una tabla operativa para cruzar usuario, feature, action y scope institucional sin salir del dashboard.
+            Tabla filtrable para cruzar usuario, feature, action y scope institucional sin salir del dashboard.
           </CardDescription>
         </CardHeader>
         <CardContent className="overflow-x-auto p-0">
@@ -356,7 +530,7 @@ export function PermissionsCenter() {
                 {model.permissionRows.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={5} className="py-10 text-center text-sm text-muted-foreground">
-                      No hay permisos explícitos activos para mostrar.
+                      No hay overrides que coincidan con los filtros actuales.
                     </TableCell>
                   </TableRow>
                 ) : (
@@ -379,7 +553,7 @@ export function PermissionsCenter() {
                             referencia incompleta
                           </Badge>
                         ) : (
-                          <Badge variant="outline">vigente</Badge>
+                          <Badge variant="outline">{row.signal}</Badge>
                         )}
                       </TableCell>
                     </TableRow>
@@ -395,13 +569,17 @@ export function PermissionsCenter() {
         <CardHeader>
           <CardTitle>Perfiles que conviene revisar</CardTitle>
           <CardDescription>
-            Usuarios sin rol o con overrides explícitos, para que el módulo también sirva como cola de revisión y no solo como catálogo.
+            Usuarios sin rol o con overrides explícitos, para que el módulo también funcione como cola de revisión.
           </CardDescription>
         </CardHeader>
         <CardContent className="overflow-x-auto p-0">
           {loading ? (
             <div className="p-6">
               <Skeleton className="h-72 w-full rounded-none" />
+            </div>
+          ) : !canReadUsers ? (
+            <div className="p-6 text-sm leading-6 text-muted-foreground">
+              La sesión actual puede leer ACL, pero no expone lectura de usuarios suficiente para construir esta cola de revisión.
             </div>
           ) : (
             <Table>
@@ -418,7 +596,7 @@ export function PermissionsCenter() {
                 {model.reviewProfiles.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={5} className="py-10 text-center text-sm text-muted-foreground">
-                      No hay perfiles marcados para revisión ahora mismo.
+                      No hay perfiles marcados para revisión con los filtros actuales.
                     </TableCell>
                   </TableRow>
                 ) : (

@@ -13,7 +13,20 @@ import { cn } from "@/lib/utils";
 
 type NavigationRole = AppRole;
 
-const navigation = [
+type NavigationItem = {
+  href: string;
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+  roles: NavigationRole[];
+  isVisible?: (user: { roles?: string[]; permissions?: string[] } | null | undefined) => boolean;
+};
+
+function hasAnyPermission(user: { permissions?: string[] } | null | undefined, ...keys: string[]) {
+  const granted = new Set(user?.permissions || []);
+  return keys.some((key) => granted.has(key));
+}
+
+const navigation: NavigationItem[] = [
   {
     href: "/dashboard",
     label: "Dashboard",
@@ -42,7 +55,19 @@ const navigation = [
     href: "/permissions",
     label: "Permisos",
     icon: KeyRound,
-    roles: ["admin"] satisfies NavigationRole[],
+    roles: ["admin", "institution-admin"] satisfies NavigationRole[],
+    isVisible: (user) =>
+      Boolean(
+        user?.roles?.includes("admin") ||
+          (user?.roles?.includes("institution-admin") &&
+            hasAnyPermission(
+              user,
+              "access_control:read",
+              "access-control:read",
+              "feature:read",
+              "feature:read:any",
+            )),
+      ),
   },
   {
     href: "/institutions",
@@ -81,9 +106,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const { user, logout } = useAuth();
 
-  const visibleNavigation = navigation.filter((item) =>
-    item.roles.some((role) => user?.roles.includes(role)),
-  );
+  const visibleNavigation = navigation.filter((item) => {
+    const allowedByRole = item.roles.some((role) => user?.roles.includes(role));
+    if (!allowedByRole) return false;
+    return item.isVisible ? item.isVisible(user) : true;
+  });
 
   return (
     <AuthGuard>
