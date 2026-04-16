@@ -721,15 +721,29 @@ export function InstitutionsOverview() {
 
                   <div>
                     <p className="text-sm font-medium text-foreground">Usuarios vinculados</p>
-                    <div className="mt-3 flex flex-wrap gap-2">
+                    <div className="mt-3 grid gap-3">
                       {previewUsers.length > 0 ? (
                         previewUsers.map((user) => (
-                          <Badge key={user.id} variant="secondary">{user.fullName}</Badge>
+                          <div key={user.id} className="rounded-2xl bg-background/70 p-3">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <p className="text-sm font-medium text-foreground">{user.fullName}</p>
+                              <Badge variant="secondary">{user.userType}</Badge>
+                            </div>
+                            <p className="mt-1 text-xs text-muted-foreground">{user.email}</p>
+                            <div className="mt-2 flex flex-wrap gap-2">
+                              {user.roleCodes.map((roleCode) => (
+                                <Badge key={roleCode} variant="outline">{roleCode}</Badge>
+                              ))}
+                              {user.updatedAt ? <Badge variant="outline">act. {formatDateTime(user.updatedAt)}</Badge> : null}
+                            </div>
+                          </div>
                         ))
                       ) : selectedInstitution.linkedUserNames.length > 0 ? (
-                        selectedInstitution.linkedUserNames.slice(0, 8).map((name) => (
-                          <Badge key={name} variant="secondary">{name}</Badge>
-                        ))
+                        <div className="flex flex-wrap gap-2">
+                          {selectedInstitution.linkedUserNames.slice(0, 8).map((name) => (
+                            <Badge key={name} variant="secondary">{name}</Badge>
+                          ))}
+                        </div>
                       ) : (
                         <Badge variant="outline">sin usuarios vinculados</Badge>
                       )}
@@ -738,15 +752,23 @@ export function InstitutionsOverview() {
 
                   <div>
                     <p className="text-sm font-medium text-foreground">Dispositivos vinculados</p>
-                    <div className="mt-3 flex flex-wrap gap-2">
+                    <div className="mt-3 grid gap-3">
                       {previewDevices.length > 0 ? (
                         previewDevices.map((device) => (
-                          <Badge key={device.id} variant="outline">{device.name}</Badge>
+                          <div key={device.id} className="rounded-2xl bg-background/70 p-3">
+                            <p className="text-sm font-medium text-foreground">{device.name}</p>
+                            <div className="mt-2 flex flex-wrap gap-2 text-xs text-muted-foreground">
+                              <Badge variant="outline">{device.deviceId}</Badge>
+                              {device.updatedAt ? <Badge variant="outline">act. {formatDateTime(device.updatedAt)}</Badge> : null}
+                            </div>
+                          </div>
                         ))
                       ) : selectedInstitution.linkedDeviceNames.length > 0 ? (
-                        selectedInstitution.linkedDeviceNames.slice(0, 8).map((name) => (
-                          <Badge key={name} variant="outline">{name}</Badge>
-                        ))
+                        <div className="flex flex-wrap gap-2">
+                          {selectedInstitution.linkedDeviceNames.slice(0, 8).map((name) => (
+                            <Badge key={name} variant="outline">{name}</Badge>
+                          ))}
+                        </div>
                       ) : (
                         <Badge variant="outline">sin dispositivos vinculados</Badge>
                       )}
@@ -755,10 +777,19 @@ export function InstitutionsOverview() {
 
                   <div>
                     <p className="text-sm font-medium text-foreground">Grupos vinculados</p>
-                    <div className="mt-3 flex flex-wrap gap-2">
+                    <div className="mt-3 grid gap-3">
                       {previewClassGroups.length > 0 ? (
                         previewClassGroups.map((classGroup) => (
-                          <Badge key={classGroup.id} variant="outline">{classGroup.name}</Badge>
+                          <div key={classGroup.id} className="rounded-2xl bg-background/70 p-3">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <p className="text-sm font-medium text-foreground">{classGroup.name}</p>
+                              <Badge variant="secondary">{classGroup.studentCount} estudiantes</Badge>
+                            </div>
+                            <div className="mt-2 flex flex-wrap gap-2">
+                              <Badge variant="outline">{classGroup.code}</Badge>
+                              {classGroup.updatedAt ? <Badge variant="outline">act. {formatDateTime(classGroup.updatedAt)}</Badge> : null}
+                            </div>
+                          </div>
                         ))
                       ) : (
                         <Badge variant="outline">sin grupos vinculados</Badge>

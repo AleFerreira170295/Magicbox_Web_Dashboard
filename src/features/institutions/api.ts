@@ -65,6 +65,13 @@ function normalizeOperationalPreview(value: unknown): InstitutionOperationalPrev
           fullName: readString(user, "full_name", "fullName") || "Sin nombre",
           email: readString(user, "email") || "sin-email",
           userType: readString(user, "user_type", "userType") || "-",
+          roleCodes: Array.isArray(user.role_codes)
+            ? user.role_codes.filter((value): value is string => typeof value === "string")
+            : Array.isArray(user.roleCodes)
+              ? user.roleCodes.filter((value): value is string => typeof value === "string")
+              : [],
+          imageUrl: readString(user, "image_url", "imageUrl") || null,
+          updatedAt: readString(user, "updated_at", "updatedAt") || null,
         };
       })
     : [];
@@ -75,28 +82,25 @@ function normalizeOperationalPreview(value: unknown): InstitutionOperationalPrev
           id: readString(device, "id") || "sin-id",
           deviceId: readString(device, "device_id", "deviceId") || "sin-device-id",
           name: readString(device, "name") || "Sin nombre",
+          updatedAt: readString(device, "updated_at", "updatedAt") || null,
         };
       })
     : [];
-  const classGroups = Array.isArray(record.class_groups)
-    ? record.class_groups.map((entry) => {
-        const classGroup = asRecord(entry);
-        return {
-          id: readString(classGroup, "id") || "sin-id",
-          name: readString(classGroup, "name") || "Sin nombre",
-          code: readString(classGroup, "code") || "sin-codigo",
-        };
-      })
+  const rawClassGroups = Array.isArray(record.class_groups)
+    ? record.class_groups
     : Array.isArray(record.classGroups)
-      ? record.classGroups.map((entry) => {
-          const classGroup = asRecord(entry);
-          return {
-            id: readString(classGroup, "id") || "sin-id",
-            name: readString(classGroup, "name") || "Sin nombre",
-            code: readString(classGroup, "code") || "sin-codigo",
-          };
-        })
+      ? record.classGroups
       : [];
+  const classGroups = rawClassGroups.map((entry) => {
+    const classGroup = asRecord(entry);
+    return {
+      id: readString(classGroup, "id") || "sin-id",
+      name: readString(classGroup, "name") || "Sin nombre",
+      code: readString(classGroup, "code") || "sin-codigo",
+      studentCount: Number(classGroup.student_count ?? classGroup.studentCount ?? 0),
+      updatedAt: readString(classGroup, "updated_at", "updatedAt") || null,
+    };
+  });
 
   if (users.length === 0 && devices.length === 0 && classGroups.length === 0) return null;
 

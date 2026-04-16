@@ -22,18 +22,24 @@ export interface InstitutionUserPreview {
   fullName: string;
   email: string;
   userType: string;
+  roleCodes: string[];
+  imageUrl?: string | null;
+  updatedAt?: string | null;
 }
 
 export interface InstitutionDevicePreview {
   id: string;
   deviceId: string;
   name: string;
+  updatedAt?: string | null;
 }
 
 export interface InstitutionClassGroupPreview {
   id: string;
   name: string;
   code: string;
+  studentCount: number;
+  updatedAt?: string | null;
 }
 
 export interface InstitutionOperationalPreview {
