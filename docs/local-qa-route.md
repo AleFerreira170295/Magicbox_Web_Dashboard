@@ -51,6 +51,11 @@ Ruta base de prueba para desarrollo cruzado entre dashboard y backend local.
    - estado real de `/health`, `/health/ready` y `/health/live`
    - checks técnicos de readiness
    - síntesis operativa combinando dispositivos, syncs, games y profiles
+16. Ir a `Settings`.
+17. Verificar:
+   - runtime real del backend y entorno actual
+   - catálogo ACL real de features y actions
+   - política OTA efectiva leída desde backend
 
 ## Estado esperado actual de `Praecepta Education`
 
@@ -171,6 +176,28 @@ Semántica esperada:
 - la tabla debe enriquecer contexto mostrando institución y dispositivo a partir de los catálogos ya cargados en dashboard
 - el panel de detalle debe resumir jugadores, turnos recientes y tasa de éxito sin depender de inspección raw
 
+### Settings read-only con configuración efectiva
+
+```bash
+curl http://127.0.0.1:3000/health
+
+TOKEN="<pegar access_token>"
+curl http://127.0.0.1:3000/api/v1.0/home/ota/release \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+Campos esperados en este slice:
+
+- `health`: `status`, `service`, `version`, `environment`
+- `ota`: `channel`, `configured`, `latest_version`, `mandatory`, `minimum_supported_version`
+- dashboard: catálogos ACL desde `/feature` y `/access-control/action`
+
+Semántica esperada:
+
+- `Settings` debe mostrar configuración efectiva real aunque todavía no exista editor persistente
+- la UI debe explicar runtime, readiness, OTA y catálogos ACL usando datos vivos del backend
+- si OTA no está configurado, debe verse explícitamente como estado válido y no como error de pantalla
+
 ### Health técnico real del backend
 
 ```bash
@@ -259,3 +286,4 @@ Usarla como smoke test después de cambios en:
 - pantalla operativa de `Partidas`
 - vista operativa real de `Profiles`
 - dashboard técnico-operativo de `Health`
+- centro read-only real de `Settings`

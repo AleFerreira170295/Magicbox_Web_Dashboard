@@ -35,6 +35,9 @@ export const apiEndpoints = {
   profiles: {
     overview: "/home/profiles/overview",
   },
+  settings: {
+    otaRelease: "/home/ota/release",
+  },
   syncs: {
     list: "/sync-sessions",
     byId: (id: string) => `/sync-sessions/${id}`,
