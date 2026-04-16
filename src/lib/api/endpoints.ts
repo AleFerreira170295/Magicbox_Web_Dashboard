@@ -13,6 +13,16 @@ export const apiEndpoints = {
     list: "/institutions",
     byId: (id: string) => `/institutions/${id}`,
   },
+  features: {
+    list: "/feature",
+    byId: (id: string) => `/feature/${id}`,
+  },
+  accessControl: {
+    actions: "/access-control/action",
+    actionById: (id: string) => `/access-control/action/${id}`,
+    permissions: "/access-control/permission",
+    permissionById: (id: string) => `/access-control/permission/${id}`,
+  },
   devices: {
     list: "/ble-device",
     byId: (id: string) => `/ble-device/${id}`,

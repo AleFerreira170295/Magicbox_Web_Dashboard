@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { apiEndpoints } from "@/lib/api/endpoints";
 import { apiRequest } from "@/lib/api/fetcher";
 import type { JsonObject, PaginatedResponse } from "@/lib/api/types";
+import { resolvePermissions, resolveRoles } from "@/features/auth/role-resolver";
 import type {
   CreateUserPayload,
   UpdateUserPayload,
@@ -22,11 +23,6 @@ function readString(record: JsonObject, ...keys: string[]) {
     }
   }
   return "";
-}
-
-function readStringArray(value: unknown) {
-  if (!Array.isArray(value)) return [] as string[];
-  return value.filter((item): item is string => typeof item === "string" && item.trim().length > 0);
 }
 
 function normalizeAddress(value: unknown): UserAddress | null {
@@ -56,7 +52,6 @@ function normalizeUser(input: unknown): UserRecord {
     readString(record, "full_name", "fullName", "name", "display_name") ||
     "Sin nombre";
   const email = readString(record, "email") || "sin-email";
-  const explicitRoles = [record.role, ...(Array.isArray(record.roles) ? record.roles : [])];
   const deletedAt = readString(record, "deleted_at", "deletedAt") || null;
 
   return {
@@ -66,8 +61,8 @@ function normalizeUser(input: unknown): UserRecord {
     fullName,
     firstName: firstName || null,
     lastName: lastName || null,
-    roles: readStringArray(explicitRoles),
-    permissions: readStringArray(record.permissions),
+    roles: resolveRoles(record),
+    permissions: resolvePermissions(record),
     userType: readString(record, "user_type", "userType") || null,
     educationalCenterId: readString(record, "educational_center_id", "educationalCenterId") || null,
     status: deletedAt ? "deleted" : "active",
