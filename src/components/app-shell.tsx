@@ -7,35 +7,36 @@ import { AuthGuard } from "@/components/auth-guard";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/features/auth/auth-context";
+import type { AppRole } from "@/features/auth/types";
 import { appConfig } from "@/lib/api/config";
 import { cn } from "@/lib/utils";
 
-type NavigationRole = "teacher" | "director" | "family" | "researcher" | "admin";
+type NavigationRole = AppRole;
 
 const navigation = [
   {
     href: "/dashboard",
     label: "Dashboard",
     icon: BarChart3,
-    roles: ["teacher", "director", "researcher", "admin"] satisfies NavigationRole[],
+    roles: ["teacher", "director", "researcher", "admin", "institution-admin"] satisfies NavigationRole[],
   },
   {
     href: "/syncs",
     label: "Sincronizaciones",
     icon: Cable,
-    roles: ["teacher", "director", "researcher", "admin"] satisfies NavigationRole[],
+    roles: ["teacher", "director", "researcher", "admin", "institution-admin"] satisfies NavigationRole[],
   },
   {
     href: "/games",
     label: "Partidas",
     icon: Database,
-    roles: ["teacher", "director", "researcher", "admin"] satisfies NavigationRole[],
+    roles: ["teacher", "director", "researcher", "admin", "institution-admin"] satisfies NavigationRole[],
   },
   {
     href: "/users",
     label: "Usuarios",
     icon: Users,
-    roles: ["admin"] satisfies NavigationRole[],
+    roles: ["admin", "institution-admin"] satisfies NavigationRole[],
   },
   {
     href: "/permissions",
@@ -47,7 +48,7 @@ const navigation = [
     href: "/institutions",
     label: "Instituciones",
     icon: Building2,
-    roles: ["admin"] satisfies NavigationRole[],
+    roles: ["admin", "institution-admin", "director"] satisfies NavigationRole[],
   },
   {
     href: "/health",
@@ -59,7 +60,7 @@ const navigation = [
     href: "/profiles",
     label: "Perfiles",
     icon: UserRound,
-    roles: ["admin"] satisfies NavigationRole[],
+    roles: ["admin", "institution-admin", "director"] satisfies NavigationRole[],
   },
   {
     href: "/settings",
@@ -71,7 +72,7 @@ const navigation = [
     href: "/devices",
     label: "Dispositivos",
     icon: Smartphone,
-    roles: ["teacher", "director", "admin"] satisfies NavigationRole[],
+    roles: ["teacher", "director", "admin", "institution-admin"] satisfies NavigationRole[],
   },
 ];
 
