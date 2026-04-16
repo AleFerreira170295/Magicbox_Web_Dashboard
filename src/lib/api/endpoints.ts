@@ -9,6 +9,10 @@ export const apiEndpoints = {
     list: "/users",
     byId: (id: string) => `/users/${id}`,
   },
+  institutions: {
+    list: "/institutions",
+    byId: (id: string) => `/institutions/${id}`,
+  },
   devices: {
     list: "/ble-device",
     byId: (id: string) => `/ble-device/${id}`,

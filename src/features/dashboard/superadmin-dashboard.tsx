@@ -251,7 +251,8 @@ export function SuperadminDashboard() {
           title="Instituciones"
           description="Mapa institucional con responsables, configuración, adopción y salud general."
           icon={Building2}
-          status="next"
+          href="/institutions"
+          status="live"
         />
         <ModuleCard
           title="Dispositivos"
