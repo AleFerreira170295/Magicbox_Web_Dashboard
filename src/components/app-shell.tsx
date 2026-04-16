@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Activity, BarChart3, Building2, Cable, Database, KeyRound, LogOut, Shield, Sparkles, Smartphone, UserRound, Users } from "lucide-react";
+import { Activity, BarChart3, Building2, Cable, Database, KeyRound, LogOut, Settings, Shield, Sparkles, Smartphone, UserRound, Users } from "lucide-react";
 import { AuthGuard } from "@/components/auth-guard";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -59,6 +59,12 @@ const navigation = [
     href: "/profiles",
     label: "Perfiles",
     icon: UserRound,
+    roles: ["admin"] satisfies NavigationRole[],
+  },
+  {
+    href: "/settings",
+    label: "Configuración",
+    icon: Settings,
     roles: ["admin"] satisfies NavigationRole[],
   },
   {

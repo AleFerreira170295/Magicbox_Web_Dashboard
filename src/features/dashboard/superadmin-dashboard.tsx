@@ -283,6 +283,13 @@ export function SuperadminDashboard() {
           status="live"
         />
         <ModuleCard
+          title="Configuración global"
+          description="Centro inicial para políticas globales, feature flags y comportamiento transversal del sistema."
+          icon={ShieldCheck}
+          href="/settings"
+          status="live"
+        />
+        <ModuleCard
           title="Partidas y datos"
           description="Acceso transversal a la información visible actual para auditoría y soporte."
           icon={Database}
