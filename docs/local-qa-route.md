@@ -36,6 +36,11 @@ Ruta base de prueba para desarrollo cruzado entre dashboard y backend local.
    - tabla operativa con sesiones visibles para dashboard
    - selección de detalle de sync
    - payload raw más reciente y participantes proyectados
+10. Ir a `Partidas`.
+11. Verificar:
+   - métricas operativas de partidas, jugadores y turnos
+   - filtro por institución y modo de jugadores
+   - panel de detalle con últimos turnos y composición manual/registrada
 
 ## Estado esperado actual de `Praecepta Education`
 
@@ -132,6 +137,30 @@ Semántica esperada:
 - en la UI `Dispositivos`, los casos Home deben verse con badge `Home` y copy explícito de que no requieren centro educativo
 - la pantalla debe permitir editar nombre, owner, firmware, status y alcance (Home/institución) cuando el backend lo autoriza
 
+### Listado operativo de partidas
+
+```bash
+TOKEN="<pegar access_token>"
+curl 'http://127.0.0.1:3000/api/v1.0/game-data/?page=1&limit=5&sort_by=created_at&order=desc' \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+Campos esperados por item en este slice:
+
+- `game_id`
+- `deck_name`
+- `educational_center_id`
+- `ble_device_id`
+- `players`
+- `turns`
+- `start_date`
+
+Semántica esperada:
+
+- la UI `Partidas` debe permitir filtrar por institución y composición de jugadores (registrados, manuales o mixtos)
+- la tabla debe enriquecer contexto mostrando institución y dispositivo a partir de los catálogos ya cargados en dashboard
+- el panel de detalle debe resumir jugadores, turnos recientes y tasa de éxito sin depender de inspección raw
+
 ### Listado operativo de syncs
 
 ```bash
@@ -169,3 +198,4 @@ Usarla como smoke test después de cambios en:
 - UX del dashboard en `Instituciones`
 - contrato, edición mínima y pantalla de `Dispositivos`
 - visibilidad operativa y pantalla de `Syncs`
+- pantalla operativa de `Partidas`
