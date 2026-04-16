@@ -1,0 +1,92 @@
+import { useQuery } from "@tanstack/react-query";
+import { apiEndpoints } from "@/lib/api/endpoints";
+import { apiRequest } from "@/lib/api/fetcher";
+import type { JsonObject, PaginatedResponse } from "@/lib/api/types";
+import type { UserRecord } from "@/features/users/types";
+
+function asRecord(value: unknown): JsonObject {
+  if (value && typeof value === "object" && !Array.isArray(value)) return value as JsonObject;
+  return {};
+}
+
+function readString(record: JsonObject, ...keys: string[]) {
+  for (const key of keys) {
+    const value = record[key];
+    if (typeof value === "string" && value.trim().length > 0) {
+      return value;
+    }
+  }
+  return "";
+}
+
+function readStringArray(value: unknown) {
+  if (!Array.isArray(value)) return [] as string[];
+  return value.filter((item): item is string => typeof item === "string" && item.trim().length > 0);
+}
+
+function normalizeUser(input: unknown): UserRecord {
+  const record = asRecord(input);
+  const firstName = readString(record, "first_name", "firstName");
+  const lastName = readString(record, "last_name", "lastName");
+  const fullName =
+    [firstName, lastName].filter(Boolean).join(" ").trim() ||
+    readString(record, "full_name", "fullName", "name", "display_name") ||
+    "Sin nombre";
+  const email = readString(record, "email") || "sin-email";
+  const explicitRoles = [record.role, ...(Array.isArray(record.roles) ? record.roles : [])];
+
+  return {
+    id: readString(record, "id", "user_id") || `${email}:${fullName}`,
+    email,
+    fullName,
+    firstName: firstName || null,
+    lastName: lastName || null,
+    roles: readStringArray(explicitRoles),
+    permissions: readStringArray(record.permissions),
+    userType: readString(record, "user_type", "userType") || null,
+    educationalCenterId: readString(record, "educational_center_id", "educationalCenterId") || null,
+    status: readString(record, "status") || null,
+    createdAt: readString(record, "created_at", "createdAt") || null,
+    lastLoginAt: readString(record, "last_login_at", "lastLoginAt") || null,
+    raw: record,
+  };
+}
+
+function normalizeResponse(response: unknown): PaginatedResponse<UserRecord> {
+  if (Array.isArray(response)) {
+    return {
+      data: response.map(normalizeUser),
+      page: 1,
+      limit: response.length,
+      total: response.length,
+      total_pages: 1,
+    };
+  }
+
+  const record = asRecord(response);
+  const rawData = Array.isArray(record.data) ? record.data : [];
+  return {
+    data: rawData.map(normalizeUser),
+    page: Number(record.page || 1),
+    limit: Number(record.limit || rawData.length || 0),
+    total: Number(record.total || rawData.length || 0),
+    total_pages: Number(record.total_pages || 1),
+  };
+}
+
+export async function listUsers(token: string) {
+  const response = await apiRequest<unknown>(apiEndpoints.users.list, {
+    token,
+    searchParams: { page: 1, limit: 100, sort_by: "created_at", order: "desc" },
+  });
+
+  return normalizeResponse(response);
+}
+
+export function useUsers(token?: string) {
+  return useQuery({
+    queryKey: ["users", token],
+    queryFn: () => listUsers(token as string),
+    enabled: Boolean(token),
+  });
+}

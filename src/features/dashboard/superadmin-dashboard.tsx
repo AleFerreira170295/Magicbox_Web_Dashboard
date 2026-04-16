@@ -237,7 +237,8 @@ export function SuperadminDashboard() {
           title="Usuarios"
           description="Alta de cuentas, revisión de perfiles, estados de acceso y control operativo de identidad."
           icon={UserPlus}
-          status="next"
+          href="/users"
+          status="live"
         />
         <ModuleCard
           title="Permisos"

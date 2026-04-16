@@ -5,6 +5,10 @@ export const apiEndpoints = {
     logout: "/auth/logout",
     refresh: "/auth/refresh-token",
   },
+  users: {
+    list: "/users",
+    byId: (id: string) => `/users/${id}`,
+  },
   devices: {
     list: "/ble-device",
     byId: (id: string) => `/ble-device/${id}`,
