@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Cpu, Search, ShieldCheck, Smartphone, UserRound, Wifi } from "lucide-react";
+import { Home, Search, ShieldCheck, Smartphone, University, UserRound, Wifi } from "lucide-react";
 import { SectionHeader } from "@/components/section-header";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -47,10 +47,28 @@ function statusLabel(status?: string | null) {
   return status.replaceAll("_", " ");
 }
 
+function scopeBadge(device: { assignmentScope: "home" | "institution"; educationalCenterName?: string | null }) {
+  if (device.assignmentScope === "home") {
+    return <Badge variant="secondary">Home</Badge>;
+  }
+
+  return <Badge variant="outline">{device.educationalCenterName || "Institución"}</Badge>;
+}
+
+function locationLabel(device: {
+  assignmentScope: "home" | "institution";
+  educationalCenterName?: string | null;
+  educationalCenterId?: string | null;
+}) {
+  if (device.assignmentScope === "home") return "Home";
+  return device.educationalCenterName || device.educationalCenterId || "Institución";
+}
+
 export function DevicesTable() {
   const { tokens, user: currentUser } = useAuth();
   const [query, setQuery] = useState("");
   const [institutionFilter, setInstitutionFilter] = useState("all");
+  const [scopeFilter, setScopeFilter] = useState<"all" | "home" | "institution">("all");
   const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null);
 
   const devicesQuery = useDevices(tokens?.accessToken);
@@ -68,13 +86,19 @@ export function DevicesTable() {
     const effectiveInstitutionFilter = institutionFilter === "all" && scopedInstitutionId ? scopedInstitutionId : institutionFilter;
 
     return devices.filter((device) => {
-      if (effectiveInstitutionFilter !== "all" && device.educationalCenterId !== effectiveInstitutionFilter) return false;
+      if (scopeFilter !== "all" && device.assignmentScope !== scopeFilter) return false;
+      if (
+        effectiveInstitutionFilter !== "all" &&
+        (device.assignmentScope !== "institution" || device.educationalCenterId !== effectiveInstitutionFilter)
+      ) {
+        return false;
+      }
       if (!normalized) return true;
 
       return [
         device.deviceId,
         device.name,
-        device.educationalCenterName,
+        device.assignmentScope === "home" ? "home" : device.educationalCenterName,
         device.ownerUserName,
         device.ownerUserEmail,
         device.firmwareVersion,
@@ -83,7 +107,7 @@ export function DevicesTable() {
         .filter(Boolean)
         .some((value) => String(value).toLowerCase().includes(normalized));
     });
-  }, [devices, institutionFilter, query, scopedInstitutionId]);
+  }, [devices, institutionFilter, query, scopeFilter, scopedInstitutionId]);
 
   const selectedDevice = useMemo(
     () => filtered.find((device) => device.id === selectedDeviceId) || devices.find((device) => device.id === selectedDeviceId) || null,
@@ -92,18 +116,22 @@ export function DevicesTable() {
 
   const metrics = useMemo(() => {
     const onlineDevices = devices.filter((device) => (device.status || "").toLowerCase().includes("online")).length;
+    const homeDevices = devices.filter((device) => device.assignmentScope === "home").length;
+    const institutionDevices = devices.filter((device) => device.assignmentScope === "institution").length;
     const devicesWithOwner = devices.filter((device) => Boolean(device.ownerUserId)).length;
-    const devicesWithFirmware = devices.filter((device) => Boolean(device.firmwareVersion)).length;
     const devicesWithMetadata = devices.filter((device) => Object.keys(device.deviceMetadata || {}).length > 0).length;
 
     return {
       total: devices.length,
       onlineDevices,
+      homeDevices,
+      institutionDevices,
       devicesWithOwner,
-      devicesWithFirmware,
       devicesWithMetadata,
     };
   }, [devices]);
+
+  const institutionFilterDisabled = Boolean(scopedInstitutionId) || scopeFilter === "home";
 
   return (
     <div className="space-y-6">
@@ -112,25 +140,34 @@ export function DevicesTable() {
         title="Dispositivos"
         description={
           isInstitutionScopedView
-            ? `Vista operativa de hardware para ${scopedInstitutionName}. Ya refleja el contrato real de /ble-device.`
-            : "Pantalla operativa de hardware conectada al contrato real de /ble-device, con contexto institucional y de ownership."
+            ? `Vista operativa de hardware para ${scopedInstitutionName}, con semántica explícita para dispositivos Home.`
+            : "Pantalla operativa de hardware conectada al contrato real de /ble-device, distinguiendo dispositivos Home y de institución."
         }
         actions={
-          <div className="flex flex-col items-stretch gap-3 md:flex-row md:items-center">
+          <div className="flex flex-col items-stretch gap-3 md:flex-row md:items-center md:flex-wrap">
             <div className="relative min-w-64">
               <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
-                placeholder="Filtrar por deviceId, nombre, institución o responsable"
+                placeholder="Filtrar por deviceId, nombre, Home, institución o responsable"
                 className="pl-9"
               />
             </div>
             <select
+              value={scopeFilter}
+              onChange={(event) => setScopeFilter(event.target.value as "all" | "home" | "institution")}
+              className="h-10 min-w-44 rounded-md border border-input bg-background px-3 text-sm"
+            >
+              <option value="all">Todos los alcances</option>
+              <option value="home">Solo Home</option>
+              <option value="institution">Solo institución</option>
+            </select>
+            <select
               value={institutionFilter}
               onChange={(event) => setInstitutionFilter(event.target.value)}
               className="h-10 min-w-56 rounded-md border border-input bg-background px-3 text-sm"
-              disabled={Boolean(scopedInstitutionId)}
+              disabled={institutionFilterDisabled}
             >
               <option value="all">Todas las instituciones</option>
               {institutions.map((institution) => (
@@ -151,25 +188,27 @@ export function DevicesTable() {
               <Badge variant={isInstitutionScopedView ? "secondary" : "outline"}>
                 {isInstitutionScopedView ? "institution-admin" : "multi-institución / global"}
               </Badge>
+              <Badge variant="secondary">Home explícito</Badge>
             </div>
             <p className="mt-2 text-sm text-muted-foreground">
-              El backend ahora expone nombre de institución, ownership real, firmware, status y metadata del dispositivo en `/ble-device`.
+              El contrato de `/ble-device` ahora distingue explícitamente entre dispositivos <strong>Home</strong> y dispositivos de institución. Un `null` en centro educativo deja de verse como dato roto y pasa a leerse como caso esperado de Home.
             </p>
           </div>
           {scopedInstitutionName ? <Badge variant="outline">Institución activa: {scopedInstitutionName}</Badge> : null}
         </CardContent>
       </Card>
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-6">
         {devicesQuery.isLoading ? (
-          Array.from({ length: 5 }).map((_, index) => <Skeleton key={index} className="h-32 rounded-2xl" />)
+          Array.from({ length: 6 }).map((_, index) => <Skeleton key={index} className="h-32 rounded-2xl" />)
         ) : (
           <>
             <SummaryCard label="Dispositivos" value={String(metrics.total)} hint="Inventario visible según ACL real." icon={Smartphone} />
+            <SummaryCard label="Home" value={String(metrics.homeDevices)} hint="Sin centro educativo asociado, por diseño." icon={Home} />
+            <SummaryCard label="Institución" value={String(metrics.institutionDevices)} hint="Asignados a una institución concreta." icon={University} />
             <SummaryCard label="Online" value={String(metrics.onlineDevices)} hint="Lectura rápida del parque activo." icon={Wifi} />
             <SummaryCard label="Con responsable" value={String(metrics.devicesWithOwner)} hint="Ownership ya resuelto desde backend." icon={UserRound} />
-            <SummaryCard label="Con firmware" value={String(metrics.devicesWithFirmware)} hint="Útil para QA de compatibilidad app/hardware." icon={Cpu} />
-            <SummaryCard label="Con metadata" value={String(metrics.devicesWithMetadata)} hint="Ayuda a ver qué tan enriquecido viene cada sync/dispositivo." icon={ShieldCheck} />
+            <SummaryCard label="Con metadata" value={String(metrics.devicesWithMetadata)} hint="Ayuda a soporte y QA manual." icon={ShieldCheck} />
           </>
         )}
       </div>
@@ -179,7 +218,7 @@ export function DevicesTable() {
           <CardHeader>
             <CardTitle>Parque de dispositivos</CardTitle>
             <CardDescription>
-              Seleccioná un dispositivo para revisar ownership, firmware, status y metadata útil para soporte manual.
+              Seleccioná un dispositivo para revisar si opera en modo Home o institucional, junto con su ownership, firmware, status y metadata útil para soporte manual.
             </CardDescription>
           </CardHeader>
           <CardContent className="overflow-x-auto p-0">
@@ -195,10 +234,10 @@ export function DevicesTable() {
                   <TableRow>
                     <TableHead>Nombre</TableHead>
                     <TableHead>Device ID</TableHead>
-                    <TableHead>Institución</TableHead>
+                    <TableHead>Alcance</TableHead>
+                    <TableHead>Ubicación</TableHead>
                     <TableHead>Responsable</TableHead>
                     <TableHead>Estado</TableHead>
-                    <TableHead>Actualizado</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -217,12 +256,15 @@ export function DevicesTable() {
                       >
                         <TableCell className="font-medium">{device.name}</TableCell>
                         <TableCell className="font-mono text-xs">{device.deviceId}</TableCell>
-                        <TableCell>{device.educationalCenterName || device.educationalCenterId || "-"}</TableCell>
+                        <TableCell>{scopeBadge(device)}</TableCell>
+                        <TableCell>{locationLabel(device)}</TableCell>
                         <TableCell>{device.ownerUserName || device.ownerUserEmail || "sin responsable"}</TableCell>
                         <TableCell>
-                          <Badge variant={device.status ? "secondary" : "outline"}>{statusLabel(device.status)}</Badge>
+                          <div className="flex flex-col gap-1">
+                            <Badge variant={device.status ? "secondary" : "outline"}>{statusLabel(device.status)}</Badge>
+                            <span className="text-xs text-muted-foreground">{formatDateTime(device.updatedAt)}</span>
+                          </div>
                         </TableCell>
-                        <TableCell>{formatDateTime(device.updatedAt)}</TableCell>
                       </TableRow>
                     ))
                   )}
@@ -236,7 +278,7 @@ export function DevicesTable() {
           <CardHeader>
             <CardTitle>Detalle operativo</CardTitle>
             <CardDescription>
-              Este panel usa el contrato enriquecido de `/ble-device` para validar manualmente lo que realmente persiste en backend.
+              Este panel usa la nueva semántica de `/ble-device` para distinguir Home de institución sin tratar el caso Home como observación o dato incompleto.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-5">
@@ -252,10 +294,15 @@ export function DevicesTable() {
                       <p className="text-sm font-semibold text-foreground">{selectedDevice.name}</p>
                       <p className="mt-1 font-mono text-xs text-muted-foreground">{selectedDevice.deviceId}</p>
                     </div>
-                    <Badge variant={selectedDevice.status ? "secondary" : "outline"}>{statusLabel(selectedDevice.status)}</Badge>
+                    <div className="flex flex-wrap items-center gap-2">
+                      {scopeBadge(selectedDevice)}
+                      <Badge variant={selectedDevice.status ? "secondary" : "outline"}>{statusLabel(selectedDevice.status)}</Badge>
+                    </div>
                   </div>
                   <div className="mt-3 grid gap-2 text-xs text-muted-foreground sm:grid-cols-2">
-                    <p>Institución: {selectedDevice.educationalCenterName || selectedDevice.educationalCenterId || "-"}</p>
+                    <p>
+                      Ubicación: {selectedDevice.assignmentScope === "home" ? "Home, sin centro educativo asociado" : locationLabel(selectedDevice)}
+                    </p>
                     <p>Firmware: {selectedDevice.firmwareVersion || "sin firmware"}</p>
                     <p>Responsable: {selectedDevice.ownerUserName || "sin responsable"}</p>
                     <p>Actualizado: {formatDateTime(selectedDevice.updatedAt)}</p>
@@ -271,9 +318,27 @@ export function DevicesTable() {
                 </div>
 
                 <div>
+                  <p className="text-sm font-medium text-foreground">Asignación</p>
+                  <div className="mt-3 rounded-2xl bg-background/70 p-4 text-sm text-muted-foreground">
+                    {selectedDevice.assignmentScope === "home"
+                      ? "Este dispositivo está en alcance Home. Es correcto que no tenga centro educativo asociado."
+                      : `Este dispositivo está asignado a ${locationLabel(selectedDevice)}.`}
+                  </div>
+                </div>
+
+                <div>
                   <p className="text-sm font-medium text-foreground">Metadata cruda</p>
                   <div className="mt-3 rounded-2xl bg-slate-950 p-4 text-xs text-slate-100">
                     <pre className="overflow-x-auto whitespace-pre-wrap">{JSON.stringify(selectedDevice.deviceMetadata || {}, null, 2)}</pre>
+                  </div>
+                </div>
+
+                <div>
+                  <p className="text-sm font-medium text-foreground">Firmware y telemetría</p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <Badge variant="outline">Firmware: {selectedDevice.firmwareVersion || "sin firmware"}</Badge>
+                    <Badge variant="outline">Status: {statusLabel(selectedDevice.status)}</Badge>
+                    <Badge variant="outline">Metadata keys: {String(Object.keys(selectedDevice.deviceMetadata || {}).length)}</Badge>
                   </div>
                 </div>
               </>

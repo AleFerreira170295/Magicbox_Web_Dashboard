@@ -6,6 +6,7 @@ export interface DeviceRecord {
   name: string;
   educationalCenterId?: string | null;
   educationalCenterName?: string | null;
+  assignmentScope: "home" | "institution";
   ownerUserId?: string | null;
   ownerUserName?: string | null;
   ownerUserEmail?: string | null;

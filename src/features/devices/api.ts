@@ -17,6 +17,7 @@ function normalizeDevice(input: unknown): DeviceRecord {
     name: String(record.name || "Sin nombre"),
     educationalCenterId: (record.educational_center_id as string | undefined) || null,
     educationalCenterName: (record.educational_center_name as string | undefined) || null,
+    assignmentScope: record.assignment_scope === "home" ? "home" : "institution",
     ownerUserId: (record.owner_user_id as string | undefined) || null,
     ownerUserName: (record.owner_user_name as string | undefined) || null,
     ownerUserEmail: (record.owner_user_email as string | undefined) || null,

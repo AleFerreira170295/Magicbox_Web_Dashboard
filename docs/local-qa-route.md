@@ -101,6 +101,7 @@ curl http://127.0.0.1:3000/api/v1.0/ble-device \
 
 Campos esperados por item en este slice:
 
+- `assignment_scope` (`home` | `institution`)
 - `educational_center_name`
 - `owner_user_id`
 - `owner_user_name`
@@ -108,6 +109,11 @@ Campos esperados por item en este slice:
 - `firmware_version`
 - `status`
 - `device_metadata`
+
+Semántica esperada:
+
+- si `assignment_scope = "home"`, el dispositivo debe tratarse como Home y no como dato faltante
+- en la UI `Dispositivos`, los casos Home deben verse con badge `Home` y copy explícito de que no requieren centro educativo
 
 ## Cuándo usar esta ruta
 
