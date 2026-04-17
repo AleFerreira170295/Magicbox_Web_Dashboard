@@ -215,6 +215,8 @@ describe("InstitutionsOverview", () => {
 
     expect(screen.getByText("Institution admin")).toBeInTheDocument();
     expect(screen.getByText(/Institución activa: Colegio Norte/)).toBeInTheDocument();
+    expect(screen.getByText("Con usuarios")).toBeInTheDocument();
+    expect(screen.getByText("Con dispositivos")).toBeInTheDocument();
     expect(screen.getByText("Alta no disponible")).toBeDisabled();
     expect(screen.getByText("solo lectura")).toBeInTheDocument();
 
@@ -245,7 +247,7 @@ describe("InstitutionsOverview", () => {
 
     renderInstitutionsOverview();
 
-    expect(screen.getAllByText("Dispositivos vinculados").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Con dispositivos").length).toBeGreaterThan(0);
 
     const institutionRow = screen.getAllByText("Colegio Norte")[0].closest("tr");
     expect(institutionRow).not.toBeNull();

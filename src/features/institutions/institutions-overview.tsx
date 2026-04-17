@@ -311,10 +311,10 @@ export function InstitutionsOverview() {
   const metrics = useMemo(() => {
     return {
       totalInstitutions: institutionRows.length,
-      totalUsersLinked: institutionRows.reduce((acc, item) => acc + item.userCount, 0),
-      totalDevicesLinked: institutionRows.reduce((acc, item) => acc + item.deviceCount, 0),
-      totalClassesLinked: institutionRows.reduce((acc, item) => acc + item.classGroupCount, 0),
-      totalStudentsLinked: institutionRows.reduce((acc, item) => acc + item.studentCount, 0),
+      institutionsWithUsers: institutionRows.filter((item) => item.userCount > 0).length,
+      institutionsWithDevices: institutionRows.filter((item) => item.deviceCount > 0).length,
+      institutionsWithClasses: institutionRows.filter((item) => item.classGroupCount > 0).length,
+      institutionsWithStudents: institutionRows.filter((item) => item.studentCount > 0).length,
       reviewInstitutions: institutionRows.filter((item) => item.needsReview).length,
     };
   }, [institutionRows]);
@@ -452,27 +452,27 @@ export function InstitutionsOverview() {
               icon={Building2}
             />
             <SummaryCard
-              label="Usuarios vinculados"
-              value={String(metrics.totalUsersLinked)}
-              hint="Cruce útil para saber qué instituciones tienen operación humana activa."
+              label="Con usuarios"
+              value={String(metrics.institutionsWithUsers)}
+              hint="Instituciones donde ya hay operación humana activa visible."
               icon={Users}
             />
             <SummaryCard
-              label="Dispositivos vinculados"
-              value={String(metrics.totalDevicesLinked)}
-              hint="Ayuda a leer despliegue físico y cobertura operativa por cliente."
+              label="Con dispositivos"
+              value={String(metrics.institutionsWithDevices)}
+              hint="Sirve para leer despliegue físico y cobertura operativa por cliente."
               icon={Smartphone}
             />
             <SummaryCard
-              label="Grupos vinculados"
-              value={String(metrics.totalClassesLinked)}
-              hint="Ahora sale del backend compartido, útil para leer profundidad pedagógica por institución."
+              label="Con grupos"
+              value={String(metrics.institutionsWithClasses)}
+              hint="Instituciones que ya muestran profundidad pedagógica en backend."
               icon={Building2}
             />
             <SummaryCard
-              label="Estudiantes vinculados"
-              value={String(metrics.totalStudentsLinked)}
-              hint="También viene consolidado desde el backend para no depender solo del dashboard."
+              label="Con estudiantes"
+              value={String(metrics.institutionsWithStudents)}
+              hint="Instituciones con población estudiantil visible en el resumen real."
               icon={Users}
             />
             <SummaryCard

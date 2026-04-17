@@ -485,13 +485,13 @@ export function UsersTable() {
 
   const metrics = useMemo(() => {
     const permissionedUsers = users.filter((item) => item.explicitPermissionKeys.length > 0).length;
-    const adminLikeUsers = users.filter((item) => item.inferredRoles.includes("admin")).length;
+    const institutionLinkedUsers = users.filter((item) => Boolean(item.educationalCenterId)).length;
     const reviewUsers = users.filter((item) => item.needsReview).length;
 
     return {
       totalUsers: usersQuery.data?.total || users.length,
       permissionedUsers,
-      adminLikeUsers,
+      institutionLinkedUsers,
       reviewUsers,
     };
   }, [users, usersQuery.data?.total]);
@@ -895,27 +895,27 @@ export function UsersTable() {
         ) : (
           <>
             <SummaryCard
-              label="Usuarios cargados"
+              label="Usuarios"
               value={String(metrics.totalUsers)}
-              hint="Base total del padrón sobre el endpoint real del backend." 
+              hint="Base total del padrón sobre el endpoint real del backend."
               icon={Users}
             />
             <SummaryCard
-              label="Con permisos explícitos"
-              value={String(metrics.permissionedUsers)}
-              hint="Usuarios ya conectados a ACL más allá del tipo base." 
-              icon={KeyRound}
+              label="Con institución"
+              value={String(metrics.institutionLinkedUsers)}
+              hint="Usuarios ya ligados a una sede concreta dentro del alcance actual."
+              icon={ShieldCheck}
             />
             <SummaryCard
-              label="Perfiles admin"
-              value={String(metrics.adminLikeUsers)}
-              hint="Detectados por permisos globales o bundles aplicados." 
-              icon={ShieldCheck}
+              label="ACL explícita"
+              value={String(metrics.permissionedUsers)}
+              hint="Usuarios conectados a permisos explícitos más allá del tipo base."
+              icon={KeyRound}
             />
             <SummaryCard
               label="Necesitan revisión"
               value={String(metrics.reviewUsers)}
-              hint="Falta de institución, teléfono o dirección." 
+              hint="Falta de institución, teléfono o dirección."
               icon={Phone}
             />
           </>

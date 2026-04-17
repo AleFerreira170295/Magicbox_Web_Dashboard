@@ -178,6 +178,8 @@ describe("UsersTable", () => {
 
     expect(screen.getByText("institution-admin")).toBeInTheDocument();
     expect(screen.getByText(/Institución activa: Colegio Norte/)).toBeInTheDocument();
+    expect(screen.getByText("Con institución")).toBeInTheDocument();
+    expect(screen.getByText("ACL explícita")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Alta no disponible" })).not.toBeInTheDocument();
 
     fireEvent.click(screen.getAllByText("Juan Pérez")[0]);
