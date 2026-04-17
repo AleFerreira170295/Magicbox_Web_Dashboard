@@ -82,9 +82,26 @@ describe("RelevantProfiles", () => {
   it("anchors profiles to the visible institution when the view is institution-scoped", () => {
     renderProfiles();
 
-    expect(screen.getByText("Institution admin")).toBeInTheDocument();
+    expect(screen.getAllByText("Institution admin")[0]).toBeInTheDocument();
     expect(screen.getByText(/Institución activa: Colegio Norte/)).toBeInTheDocument();
-    expect(screen.getByText(/La tabla queda anclada a la institución visible por ACL/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/La tabla queda anclada a la institución visible por ACL/i)[0]).toBeInTheDocument();
+    expect(screen.getAllByRole("combobox")[0]).toBeDisabled();
+  });
+
+  it("keeps the institution-scoped explanation even when no institution-linked profiles are returned", () => {
+    useProfilesOverviewMock.mockReturnValue({
+      data: [],
+      isLoading: false,
+      error: null,
+    });
+
+    renderProfiles();
+
+    expect(screen.getAllByText("Institution admin")[0]).toBeInTheDocument();
+    expect(screen.getAllByText(/La tabla queda anclada a la institución visible por ACL/i)[0]).toBeInTheDocument();
+    expect(
+      screen.getByText(/No hay perfiles Home ligados a la institución visible/i),
+    ).toBeInTheDocument();
     expect(screen.getAllByRole("combobox")[0]).toBeDisabled();
   });
 });

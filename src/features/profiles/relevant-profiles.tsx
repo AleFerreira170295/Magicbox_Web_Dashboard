@@ -50,6 +50,9 @@ export function RelevantProfiles() {
 
   const profilesQuery = useProfilesOverview(tokens?.accessToken);
   const profiles = useMemo(() => profilesQuery.data || [], [profilesQuery.data]);
+  const isScopedActor = Boolean(
+    currentUser?.roles.includes("institution-admin") || currentUser?.roles.includes("director"),
+  );
 
   const institutions = useMemo(() => {
     const map = new Map<string, string>();
@@ -61,9 +64,15 @@ export function RelevantProfiles() {
     return Array.from(map.entries()).map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name));
   }, [profiles]);
 
-  const scopedInstitutionId = institutions.length === 1 ? institutions[0]?.id || null : null;
-  const scopedInstitutionName = scopedInstitutionId ? institutions[0]?.name || scopedInstitutionId : null;
-  const isInstitutionScopedView = Boolean(scopedInstitutionId && currentUser?.educationalCenterId === scopedInstitutionId);
+  const scopedInstitutionId = isScopedActor
+    ? currentUser?.educationalCenterId || null
+    : institutions.length === 1
+      ? institutions[0]?.id || null
+      : null;
+  const scopedInstitutionName = scopedInstitutionId
+    ? institutions.find((institution) => institution.id === scopedInstitutionId)?.name || null
+    : null;
+  const isInstitutionScopedView = Boolean(scopedInstitutionId && isScopedActor);
 
   const filtered = useMemo(() => {
     const normalized = query.trim().toLowerCase();
@@ -220,7 +229,9 @@ export function RelevantProfiles() {
                   {filtered.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={6} className="py-10 text-center text-sm text-muted-foreground">
-                        No hay perfiles para mostrar.
+                        {isInstitutionScopedView
+                          ? "No hay perfiles Home ligados a la institución visible. Los perfiles personales sin vínculo institucional quedan fuera de esta vista operativa."
+                          : "No hay perfiles para mostrar."}
                       </TableCell>
                     </TableRow>
                   ) : (
