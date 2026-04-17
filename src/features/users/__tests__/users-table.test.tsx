@@ -483,6 +483,196 @@ describe("UsersTable", () => {
     expect(await screen.findByText(/Bundle Teacher aplicado en Colegio Norte/i)).toBeInTheDocument();
   });
 
+  it("adds a scoped ACL permission even when the same key already exists globally", async () => {
+    useAuthMock.mockReturnValue({
+      tokens: { accessToken: "token", refreshToken: "refresh" },
+      user: {
+        id: "current-user",
+        email: "admin@example.com",
+        firstName: "Iris",
+        lastName: "Admin",
+        fullName: "Iris Admin",
+        educationalCenterId: null,
+        roles: ["admin"],
+        permissions: ["user:read", "user:update", "access_control:read", "access_control:create", "access_control:update"],
+        raw: {},
+      },
+    });
+
+    useInstitutionsMock.mockReturnValue(
+      okQuery({
+        data: [
+          { id: "ec-1", name: "Colegio Norte", code: null, status: null, city: null, country: null, contactName: null, contactEmail: null, createdAt: null, updatedAt: null, raw: {} },
+          { id: "ec-2", name: "Colegio Sur", code: null, status: null, city: null, country: null, contactName: null, contactEmail: null, createdAt: null, updatedAt: null, raw: {} },
+        ],
+        page: 1,
+        limit: 2,
+        total: 2,
+        total_pages: 1,
+      }),
+    );
+    usePermissionsMock.mockReturnValue(
+      okQuery({
+        data: [
+          {
+            id: "perm-device-global",
+            userId: "user-1",
+            featureId: "feature-device",
+            actionId: "action-read",
+            educationalCenterId: null,
+            createdAt: "2026-04-16T12:00:00Z",
+            updatedAt: "2026-04-16T12:00:00Z",
+            deletedAt: null,
+            raw: {},
+          },
+        ],
+        page: 1,
+        limit: 1,
+        total: 1,
+        total_pages: 1,
+      }),
+    );
+    useAccessActionsMock.mockReturnValue(
+      okQuery({
+        data: [{ id: "action-read", code: "read", name: "Leer", raw: {} }],
+        page: 1,
+        limit: 1,
+        total: 1,
+        total_pages: 1,
+      }),
+    );
+    useAccessFeaturesMock.mockReturnValue(
+      okQuery({
+        data: [{ id: "feature-device", code: "ble_device", name: "Dispositivos", raw: {} }],
+        page: 1,
+        limit: 1,
+        total: 1,
+        total_pages: 1,
+      }),
+    );
+    createPermissionMock.mockResolvedValue({});
+
+    renderUsersTable();
+
+    fireEvent.click(screen.getAllByText("Juan Pérez")[0]);
+
+    const aclScopeField = screen.getByText("Scope ACL").parentElement?.querySelector("select");
+    expect(aclScopeField).toBeTruthy();
+    fireEvent.change(aclScopeField as HTMLSelectElement, { target: { value: "ec-1" } });
+
+    fireEvent.click(screen.getByRole("checkbox", { name: "read" }));
+
+    await waitFor(() => {
+      expect(createPermissionMock).toHaveBeenCalledWith("token", {
+        userId: "user-1",
+        featureId: "feature-device",
+        actionId: "action-read",
+        educationalCenterId: "ec-1",
+      });
+    });
+
+    expect(await screen.findByText(/Permiso ble_device:read agregado en scope Colegio Norte/i)).toBeInTheDocument();
+  });
+
+  it("removes only the scoped ACL permission and keeps the global one untouched", async () => {
+    useAuthMock.mockReturnValue({
+      tokens: { accessToken: "token", refreshToken: "refresh" },
+      user: {
+        id: "current-user",
+        email: "admin@example.com",
+        firstName: "Iris",
+        lastName: "Admin",
+        fullName: "Iris Admin",
+        educationalCenterId: null,
+        roles: ["admin"],
+        permissions: ["user:read", "user:update", "access_control:read", "access_control:create", "access_control:update", "access_control:delete"],
+        raw: {},
+      },
+    });
+
+    useInstitutionsMock.mockReturnValue(
+      okQuery({
+        data: [
+          { id: "ec-1", name: "Colegio Norte", code: null, status: null, city: null, country: null, contactName: null, contactEmail: null, createdAt: null, updatedAt: null, raw: {} },
+          { id: "ec-2", name: "Colegio Sur", code: null, status: null, city: null, country: null, contactName: null, contactEmail: null, createdAt: null, updatedAt: null, raw: {} },
+        ],
+        page: 1,
+        limit: 2,
+        total: 2,
+        total_pages: 1,
+      }),
+    );
+    usePermissionsMock.mockReturnValue(
+      okQuery({
+        data: [
+          {
+            id: "perm-device-global",
+            userId: "user-1",
+            featureId: "feature-device",
+            actionId: "action-read",
+            educationalCenterId: null,
+            createdAt: "2026-04-16T12:00:00Z",
+            updatedAt: "2026-04-16T12:00:00Z",
+            deletedAt: null,
+            raw: {},
+          },
+          {
+            id: "perm-device-ec-1",
+            userId: "user-1",
+            featureId: "feature-device",
+            actionId: "action-read",
+            educationalCenterId: "ec-1",
+            createdAt: "2026-04-16T12:00:00Z",
+            updatedAt: "2026-04-16T12:00:00Z",
+            deletedAt: null,
+            raw: {},
+          },
+        ],
+        page: 1,
+        limit: 2,
+        total: 2,
+        total_pages: 1,
+      }),
+    );
+    useAccessActionsMock.mockReturnValue(
+      okQuery({
+        data: [{ id: "action-read", code: "read", name: "Leer", raw: {} }],
+        page: 1,
+        limit: 1,
+        total: 1,
+        total_pages: 1,
+      }),
+    );
+    useAccessFeaturesMock.mockReturnValue(
+      okQuery({
+        data: [{ id: "feature-device", code: "ble_device", name: "Dispositivos", raw: {} }],
+        page: 1,
+        limit: 1,
+        total: 1,
+        total_pages: 1,
+      }),
+    );
+    deletePermissionMock.mockResolvedValue(undefined);
+
+    renderUsersTable();
+
+    fireEvent.click(screen.getAllByText("Juan Pérez")[0]);
+
+    const aclScopeField = screen.getByText("Scope ACL").parentElement?.querySelector("select");
+    expect(aclScopeField).toBeTruthy();
+    fireEvent.change(aclScopeField as HTMLSelectElement, { target: { value: "ec-1" } });
+
+    fireEvent.click(screen.getByRole("checkbox", { name: "read" }));
+
+    await waitFor(() => {
+      expect(deletePermissionMock).toHaveBeenCalledTimes(1);
+    });
+
+    expect(deletePermissionMock).toHaveBeenCalledWith("token", "perm-device-ec-1");
+    expect(deletePermissionMock).not.toHaveBeenCalledWith("token", "perm-device-global");
+    expect(await screen.findByText(/Permiso ble_device:read removido de scope Colegio Norte/i)).toBeInTheDocument();
+  });
+
   it("deletes the selected user after confirmation", async () => {
     useAuthMock.mockReturnValue({
       tokens: { accessToken: "token", refreshToken: "refresh" },

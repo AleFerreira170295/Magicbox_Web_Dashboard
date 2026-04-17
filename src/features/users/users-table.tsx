@@ -663,7 +663,10 @@ export function UsersTable() {
         for (const permission of permissionEntries) {
           await deletePermissionRequest(tokens.accessToken, permission.id);
         }
-        setFeedback({ type: "success", message: `Permiso ${featureCode}:${actionCode} removido.` });
+        setFeedback({
+          type: "success",
+          message: `Permiso ${featureCode}:${actionCode} removido de scope ${resolveScopeLabel(scope === GLOBAL_SCOPE ? null : scope)}.`,
+        });
       } else {
         await createPermissionRequest(tokens.accessToken, {
           userId: user.id,
