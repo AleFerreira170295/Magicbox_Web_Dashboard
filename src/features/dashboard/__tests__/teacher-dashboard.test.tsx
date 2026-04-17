@@ -39,6 +39,10 @@ function okQuery<T>(data: T) {
   return { data, isLoading: false, error: null };
 }
 
+function errorQuery(message: string) {
+  return { data: undefined, isLoading: false, error: new Error(message) };
+}
+
 function okPaginated(data: unknown[]) {
   return { data, total: data.length, page: 1, limit: data.length || 1, total_pages: 1 };
 }
@@ -100,5 +104,24 @@ describe("TeacherDashboard", () => {
     expect(screen.getAllByText("2").length).toBeGreaterThan(0);
     expect(screen.getByText(/Fuente base para el mapa operativo del parque MagicBox en circulación/i)).toBeInTheDocument();
     expect(screen.getByText(/Sirve para validar el flujo actual mientras completamos la capa lossless/i)).toBeInTheDocument();
+  });
+
+  it("shows empty-state copy when the teacher view has no recent syncs", () => {
+    useGamesMock.mockReturnValue(okQuery(okPaginated([])));
+    useDevicesMock.mockReturnValue(okQuery(okPaginated([])));
+    useSyncSessionsMock.mockReturnValue(okQuery(okPaginated([])));
+
+    renderDashboard();
+
+    expect(screen.getByText("No hay sincronizaciones visibles todavía.")).toBeInTheDocument();
+  });
+
+  it("shows an error banner when one teacher dashboard feed fails", () => {
+    useSyncSessionsMock.mockReturnValue(errorQuery("Syncs docentes caídas"));
+
+    renderDashboard();
+
+    expect(screen.getByText(/No pude cargar una parte del dashboard/i)).toBeInTheDocument();
+    expect(screen.getByText(/Syncs docentes caídas/i)).toBeInTheDocument();
   });
 });

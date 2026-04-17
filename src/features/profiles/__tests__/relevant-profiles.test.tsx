@@ -29,6 +29,14 @@ function renderProfiles() {
   );
 }
 
+function errorQuery(message: string) {
+  return {
+    data: undefined,
+    isLoading: false,
+    error: new Error(message),
+  };
+}
+
 describe("RelevantProfiles", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -150,5 +158,13 @@ describe("RelevantProfiles", () => {
     expect(screen.getByText("MagicBox Aula 1")).toBeInTheDocument();
     expect(screen.getByText("MagicBox Aula 2")).toBeInTheDocument();
     expect(screen.getByText(/Owner Ana Owner/i)).toBeInTheDocument();
+  });
+
+  it("shows the backend error when profiles cannot be loaded", () => {
+    useProfilesOverviewMock.mockReturnValue(errorQuery("Profiles caídos"));
+
+    renderProfiles();
+
+    expect(screen.getByText("Profiles caídos")).toBeInTheDocument();
   });
 });
