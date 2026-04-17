@@ -42,7 +42,7 @@ function SummaryCard({
 }
 
 export function RelevantProfiles() {
-  const { tokens } = useAuth();
+  const { tokens, user: currentUser } = useAuth();
   const [query, setQuery] = useState("");
   const [institutionFilter, setInstitutionFilter] = useState<string>("");
   const [activityFilter, setActivityFilter] = useState<"all" | "active" | "inactive">("all");
@@ -61,11 +61,16 @@ export function RelevantProfiles() {
     return Array.from(map.entries()).map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name));
   }, [profiles]);
 
+  const scopedInstitutionId = institutions.length === 1 ? institutions[0]?.id || null : null;
+  const scopedInstitutionName = scopedInstitutionId ? institutions[0]?.name || scopedInstitutionId : null;
+  const isInstitutionScopedView = Boolean(scopedInstitutionId && currentUser?.educationalCenterId === scopedInstitutionId);
+
   const filtered = useMemo(() => {
     const normalized = query.trim().toLowerCase();
+    const effectiveInstitutionFilter = institutionFilter || scopedInstitutionId || "";
 
     return profiles.filter((profile) => {
-      if (institutionFilter && profile.educationalCenterId !== institutionFilter) return false;
+      if (effectiveInstitutionFilter && profile.educationalCenterId !== effectiveInstitutionFilter) return false;
       if (activityFilter === "active" && !profile.isActive) return false;
       if (activityFilter === "inactive" && profile.isActive) return false;
       if (!normalized) return true;
@@ -81,7 +86,7 @@ export function RelevantProfiles() {
         .filter(Boolean)
         .some((value) => String(value).toLowerCase().includes(normalized));
     });
-  }, [activityFilter, institutionFilter, profiles, query]);
+  }, [activityFilter, institutionFilter, profiles, query, scopedInstitutionId]);
 
   const selectedProfile = useMemo(
     () => filtered.find((profile) => profile.id === selectedProfileId) || profiles.find((profile) => profile.id === selectedProfileId) || null,
@@ -106,9 +111,13 @@ export function RelevantProfiles() {
   return (
     <div className="space-y-6">
       <SectionHeader
-        eyebrow="Perfiles Home"
+        eyebrow={isInstitutionScopedView ? "Institution admin" : "Perfiles Home"}
         title="Profiles"
-        description="Vista operativa real de perfiles Home, con ownership, bindings y actividad de sesiones. Ya no usa `users` como proxy del módulo."
+        description={
+          isInstitutionScopedView
+            ? `Vista operativa real de perfiles Home para ${scopedInstitutionName}, ya alineada con el alcance institucional visible.`
+            : "Vista operativa real de perfiles Home, con ownership, bindings y actividad de sesiones. Ya no usa `users` como proxy del módulo."
+        }
         actions={
           <div className="flex flex-col items-stretch gap-3 md:flex-row md:items-center">
             <div className="relative min-w-72">
@@ -121,9 +130,10 @@ export function RelevantProfiles() {
               />
             </div>
             <select
-              value={institutionFilter}
+              value={institutionFilter || scopedInstitutionId || ""}
               onChange={(event) => setInstitutionFilter(event.target.value)}
               className="h-10 min-w-48 rounded-md border border-input bg-background px-3 text-sm"
+              disabled={Boolean(scopedInstitutionId)}
             >
               <option value="">Todas las instituciones</option>
               {institutions.map((institution) => (
@@ -144,6 +154,26 @@ export function RelevantProfiles() {
           </div>
         }
       />
+
+      <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
+        <CardContent className="flex flex-wrap items-center justify-between gap-4 p-5">
+          <div>
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="text-sm font-medium text-foreground">Alcance operativo</p>
+              <Badge variant={isInstitutionScopedView ? "secondary" : "outline"}>
+                {isInstitutionScopedView ? "institution-admin" : "multi-institución / global"}
+              </Badge>
+              <Badge variant="outline">profiles reales</Badge>
+            </div>
+            <p className="mt-2 text-sm text-muted-foreground">
+              {isInstitutionScopedView
+                ? "La tabla queda anclada a la institución visible por ACL, así que el filtro institucional pasa a ser informativo y no abre otras sedes."
+                : "La vista refleja perfiles reales con ownership, cards y bindings visibles según el alcance actual."}
+            </p>
+          </div>
+          {scopedInstitutionName ? <Badge variant="outline">Institución activa: {scopedInstitutionName}</Badge> : null}
+        </CardContent>
+      </Card>
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
         {profilesQuery.isLoading ? (
