@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { InstitutionsOverview } from "@/features/institutions/institutions-overview";
@@ -188,5 +188,39 @@ describe("InstitutionsOverview", () => {
 
     expect(screen.getByRole("button", { name: "Edición bloqueada" })).toBeDisabled();
     expect(screen.getByText("Sin permiso para eliminar")).toBeInTheDocument();
+  });
+
+  it("shows device linkage in metrics, table and operational impact", () => {
+    useInstitutionByIdMock.mockReturnValue(
+      okQuery({
+        id: "ec-1",
+        operationalPreview: {
+          users: [],
+          devices: [
+            {
+              id: "device-1",
+              deviceId: "mb-1",
+              name: "MagicBox Aula 1",
+              updatedAt: "2026-04-16T18:00:00.000Z",
+            },
+          ],
+          classGroups: [],
+        },
+      }),
+    );
+
+    renderInstitutionsOverview();
+
+    expect(screen.getAllByText("Dispositivos vinculados").length).toBeGreaterThan(0);
+
+    const institutionRow = screen.getAllByText("Colegio Norte")[0].closest("tr");
+    expect(institutionRow).not.toBeNull();
+    expect(within(institutionRow as HTMLTableRowElement).getByText("2")).toBeInTheDocument();
+
+    fireEvent.click(screen.getAllByText("Colegio Norte")[0]);
+
+    expect(screen.getByText(/Dispositivos vinculados: 2/i)).toBeInTheDocument();
+    expect(screen.getByText("MagicBox Aula 1")).toBeInTheDocument();
+    expect(screen.getByText("mb-1")).toBeInTheDocument();
   });
 });

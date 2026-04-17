@@ -58,4 +58,50 @@ describe("SystemHealthDashboard", () => {
     expect(screen.getByText("admin global")).toBeInTheDocument();
     expect(screen.getByText(/No representa una vista scopeada por institución/i)).toBeInTheDocument();
   });
+
+  it("surfaces device operational signals from the shared devices feed", () => {
+    useDevicesMock.mockReturnValue(
+      okQuery(
+        okPaginated([
+          {
+            id: "device-1",
+            deviceId: "mb-1",
+            name: "MagicBox Casa",
+            assignmentScope: "home",
+            status: null,
+            firmwareVersion: "v2.2",
+            updatedAt: "2026-04-16T18:00:00.000Z",
+            raw: {},
+          },
+          {
+            id: "device-2",
+            deviceId: "mb-2",
+            name: "MagicBox Aula 2",
+            assignmentScope: "institution",
+            status: "online",
+            firmwareVersion: "v3.0",
+            updatedAt: "2026-04-16T17:00:00.000Z",
+            raw: {},
+          },
+        ]),
+      ),
+    );
+
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <SystemHealthDashboard />
+      </QueryClientProvider>,
+    );
+
+    expect(screen.getAllByText("Dispositivos sin estado").length).toBeGreaterThan(0);
+    expect(screen.getByText(/Home devices visibles: 1\./i)).toBeInTheDocument();
+    expect(screen.getByText("MagicBox Casa")).toBeInTheDocument();
+    expect(screen.getByText("MagicBox Aula 2")).toBeInTheDocument();
+    expect(screen.getByText("sin estado")).toBeInTheDocument();
+    expect(screen.getByText("online")).toBeInTheDocument();
+    expect(screen.getByText("v2.2")).toBeInTheDocument();
+    expect(screen.getByText("v3.0")).toBeInTheDocument();
+  });
 });

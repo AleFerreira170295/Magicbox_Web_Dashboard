@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { SyncsTable } from "@/features/syncs/syncs-table";
@@ -125,5 +125,33 @@ describe("SyncsTable", () => {
     expect(screen.getByText("Mi actividad")).toBeInTheDocument();
     expect(screen.getByText("historial personal")).toBeInTheDocument();
     expect(screen.getByText(/la tabla queda limitada a tus propias sincronizaciones/i)).toBeInTheDocument();
+  });
+
+  it("resolves the device name from the devices feed in both table and detail", () => {
+    useDevicesMock.mockReturnValue(
+      okQuery({
+        data: [
+          {
+            id: "device-1",
+            deviceId: "mb-1",
+            name: "MagicBox Renombrada",
+            assignmentScope: "institution",
+            raw: {},
+          },
+        ],
+        page: 1,
+        limit: 1,
+        total: 1,
+        total_pages: 1,
+      }),
+    );
+
+    renderSyncsTable();
+
+    expect(screen.getAllByText("MagicBox Renombrada").length).toBeGreaterThan(0);
+
+    fireEvent.click(screen.getByText("MagicBox Renombrada"));
+
+    expect(screen.getByText(/Dispositivo: MagicBox Renombrada/i)).toBeInTheDocument();
   });
 });

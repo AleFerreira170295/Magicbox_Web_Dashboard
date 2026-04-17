@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { GamesTable } from "@/features/games/games-table";
@@ -110,5 +110,33 @@ describe("GamesTable", () => {
     expect(screen.getByText(/Institución activa: Colegio Norte/)).toBeInTheDocument();
     expect(screen.getByText(/La tabla queda anclada a la institución visible por ACL/i)).toBeInTheDocument();
     expect(screen.getAllByRole("combobox")[0]).toBeDisabled();
+  });
+
+  it("resolves the device name from the devices feed in both table and detail", () => {
+    useDevicesMock.mockReturnValue(
+      okQuery({
+        data: [
+          {
+            id: "device-1",
+            deviceId: "mb-1",
+            name: "MagicBox Aula Renombrada",
+            assignmentScope: "institution",
+            raw: {},
+          },
+        ],
+        page: 1,
+        limit: 1,
+        total: 1,
+        total_pages: 1,
+      }),
+    );
+
+    renderGamesTable();
+
+    expect(screen.getAllByText("MagicBox Aula Renombrada").length).toBeGreaterThan(0);
+
+    fireEvent.click(screen.getByText("MagicBox Aula Renombrada"));
+
+    expect(screen.getByText(/Dispositivo: MagicBox Aula Renombrada/i)).toBeInTheDocument();
   });
 });
