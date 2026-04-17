@@ -459,4 +459,59 @@ describe("InstitutionsOverview", () => {
       });
     });
   });
+
+  it("blocks create when required institution fields are missing", async () => {
+    useAuthMock.mockReturnValue({
+      tokens: { accessToken: "token", refreshToken: "refresh" },
+      user: {
+        id: "user-current",
+        email: "admin@example.com",
+        firstName: "Iris",
+        lastName: "Admin",
+        fullName: "Iris Admin",
+        educationalCenterId: null,
+        roles: ["admin"],
+        permissions: ["educational_center:create"],
+        raw: {},
+      },
+    });
+
+    renderInstitutionsOverview();
+
+    fireEvent.click(screen.getByRole("button", { name: "Nueva institución" }));
+    fireEvent.change(screen.getByLabelText("Nombre"), { target: { value: "Colegio Sur" } });
+    fireEvent.click(screen.getByRole("button", { name: "Crear institución" }));
+
+    expect(await screen.findByText("Completá nombre, email y teléfono.")).toBeInTheDocument();
+    expect(createInstitutionMock).not.toHaveBeenCalled();
+  });
+
+  it("blocks create when the institution address is incomplete", async () => {
+    useAuthMock.mockReturnValue({
+      tokens: { accessToken: "token", refreshToken: "refresh" },
+      user: {
+        id: "user-current",
+        email: "admin@example.com",
+        firstName: "Iris",
+        lastName: "Admin",
+        fullName: "Iris Admin",
+        educationalCenterId: null,
+        roles: ["admin"],
+        permissions: ["educational_center:create"],
+        raw: {},
+      },
+    });
+
+    renderInstitutionsOverview();
+
+    fireEvent.click(screen.getByRole("button", { name: "Nueva institución" }));
+    fireEvent.change(screen.getByLabelText("Nombre"), { target: { value: "Colegio Sur" } });
+    fireEvent.change(screen.getByLabelText("Email"), { target: { value: "nuevo@example.com" } });
+    fireEvent.change(screen.getByLabelText("Teléfono"), { target: { value: "+598222222" } });
+    fireEvent.change(screen.getByLabelText("Calle"), { target: { value: "Nueva 456" } });
+    fireEvent.click(screen.getByRole("button", { name: "Crear institución" }));
+
+    expect(await screen.findByText("Completá al menos calle, ciudad y país.")).toBeInTheDocument();
+    expect(createInstitutionMock).not.toHaveBeenCalled();
+  });
 });

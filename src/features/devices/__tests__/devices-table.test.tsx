@@ -317,4 +317,82 @@ describe("DevicesTable", () => {
     expect(screen.getByRole("option", { name: /Carla Sur · carla@example.com/i })).toBeInTheDocument();
     expect(screen.queryByRole("option", { name: /Ana Admin · ana@example.com/i })).not.toBeInTheDocument();
   });
+
+  it("blocks saving when the device name is empty", async () => {
+    useAuthMock.mockReturnValue({
+      tokens: { accessToken: "token", refreshToken: "refresh" },
+      user: {
+        id: "user-current",
+        email: "admin@example.com",
+        firstName: "Iris",
+        lastName: "Admin",
+        fullName: "Iris Admin",
+        educationalCenterId: null,
+        roles: ["admin"],
+        permissions: ["ble_device:update"],
+        raw: {},
+      },
+    });
+
+    useInstitutionsMock.mockReturnValue(
+      okQuery({
+        data: [
+          { id: "ec-1", name: "Colegio Norte", raw: {} },
+          { id: "ec-2", name: "Colegio Sur", raw: {} },
+        ],
+        page: 1,
+        limit: 2,
+        total: 2,
+        total_pages: 1,
+      }),
+    );
+
+    renderDevicesTable();
+
+    fireEvent.click(screen.getAllByText("MagicBox Aula 1")[0]);
+    fireEvent.change(screen.getByDisplayValue("MagicBox Aula 1"), { target: { value: "" } });
+    fireEvent.click(screen.getByRole("button", { name: "Guardar cambios" }));
+
+    expect(await screen.findByText("El nombre es obligatorio.")).toBeInTheDocument();
+    expect(updateDeviceMock).not.toHaveBeenCalled();
+  });
+
+  it("blocks saving an institution-scoped device without institution", async () => {
+    useAuthMock.mockReturnValue({
+      tokens: { accessToken: "token", refreshToken: "refresh" },
+      user: {
+        id: "user-current",
+        email: "admin@example.com",
+        firstName: "Iris",
+        lastName: "Admin",
+        fullName: "Iris Admin",
+        educationalCenterId: null,
+        roles: ["admin"],
+        permissions: ["ble_device:update"],
+        raw: {},
+      },
+    });
+
+    useInstitutionsMock.mockReturnValue(
+      okQuery({
+        data: [
+          { id: "ec-1", name: "Colegio Norte", raw: {} },
+          { id: "ec-2", name: "Colegio Sur", raw: {} },
+        ],
+        page: 1,
+        limit: 2,
+        total: 2,
+        total_pages: 1,
+      }),
+    );
+
+    renderDevicesTable();
+
+    fireEvent.click(screen.getAllByText("MagicBox Aula 1")[0]);
+    fireEvent.change(screen.getAllByRole("combobox")[3], { target: { value: "" } });
+    fireEvent.click(screen.getByRole("button", { name: "Guardar cambios" }));
+
+    expect(await screen.findByText("Elegí una institución para el dispositivo.")).toBeInTheDocument();
+    expect(updateDeviceMock).not.toHaveBeenCalled();
+  });
 });
