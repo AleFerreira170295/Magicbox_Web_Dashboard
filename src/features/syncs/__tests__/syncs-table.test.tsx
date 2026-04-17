@@ -32,6 +32,14 @@ function okQuery<T>(data: T) {
   };
 }
 
+function errorQuery(message: string) {
+  return {
+    data: undefined,
+    isLoading: false,
+    error: new Error(message),
+  };
+}
+
 function renderSyncsTable() {
   const queryClient = new QueryClient({
     defaultOptions: {
@@ -421,5 +429,30 @@ describe("SyncsTable", () => {
     fireEvent.change(screen.getByPlaceholderText(/Filtrar por syncId, origen, mazo, dispositivo o usuario/i), { target: { value: "MagicBox Norte" } });
     expect(screen.getByText("mb-sync-1")).toBeInTheDocument();
     expect(screen.queryByText("mb-sync-2")).not.toBeInTheDocument();
+  });
+
+  it("shows an empty-state message when no syncs are visible", () => {
+    useSyncSessionsMock.mockReturnValue(
+      okQuery({
+        data: [],
+        page: 1,
+        limit: 0,
+        total: 0,
+        total_pages: 0,
+      }),
+    );
+
+    renderSyncsTable();
+
+    expect(screen.getByText("No hay sincronizaciones para mostrar.")).toBeInTheDocument();
+    expect(screen.getByText("Elegí una sincronización para revisar su detalle.")).toBeInTheDocument();
+  });
+
+  it("shows the backend error when sync sessions cannot be loaded", () => {
+    useSyncSessionsMock.mockReturnValue(errorQuery("Syncs caídas"));
+
+    renderSyncsTable();
+
+    expect(screen.getByText("Syncs caídas")).toBeInTheDocument();
   });
 });

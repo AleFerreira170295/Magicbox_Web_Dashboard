@@ -32,6 +32,14 @@ function okQuery<T>(data: T) {
   };
 }
 
+function errorQuery(message: string) {
+  return {
+    data: undefined,
+    isLoading: false,
+    error: new Error(message),
+  };
+}
+
 function renderGamesTable() {
   const queryClient = new QueryClient({
     defaultOptions: {
@@ -338,5 +346,30 @@ describe("GamesTable", () => {
     fireEvent.change(screen.getByPlaceholderText(/Filtrar por mazo, gameId, institución, dispositivo o jugador/i), { target: { value: "MagicBox Norte" } });
     expect(screen.getByText("101")).toBeInTheDocument();
     expect(screen.queryByText("202")).not.toBeInTheDocument();
+  });
+
+  it("shows an empty-state message when no games are visible", () => {
+    useGamesMock.mockReturnValue(
+      okQuery({
+        data: [],
+        page: 1,
+        limit: 0,
+        total: 0,
+        total_pages: 0,
+      }),
+    );
+
+    renderGamesTable();
+
+    expect(screen.getByText("No hay partidas para mostrar.")).toBeInTheDocument();
+    expect(screen.getByText("Elegí una partida para revisar su detalle operativo.")).toBeInTheDocument();
+  });
+
+  it("shows the backend error when games cannot be loaded", () => {
+    useGamesMock.mockReturnValue(errorQuery("Games caídas"));
+
+    renderGamesTable();
+
+    expect(screen.getByText("Games caídas")).toBeInTheDocument();
   });
 });
