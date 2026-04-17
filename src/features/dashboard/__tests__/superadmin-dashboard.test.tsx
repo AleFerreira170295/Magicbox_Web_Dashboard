@@ -54,6 +54,10 @@ function okQuery<T>(data: T) {
   return { data, isLoading: false, error: null };
 }
 
+function errorQuery(message: string) {
+  return { data: undefined, isLoading: false, error: new Error(message) };
+}
+
 function renderDashboard() {
   const queryClient = new QueryClient({
     defaultOptions: {
@@ -178,5 +182,47 @@ describe("SuperadminDashboard", () => {
     expect(screen.getByRole("link", { name: /Dispositivos/i })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /Health/i })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /Settings/i })).toBeInTheDocument();
+  });
+
+  it("keeps a zeroed scoped summary when the command home has no operational records", () => {
+    useAuthMock.mockReturnValue({
+      tokens: { accessToken: "token", refreshToken: "refresh" },
+      user: {
+        fullName: "Paula Control",
+        roles: ["institution-admin"],
+        permissions: ["feature:read", "ble_device:read"],
+      },
+    });
+
+    useUsersMock.mockReturnValue(okQuery(okPaginated([])));
+    useInstitutionsMock.mockReturnValue(okQuery(okPaginated([])));
+    useDevicesMock.mockReturnValue(okQuery(okPaginated([])));
+    useSyncSessionsMock.mockReturnValue(okQuery(okPaginated([])));
+    useGamesMock.mockReturnValue(okQuery(okPaginated([])));
+    useProfilesOverviewMock.mockReturnValue(okQuery([]));
+
+    renderDashboard();
+
+    expect(screen.getByText(/0 usuarios, 0 instituciones y 0 dispositivos visibles/i)).toBeInTheDocument();
+    expect(screen.getByText(/0 syncs, 0 partidas y 0 profiles/i)).toBeInTheDocument();
+    expect(screen.getAllByText("Profiles").length).toBeGreaterThan(0);
+  });
+
+  it("shows an error banner when one executive feed fails", () => {
+    useAuthMock.mockReturnValue({
+      tokens: { accessToken: "token", refreshToken: "refresh" },
+      user: {
+        fullName: "Ada Admin",
+        roles: ["admin"],
+        permissions: ["ble_device:read", "game_data:read"],
+      },
+    });
+
+    useGamesMock.mockReturnValue(errorQuery("Games ejecutivos caídos"));
+
+    renderDashboard();
+
+    expect(screen.getByText(/No pude cargar una parte del dashboard/i)).toBeInTheDocument();
+    expect(screen.getByText(/Games ejecutivos caídos/i)).toBeInTheDocument();
   });
 });
