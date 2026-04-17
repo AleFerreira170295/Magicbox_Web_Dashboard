@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { RelevantProfiles } from "@/features/profiles/relevant-profiles";
@@ -103,5 +103,52 @@ describe("RelevantProfiles", () => {
       screen.getByText(/No hay perfiles Home ligados a la institución visible/i),
     ).toBeInTheDocument();
     expect(screen.getAllByRole("combobox")[0]).toBeDisabled();
+  });
+
+  it("shows bound devices in metrics and profile detail", () => {
+    useProfilesOverviewMock.mockReturnValue({
+      data: [
+        {
+          id: "profile-1",
+          displayName: "Tomi",
+          avatarUrl: null,
+          age: 7,
+          ageCategory: "6-8",
+          isActive: true,
+          userId: "user-1",
+          userName: "Ana Owner",
+          userEmail: "ana@example.com",
+          educationalCenterId: "ec-1",
+          educationalCenterName: "Colegio Norte",
+          bindingCount: 2,
+          activeBindingCount: 2,
+          cardUids: ["card-1", "card-2"],
+          boundDevices: [
+            { id: "device-1", deviceId: "mb-1", name: "MagicBox Aula 1" },
+            { id: "device-2", deviceId: "mb-2", name: "MagicBox Aula 2" },
+          ],
+          sessionCount: 3,
+          lastSessionAt: null,
+          createdAt: null,
+          updatedAt: null,
+          deletedAt: null,
+          raw: {},
+        },
+      ],
+      isLoading: false,
+      error: null,
+    });
+
+    renderProfiles();
+
+    expect(screen.getAllByText("Con tarjeta").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("2").length).toBeGreaterThan(0);
+
+    fireEvent.click(screen.getAllByText("Tomi")[0]);
+
+    expect(screen.getByText("Dispositivos vinculados")).toBeInTheDocument();
+    expect(screen.getByText("MagicBox Aula 1")).toBeInTheDocument();
+    expect(screen.getByText("MagicBox Aula 2")).toBeInTheDocument();
+    expect(screen.getByText(/Owner Ana Owner/i)).toBeInTheDocument();
   });
 });
