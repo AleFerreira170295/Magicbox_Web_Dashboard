@@ -410,6 +410,14 @@ describe("InstitutionsOverview", () => {
     fireEvent.change(screen.getByPlaceholderText(/Buscar por institución, email, usuario o dispositivo/i), { target: { value: "Ana Admin" } });
     expect(screen.getByText("Colegio Norte")).toBeInTheDocument();
     expect(screen.queryByText("Colegio Sur")).not.toBeInTheDocument();
+
+    fireEvent.change(screen.getByPlaceholderText(/Buscar por institución, email, usuario o dispositivo/i), { target: { value: "ana@example.com" } });
+    expect(screen.getByText("Colegio Norte")).toBeInTheDocument();
+    expect(screen.queryByText("Colegio Sur")).not.toBeInTheDocument();
+
+    fireEvent.change(screen.getByPlaceholderText(/Buscar por institución, email, usuario o dispositivo/i), { target: { value: "mb-2" } });
+    expect(screen.getByText("Colegio Sur")).toBeInTheDocument();
+    expect(screen.queryByText("Colegio Norte")).not.toBeInTheDocument();
   });
 
   it("creates institutions with normalized backend payload", async () => {

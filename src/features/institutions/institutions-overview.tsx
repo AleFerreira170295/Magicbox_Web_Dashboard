@@ -80,7 +80,9 @@ type InstitutionRow = InstitutionRecord & {
   classGroupCount: number;
   studentCount: number;
   linkedUserNames: string[];
+  linkedUserSearchTerms: string[];
   linkedDeviceNames: string[];
+  linkedDeviceSearchTerms: string[];
   needsReview: boolean;
 };
 
@@ -216,22 +218,35 @@ export function InstitutionsOverview() {
   });
 
   const usersByInstitutionId = useMemo(() => {
-    const map = new Map<string, string[]>();
+    const map = new Map<string, { names: string[]; searchTerms: string[] }>();
     for (const item of users) {
       if (!item.educationalCenterId) continue;
-      const current = map.get(item.educationalCenterId) || [];
-      current.push(item.fullName);
+      const current = map.get(item.educationalCenterId) || { names: [], searchTerms: [] };
+      if (item.fullName) {
+        current.names.push(item.fullName);
+        current.searchTerms.push(item.fullName);
+      }
+      if (item.email) {
+        current.searchTerms.push(item.email);
+      }
       map.set(item.educationalCenterId, current);
     }
     return map;
   }, [users]);
 
   const devicesByInstitutionId = useMemo(() => {
-    const map = new Map<string, string[]>();
+    const map = new Map<string, { names: string[]; searchTerms: string[] }>();
     for (const item of devices) {
       if (!item.educationalCenterId) continue;
-      const current = map.get(item.educationalCenterId) || [];
-      current.push(item.name || item.deviceId);
+      const current = map.get(item.educationalCenterId) || { names: [], searchTerms: [] };
+      const displayName = item.name || item.deviceId;
+      if (displayName) {
+        current.names.push(displayName);
+        current.searchTerms.push(displayName);
+      }
+      if (item.deviceId) {
+        current.searchTerms.push(item.deviceId);
+      }
       map.set(item.educationalCenterId, current);
     }
     return map;
@@ -239,8 +254,10 @@ export function InstitutionsOverview() {
 
   const institutionRows = useMemo<InstitutionRow[]>(() => {
     return institutions.map((institution) => {
-      const linkedUserNames = usersByInstitutionId.get(institution.id) || [];
-      const linkedDeviceNames = devicesByInstitutionId.get(institution.id) || [];
+      const linkedUsers = usersByInstitutionId.get(institution.id) || { names: [], searchTerms: [] };
+      const linkedDevices = devicesByInstitutionId.get(institution.id) || { names: [], searchTerms: [] };
+      const linkedUserNames = linkedUsers.names;
+      const linkedDeviceNames = linkedDevices.names;
       const userCount = institution.operationalSummary?.userCount ?? linkedUserNames.length;
       const deviceCount = institution.operationalSummary?.deviceCount ?? linkedDeviceNames.length;
       const classGroupCount = institution.operationalSummary?.classGroupCount ?? 0;
@@ -254,7 +271,9 @@ export function InstitutionsOverview() {
         classGroupCount,
         studentCount,
         linkedUserNames,
+        linkedUserSearchTerms: linkedUsers.searchTerms,
         linkedDeviceNames,
+        linkedDeviceSearchTerms: linkedDevices.searchTerms,
         needsReview,
       };
     });
@@ -281,8 +300,8 @@ export function InstitutionsOverview() {
         item.city,
         item.country,
         item.url,
-        ...item.linkedUserNames,
-        ...item.linkedDeviceNames,
+        ...item.linkedUserSearchTerms,
+        ...item.linkedDeviceSearchTerms,
       ]
         .filter(Boolean)
         .some((value) => String(value).toLowerCase().includes(normalized)),
