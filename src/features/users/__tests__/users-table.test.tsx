@@ -1,6 +1,6 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { UsersTable } from "@/features/users/users-table";
 
 const useAuthMock = vi.fn();
@@ -10,6 +10,9 @@ const usePermissionsMock = vi.fn();
 const useAccessActionsMock = vi.fn();
 const useAccessFeaturesMock = vi.fn();
 const useAccessAuditEventsMock = vi.fn();
+const createUserMock = vi.fn();
+const updateUserMock = vi.fn();
+const deleteUserMock = vi.fn();
 
 vi.mock("@/features/auth/auth-context", () => ({
   useAuth: () => useAuthMock(),
@@ -17,9 +20,9 @@ vi.mock("@/features/auth/auth-context", () => ({
 
 vi.mock("@/features/users/api", () => ({
   useUsers: (...args: unknown[]) => useUsersMock(...args),
-  createUser: vi.fn(),
-  updateUser: vi.fn(),
-  deleteUser: vi.fn(),
+  createUser: (...args: unknown[]) => createUserMock(...args),
+  updateUser: (...args: unknown[]) => updateUserMock(...args),
+  deleteUser: (...args: unknown[]) => deleteUserMock(...args),
 }));
 
 vi.mock("@/features/institutions/api", () => ({
@@ -149,6 +152,10 @@ describe("UsersTable", () => {
     setupBaseMocks();
   });
 
+  afterEach(() => {
+    cleanup();
+  });
+
   it("adapts the ACL UI to a single institution scope", () => {
     useAuthMock.mockReturnValue({
       tokens: { accessToken: "token", refreshToken: "refresh" },
@@ -231,5 +238,105 @@ describe("UsersTable", () => {
     expect(screen.getByText(/user:read · Colegio Norte/i)).toBeInTheDocument();
     expect(screen.getByText(/Bundle target: Colegio Norte/i)).toBeInTheDocument();
     expect(screen.getByText(/Scope bloqueado a institución/i)).toBeInTheDocument();
+  });
+
+  it("creates a user with normalized payload and scoped institution", async () => {
+    useAuthMock.mockReturnValue({
+      tokens: { accessToken: "token", refreshToken: "refresh" },
+      user: {
+        id: "current-user",
+        email: "director@example.com",
+        firstName: "Ana",
+        lastName: "Director",
+        fullName: "Ana Director",
+        educationalCenterId: "ec-1",
+        roles: ["institution-admin"],
+        permissions: ["user:read", "user:create", "user:update", "access_control:read", "access_control:update"],
+        raw: {},
+      },
+    });
+
+    createUserMock.mockResolvedValue({
+      ...baseUser,
+      id: "user-2",
+      email: "maria@example.com",
+      fullName: "Maria Gomez",
+      firstName: "Maria",
+      lastName: "Gomez",
+      phoneNumber: "+598222222",
+    });
+
+    renderUsersTable();
+
+    fireEvent.click(screen.getByRole("button", { name: "Nuevo usuario" }));
+
+    fireEvent.change(screen.getByLabelText("Nombre"), { target: { value: "Maria" } });
+    fireEvent.change(screen.getByLabelText("Apellido"), { target: { value: "Gomez" } });
+    fireEvent.change(screen.getByLabelText("Email"), { target: { value: "MARIA@EXAMPLE.COM" } });
+    fireEvent.change(screen.getByLabelText("Contraseña inicial"), { target: { value: "secreta123" } });
+    fireEvent.change(screen.getByLabelText("Teléfono"), { target: { value: "+598222222" } });
+    fireEvent.change(screen.getByLabelText("Calle"), { target: { value: "Av. Siempre Viva 123" } });
+    fireEvent.change(screen.getByLabelText("Ciudad"), { target: { value: "Montevideo" } });
+    fireEvent.change(screen.getByLabelText("País (código)"), { target: { value: "uy" } });
+
+    fireEvent.click(screen.getByRole("button", { name: "Crear usuario" }));
+
+    await waitFor(() => {
+      expect(createUserMock).toHaveBeenCalledWith("token", {
+        firstName: "Maria",
+        lastName: "Gomez",
+        email: "maria@example.com",
+        password: "secreta123",
+        phoneNumber: "+598222222",
+        userType: "web",
+        roles: [],
+        educationalCenterId: "ec-1",
+        imageUrl: null,
+        address: {
+          addressFirstLine: "Av. Siempre Viva 123",
+          addressSecondLine: null,
+          countryCode: "UY",
+          city: "Montevideo",
+          state: null,
+          postalCode: null,
+        },
+      });
+    });
+
+    expect(await screen.findByText("Usuario creado correctamente.")).toBeInTheDocument();
+  });
+
+  it("deletes the selected user after confirmation", async () => {
+    useAuthMock.mockReturnValue({
+      tokens: { accessToken: "token", refreshToken: "refresh" },
+      user: {
+        id: "current-user",
+        email: "admin@example.com",
+        firstName: "Iris",
+        lastName: "Admin",
+        fullName: "Iris Admin",
+        educationalCenterId: null,
+        roles: ["admin"],
+        permissions: ["user:read", "user:update", "user:delete", "access_control:read", "access_control:update"],
+        raw: {},
+      },
+    });
+
+    const confirmSpy = vi.spyOn(globalThis, "confirm").mockReturnValue(true);
+    deleteUserMock.mockResolvedValue(undefined);
+
+    renderUsersTable();
+
+    fireEvent.click(screen.getAllByText("Juan Pérez")[0]);
+    fireEvent.click(screen.getByRole("button", { name: "Eliminar" }));
+
+    await waitFor(() => {
+      expect(deleteUserMock).toHaveBeenCalledWith("token", "user-1");
+    });
+
+    expect(await screen.findByText("Usuario eliminado correctamente.")).toBeInTheDocument();
+    expect(confirmSpy).toHaveBeenCalledWith("¿Eliminar a Juan Pérez?");
+
+    confirmSpy.mockRestore();
   });
 });
