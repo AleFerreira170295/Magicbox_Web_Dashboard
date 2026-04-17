@@ -156,10 +156,20 @@ Beyond device propagation, the current regression suite also covers adjacent con
 
 - `Profiles`: device binding and active binding counts
 - `Users`: institution/ACL detail visibility plus create/delete workflow normalization
-- `Permissions`: institution-scoped filters, review queue signals, and incomplete ACL reference surfacing
+- `Permissions`: institution-scoped filters, review queue signals, incomplete ACL reference surfacing, and blocked governance when ACL read permissions are missing
 - `Settings` + route guards: admin-only command surfaces and effective runtime visibility
 - `AuthGuard` + `LoginForm` + `AppShell`: role landing, redirects, and visible navigation by role
-- `Institutions`: cross-search by linked device/user and normalized create payloads
+- `Institutions`: cross-search by linked device/user, normalized create payloads, and blocked create flows when required fields or address context are incomplete
+- `Devices`: source-side ownership/scope editing plus blocked saves for empty name or institution-scoped devices without institution
+
+## Negative-path coverage added
+
+The suite now explicitly checks local validation and permission-blocked behavior on the most mutation-sensitive screens:
+
+- `Users`: short initial password and incomplete address block creation before hitting the API
+- `Permissions`: institution-admin without ACL/feature read keeps the module visible but governance stays blocked
+- `Institutions`: create flow rejects missing required fields and incomplete address payloads
+- `Devices`: edit flow rejects empty names and invalid institution-scoped submissions
 
 ## Latest combined regression snapshot
 
@@ -180,3 +190,4 @@ A build is green for this matrix when:
 - institution-linked counts/previews update after scope reassignment
 - sync/game operator filters still resolve the correct device, institution, and player context
 - user and ACL review workflows remain scoped, normalized, and role-safe
+- source workflows fail safely on invalid local input before mutating backend state
