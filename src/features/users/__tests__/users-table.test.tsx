@@ -242,6 +242,63 @@ describe("UsersTable", () => {
     expect(screen.getByText(/Scope bloqueado a institución/i)).toBeInTheDocument();
   });
 
+  it("renders audit history with resolved permission keys and role snapshots", () => {
+    useAuthMock.mockReturnValue({
+      tokens: { accessToken: "token", refreshToken: "refresh" },
+      user: {
+        id: "current-user",
+        email: "admin@example.com",
+        firstName: "Iris",
+        lastName: "Admin",
+        fullName: "Iris Admin",
+        educationalCenterId: "ec-1",
+        roles: ["admin"],
+        permissions: ["user:read", "user:update", "access_control:read", "access_control:update"],
+        raw: {},
+      },
+    });
+    useAccessAuditEventsMock.mockReturnValue(
+      okQuery([
+        {
+          id: "audit-role-1",
+          targetUserId: "user-1",
+          actorUserId: "current-user",
+          entityType: "role",
+          entityId: "director",
+          eventType: "role.assigned",
+          educationalCenterId: "ec-1",
+          payload: { roles: ["director", "teacher"], source: "update_user" },
+          createdAt: "2026-04-16T12:30:00Z",
+          raw: {},
+        },
+        {
+          id: "audit-perm-1",
+          targetUserId: "user-1",
+          actorUserId: "current-user",
+          entityType: "permission",
+          entityId: "perm-1",
+          eventType: "permission.deleted",
+          educationalCenterId: "ec-1",
+          payload: { feature_id: "feature-user", action_id: "action-read" },
+          createdAt: "2026-04-16T12:35:00Z",
+          raw: {},
+        },
+      ]),
+    );
+
+    renderUsersTable();
+
+    fireEvent.click(screen.getAllByText("Juan Pérez")[0]);
+
+    expect(screen.getByText("Rol asignado")).toBeInTheDocument();
+    expect(screen.getByText("Roles actuales: director, teacher.")).toBeInTheDocument();
+    expect(screen.getByText("update_user")).toBeInTheDocument();
+    expect(screen.getAllByText("actor sesión actual").length).toBeGreaterThan(0);
+    expect(screen.getByText("Permiso eliminado")).toBeInTheDocument();
+    expect(screen.getAllByText("user:read").length).toBeGreaterThan(0);
+    expect(screen.getByText("Permiso user:read.")).toBeInTheDocument();
+  });
+
   it("creates a user with normalized payload and scoped institution", async () => {
     useAuthMock.mockReturnValue({
       tokens: { accessToken: "token", refreshToken: "refresh" },

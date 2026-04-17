@@ -19,7 +19,7 @@ import {
   useAccessFeatures,
   usePermissions,
 } from "@/features/access-control/api";
-import type { PermissionRecord } from "@/features/access-control/types";
+import type { AccessAuditEventRecord, PermissionRecord } from "@/features/access-control/types";
 import { useAuth } from "@/features/auth/auth-context";
 import { useInstitutions } from "@/features/institutions/api";
 import { createUser, deleteUser, updateUser, useUsers } from "@/features/users/api";
@@ -242,6 +242,22 @@ function inferRoles(user: UserRecord, permissionKeys: string[]) {
   }
 
   return Array.from(roles);
+}
+
+function readPayloadString(payload: Record<string, unknown>, ...keys: string[]) {
+  for (const key of keys) {
+    const value = payload[key];
+    if (typeof value === "string" && value.trim().length > 0) {
+      return value;
+    }
+  }
+  return "";
+}
+
+function readPayloadStringArray(payload: Record<string, unknown>, key: string) {
+  const value = payload[key];
+  if (!Array.isArray(value)) return [] as string[];
+  return value.filter((item): item is string => typeof item === "string" && item.trim().length > 0);
 }
 
 function SummaryCard({
@@ -606,6 +622,24 @@ export function UsersTable() {
       "permission.restored": "Permiso restaurado",
     };
     return labels[eventType] || eventType;
+  }
+
+  function describeAuditEvent(event: AccessAuditEventRecord) {
+    const featureId = readPayloadString(event.payload, "feature_id", "featureId");
+    const actionId = readPayloadString(event.payload, "action_id", "actionId");
+    const featureCode = featureId ? featuresById.get(featureId)?.code || featureId : "";
+    const actionCode = actionId ? actionsById.get(actionId)?.code || actionId : "";
+    const permissionKey = featureCode && actionCode ? `${featureCode}:${actionCode}` : "";
+    const roles = readPayloadStringArray(event.payload, "roles");
+    const source = readPayloadString(event.payload, "source");
+    const actor = event.actorUserId ? (event.actorUserId === currentUser?.id ? "sesión actual" : event.actorUserId) : "";
+
+    return {
+      permissionKey,
+      roles,
+      source,
+      actor,
+    };
   }
 
   function selectUser(user: UserRow) {
@@ -1364,21 +1398,33 @@ export function UsersTable() {
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {auditEventsQuery.data.map((event) => (
-                    <div key={event.id} className="rounded-2xl border border-border bg-white/80 p-4">
-                      <div className="flex flex-wrap items-center justify-between gap-3">
-                        <div>
-                          <p className="text-sm font-medium text-foreground">{formatAuditEventLabel(event.eventType)}</p>
-                          <p className="text-xs text-muted-foreground">{formatDateTime(event.createdAt)}</p>
-                        </div>
-                        <div className="flex flex-wrap gap-2">
-                          <Badge variant="outline">{event.entityType}</Badge>
-                          <Badge variant="outline">{resolveScopeLabel(event.educationalCenterId)}</Badge>
-                          {event.entityId ? <Badge variant="outline">{event.entityId}</Badge> : null}
+                  {auditEventsQuery.data.map((event) => {
+                    const details = describeAuditEvent(event);
+
+                    return (
+                      <div key={event.id} className="rounded-2xl border border-border bg-white/80 p-4">
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                          <div>
+                            <p className="text-sm font-medium text-foreground">{formatAuditEventLabel(event.eventType)}</p>
+                            <p className="text-xs text-muted-foreground">{formatDateTime(event.createdAt)}</p>
+                            {details.permissionKey ? (
+                              <p className="mt-2 text-sm text-muted-foreground">Permiso {details.permissionKey}.</p>
+                            ) : null}
+                            {details.roles.length > 0 ? (
+                              <p className="mt-1 text-sm text-muted-foreground">Roles actuales: {details.roles.join(", ")}.</p>
+                            ) : null}
+                          </div>
+                          <div className="flex flex-wrap gap-2">
+                            <Badge variant="outline">{event.entityType}</Badge>
+                            <Badge variant="outline">{resolveScopeLabel(event.educationalCenterId)}</Badge>
+                            {details.permissionKey ? <Badge variant="outline">{details.permissionKey}</Badge> : event.entityId ? <Badge variant="outline">{event.entityId}</Badge> : null}
+                            {details.source ? <Badge variant="outline">{details.source}</Badge> : null}
+                            {details.actor ? <Badge variant="outline">actor {details.actor}</Badge> : null}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </CardContent>
