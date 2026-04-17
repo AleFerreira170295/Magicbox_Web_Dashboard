@@ -691,7 +691,12 @@ export function UsersTable() {
       return;
     }
 
-    const missingKeys = bundle.permissionKeys.filter((key) => !user.explicitPermissionKeys.includes(key));
+    const scopedPermissionKeys = new Set(
+      user.explicitPermissions
+        .filter((item) => (scope === GLOBAL_SCOPE ? !item.educationalCenterId : item.educationalCenterId === scope))
+        .map((item) => item.key),
+    );
+    const missingKeys = bundle.permissionKeys.filter((key) => !scopedPermissionKeys.has(key));
     const nextRoles = Array.from(new Set([...user.roles, bundle.role])).sort();
     if (missingKeys.length === 0 && user.roles.includes(bundle.role)) {
       setFeedback({ type: "success", message: `El bundle ${bundle.label} ya está completo.` });
