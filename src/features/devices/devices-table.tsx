@@ -365,19 +365,19 @@ export function DevicesTable() {
   );
 
   const metrics = useMemo(() => {
-    const onlineDevices = devices.filter((device) => (device.status || "").toLowerCase().includes("online")).length;
     const homeDevices = devices.filter((device) => device.assignmentScope === "home").length;
     const institutionDevices = devices.filter((device) => device.assignmentScope === "institution").length;
     const devicesWithOwner = devices.filter((device) => Boolean(device.ownerUserId)).length;
-    const devicesWithMetadata = devices.filter((device) => Object.keys(device.deviceMetadata || {}).length > 0).length;
+    const devicesWithStatus = devices.filter((device) => Boolean(device.status)).length;
+    const devicesWithoutStatus = devices.length - devicesWithStatus;
 
     return {
       total: devices.length,
-      onlineDevices,
       homeDevices,
       institutionDevices,
       devicesWithOwner,
-      devicesWithMetadata,
+      devicesWithStatus,
+      devicesWithoutStatus,
     };
   }, [devices]);
 
@@ -459,9 +459,9 @@ export function DevicesTable() {
             <SummaryCard label="Dispositivos" value={String(metrics.total)} hint="Inventario visible según ACL real." icon={Smartphone} />
             <SummaryCard label="Home" value={String(metrics.homeDevices)} hint="Sin centro educativo asociado, por diseño." icon={Home} />
             <SummaryCard label="Institución" value={String(metrics.institutionDevices)} hint="Asignados a una institución concreta." icon={University} />
-            <SummaryCard label="Online" value={String(metrics.onlineDevices)} hint="Lectura rápida del parque activo." icon={Wifi} />
+            <SummaryCard label="Con estado" value={String(metrics.devicesWithStatus)} hint="Dispositivos con status operativo explícito." icon={Wifi} />
             <SummaryCard label="Con responsable" value={String(metrics.devicesWithOwner)} hint="Ownership ya resuelto desde backend." icon={UserRound} />
-            <SummaryCard label="Con metadata" value={String(metrics.devicesWithMetadata)} hint="Ayuda a soporte y QA manual." icon={ShieldCheck} />
+            <SummaryCard label="Sin estado" value={String(metrics.devicesWithoutStatus)} hint="Conviene revisarlos porque todavía no publican status." icon={ShieldCheck} />
           </>
         )}
       </div>

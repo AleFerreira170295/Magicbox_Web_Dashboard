@@ -151,6 +151,8 @@ describe("DevicesTable", () => {
 
     expect(screen.getByText("institution-admin")).toBeInTheDocument();
     expect(screen.getByText(/Institución activa: Colegio Norte/)).toBeInTheDocument();
+    expect(screen.getByText("Con estado")).toBeInTheDocument();
+    expect(screen.getByText("Sin estado")).toBeInTheDocument();
     expect(screen.getByText("solo lectura")).toBeInTheDocument();
 
     fireEvent.click(screen.getAllByText("MagicBox Aula 1")[0]);
