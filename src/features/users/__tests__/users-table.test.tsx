@@ -339,4 +339,67 @@ describe("UsersTable", () => {
 
     confirmSpy.mockRestore();
   });
+
+  it("blocks create when the initial password is too short", async () => {
+    useAuthMock.mockReturnValue({
+      tokens: { accessToken: "token", refreshToken: "refresh" },
+      user: {
+        id: "current-user",
+        email: "director@example.com",
+        firstName: "Ana",
+        lastName: "Director",
+        fullName: "Ana Director",
+        educationalCenterId: "ec-1",
+        roles: ["institution-admin"],
+        permissions: ["user:read", "user:create", "user:update", "access_control:read", "access_control:update"],
+        raw: {},
+      },
+    });
+
+    renderUsersTable();
+
+    fireEvent.click(screen.getByRole("button", { name: "Nuevo usuario" }));
+    fireEvent.change(screen.getByLabelText("Nombre"), { target: { value: "Lola" } });
+    fireEvent.change(screen.getByLabelText("Apellido"), { target: { value: "Cruz" } });
+    fireEvent.change(screen.getByLabelText("Email"), { target: { value: "lola@example.com" } });
+    fireEvent.change(screen.getByLabelText("Contraseña inicial"), { target: { value: "corta" } });
+    fireEvent.change(screen.getByLabelText("Teléfono"), { target: { value: "+598333333" } });
+
+    fireEvent.click(screen.getByRole("button", { name: "Crear usuario" }));
+
+    expect(await screen.findByText("La contraseña inicial debe tener al menos 8 caracteres.")).toBeInTheDocument();
+    expect(createUserMock).not.toHaveBeenCalled();
+  });
+
+  it("blocks create when the address is incomplete", async () => {
+    useAuthMock.mockReturnValue({
+      tokens: { accessToken: "token", refreshToken: "refresh" },
+      user: {
+        id: "current-user",
+        email: "director@example.com",
+        firstName: "Ana",
+        lastName: "Director",
+        fullName: "Ana Director",
+        educationalCenterId: "ec-1",
+        roles: ["institution-admin"],
+        permissions: ["user:read", "user:create", "user:update", "access_control:read", "access_control:update"],
+        raw: {},
+      },
+    });
+
+    renderUsersTable();
+
+    fireEvent.click(screen.getByRole("button", { name: "Nuevo usuario" }));
+    fireEvent.change(screen.getByLabelText("Nombre"), { target: { value: "Lola" } });
+    fireEvent.change(screen.getByLabelText("Apellido"), { target: { value: "Cruz" } });
+    fireEvent.change(screen.getByLabelText("Email"), { target: { value: "lola@example.com" } });
+    fireEvent.change(screen.getByLabelText("Contraseña inicial"), { target: { value: "secreta123" } });
+    fireEvent.change(screen.getByLabelText("Teléfono"), { target: { value: "+598333333" } });
+    fireEvent.change(screen.getByLabelText("Calle"), { target: { value: "Calle falsa 123" } });
+
+    fireEvent.click(screen.getByRole("button", { name: "Crear usuario" }));
+
+    expect(await screen.findByText("Si cargás dirección, completá al menos calle, ciudad y país.")).toBeInTheDocument();
+    expect(createUserMock).not.toHaveBeenCalled();
+  });
 });

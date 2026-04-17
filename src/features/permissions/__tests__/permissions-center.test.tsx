@@ -277,4 +277,31 @@ describe("PermissionsCenter", () => {
     expect(within(overridesTable).getByText("referencia incompleta")).toBeInTheDocument();
     expect(within(overridesTable).getByText("Global")).toBeInTheDocument();
   });
+
+  it("keeps the module visible but blocks ACL governance when read permissions are missing", () => {
+    useAuthMock.mockReturnValue({
+      tokens: { accessToken: "token", refreshToken: "refresh" },
+      user: {
+        id: "user-current",
+        email: "maite@example.com",
+        firstName: "Maite",
+        lastName: "Viewer",
+        fullName: "Maite Viewer",
+        educationalCenterId: "ec-1",
+        roles: ["institution-admin"],
+        permissions: ["user:read"],
+        raw: {},
+      },
+    });
+
+    renderPermissionsCenter();
+
+    expect(screen.getByText("ACL bloqueada")).toBeInTheDocument();
+    expect(screen.getByText("features bloqueadas")).toBeInTheDocument();
+    expect(screen.getByText(/Lectura ACL no disponible para esta sesión/i)).toBeInTheDocument();
+    expect(screen.getByText(/solo se activa cuando el backend expone esos permisos/i)).toBeInTheDocument();
+    expect(useAccessActionsMock).toHaveBeenCalledWith(undefined);
+    expect(useAccessFeaturesMock).toHaveBeenCalledWith(undefined);
+    expect(usePermissionsMock).toHaveBeenCalledWith(undefined);
+  });
 });
