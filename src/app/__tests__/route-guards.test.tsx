@@ -1,9 +1,10 @@
-import { render, screen } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { cleanup, render, screen } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import DashboardPage from "@/app/(app)/dashboard/page";
 import DevicesPage from "@/app/(app)/devices/page";
 import GamesPage from "@/app/(app)/games/page";
 import SyncsPage from "@/app/(app)/syncs/page";
+import SettingsPage from "@/app/(app)/settings/page";
 
 const useAuthMock = vi.fn();
 
@@ -27,9 +28,17 @@ vi.mock("@/features/syncs/syncs-table", () => ({
   SyncsTable: () => <div>syncs-table</div>,
 }));
 
+vi.mock("@/features/settings/system-settings-center", () => ({
+  SystemSettingsCenter: () => <div>system-settings-center</div>,
+}));
+
 describe("operational route guards", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    cleanup();
   });
 
   it("blocks direct access for roles outside the allowed navigation contract", () => {
@@ -43,6 +52,7 @@ describe("operational route guards", () => {
         <DevicesPage />
         <GamesPage />
         <SyncsPage />
+        <SettingsPage />
       </>,
     );
 
@@ -50,7 +60,8 @@ describe("operational route guards", () => {
     expect(screen.queryByText("devices-table")).not.toBeInTheDocument();
     expect(screen.queryByText("games-table")).not.toBeInTheDocument();
     expect(screen.queryByText("syncs-table")).not.toBeInTheDocument();
-    expect(screen.getAllByText("Acceso restringido")).toHaveLength(4);
+    expect(screen.queryByText("system-settings-center")).not.toBeInTheDocument();
+    expect(screen.getAllByText("Acceso restringido")).toHaveLength(5);
   });
 
   it("allows teacher access to the routes enabled for that role", () => {
@@ -64,6 +75,7 @@ describe("operational route guards", () => {
         <DevicesPage />
         <GamesPage />
         <SyncsPage />
+        <SettingsPage />
       </>,
     );
 
@@ -71,5 +83,29 @@ describe("operational route guards", () => {
     expect(screen.getByText("devices-table")).toBeInTheDocument();
     expect(screen.getByText("games-table")).toBeInTheDocument();
     expect(screen.getByText("syncs-table")).toBeInTheDocument();
+    expect(screen.queryByText("system-settings-center")).not.toBeInTheDocument();
+    expect(screen.getAllByText("Acceso restringido")).toHaveLength(1);
+  });
+
+  it("allows admin access to settings alongside the operational modules", () => {
+    useAuthMock.mockReturnValue({
+      user: { roles: ["admin"], permissions: [] },
+    });
+
+    render(
+      <>
+        <DashboardPage />
+        <DevicesPage />
+        <GamesPage />
+        <SyncsPage />
+        <SettingsPage />
+      </>,
+    );
+
+    expect(screen.getAllByText("dashboard-home")).toHaveLength(1);
+    expect(screen.getAllByText("devices-table")).toHaveLength(1);
+    expect(screen.getAllByText("games-table")).toHaveLength(1);
+    expect(screen.getAllByText("syncs-table")).toHaveLength(1);
+    expect(screen.getAllByText("system-settings-center")).toHaveLength(1);
   });
 });
