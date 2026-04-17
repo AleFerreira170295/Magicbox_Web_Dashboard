@@ -1,5 +1,5 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { PermissionsCenter } from "@/features/permissions/permissions-center";
 
 const useAuthMock = vi.fn();
@@ -177,6 +177,10 @@ describe("PermissionsCenter", () => {
     );
   });
 
+  afterEach(() => {
+    cleanup();
+  });
+
   it("shows the scoped institution-admin mode when ACL reads are available", () => {
     renderPermissionsCenter();
 
@@ -218,5 +222,59 @@ describe("PermissionsCenter", () => {
     expect(within(reviewTable).getByText("Ana Admin")).toBeInTheDocument();
     expect(within(reviewTable).getByText("override explícito")).toBeInTheDocument();
     expect(within(reviewTable).queryByText("Bruno Campo")).not.toBeInTheDocument();
+  });
+
+  it("filters the review queue by signal and free-text search", () => {
+    renderPermissionsCenter();
+
+    fireEvent.change(screen.getByLabelText("Señal"), { target: { value: "sin rol" } });
+    fireEvent.change(screen.getByLabelText("Buscar"), { target: { value: "Bruno" } });
+
+    const tables = screen.getAllByRole("table");
+    const reviewTable = tables[2];
+
+    expect(within(reviewTable).getByText("Bruno Campo")).toBeInTheDocument();
+    expect(within(reviewTable).getAllByText("sin rol").length).toBeGreaterThan(0);
+    expect(within(reviewTable).queryByText("Ana Admin")).not.toBeInTheDocument();
+  });
+
+  it("surfaces incomplete ACL references in metrics and override rows", () => {
+    usePermissionsMock.mockReturnValue(
+      okQuery({
+        data: [
+          {
+            id: "perm-broken",
+            userId: "missing-user",
+            featureId: "missing-feature",
+            actionId: "missing-action",
+            educationalCenterId: null,
+            createdAt: null,
+            updatedAt: null,
+            deletedAt: null,
+            raw: {},
+          },
+        ],
+        page: 1,
+        limit: 1,
+        total: 1,
+        total_pages: 1,
+      }),
+    );
+
+    renderPermissionsCenter();
+
+    const brokenRefsCard = screen.getByText("Referencias rotas").closest("div");
+    expect(screen.getByText("Referencias rotas")).toBeInTheDocument();
+    expect(brokenRefsCard).not.toBeNull();
+    expect(within(brokenRefsCard as HTMLElement).getByText("1")).toBeInTheDocument();
+
+    const tables = screen.getAllByRole("table");
+    const overridesTable = tables[1];
+
+    expect(within(overridesTable).getByText("Usuario no resuelto")).toBeInTheDocument();
+    expect(within(overridesTable).getByText("missing-feature")).toBeInTheDocument();
+    expect(within(overridesTable).getByText("missing-action")).toBeInTheDocument();
+    expect(within(overridesTable).getByText("referencia incompleta")).toBeInTheDocument();
+    expect(within(overridesTable).getByText("Global")).toBeInTheDocument();
   });
 });
