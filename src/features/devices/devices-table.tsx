@@ -102,6 +102,7 @@ function DeviceEditorPanel({
   institutions,
   users,
   token,
+  canUpdateDevices,
   onUpdated,
 }: {
   selectedDevice: DeviceRecord;
@@ -109,6 +110,7 @@ function DeviceEditorPanel({
   institutions: Array<{ id: string; name: string }>;
   users: Array<{ id: string; fullName: string; email: string; educationalCenterId?: string | null }>;
   token?: string;
+  canUpdateDevices: boolean;
   onUpdated: (deviceId: string) => void;
 }) {
   const queryClient = useQueryClient();
@@ -147,6 +149,11 @@ function DeviceEditorPanel({
   const handleSubmit = async () => {
     if (!selectedDevice) {
       setFeedback({ tone: "error", text: "Seleccioná un dispositivo primero." });
+      return;
+    }
+
+    if (!canUpdateDevices) {
+      setFeedback({ tone: "error", text: "Tu acceso actual no permite editar dispositivos." });
       return;
     }
 
@@ -206,7 +213,7 @@ function DeviceEditorPanel({
       <div className="grid gap-4 md:grid-cols-2">
         <div className="space-y-2 md:col-span-2">
           <label className="text-sm font-medium text-foreground">Nombre</label>
-          <Input value={formState.name} onChange={(event) => handleFieldChange("name", event.target.value)} />
+          <Input value={formState.name} onChange={(event) => handleFieldChange("name", event.target.value)} disabled={!canUpdateDevices} />
         </div>
 
         <div className="space-y-2">
@@ -214,7 +221,7 @@ function DeviceEditorPanel({
           <select
             value={formState.assignmentScope}
             onChange={(event) => handleFieldChange("assignmentScope", event.target.value as "home" | "institution")}
-            disabled={assignmentLockedToInstitution}
+            disabled={assignmentLockedToInstitution || !canUpdateDevices}
             className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
           >
             <option value="home">Home</option>
@@ -222,6 +229,8 @@ function DeviceEditorPanel({
           </select>
           {assignmentLockedToInstitution ? (
             <p className="text-xs text-muted-foreground">Tu vista está anclada a una única institución, así que no podés mover este dispositivo a Home desde aquí.</p>
+          ) : !canUpdateDevices ? (
+            <p className="text-xs text-muted-foreground">Tu acceso actual es de solo lectura para dispositivos.</p>
           ) : null}
         </div>
 
@@ -230,7 +239,7 @@ function DeviceEditorPanel({
           <select
             value={formState.educationalCenterId}
             onChange={(event) => handleFieldChange("educationalCenterId", event.target.value)}
-            disabled={formState.assignmentScope === "home"}
+            disabled={formState.assignmentScope === "home" || !canUpdateDevices}
             className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
           >
             <option value="">Seleccionar institución</option>
@@ -248,6 +257,7 @@ function DeviceEditorPanel({
             value={formState.ownerUserId}
             onChange={(event) => handleFieldChange("ownerUserId", event.target.value)}
             className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+            disabled={!canUpdateDevices}
           >
             <option value="">Sin owner</option>
             {availableOwners.map((user) => (
@@ -260,12 +270,12 @@ function DeviceEditorPanel({
 
         <div className="space-y-2">
           <label className="text-sm font-medium text-foreground">Status</label>
-          <Input value={formState.status} onChange={(event) => handleFieldChange("status", event.target.value)} placeholder="online, offline, active..." />
+          <Input value={formState.status} onChange={(event) => handleFieldChange("status", event.target.value)} placeholder="online, offline, active..." disabled={!canUpdateDevices} />
         </div>
 
         <div className="space-y-2 md:col-span-2">
           <label className="text-sm font-medium text-foreground">Firmware</label>
-          <Input value={formState.firmwareVersion} onChange={(event) => handleFieldChange("firmwareVersion", event.target.value)} placeholder="V2.2" />
+          <Input value={formState.firmwareVersion} onChange={(event) => handleFieldChange("firmwareVersion", event.target.value)} placeholder="V2.2" disabled={!canUpdateDevices} />
         </div>
       </div>
 
@@ -275,8 +285,8 @@ function DeviceEditorPanel({
             ? "Home es un caso válido. El dispositivo quedará sin centro educativo asociado."
             : "En modo institución, el dispositivo debe quedar asociado a un centro concreto."}
         </div>
-        <Button onClick={handleSubmit} disabled={updateDeviceMutation.isPending}>
-          {updateDeviceMutation.isPending ? "Guardando..." : "Guardar cambios"}
+        <Button onClick={handleSubmit} disabled={updateDeviceMutation.isPending || !canUpdateDevices}>
+          {updateDeviceMutation.isPending ? "Guardando..." : canUpdateDevices ? "Guardar cambios" : "Edición bloqueada"}
         </Button>
       </div>
 
@@ -308,6 +318,18 @@ export function DevicesTable() {
   const scopedInstitutionId = institutions.length === 1 ? institutions[0]?.id || null : null;
   const scopedInstitutionName = scopedInstitutionId ? institutions[0]?.name || scopedInstitutionId : null;
   const isInstitutionScopedView = Boolean(scopedInstitutionId && currentUser?.educationalCenterId === scopedInstitutionId);
+
+  const currentPermissionKeys = useMemo(() => new Set(currentUser?.permissions || []), [currentUser?.permissions]);
+  const hasGlobalAdminRole = currentUser?.roles.includes("admin") || false;
+  const hasResolvedCapabilities = hasGlobalAdminRole || currentPermissionKeys.size > 0;
+
+  function hasAnyPermission(...keys: string[]) {
+    if (hasGlobalAdminRole) return true;
+    if (!hasResolvedCapabilities) return true;
+    return keys.some((key) => currentPermissionKeys.has(key));
+  }
+
+  const canUpdateDevices = hasAnyPermission("ble_device:update", "ble-device:update");
 
   const filtered = useMemo(() => {
     const normalized = query.trim().toLowerCase();
@@ -417,10 +439,12 @@ export function DevicesTable() {
                 {isInstitutionScopedView ? "institution-admin" : "multi-institución / global"}
               </Badge>
               <Badge variant="secondary">Home explícito</Badge>
-              <Badge variant="outline">mutaciones reales</Badge>
+              <Badge variant={canUpdateDevices ? "secondary" : "outline"}>{canUpdateDevices ? "edición habilitada" : "solo lectura"}</Badge>
             </div>
             <p className="mt-2 text-sm text-muted-foreground">
-              Además de distinguir Home vs institución, ahora esta pantalla puede persistir nombre, owner, firmware, estado y cambio de alcance cuando el backend lo permite.
+              {canUpdateDevices
+                ? "Además de distinguir Home vs institución, ahora esta pantalla puede persistir nombre, owner, firmware, estado y cambio de alcance cuando el backend lo permite."
+                : "La sesión actual puede revisar el parque visible por ACL, pero no editar dispositivos sin permiso explícito de actualización."}
             </p>
           </div>
           {scopedInstitutionName ? <Badge variant="outline">Institución activa: {scopedInstitutionName}</Badge> : null}
@@ -528,6 +552,7 @@ export function DevicesTable() {
                   educationalCenterId: user.educationalCenterId,
                 }))}
                 token={tokens?.accessToken}
+                canUpdateDevices={canUpdateDevices}
                 onUpdated={(deviceId) => setSelectedDeviceId(deviceId)}
               />
             )}
