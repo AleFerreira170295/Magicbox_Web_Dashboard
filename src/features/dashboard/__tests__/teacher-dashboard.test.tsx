@@ -116,8 +116,12 @@ describe("TeacherDashboard", () => {
     expect(screen.getByText("Mazos para mirar de cerca")).toBeInTheDocument();
     expect(screen.getByText("Estudiantes para acompañar")).toBeInTheDocument();
     expect(screen.getByText("Contenidos para reforzar")).toBeInTheDocument();
+    expect(screen.getByText("Detalle de estudiante")).toBeInTheDocument();
+    expect(screen.getByText("Detalle de mazo")).toBeInTheDocument();
     expect(screen.getAllByText("Ana").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Animales").length).toBeGreaterThan(0);
+    expect(screen.getByText(/1 partidas visibles en el período/i)).toBeInTheDocument();
+    expect(screen.getByText(/Jugadores más activos/i)).toBeInTheDocument();
   });
 
   it("shows empty-state copy when the teacher view has no dated activity yet", () => {
@@ -132,6 +136,8 @@ describe("TeacherDashboard", () => {
     expect(screen.getByText("No aparecen mazos con señal de refuerzo en el período seleccionado.")).toBeInTheDocument();
     expect(screen.getByText("Todavía no hay jugadas suficientes para construir una lectura por estudiante.")).toBeInTheDocument();
     expect(screen.getByText("Aún no hay suficiente actividad para construir señales por mazo.")).toBeInTheDocument();
+    expect(screen.getByText("Seleccioná un estudiante para ver su detalle.")).toBeInTheDocument();
+    expect(screen.getByText("Seleccioná un mazo para ver su detalle.")).toBeInTheDocument();
   });
 
   it("shows an error banner when one teacher dashboard feed fails", () => {

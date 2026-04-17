@@ -110,6 +110,8 @@ export function TeacherDashboard() {
   const syncsQuery = useSyncSessions(tokens?.accessToken);
   const [referenceNow] = useState(() => Date.now());
   const [periodFilter, setPeriodFilter] = useState<"7d" | "30d" | "all">("7d");
+  const [selectedPlayerName, setSelectedPlayerName] = useState<string | null>(null);
+  const [selectedDeckName, setSelectedDeckName] = useState<string | null>(null);
 
   const isLoading = gamesQuery.isLoading || syncsQuery.isLoading;
   const error = gamesQuery.error || syncsQuery.error;
@@ -159,8 +161,14 @@ export function TeacherDashboard() {
       ...filteredGames.map((game) => parseDate(game.startDate || game.createdAt || game.updatedAt)),
       ...filteredSyncs.map((sync) => parseDate(sync.startedAt || sync.syncedAt || sync.createdAt || sync.capturedAt)),
     ].filter((value): value is Date => Boolean(value));
-    const playerStatsMap = new Map<string, { name: string; totalTurns: number; successfulTurns: number; totalPlayTime: number }>();
-    const deckStatsMap = new Map<string, { name: string; totalGames: number; totalTurns: number; successfulTurns: number; totalPlayTime: number }>();
+    const playerStatsMap = new Map<
+      string,
+      { name: string; totalTurns: number; successfulTurns: number; totalPlayTime: number; games: Set<string>; decks: Map<string, number> }
+    >();
+    const deckStatsMap = new Map<
+      string,
+      { name: string; totalGames: number; totalTurns: number; successfulTurns: number; totalPlayTime: number; players: Map<string, number> }
+    >();
 
     datedActivity.forEach((date) => {
       const key = date.toISOString().slice(0, 10);
@@ -170,42 +178,58 @@ export function TeacherDashboard() {
 
     filteredGames.forEach((game) => {
       const deckKey = game.deckName || "Sin mazo";
-      const deckStat = deckStatsMap.get(deckKey) || { name: deckKey, totalGames: 0, totalTurns: 0, successfulTurns: 0, totalPlayTime: 0 };
+      const deckStat = deckStatsMap.get(deckKey) || { name: deckKey, totalGames: 0, totalTurns: 0, successfulTurns: 0, totalPlayTime: 0, players: new Map<string, number>() };
       deckStat.totalGames += 1;
 
       game.turns.forEach((turn) => {
         const actor = resolveTurnActor(game, turn);
-        const playerStat = playerStatsMap.get(actor) || { name: actor, totalTurns: 0, successfulTurns: 0, totalPlayTime: 0 };
+        const playerStat = playerStatsMap.get(actor) || { name: actor, totalTurns: 0, successfulTurns: 0, totalPlayTime: 0, games: new Set<string>(), decks: new Map<string, number>() };
         playerStat.totalTurns += 1;
         playerStat.successfulTurns += turn.success ? 1 : 0;
         playerStat.totalPlayTime += turn.playTimeSeconds || 0;
+        playerStat.games.add(game.id);
+        playerStat.decks.set(deckKey, (playerStat.decks.get(deckKey) || 0) + 1);
         playerStatsMap.set(actor, playerStat);
 
         deckStat.totalTurns += 1;
         deckStat.successfulTurns += turn.success ? 1 : 0;
         deckStat.totalPlayTime += turn.playTimeSeconds || 0;
+        deckStat.players.set(actor, (deckStat.players.get(actor) || 0) + 1);
       });
 
       deckStatsMap.set(deckKey, deckStat);
     });
 
-    const playerStats = Array.from(playerStatsMap.values())
+    const playerDrilldowns = Array.from(playerStatsMap.values())
       .map((item) => ({
-        ...item,
+        name: item.name,
+        totalTurns: item.totalTurns,
+        totalGames: item.games.size,
         successRate: item.totalTurns > 0 ? Math.round((item.successfulTurns / item.totalTurns) * 100) : 0,
         avgTurnTime: item.totalTurns > 0 ? item.totalPlayTime / item.totalTurns : 0,
+        decks: Array.from(item.decks.entries())
+          .map(([name, totalTurns]) => ({ name, totalTurns }))
+          .sort((left, right) => right.totalTurns - left.totalTurns)
+          .slice(0, 3),
       }))
-      .sort((left, right) => right.totalTurns - left.totalTurns || right.successRate - left.successRate)
-      .slice(0, 5);
+      .sort((left, right) => right.totalTurns - left.totalTurns || right.successRate - left.successRate);
 
-    const deckInsights = Array.from(deckStatsMap.values())
+    const deckDrilldowns = Array.from(deckStatsMap.values())
       .map((item) => ({
-        ...item,
+        name: item.name,
+        totalGames: item.totalGames,
+        totalTurns: item.totalTurns,
         successRate: item.totalTurns > 0 ? Math.round((item.successfulTurns / item.totalTurns) * 100) : 0,
         avgTurnTime: item.totalTurns > 0 ? item.totalPlayTime / item.totalTurns : 0,
+        players: Array.from(item.players.entries())
+          .map(([name, totalTurns]) => ({ name, totalTurns }))
+          .sort((left, right) => right.totalTurns - left.totalTurns)
+          .slice(0, 4),
       }))
-      .sort((left, right) => left.successRate - right.successRate || right.totalTurns - left.totalTurns)
-      .slice(0, 5);
+      .sort((left, right) => left.successRate - right.successRate || right.totalTurns - left.totalTurns);
+
+    const playerStats = playerDrilldowns.slice(0, 5);
+    const deckInsights = deckDrilldowns.slice(0, 5);
 
     return {
       recentGames: filteredGames.length,
@@ -226,11 +250,16 @@ export function TeacherDashboard() {
       hasDatedActivity: datedActivity.length > 0,
       playerStats,
       deckInsights,
+      playerDrilldowns,
+      deckDrilldowns,
       supportPlayers: playerStats.filter((item) => item.totalTurns >= 2 && item.successRate < 60).slice(0, 3),
       supportDecks: deckInsights.filter((item) => item.totalTurns >= 2 && item.successRate < 60).slice(0, 3),
       periodLabel: periodFilter === "all" ? "visibles" : periodFilter === "30d" ? "30 días" : "7 días",
     };
   }, [gamesQuery.data, periodFilter, referenceNow, syncsQuery.data]);
+
+  const selectedPlayer = metrics.playerDrilldowns.find((item) => item.name === selectedPlayerName) || metrics.playerDrilldowns[0] || null;
+  const selectedDeck = metrics.deckDrilldowns.find((item) => item.name === selectedDeckName) || metrics.deckDrilldowns[0] || null;
 
   return (
     <div className="space-y-8">
@@ -478,7 +507,12 @@ export function TeacherDashboard() {
               </div>
             ) : (
               metrics.playerStats.map((player) => (
-                <div key={player.name} className="rounded-2xl bg-background/70 p-4">
+                <button
+                  key={player.name}
+                  type="button"
+                  onClick={() => setSelectedPlayerName(player.name)}
+                  className="w-full rounded-2xl bg-background/70 p-4 text-left transition-colors hover:bg-background"
+                >
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div>
                       <p className="font-medium text-foreground">{player.name}</p>
@@ -489,7 +523,7 @@ export function TeacherDashboard() {
                       <Badge variant="outline">{formatDurationSeconds(player.avgTurnTime)}</Badge>
                     </div>
                   </div>
-                </div>
+                </button>
               ))
             )}
           </CardContent>
@@ -509,7 +543,12 @@ export function TeacherDashboard() {
               </div>
             ) : (
               metrics.deckInsights.map((deck) => (
-                <div key={deck.name} className="rounded-2xl bg-background/70 p-4">
+                <button
+                  key={deck.name}
+                  type="button"
+                  onClick={() => setSelectedDeckName(deck.name)}
+                  className="w-full rounded-2xl bg-background/70 p-4 text-left transition-colors hover:bg-background"
+                >
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div>
                       <p className="font-medium text-foreground">{deck.name}</p>
@@ -520,8 +559,96 @@ export function TeacherDashboard() {
                       <Badge variant="outline">{formatDurationSeconds(deck.avgTurnTime)}</Badge>
                     </div>
                   </div>
-                </div>
+                </button>
               ))
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid gap-6 xl:grid-cols-2">
+        <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
+          <CardHeader>
+            <CardTitle>Detalle de estudiante</CardTitle>
+            <CardDescription>
+              Drilldown rápido desde el dashboard docente, sin salir a otra pantalla, para entender participación y foco de apoyo.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {!selectedPlayer ? (
+              <div className="rounded-2xl bg-background/70 p-4 text-sm text-muted-foreground">
+                Seleccioná un estudiante para ver su detalle.
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="rounded-2xl bg-background/70 p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <p className="font-medium text-foreground">{selectedPlayer.name}</p>
+                      <p className="text-xs text-muted-foreground">{selectedPlayer.totalGames} partidas visibles en el período</p>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <Badge variant="secondary">{selectedPlayer.successRate}% éxito</Badge>
+                      <Badge variant="outline">{formatDurationSeconds(selectedPlayer.avgTurnTime)}</Badge>
+                    </div>
+                  </div>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-foreground">Mazos más frecuentes</p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {selectedPlayer.decks.length === 0 ? (
+                      <Badge variant="outline">sin mazos detectados</Badge>
+                    ) : (
+                      selectedPlayer.decks.map((deck) => (
+                        <Badge key={deck.name} variant="outline">{deck.name} · {deck.totalTurns} turnos</Badge>
+                      ))
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
+          <CardHeader>
+            <CardTitle>Detalle de mazo</CardTitle>
+            <CardDescription>
+              Drilldown rápido para leer volumen, desempeño y quiénes están interactuando con ese contenido.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {!selectedDeck ? (
+              <div className="rounded-2xl bg-background/70 p-4 text-sm text-muted-foreground">
+                Seleccioná un mazo para ver su detalle.
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="rounded-2xl bg-background/70 p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <p className="font-medium text-foreground">{selectedDeck.name}</p>
+                      <p className="text-xs text-muted-foreground">{selectedDeck.totalGames} partidas, {selectedDeck.totalTurns} turnos</p>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <Badge variant="secondary">{selectedDeck.successRate}% éxito</Badge>
+                      <Badge variant="outline">{formatDurationSeconds(selectedDeck.avgTurnTime)}</Badge>
+                    </div>
+                  </div>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-foreground">Jugadores más activos</p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {selectedDeck.players.length === 0 ? (
+                      <Badge variant="outline">sin jugadores detectados</Badge>
+                    ) : (
+                      selectedDeck.players.map((player) => (
+                        <Badge key={player.name} variant="outline">{player.name} · {player.totalTurns} turnos</Badge>
+                      ))
+                    )}
+                  </div>
+                </div>
+              </div>
             )}
           </CardContent>
         </Card>
