@@ -152,6 +152,60 @@ describe("GamesTable", () => {
     expect(screen.getByText(/Dispositivo: MagicBox Aula Renombrada/i)).toBeInTheDocument();
   });
 
+  it("shows the full turn timeline with hits and errors in the detail panel", () => {
+    useGamesMock.mockReturnValue(
+      okQuery({
+        data: [
+          {
+            id: "game-1",
+            educationalCenterId: "ec-1",
+            bleDeviceId: "device-1",
+            gameId: 101,
+            deckName: "Animales",
+            totalPlayers: 2,
+            startDate: null,
+            createdAt: null,
+            updatedAt: null,
+            players: [
+              { id: "p1", playerName: "Ana", playerSource: "registered" },
+              { id: "p2", playerName: "Beto", playerSource: "manual" },
+            ],
+            turns: Array.from({ length: 8 }, (_, index) => ({
+              id: `turn-${index + 1}`,
+              gameDataId: "game-1",
+              turnNumber: index + 1,
+              position: index + 1,
+              success: index % 3 !== 0,
+              playTimeSeconds: index + 2,
+              difficulty: index % 2 === 0 ? "easy" : "hard",
+              cardId: `card-${index + 1}`,
+              externalPlayerUid: index % 2 === 0 ? "Ana" : "Beto",
+              raw: {},
+            })),
+            raw: {},
+          },
+        ],
+        page: 1,
+        limit: 1,
+        total: 1,
+        total_pages: 1,
+      }),
+    );
+
+    renderGamesTable();
+
+    fireEvent.click(screen.getByText("101"));
+
+    expect(screen.getByText("Historial completo de jugadas")).toBeInTheDocument();
+    expect(screen.getByText("Aciertos 5")).toBeInTheDocument();
+    expect(screen.getByText("Errores 3")).toBeInTheDocument();
+    expect(screen.getByText("Turno 1")).toBeInTheDocument();
+    expect(screen.getByText("Turno 8")).toBeInTheDocument();
+    expect(screen.getByText(/Carta: card-8/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/error/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/acierto/i).length).toBeGreaterThan(0);
+  });
+
   it("filters games by player mode", () => {
     useAuthMock.mockReturnValue({
       tokens: { accessToken: "token", refreshToken: "refresh" },

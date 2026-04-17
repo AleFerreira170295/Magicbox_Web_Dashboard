@@ -128,8 +128,10 @@ export function GamesTable() {
   const selectedManualCount = selectedGame?.players.filter((player) => player.playerSource === "manual").length || 0;
   const selectedRegisteredCount = selectedGame?.players.filter((player) => player.playerSource !== "manual").length || 0;
   const selectedSuccessfulTurns = selectedGame?.turns.filter((turn) => turn.success).length || 0;
+  const selectedFailedTurns = selectedGame?.turns.filter((turn) => !turn.success).length || 0;
+  const selectedTotalPlayTimeSeconds = (selectedGame?.turns || []).reduce((acc, turn) => acc + (turn.playTimeSeconds || 0), 0);
   const selectedTurnSuccessRate = selectedGame && selectedGame.turns.length > 0 ? Math.round((selectedSuccessfulTurns / selectedGame.turns.length) * 100) : 0;
-  const selectedRecentTurns = [...(selectedGame?.turns || [])].sort((a, b) => b.turnNumber - a.turnNumber).slice(0, 6);
+  const selectedTurnsTimeline = [...(selectedGame?.turns || [])].sort((a, b) => a.turnNumber - b.turnNumber);
 
   return (
     <div className="space-y-6">
@@ -337,27 +339,42 @@ export function GamesTable() {
                 </div>
 
                 <div>
-                  <p className="text-sm font-medium text-foreground">Últimos turnos</p>
-                  <div className="mt-3 space-y-2">
-                    {selectedRecentTurns.length === 0 ? (
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <p className="text-sm font-medium text-foreground">Historial completo de jugadas</p>
+                    <div className="flex flex-wrap gap-2">
+                      <Badge variant="success">Aciertos {selectedSuccessfulTurns}</Badge>
+                      <Badge variant="outline">Errores {selectedFailedTurns}</Badge>
+                      <Badge variant="outline">Tiempo total {selectedTotalPlayTimeSeconds}s</Badge>
+                    </div>
+                  </div>
+                  <div className="mt-3 space-y-2 rounded-2xl bg-background/40 p-2">
+                    {selectedTurnsTimeline.length === 0 ? (
                       <div className="rounded-2xl bg-background/70 p-3 text-sm text-muted-foreground">Sin turnos persistidos.</div>
                     ) : (
-                      selectedRecentTurns.map((turn) => (
-                        <div key={turn.id} className="rounded-2xl bg-background/70 p-3 text-sm">
-                          <div className="flex flex-wrap items-center justify-between gap-3">
-                            <div>
-                              <p className="font-medium text-foreground">Turno {turn.turnNumber}</p>
-                              <p className="text-xs text-muted-foreground">
-                                {turn.externalPlayerUid || turn.gamePlayerId || turn.studentId || "sin jugador enlazado"}
-                              </p>
+                      <div className="max-h-[28rem] space-y-2 overflow-y-auto pr-1">
+                        {selectedTurnsTimeline.map((turn) => (
+                          <div key={turn.id} className="rounded-2xl bg-background/70 p-3 text-sm">
+                            <div className="flex flex-wrap items-center justify-between gap-3">
+                              <div>
+                                <p className="font-medium text-foreground">Turno {turn.turnNumber}</p>
+                                <p className="text-xs text-muted-foreground">
+                                  {turn.externalPlayerUid || turn.gamePlayerId || turn.studentId || "sin jugador enlazado"}
+                                </p>
+                              </div>
+                              <div className="flex flex-wrap gap-2">
+                                <Badge variant={turn.success ? "success" : "outline"}>{turn.success ? "acierto" : "error"}</Badge>
+                                <Badge variant="outline">{turn.playTimeSeconds || 0}s</Badge>
+                              </div>
                             </div>
-                            <div className="flex flex-wrap gap-2">
-                              <Badge variant={turn.success ? "success" : "outline"}>{turn.success ? "éxito" : "fallo"}</Badge>
-                              <Badge variant="outline">{turn.playTimeSeconds || 0}s</Badge>
+                            <div className="mt-3 grid gap-2 text-xs text-muted-foreground sm:grid-cols-2">
+                              <p>Posición: {turn.position}</p>
+                              <p>Dificultad: {turn.difficulty || "-"}</p>
+                              <p>Carta: {turn.cardId || "-"}</p>
+                              <p>Inicio: {formatDateTime(turn.turnStartDate || turn.createdAt)}</p>
                             </div>
                           </div>
-                        </div>
-                      ))
+                        ))}
+                      </div>
                     )}
                   </div>
                 </div>
