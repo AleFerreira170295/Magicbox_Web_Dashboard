@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { apiEndpoints } from "@/lib/api/endpoints";
-import { apiRequest } from "@/lib/api/fetcher";
+import { ApiError, apiRequest } from "@/lib/api/fetcher";
 import type { JsonObject } from "@/lib/api/types";
 import type { OtaReleaseRecord } from "@/features/settings/types";
 
@@ -29,8 +29,16 @@ function normalizeOtaRelease(input: unknown): OtaReleaseRecord {
 }
 
 export async function getOtaRelease(token: string) {
-  const response = await apiRequest<unknown>(apiEndpoints.settings.otaRelease, { token });
-  return normalizeOtaRelease(response);
+  try {
+    const response = await apiRequest<unknown>(apiEndpoints.settings.otaRelease, { token });
+    return normalizeOtaRelease(response);
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 404) {
+      const legacyResponse = await apiRequest<unknown>(apiEndpoints.settings.otaReleaseLegacy, { token });
+      return normalizeOtaRelease(legacyResponse);
+    }
+    throw error;
+  }
 }
 
 export function useOtaRelease(token?: string) {

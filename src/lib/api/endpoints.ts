@@ -36,7 +36,8 @@ export const apiEndpoints = {
     overview: "/home/profiles/overview",
   },
   settings: {
-    otaRelease: "/home/ota/release",
+    otaRelease: "/system/ota/release",
+    otaReleaseLegacy: "/home/ota/release",
   },
   syncs: {
     list: "/sync-sessions",

@@ -204,6 +204,10 @@ Semántica esperada en este slice:
 curl http://127.0.0.1:3000/health
 
 TOKEN="<pegar access_token>"
+curl http://127.0.0.1:3000/api/v1.0/system/ota/release \
+  -H "Authorization: Bearer $TOKEN"
+
+# Referencia legacy app-facing, no usada ya por Settings web:
 curl http://127.0.0.1:3000/api/v1.0/home/ota/release \
   -H "Authorization: Bearer $TOKEN"
 ```
@@ -220,6 +224,7 @@ Semántica esperada:
 - la UI debe explicar runtime, readiness, OTA y catálogos ACL usando datos vivos del backend
 - si OTA no está configurado, debe verse explícitamente como estado válido y no como error de pantalla
 - la pantalla debe dejar claro que se trata de una superficie global-only para admin
+- el dashboard debe consumir la superficie admin dedicada `/system/ota/release`, sin endurecer el endpoint `home` usado por el app
 
 ### Health técnico real del backend
 
