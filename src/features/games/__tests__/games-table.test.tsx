@@ -1,6 +1,6 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { GamesTable } from "@/features/games/games-table";
 
 const useAuthMock = vi.fn();
@@ -103,6 +103,10 @@ describe("GamesTable", () => {
     );
   });
 
+  afterEach(() => {
+    cleanup();
+  });
+
   it("anchors the games view to a single institution when the session is institution-scoped", () => {
     renderGamesTable();
 
@@ -138,5 +142,201 @@ describe("GamesTable", () => {
     fireEvent.click(screen.getByText("MagicBox Aula Renombrada"));
 
     expect(screen.getByText(/Dispositivo: MagicBox Aula Renombrada/i)).toBeInTheDocument();
+  });
+
+  it("filters games by player mode", () => {
+    useAuthMock.mockReturnValue({
+      tokens: { accessToken: "token", refreshToken: "refresh" },
+      user: {
+        id: "user-1",
+        email: "admin@example.com",
+        firstName: "Ines",
+        lastName: "Admin",
+        fullName: "Ines Admin",
+        educationalCenterId: null,
+        roles: ["admin"],
+        permissions: ["game_data:read"],
+        raw: {},
+      },
+    });
+
+    useInstitutionsMock.mockReturnValue(
+      okQuery({
+        data: [
+          { id: "ec-1", name: "Colegio Norte", raw: {} },
+          { id: "ec-2", name: "Colegio Sur", raw: {} },
+        ],
+        page: 1,
+        limit: 2,
+        total: 2,
+        total_pages: 1,
+      }),
+    );
+
+    useGamesMock.mockReturnValue(
+      okQuery({
+        data: [
+          {
+            id: "game-1",
+            educationalCenterId: "ec-1",
+            bleDeviceId: "device-1",
+            gameId: 101,
+            deckName: "Animales",
+            totalPlayers: 2,
+            startDate: null,
+            createdAt: null,
+            updatedAt: null,
+            players: [
+              { id: "p1", playerName: "Ana", playerSource: "registered" },
+              { id: "p2", playerName: "Beto", playerSource: "registered" },
+            ],
+            turns: [],
+            raw: {},
+          },
+          {
+            id: "game-2",
+            educationalCenterId: "ec-2",
+            bleDeviceId: "device-2",
+            gameId: 202,
+            deckName: "Números",
+            totalPlayers: 2,
+            startDate: null,
+            createdAt: null,
+            updatedAt: null,
+            players: [
+              { id: "p3", playerName: "Cami", playerSource: "manual" },
+              { id: "p4", playerName: "Dani", playerSource: "manual" },
+            ],
+            turns: [],
+            raw: {},
+          },
+          {
+            id: "game-3",
+            educationalCenterId: "ec-2",
+            bleDeviceId: "device-2",
+            gameId: 303,
+            deckName: "Colores",
+            totalPlayers: 2,
+            startDate: null,
+            createdAt: null,
+            updatedAt: null,
+            players: [
+              { id: "p5", playerName: "Eva", playerSource: "manual" },
+              { id: "p6", playerName: "Fede", playerSource: "registered" },
+            ],
+            turns: [],
+            raw: {},
+          },
+        ],
+        page: 1,
+        limit: 3,
+        total: 3,
+        total_pages: 1,
+      }),
+    );
+
+    renderGamesTable();
+
+    fireEvent.change(screen.getByDisplayValue("Todos los modos"), { target: { value: "mixed" } });
+    expect(screen.getByText("303")).toBeInTheDocument();
+    expect(screen.queryByText("101")).not.toBeInTheDocument();
+    expect(screen.queryByText("202")).not.toBeInTheDocument();
+
+    fireEvent.change(screen.getByDisplayValue("Mixtos"), { target: { value: "manual" } });
+    expect(screen.getByText("202")).toBeInTheDocument();
+    expect(screen.queryByText("101")).not.toBeInTheDocument();
+    expect(screen.queryByText("303")).not.toBeInTheDocument();
+  });
+
+  it("filters games by linked player and device names", () => {
+    useAuthMock.mockReturnValue({
+      tokens: { accessToken: "token", refreshToken: "refresh" },
+      user: {
+        id: "user-1",
+        email: "admin@example.com",
+        firstName: "Ines",
+        lastName: "Admin",
+        fullName: "Ines Admin",
+        educationalCenterId: null,
+        roles: ["admin"],
+        permissions: ["game_data:read"],
+        raw: {},
+      },
+    });
+
+    useInstitutionsMock.mockReturnValue(
+      okQuery({
+        data: [
+          { id: "ec-1", name: "Colegio Norte", raw: {} },
+          { id: "ec-2", name: "Colegio Sur", raw: {} },
+        ],
+        page: 1,
+        limit: 2,
+        total: 2,
+        total_pages: 1,
+      }),
+    );
+
+    useGamesMock.mockReturnValue(
+      okQuery({
+        data: [
+          {
+            id: "game-1",
+            educationalCenterId: "ec-1",
+            bleDeviceId: "device-1",
+            gameId: 101,
+            deckName: "Animales",
+            totalPlayers: 1,
+            startDate: null,
+            createdAt: null,
+            updatedAt: null,
+            players: [{ id: "p1", playerName: "Ana Norte", playerSource: "registered" }],
+            turns: [],
+            raw: {},
+          },
+          {
+            id: "game-2",
+            educationalCenterId: "ec-2",
+            bleDeviceId: "device-2",
+            gameId: 202,
+            deckName: "Números",
+            totalPlayers: 1,
+            startDate: null,
+            createdAt: null,
+            updatedAt: null,
+            players: [{ id: "p2", playerName: "Bruno Sur", playerSource: "manual" }],
+            turns: [],
+            raw: {},
+          },
+        ],
+        page: 1,
+        limit: 2,
+        total: 2,
+        total_pages: 1,
+      }),
+    );
+
+    useDevicesMock.mockReturnValue(
+      okQuery({
+        data: [
+          { id: "device-1", deviceId: "mb-1", name: "MagicBox Norte", assignmentScope: "institution", raw: {} },
+          { id: "device-2", deviceId: "mb-2", name: "MagicBox Sur", assignmentScope: "institution", raw: {} },
+        ],
+        page: 1,
+        limit: 2,
+        total: 2,
+        total_pages: 1,
+      }),
+    );
+
+    renderGamesTable();
+
+    fireEvent.change(screen.getByPlaceholderText(/Filtrar por mazo, gameId, institución, dispositivo o jugador/i), { target: { value: "Bruno Sur" } });
+    expect(screen.getByText("202")).toBeInTheDocument();
+    expect(screen.queryByText("101")).not.toBeInTheDocument();
+
+    fireEvent.change(screen.getByPlaceholderText(/Filtrar por mazo, gameId, institución, dispositivo o jugador/i), { target: { value: "MagicBox Norte" } });
+    expect(screen.getByText("101")).toBeInTheDocument();
+    expect(screen.queryByText("202")).not.toBeInTheDocument();
   });
 });
