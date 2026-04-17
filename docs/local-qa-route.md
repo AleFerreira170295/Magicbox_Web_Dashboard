@@ -24,6 +24,7 @@ Ruta base de prueba para desarrollo cruzado entre dashboard y backend local.
    - resumen operativo real de usuarios, instituciones, devices, syncs, games y health
    - accesos rápidos a módulos ya aterrizados
    - foco de revisión con señales blandas (instituciones con review, devices sin estado, syncs sin raw, profiles sin binding)
+   - la home debe respetar el rol real: ocultar módulos no accesibles para `institution-admin` o `director`
 5. Ir a `Instituciones`.
 6. Abrir `Praecepta Education`.
 7. Verificar:
@@ -41,26 +42,31 @@ Ruta base de prueba para desarrollo cruzado entre dashboard y backend local.
    - tabla operativa con sesiones visibles para dashboard
    - selección de detalle de sync
    - payload raw más reciente y participantes proyectados
+   - copy de alcance visible coherente con permisos reales (`historial personal` vs `operativo por ACL BLE`)
 12. Ir a `Partidas`.
 13. Verificar:
    - métricas operativas de partidas, jugadores y turnos
    - filtro por institución y modo de jugadores
    - panel de detalle con últimos turnos y composición manual/registrada
+   - si la sesión queda scopeada a una sola institución, la UI debe anclar el filtro institucional y mostrar badge de alcance
 14. Ir a `Profiles`.
 15. Verificar:
    - listado real de perfiles Home, no usuarios proxy
    - owner, institución, bindings y sesiones por perfil
    - panel de detalle con tarjetas y dispositivos vinculados
+   - si la sesión queda scopeada a una sola institución, la UI debe anclar el filtro institucional y mostrar badge de alcance
 16. Ir a `Health`.
 17. Verificar:
    - estado real de `/health`, `/health/ready` y `/health/live`
    - checks técnicos de readiness
    - síntesis operativa combinando dispositivos, syncs, games y profiles
+   - banner explícito de que es una superficie `admin global`, no una vista institucional
 18. Ir a `Settings`.
 19. Verificar:
    - runtime real del backend y entorno actual
    - catálogo ACL real de features y actions
    - política OTA efectiva leída desde backend
+   - banner explícito de que es una superficie `admin global`, no una vista institucional
 
 ## Estado esperado actual de `Praecepta Education`
 
@@ -180,6 +186,7 @@ Semántica esperada:
 - la UI `Partidas` debe permitir filtrar por institución y composición de jugadores (registrados, manuales o mixtos)
 - la tabla debe enriquecer contexto mostrando institución y dispositivo a partir de los catálogos ya cargados en dashboard
 - el panel de detalle debe resumir jugadores, turnos recientes y tasa de éxito sin depender de inspección raw
+- cuando solo haya una institución visible, la UI debe anclar el filtro y explicitar el alcance institucional
 
 ### Home operativa del dashboard
 
@@ -188,6 +195,8 @@ Semántica esperada en este slice:
 - `/dashboard` ya no debe hablar de módulos "próximos" que hoy ya existen
 - debe resumir datos reales de users, institutions, devices, syncs, games, profiles y health
 - institution-admin y director deben caer en esta home operativa, no en la home docente
+- la home debe ocultar módulos no accesibles según el rol real, en línea con la navegación lateral
+- institution-admin no debe depender de queries globales de health desde esta home
 
 ### Settings read-only con configuración efectiva
 
@@ -210,6 +219,7 @@ Semántica esperada:
 - `Settings` debe mostrar configuración efectiva real aunque todavía no exista editor persistente
 - la UI debe explicar runtime, readiness, OTA y catálogos ACL usando datos vivos del backend
 - si OTA no está configurado, debe verse explícitamente como estado válido y no como error de pantalla
+- la pantalla debe dejar claro que se trata de una superficie global-only para admin
 
 ### Health técnico real del backend
 
@@ -230,6 +240,7 @@ Semántica esperada:
 - la pantalla `Health` debe usar los endpoints de health reales del backend, no solo inferencias desde otros módulos
 - la UI debe combinar ese estado técnico con señales operativas ya visibles en dashboard
 - readiness degradado o checks no saludables deben verse como primera señal de alerta blanda
+- la pantalla debe dejar claro que se trata de una superficie global-only para admin
 
 ### Listado operativo de perfiles Home
 
@@ -258,6 +269,7 @@ Semántica esperada:
 - `Profiles` debe usar perfiles Home reales y no reutilizar el padrón `/user` como proxy
 - sin ACL global/scoped de `user:read`, el overview debe caer a perfiles propios del actor autenticado
 - con ACL global/scoped de `user:read`, el overview debe abrirse a visibilidad operativa respetando alcance institucional cuando corresponda
+- cuando solo haya una institución visible, la UI debe anclar el filtro y explicitar el alcance institucional
 
 ### Listado operativo de syncs
 
@@ -282,6 +294,7 @@ Semántica esperada:
 
 - si el actor tiene permisos globales sobre `ble_device:read`, `GET /sync-sessions` debe comportarse como vista operativa amplia y no solo como historial propio
 - si el actor solo tiene alcance institucional, la lista debe quedar limitada a syncs de dispositivos dentro de sus instituciones permitidas
+- si el actor no tiene `ble_device:read`, la UI debe reconocer el modo `historial personal` y no prometer visibilidad operativa amplia
 - la UI `Syncs` debe permitir buscar por sync, dispositivo, origen o usuario y mostrar un panel de detalle con participantes y raw reciente
 
 ## Cuándo usar esta ruta
