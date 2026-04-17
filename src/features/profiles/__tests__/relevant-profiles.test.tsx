@@ -150,6 +150,7 @@ describe("RelevantProfiles", () => {
     renderProfiles();
 
     expect(screen.getAllByText("Con tarjeta").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Con juego").length).toBeGreaterThan(0);
     expect(screen.getAllByText("2").length).toBeGreaterThan(0);
 
     fireEvent.click(screen.getAllByText("Tomi")[0]);

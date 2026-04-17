@@ -105,14 +105,14 @@ export function RelevantProfiles() {
   const metrics = useMemo(() => {
     const activeProfiles = profiles.filter((profile) => profile.isActive).length;
     const withBindings = profiles.filter((profile) => profile.activeBindingCount > 0).length;
-    const withSessions = profiles.filter((profile) => profile.sessionCount > 0).length;
+    const withGameplay = profiles.filter((profile) => profile.sessionCount > 0).length;
     const institutionLinked = profiles.filter((profile) => Boolean(profile.educationalCenterId)).length;
 
     return {
       total: profiles.length,
       activeProfiles,
       withBindings,
-      withSessions,
+      withGameplay,
       institutionLinked,
     };
   }, [profiles]);
@@ -190,10 +190,10 @@ export function RelevantProfiles() {
         ) : (
           <>
             <SummaryCard label="Perfiles" value={String(metrics.total)} hint="Perfiles Home visibles en el alcance actual." icon={Users} />
-            <SummaryCard label="Activos" value={String(metrics.activeProfiles)} hint="Perfiles no archivados y operativamente vigentes." icon={BadgeCheck} />
-            <SummaryCard label="Con tarjeta" value={String(metrics.withBindings)} hint="Perfiles con bindings activos a cards." icon={CreditCard} />
-            <SummaryCard label="Con sesiones" value={String(metrics.withSessions)} hint="Perfiles que ya aparecen en historial de juego." icon={Waves} />
-            <SummaryCard label="Institucionales" value={String(metrics.institutionLinked)} hint="Perfiles cuyos owners ya están ligados a una institución." icon={UserRound} />
+            <SummaryCard label="Activos" value={String(metrics.activeProfiles)} hint="Perfiles vigentes y utilizables en la experiencia actual." icon={BadgeCheck} />
+            <SummaryCard label="Con tarjeta" value={String(metrics.withBindings)} hint="Perfiles con tarjeta o binding listo para jugar." icon={CreditCard} />
+            <SummaryCard label="Con juego" value={String(metrics.withGameplay)} hint="Perfiles que ya muestran historial de partidas o sesiones." icon={Waves} />
+            <SummaryCard label="Con institución" value={String(metrics.institutionLinked)} hint="Perfiles ligados a un owner con contexto institucional." icon={UserRound} />
           </>
         )}
       </div>

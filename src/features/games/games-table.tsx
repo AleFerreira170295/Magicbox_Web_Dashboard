@@ -108,17 +108,13 @@ export function GamesTable() {
     const totalPlayers = games.reduce((acc, game) => acc + (game.players.length || game.totalPlayers || 0), 0);
     const totalTurns = games.reduce((acc, game) => acc + game.turns.length, 0);
     const successfulTurns = games.reduce((acc, game) => acc + game.turns.filter((turn) => turn.success).length, 0);
-    const mixedGames = games.filter((game) => {
-      const manualCount = game.players.filter((player) => player.playerSource === "manual").length;
-      const registeredCount = game.players.filter((player) => player.playerSource !== "manual").length;
-      return manualCount > 0 && registeredCount > 0;
-    }).length;
+    const failedTurns = totalTurns - successfulTurns;
 
     return {
       totalGames: games.length,
       totalPlayers,
       totalTurns,
-      mixedGames,
+      failedTurns,
       successRate: totalTurns > 0 ? Math.round((successfulTurns / totalTurns) * 100) : 0,
     };
   }, [games]);
@@ -206,11 +202,11 @@ export function GamesTable() {
           Array.from({ length: 5 }).map((_, index) => <Skeleton key={index} className="h-32 rounded-2xl" />)
         ) : (
           <>
-            <SummaryCard label="Partidas" value={String(metrics.totalGames)} hint="Juegos visibles en la consulta actual." icon={Gamepad2} />
-            <SummaryCard label="Jugadores" value={String(metrics.totalPlayers)} hint="Suma proyectada de participantes en la muestra." icon={Users} />
-            <SummaryCard label="Turnos" value={String(metrics.totalTurns)} hint="Volumen operativo de interacción ya persistido." icon={TimerReset} />
-            <SummaryCard label="Mixtas" value={String(metrics.mixedGames)} hint="Partidas con mezcla de jugadores manuales y registrados." icon={BookOpen} />
-            <SummaryCard label="Éxito" value={`${metrics.successRate}%`} hint="Tasa agregada de turnos exitosos en la vista." icon={Trophy} />
+            <SummaryCard label="Partidas" value={String(metrics.totalGames)} hint="Partidas visibles en la consulta actual." icon={Gamepad2} />
+            <SummaryCard label="Participantes" value={String(metrics.totalPlayers)} hint="Suma proyectada de jugadores presentes en la muestra." icon={Users} />
+            <SummaryCard label="Turnos" value={String(metrics.totalTurns)} hint="Jugadas persistidas y visibles para revisar la partida completa." icon={TimerReset} />
+            <SummaryCard label="Errores" value={String(metrics.failedTurns)} hint="Intentos fallidos detectados en la vista actual." icon={BookOpen} />
+            <SummaryCard label="Éxito" value={`${metrics.successRate}%`} hint="Proporción agregada de aciertos sobre el total de jugadas." icon={Trophy} />
           </>
         )}
       </div>

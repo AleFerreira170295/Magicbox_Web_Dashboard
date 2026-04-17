@@ -194,6 +194,9 @@ describe("GamesTable", () => {
 
     renderGamesTable();
 
+    expect(screen.getByText("Participantes")).toBeInTheDocument();
+    expect(screen.getByText("Errores")).toBeInTheDocument();
+
     fireEvent.click(screen.getByText("101"));
 
     expect(screen.getByText("Historial completo de jugadas")).toBeInTheDocument();
