@@ -25,10 +25,14 @@ describe("DashboardHome", () => {
     cleanup();
   });
 
-  it("routes institution-admin users to the operational dashboard home", () => {
+  it.each([
+    [["admin"]],
+    [["institution-admin"]],
+    [["director"]],
+  ])("routes %j users to the operational dashboard home", (roles) => {
     useAuthMock.mockReturnValue({
       user: {
-        roles: ["institution-admin"],
+        roles,
       },
     });
 

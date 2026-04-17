@@ -87,7 +87,7 @@ describe("SuperadminDashboard", () => {
     cleanup();
   });
 
-  it("hides health and settings modules for institution-admin and disables health queries", () => {
+  it("gives institution-admin a scoped command center without health/settings, but with permissions when enabled", () => {
     useAuthMock.mockReturnValue({
       tokens: { accessToken: "token", refreshToken: "refresh" },
       user: {
@@ -99,11 +99,30 @@ describe("SuperadminDashboard", () => {
 
     renderDashboard();
 
+    expect(screen.getByRole("link", { name: /Usuarios/i })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Permisos/i })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Dispositivos/i })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Profiles/i })).toBeInTheDocument();
     expect(screen.queryByText("Health")).not.toBeInTheDocument();
     expect(screen.queryByText("Settings")).not.toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /Profiles/i })).toBeInTheDocument();
     expect(useBasicHealthMock).toHaveBeenCalledWith({ enabled: false });
     expect(useReadinessHealthMock).toHaveBeenCalledWith({ enabled: false });
+  });
+
+  it("hides the permissions module for institution-admin when ACL access is missing", () => {
+    useAuthMock.mockReturnValue({
+      tokens: { accessToken: "token", refreshToken: "refresh" },
+      user: {
+        fullName: "Paula Limited",
+        roles: ["institution-admin"],
+        permissions: ["ble_device:read"],
+      },
+    });
+
+    renderDashboard();
+
+    expect(screen.getByRole("link", { name: /Usuarios/i })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /Permisos/i })).not.toBeInTheDocument();
   });
 
   it("keeps director dashboard cards aligned with navigation visibility", () => {
@@ -120,7 +139,10 @@ describe("SuperadminDashboard", () => {
 
     expect(screen.getByText("Dirección")).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /Usuarios/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /Permisos/i })).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: /Instituciones/i })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Dispositivos/i })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Profiles/i })).toBeInTheDocument();
     expect(screen.queryByText("Health")).not.toBeInTheDocument();
     expect(screen.queryByText("Settings")).not.toBeInTheDocument();
   });
@@ -151,7 +173,10 @@ describe("SuperadminDashboard", () => {
     expect(screen.getByText(/0 usuarios, 1 instituciones y 2 dispositivos visibles/i)).toBeInTheDocument();
     expect(screen.getByText(/1 dispositivos visibles siguen sin `status` explícito/i)).toBeInTheDocument();
     expect(screen.getByText("Devices")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Usuarios/i })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Permisos/i })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /Dispositivos/i })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /Health/i })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Settings/i })).toBeInTheDocument();
   });
 });
