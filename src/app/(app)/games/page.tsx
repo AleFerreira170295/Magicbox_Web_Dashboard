@@ -1,5 +1,10 @@
+import { RoleGuard } from "@/components/role-guard";
 import { GamesTable } from "@/features/games/games-table";
 
 export default function GamesPage() {
-  return <GamesTable />;
+  return (
+    <RoleGuard allowedRoles={["teacher", "director", "researcher", "admin", "institution-admin"]}>
+      <GamesTable />
+    </RoleGuard>
+  );
 }

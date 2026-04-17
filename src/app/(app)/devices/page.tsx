@@ -1,5 +1,10 @@
+import { RoleGuard } from "@/components/role-guard";
 import { DevicesTable } from "@/features/devices/devices-table";
 
 export default function DevicesPage() {
-  return <DevicesTable />;
+  return (
+    <RoleGuard allowedRoles={["teacher", "director", "admin", "institution-admin"]}>
+      <DevicesTable />
+    </RoleGuard>
+  );
 }

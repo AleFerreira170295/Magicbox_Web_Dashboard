@@ -1,5 +1,10 @@
+import { RoleGuard } from "@/components/role-guard";
 import { SyncsTable } from "@/features/syncs/syncs-table";
 
 export default function SyncsPage() {
-  return <SyncsTable />;
+  return (
+    <RoleGuard allowedRoles={["teacher", "director", "researcher", "admin", "institution-admin"]}>
+      <SyncsTable />
+    </RoleGuard>
+  );
 }
