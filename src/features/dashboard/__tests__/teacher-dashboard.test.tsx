@@ -111,6 +111,9 @@ describe("TeacherDashboard", () => {
     expect(screen.getByText(/Volumen reciente de juego para leer continuidad de uso/i)).toBeInTheDocument();
     expect(screen.getByText(/Cuenta única de jugadores visibles en la muestra actual/i)).toBeInTheDocument();
     expect(screen.getAllByText(/50%/i).length).toBeGreaterThan(0);
+    expect(screen.getByText("Tendencias del período")).toBeInTheDocument();
+    expect(screen.getByText("Ritmo de juego")).toBeInTheDocument();
+    expect(screen.getAllByText(/partidas vs período anterior/i).length).toBeGreaterThan(0);
     expect(screen.getByText("Señales de acompañamiento")).toBeInTheDocument();
     expect(screen.getAllByText("Participación del grupo").length).toBeGreaterThan(0);
     expect(screen.getByText("Mazos para mirar de cerca")).toBeInTheDocument();
@@ -122,6 +125,7 @@ describe("TeacherDashboard", () => {
     expect(screen.getAllByText("Animales").length).toBeGreaterThan(0);
     expect(screen.getByText(/1 partidas visibles en el período/i)).toBeInTheDocument();
     expect(screen.getByText(/Jugadores más activos/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/nuevo en foco/i).length).toBeGreaterThan(0);
   });
 
   it("shows empty-state copy when the teacher view has no dated activity yet", () => {

@@ -25,10 +25,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/features/auth/auth-context";
 import { useGames } from "@/features/games/api";
+import type { GameRecord } from "@/features/games/types";
 import { useSyncSessions } from "@/features/syncs/api";
+import type { SyncSessionRecord } from "@/features/syncs/types";
 import { getErrorMessage, formatDurationSeconds } from "@/lib/utils";
 
-const RECENT_WINDOW_DAYS = 7;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 function parseDate(value?: string | null) {
@@ -53,15 +54,178 @@ function resolveTurnActor(game: { players: Array<{ id: string; playerName?: stri
   );
 }
 
+type TrendTone = "up" | "down" | "flat";
+
+type TrendSummary = {
+  label: string;
+  tone: TrendTone;
+};
+
+type PlayerDrilldown = {
+  name: string;
+  totalTurns: number;
+  totalGames: number;
+  successRate: number;
+  avgTurnTime: number;
+  decks: Array<{ name: string; totalTurns: number }>;
+};
+
+type DeckDrilldown = {
+  name: string;
+  totalGames: number;
+  totalTurns: number;
+  successRate: number;
+  avgTurnTime: number;
+  players: Array<{ name: string; totalTurns: number }>;
+};
+
+type GameAnalysis = {
+  recentGames: number;
+  totalTurns: number;
+  totalTurnTime: number;
+  successfulTurns: number;
+  activePlayers: number;
+  deckChart: Array<{ name: string; total: number }>;
+  playerDrilldowns: PlayerDrilldown[];
+  deckDrilldowns: DeckDrilldown[];
+};
+
+function formatSignedDelta(value: number) {
+  if (value > 0) return `+${value}`;
+  return `${value}`;
+}
+
+function describeCountTrend(current: number, previous: number, noun: string): TrendSummary {
+  const delta = current - previous;
+  if (delta > 0) return { label: `${formatSignedDelta(delta)} ${noun} vs período anterior`, tone: "up" };
+  if (delta < 0) return { label: `${formatSignedDelta(delta)} ${noun} vs período anterior`, tone: "down" };
+  return { label: `Sin cambio vs período anterior`, tone: "flat" };
+}
+
+function describeRateTrend(current: number, previous: number): TrendSummary {
+  const delta = current - previous;
+  if (delta > 0) return { label: `${formatSignedDelta(delta)} pp de acierto`, tone: "up" };
+  if (delta < 0) return { label: `${formatSignedDelta(delta)} pp de acierto`, tone: "down" };
+  return { label: "Acierto estable", tone: "flat" };
+}
+
+function describeDurationTrend(current: number, previous: number): TrendSummary {
+  const delta = Math.round(current - previous);
+  if (delta > 0) return { label: `${formatSignedDelta(delta)}s por turno`, tone: "down" };
+  if (delta < 0) return { label: `${formatSignedDelta(delta)}s por turno`, tone: "up" };
+  return { label: "Ritmo estable", tone: "flat" };
+}
+
+function buildSupportTrendLabel(currentValue: number, previousValue?: number | null, unit = "pp") {
+  if (previousValue == null) return "nuevo en foco";
+  const delta = currentValue - previousValue;
+  if (delta > 0) return `mejoró ${formatSignedDelta(delta)} ${unit}`;
+  if (delta < 0) return `cayó ${formatSignedDelta(delta)} ${unit}`;
+  return "sin cambio relevante";
+}
+
+function analyzeGames(games: GameRecord[]): GameAnalysis {
+  let totalTurns = 0;
+  let totalTurnTime = 0;
+  let successfulTurns = 0;
+  const playerStatsMap = new Map<
+    string,
+    { name: string; totalTurns: number; successfulTurns: number; totalPlayTime: number; games: Set<string>; decks: Map<string, number> }
+  >();
+  const deckStatsMap = new Map<
+    string,
+    { name: string; totalGames: number; totalTurns: number; successfulTurns: number; totalPlayTime: number; players: Map<string, number> }
+  >();
+
+  games.forEach((game) => {
+    const deckKey = game.deckName || "Sin mazo";
+    const deckStat = deckStatsMap.get(deckKey) || { name: deckKey, totalGames: 0, totalTurns: 0, successfulTurns: 0, totalPlayTime: 0, players: new Map<string, number>() };
+    deckStat.totalGames += 1;
+
+    game.turns.forEach((turn) => {
+      const actor = resolveTurnActor(game, turn);
+      const playTime = turn.playTimeSeconds || 0;
+      const playerStat = playerStatsMap.get(actor) || { name: actor, totalTurns: 0, successfulTurns: 0, totalPlayTime: 0, games: new Set<string>(), decks: new Map<string, number>() };
+      playerStat.totalTurns += 1;
+      playerStat.successfulTurns += turn.success ? 1 : 0;
+      playerStat.totalPlayTime += playTime;
+      playerStat.games.add(game.id);
+      playerStat.decks.set(deckKey, (playerStat.decks.get(deckKey) || 0) + 1);
+      playerStatsMap.set(actor, playerStat);
+
+      deckStat.totalTurns += 1;
+      deckStat.successfulTurns += turn.success ? 1 : 0;
+      deckStat.totalPlayTime += playTime;
+      deckStat.players.set(actor, (deckStat.players.get(actor) || 0) + 1);
+
+      totalTurns += 1;
+      totalTurnTime += playTime;
+      successfulTurns += turn.success ? 1 : 0;
+    });
+
+    deckStatsMap.set(deckKey, deckStat);
+  });
+
+  const playerDrilldowns = Array.from(playerStatsMap.values())
+    .map((item) => ({
+      name: item.name,
+      totalTurns: item.totalTurns,
+      totalGames: item.games.size,
+      successRate: item.totalTurns > 0 ? Math.round((item.successfulTurns / item.totalTurns) * 100) : 0,
+      avgTurnTime: item.totalTurns > 0 ? item.totalPlayTime / item.totalTurns : 0,
+      decks: Array.from(item.decks.entries())
+        .map(([name, totalTurns]) => ({ name, totalTurns }))
+        .sort((left, right) => right.totalTurns - left.totalTurns)
+        .slice(0, 3),
+    }))
+    .sort((left, right) => right.totalTurns - left.totalTurns || right.successRate - left.successRate);
+
+  const deckDrilldowns = Array.from(deckStatsMap.values())
+    .map((item) => ({
+      name: item.name,
+      totalGames: item.totalGames,
+      totalTurns: item.totalTurns,
+      successRate: item.totalTurns > 0 ? Math.round((item.successfulTurns / item.totalTurns) * 100) : 0,
+      avgTurnTime: item.totalTurns > 0 ? item.totalPlayTime / item.totalTurns : 0,
+      players: Array.from(item.players.entries())
+        .map(([name, totalTurns]) => ({ name, totalTurns }))
+        .sort((left, right) => right.totalTurns - left.totalTurns)
+        .slice(0, 4),
+    }))
+    .sort((left, right) => left.successRate - right.successRate || right.totalTurns - left.totalTurns);
+
+  return {
+    recentGames: games.length,
+    totalTurns,
+    totalTurnTime,
+    successfulTurns,
+    activePlayers: playerDrilldowns.length,
+    deckChart: Object.entries(
+      games.reduce<Record<string, number>>((acc, game) => {
+        const key = game.deckName || "Sin mazo";
+        acc[key] = (acc[key] || 0) + 1;
+        return acc;
+      }, {}),
+    )
+      .map(([name, total]) => ({ name, total }))
+      .sort((a, b) => b.total - a.total)
+      .slice(0, 6),
+    playerDrilldowns,
+    deckDrilldowns,
+  };
+}
+
 function MetricCard({
   label,
   value,
   hint,
+  trend,
   icon: Icon,
 }: {
   label: string;
   value: string;
   hint: string;
+  trend?: TrendSummary;
   icon: React.ComponentType<{ className?: string }>;
 }) {
   return (
@@ -72,6 +236,11 @@ function MetricCard({
             <p className="text-sm text-muted-foreground">{label}</p>
             <p className="mt-2 text-3xl font-semibold tracking-tight text-foreground">{value}</p>
             <p className="mt-2 text-sm leading-6 text-muted-foreground">{hint}</p>
+            {trend ? (
+              <Badge variant="outline" className="mt-3">
+                {trend.label}
+              </Badge>
+            ) : null}
           </div>
           <div className="rounded-2xl bg-primary/12 p-3 text-primary">
             <Icon className="size-5" />
@@ -117,10 +286,13 @@ export function TeacherDashboard() {
   const error = gamesQuery.error || syncsQuery.error;
 
   const metrics = useMemo(() => {
-    const games = gamesQuery.data?.data || [];
-    const syncs = syncsQuery.data?.data || [];
+    const games = (gamesQuery.data?.data || []) as GameRecord[];
+    const syncs = (syncsQuery.data?.data || []) as SyncSessionRecord[];
     const windowDays = periodFilter === "all" ? null : Number(periodFilter.replace("d", ""));
+    const chartWindowDays = windowDays || 30;
     const recentThreshold = windowDays ? referenceNow - windowDays * DAY_MS : null;
+    const previousThresholdStart = referenceNow - chartWindowDays * DAY_MS * 2;
+    const previousThresholdEnd = referenceNow - chartWindowDays * DAY_MS;
     const hasDatedGames = games.some((game) => Boolean(parseDate(game.startDate || game.createdAt || game.updatedAt)));
     const hasDatedSyncs = syncs.some((sync) => Boolean(parseDate(sync.startedAt || sync.syncedAt || sync.createdAt || sync.capturedAt)));
     const filteredGames = recentThreshold && hasDatedGames
@@ -135,22 +307,19 @@ export function TeacherDashboard() {
           return Boolean(date && date.getTime() >= recentThreshold && date.getTime() <= referenceNow);
         })
       : syncs;
-    const totalTurns = filteredGames.reduce((sum, game) => sum + game.turns.length, 0);
-    const totalTurnTime = filteredGames.reduce(
-      (sum, game) => sum + game.turns.reduce((turnSum, turn) => turnSum + (turn.playTimeSeconds || 0), 0),
-      0,
-    );
-    const successfulTurns = filteredGames.reduce((sum, game) => sum + game.turns.filter((turn) => turn.success).length, 0);
-    const avgTurnTime = totalTurns > 0 ? totalTurnTime / totalTurns : 0;
-    const successRate = totalTurns > 0 ? Math.round((successfulTurns / totalTurns) * 100) : 0;
-    const activePlayers = new Set(
-      filteredGames.flatMap((game) =>
-        game.players
-          .map((player) => player.playerName || player.externalPlayerUid || player.studentId || player.id)
-          .filter(Boolean),
-      ),
-    ).size;
-    const chartWindowDays = windowDays || 30;
+    const previousGames = hasDatedGames
+      ? games.filter((game) => {
+          const date = parseDate(game.startDate || game.createdAt || game.updatedAt);
+          return Boolean(date && date.getTime() >= previousThresholdStart && date.getTime() < previousThresholdEnd);
+        })
+      : [];
+
+    const currentAnalysis = analyzeGames(filteredGames);
+    const previousAnalysis = analyzeGames(previousGames);
+    const avgTurnTime = currentAnalysis.totalTurns > 0 ? currentAnalysis.totalTurnTime / currentAnalysis.totalTurns : 0;
+    const successRate = currentAnalysis.totalTurns > 0 ? Math.round((currentAnalysis.successfulTurns / currentAnalysis.totalTurns) * 100) : 0;
+    const previousAvgTurnTime = previousAnalysis.totalTurns > 0 ? previousAnalysis.totalTurnTime / previousAnalysis.totalTurns : 0;
+    const previousSuccessRate = previousAnalysis.totalTurns > 0 ? Math.round((previousAnalysis.successfulTurns / previousAnalysis.totalTurns) * 100) : 0;
     const activityBuckets = Array.from({ length: chartWindowDays }, (_, index) => {
       const date = new Date(referenceNow - (chartWindowDays - index - 1) * DAY_MS);
       const key = date.toISOString().slice(0, 10);
@@ -161,14 +330,6 @@ export function TeacherDashboard() {
       ...filteredGames.map((game) => parseDate(game.startDate || game.createdAt || game.updatedAt)),
       ...filteredSyncs.map((sync) => parseDate(sync.startedAt || sync.syncedAt || sync.createdAt || sync.capturedAt)),
     ].filter((value): value is Date => Boolean(value));
-    const playerStatsMap = new Map<
-      string,
-      { name: string; totalTurns: number; successfulTurns: number; totalPlayTime: number; games: Set<string>; decks: Map<string, number> }
-    >();
-    const deckStatsMap = new Map<
-      string,
-      { name: string; totalGames: number; totalTurns: number; successfulTurns: number; totalPlayTime: number; players: Map<string, number> }
-    >();
 
     datedActivity.forEach((date) => {
       const key = date.toISOString().slice(0, 10);
@@ -176,85 +337,45 @@ export function TeacherDashboard() {
       if (bucket) bucket.total += 1;
     });
 
-    filteredGames.forEach((game) => {
-      const deckKey = game.deckName || "Sin mazo";
-      const deckStat = deckStatsMap.get(deckKey) || { name: deckKey, totalGames: 0, totalTurns: 0, successfulTurns: 0, totalPlayTime: 0, players: new Map<string, number>() };
-      deckStat.totalGames += 1;
-
-      game.turns.forEach((turn) => {
-        const actor = resolveTurnActor(game, turn);
-        const playerStat = playerStatsMap.get(actor) || { name: actor, totalTurns: 0, successfulTurns: 0, totalPlayTime: 0, games: new Set<string>(), decks: new Map<string, number>() };
-        playerStat.totalTurns += 1;
-        playerStat.successfulTurns += turn.success ? 1 : 0;
-        playerStat.totalPlayTime += turn.playTimeSeconds || 0;
-        playerStat.games.add(game.id);
-        playerStat.decks.set(deckKey, (playerStat.decks.get(deckKey) || 0) + 1);
-        playerStatsMap.set(actor, playerStat);
-
-        deckStat.totalTurns += 1;
-        deckStat.successfulTurns += turn.success ? 1 : 0;
-        deckStat.totalPlayTime += turn.playTimeSeconds || 0;
-        deckStat.players.set(actor, (deckStat.players.get(actor) || 0) + 1);
-      });
-
-      deckStatsMap.set(deckKey, deckStat);
-    });
-
-    const playerDrilldowns = Array.from(playerStatsMap.values())
-      .map((item) => ({
-        name: item.name,
-        totalTurns: item.totalTurns,
-        totalGames: item.games.size,
-        successRate: item.totalTurns > 0 ? Math.round((item.successfulTurns / item.totalTurns) * 100) : 0,
-        avgTurnTime: item.totalTurns > 0 ? item.totalPlayTime / item.totalTurns : 0,
-        decks: Array.from(item.decks.entries())
-          .map(([name, totalTurns]) => ({ name, totalTurns }))
-          .sort((left, right) => right.totalTurns - left.totalTurns)
-          .slice(0, 3),
-      }))
-      .sort((left, right) => right.totalTurns - left.totalTurns || right.successRate - left.successRate);
-
-    const deckDrilldowns = Array.from(deckStatsMap.values())
-      .map((item) => ({
-        name: item.name,
-        totalGames: item.totalGames,
-        totalTurns: item.totalTurns,
-        successRate: item.totalTurns > 0 ? Math.round((item.successfulTurns / item.totalTurns) * 100) : 0,
-        avgTurnTime: item.totalTurns > 0 ? item.totalPlayTime / item.totalTurns : 0,
-        players: Array.from(item.players.entries())
-          .map(([name, totalTurns]) => ({ name, totalTurns }))
-          .sort((left, right) => right.totalTurns - left.totalTurns)
-          .slice(0, 4),
-      }))
-      .sort((left, right) => left.successRate - right.successRate || right.totalTurns - left.totalTurns);
-
-    const playerStats = playerDrilldowns.slice(0, 5);
-    const deckInsights = deckDrilldowns.slice(0, 5);
+    const playerStats = currentAnalysis.playerDrilldowns.slice(0, 5);
+    const deckInsights = currentAnalysis.deckDrilldowns.slice(0, 5);
+    const previousPlayers = new Map(previousAnalysis.playerDrilldowns.map((item) => [item.name, item]));
+    const previousDecks = new Map(previousAnalysis.deckDrilldowns.map((item) => [item.name, item]));
 
     return {
-      recentGames: filteredGames.length,
-      activePlayers,
+      recentGames: currentAnalysis.recentGames,
+      activePlayers: currentAnalysis.activePlayers,
       avgTurnTime,
       successRate,
-      deckChart: Object.entries(
-        filteredGames.reduce<Record<string, number>>((acc, game) => {
-          const key = game.deckName || "Sin mazo";
-          acc[key] = (acc[key] || 0) + 1;
-          return acc;
-        }, {}),
-      )
-        .map(([name, total]) => ({ name, total }))
-        .sort((a, b) => b.total - a.total)
-        .slice(0, 6),
+      deckChart: currentAnalysis.deckChart,
       activityChart: activityBuckets,
       hasDatedActivity: datedActivity.length > 0,
       playerStats,
       deckInsights,
-      playerDrilldowns,
-      deckDrilldowns,
-      supportPlayers: playerStats.filter((item) => item.totalTurns >= 2 && item.successRate < 60).slice(0, 3),
-      supportDecks: deckInsights.filter((item) => item.totalTurns >= 2 && item.successRate < 60).slice(0, 3),
+      playerDrilldowns: currentAnalysis.playerDrilldowns,
+      deckDrilldowns: currentAnalysis.deckDrilldowns,
+      supportPlayers: playerStats
+        .filter((item) => item.totalTurns >= 2 && item.successRate < 60)
+        .map((item) => ({
+          ...item,
+          trendLabel: buildSupportTrendLabel(item.successRate, previousPlayers.get(item.name)?.successRate),
+        }))
+        .slice(0, 3),
+      supportDecks: deckInsights
+        .filter((item) => item.totalTurns >= 2 && item.successRate < 60)
+        .map((item) => ({
+          ...item,
+          trendLabel: buildSupportTrendLabel(item.successRate, previousDecks.get(item.name)?.successRate),
+        }))
+        .slice(0, 3),
       periodLabel: periodFilter === "all" ? "visibles" : periodFilter === "30d" ? "30 días" : "7 días",
+      periodWindowLabel: periodFilter === "all" ? "últimos 30 días" : periodFilter === "30d" ? "últimos 30 días" : "últimos 7 días",
+      trends: {
+        games: describeCountTrend(currentAnalysis.recentGames, previousAnalysis.recentGames, "partidas"),
+        players: describeCountTrend(currentAnalysis.activePlayers, previousAnalysis.activePlayers, "estudiantes"),
+        success: describeRateTrend(successRate, previousSuccessRate),
+        pace: describeDurationTrend(avgTurnTime, previousAvgTurnTime),
+      },
     };
   }, [gamesQuery.data, periodFilter, referenceNow, syncsQuery.data]);
 
@@ -355,24 +476,28 @@ export function TeacherDashboard() {
               label={`Partidas ${metrics.periodLabel}`}
               value={String(metrics.recentGames)}
               hint="Volumen reciente de juego para leer continuidad de uso, no solo histórico acumulado."
+              trend={metrics.trends.games}
               icon={Database}
             />
             <MetricCard
               label="Estudiantes participantes"
               value={String(metrics.activePlayers)}
               hint="Cuenta única de jugadores visibles en la muestra actual."
+              trend={metrics.trends.players}
               icon={Users2}
             />
             <MetricCard
               label="Tiempo promedio por turno"
               value={formatDurationSeconds(metrics.avgTurnTime)}
               hint="Sirve para detectar ritmo de juego y posibles momentos de fricción."
+              trend={metrics.trends.pace}
               icon={Activity}
             />
             <MetricCard
               label="Éxito de turnos"
               value={`${metrics.successRate}%`}
               hint="Proporción agregada de aciertos sobre el total de jugadas visibles."
+              trend={metrics.trends.success}
               icon={Trophy}
             />
           </>
@@ -386,6 +511,33 @@ export function TeacherDashboard() {
           </CardContent>
         </Card>
       ) : null}
+
+      <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
+        <CardHeader>
+          <CardTitle>Tendencias del período</CardTitle>
+          <CardDescription>
+            Lectura comparativa de {metrics.periodWindowLabel} contra el bloque anterior para detectar cambios de ritmo antes de que se vuelvan problema.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <div className="rounded-2xl bg-background/70 p-4">
+            <p className="text-sm font-medium text-foreground">Ritmo de juego</p>
+            <p className="mt-2 text-sm text-muted-foreground">{metrics.trends.games.label}</p>
+          </div>
+          <div className="rounded-2xl bg-background/70 p-4">
+            <p className="text-sm font-medium text-foreground">Participación</p>
+            <p className="mt-2 text-sm text-muted-foreground">{metrics.trends.players.label}</p>
+          </div>
+          <div className="rounded-2xl bg-background/70 p-4">
+            <p className="text-sm font-medium text-foreground">Acierto</p>
+            <p className="mt-2 text-sm text-muted-foreground">{metrics.trends.success.label}</p>
+          </div>
+          <div className="rounded-2xl bg-background/70 p-4">
+            <p className="text-sm font-medium text-foreground">Fluidez</p>
+            <p className="mt-2 text-sm text-muted-foreground">{metrics.trends.pace.label}</p>
+          </div>
+        </CardContent>
+      </Card>
 
       <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
         <CardHeader>
@@ -407,6 +559,7 @@ export function TeacherDashboard() {
                     <div className="flex flex-wrap gap-2">
                       <Badge variant="outline">{player.totalTurns} turnos</Badge>
                       <Badge variant="secondary">{player.successRate}% éxito</Badge>
+                      <Badge variant="outline">{player.trendLabel}</Badge>
                     </div>
                   </div>
                 ))
@@ -425,6 +578,7 @@ export function TeacherDashboard() {
                     <div className="flex flex-wrap gap-2">
                       <Badge variant="outline">{deck.totalTurns} turnos</Badge>
                       <Badge variant="secondary">{deck.successRate}% éxito</Badge>
+                      <Badge variant="outline">{deck.trendLabel}</Badge>
                     </div>
                   </div>
                 ))
@@ -467,7 +621,7 @@ export function TeacherDashboard() {
           <CardHeader>
             <CardTitle>Actividad reciente</CardTitle>
             <CardDescription>
-              Últimos {RECENT_WINDOW_DAYS} días combinando partidas y sincronizaciones fechadas para leer continuidad real.
+              {metrics.periodWindowLabel} combinando partidas y sincronizaciones fechadas para leer continuidad real.
             </CardDescription>
           </CardHeader>
           <CardContent className="h-80">
