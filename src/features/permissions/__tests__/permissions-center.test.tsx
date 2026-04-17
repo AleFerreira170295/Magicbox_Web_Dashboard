@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { PermissionsCenter } from "@/features/permissions/permissions-center";
 
@@ -197,5 +197,26 @@ describe("PermissionsCenter", () => {
     expect(screen.getByLabelText("Feature")).toBeInTheDocument();
     expect(screen.getByLabelText("Action")).toBeInTheDocument();
     expect(screen.getByLabelText("Señal")).toBeInTheDocument();
+  });
+
+  it("filters scoped overrides and review profiles by institution", () => {
+    renderPermissionsCenter();
+
+    const scopeSelect = screen.getByLabelText("Scope") as HTMLSelectElement;
+    fireEvent.change(scopeSelect, { target: { value: "ec-1" } });
+
+    const tables = screen.getAllByRole("table");
+    const overridesTable = tables[1];
+    const reviewTable = tables[2];
+
+    expect(scopeSelect.value).toBe("ec-1");
+    expect(within(overridesTable).getByText("Ana Admin")).toBeInTheDocument();
+    expect(within(overridesTable).getByText("access_control")).toBeInTheDocument();
+    expect(within(overridesTable).getByText("Colegio Norte")).toBeInTheDocument();
+    expect(within(overridesTable).queryByText("Bruno Campo")).not.toBeInTheDocument();
+    expect(within(overridesTable).queryByText("Global")).not.toBeInTheDocument();
+    expect(within(reviewTable).getByText("Ana Admin")).toBeInTheDocument();
+    expect(within(reviewTable).getByText("override explícito")).toBeInTheDocument();
+    expect(within(reviewTable).queryByText("Bruno Campo")).not.toBeInTheDocument();
   });
 });
