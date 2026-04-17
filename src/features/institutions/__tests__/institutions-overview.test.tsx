@@ -1,6 +1,6 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { InstitutionsOverview } from "@/features/institutions/institutions-overview";
 
 const useAuthMock = vi.fn();
@@ -8,6 +8,9 @@ const useInstitutionsMock = vi.fn();
 const useInstitutionByIdMock = vi.fn();
 const useUsersMock = vi.fn();
 const useDevicesMock = vi.fn();
+const createInstitutionMock = vi.fn();
+const updateInstitutionMock = vi.fn();
+const deleteInstitutionMock = vi.fn();
 
 vi.mock("@/features/auth/auth-context", () => ({
   useAuth: () => useAuthMock(),
@@ -16,9 +19,9 @@ vi.mock("@/features/auth/auth-context", () => ({
 vi.mock("@/features/institutions/api", () => ({
   useInstitutions: (...args: unknown[]) => useInstitutionsMock(...args),
   useInstitutionById: (...args: unknown[]) => useInstitutionByIdMock(...args),
-  createInstitution: vi.fn(),
-  updateInstitution: vi.fn(),
-  deleteInstitution: vi.fn(),
+  createInstitution: (...args: unknown[]) => createInstitutionMock(...args),
+  updateInstitution: (...args: unknown[]) => updateInstitutionMock(...args),
+  deleteInstitution: (...args: unknown[]) => deleteInstitutionMock(...args),
 }));
 
 vi.mock("@/features/users/api", () => ({
@@ -55,6 +58,33 @@ function renderInstitutionsOverview() {
 describe("InstitutionsOverview", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+
+    createInstitutionMock.mockResolvedValue({
+      id: "ec-2",
+      name: "Colegio Sur",
+      email: "nuevo@example.com",
+      phoneNumber: "+598222222",
+      url: "https://sur.example.com",
+      address: {
+        addressFirstLine: "Nueva 456",
+        addressSecondLine: null,
+        countryCode: "UY",
+        city: "Canelones",
+        state: "Canelones",
+        postalCode: "90000",
+      },
+      city: "Canelones",
+      country: "UY",
+      contactName: null,
+      contactEmail: null,
+      code: null,
+      status: null,
+      createdAt: null,
+      updatedAt: null,
+      raw: {},
+    });
+    updateInstitutionMock.mockResolvedValue({ id: "ec-1", name: "Colegio Norte" });
+    deleteInstitutionMock.mockResolvedValue(undefined);
 
     useAuthMock.mockReturnValue({
       tokens: { accessToken: "token", refreshToken: "refresh" },
@@ -176,6 +206,10 @@ describe("InstitutionsOverview", () => {
     );
   });
 
+  afterEach(() => {
+    cleanup();
+  });
+
   it("shows institution-admin scoped read-only mode for institutions", () => {
     renderInstitutionsOverview();
 
@@ -222,5 +256,207 @@ describe("InstitutionsOverview", () => {
     expect(screen.getByText(/Dispositivos vinculados: 2/i)).toBeInTheDocument();
     expect(screen.getByText("MagicBox Aula 1")).toBeInTheDocument();
     expect(screen.getByText("mb-1")).toBeInTheDocument();
+  });
+
+  it("filters institutions by linked device and linked user context", () => {
+    useAuthMock.mockReturnValue({
+      tokens: { accessToken: "token", refreshToken: "refresh" },
+      user: {
+        id: "user-current",
+        email: "admin@example.com",
+        firstName: "Iris",
+        lastName: "Admin",
+        fullName: "Iris Admin",
+        educationalCenterId: null,
+        roles: ["admin"],
+        permissions: ["educational_center:read"],
+        raw: {},
+      },
+    });
+
+    useInstitutionsMock.mockReturnValue(
+      okQuery({
+        data: [
+          {
+            id: "ec-1",
+            name: "Colegio Norte",
+            email: "colegio@example.com",
+            phoneNumber: "+598111111",
+            url: "https://colegio.example.com",
+            address: {
+              addressFirstLine: "Calle 123",
+              addressSecondLine: null,
+              countryCode: "UY",
+              city: "Montevideo",
+              state: "Montevideo",
+              postalCode: "11000",
+            },
+            city: "Montevideo",
+            country: "UY",
+            contactName: null,
+            contactEmail: null,
+            code: null,
+            status: null,
+            createdAt: null,
+            updatedAt: null,
+            raw: {},
+            operationalSummary: { userCount: 1, deviceCount: 1, classGroupCount: 1, studentCount: 20, needsReview: false },
+          },
+          {
+            id: "ec-2",
+            name: "Colegio Sur",
+            email: "sur@example.com",
+            phoneNumber: "+598222222",
+            url: "https://sur.example.com",
+            address: {
+              addressFirstLine: "Avenida 456",
+              addressSecondLine: null,
+              countryCode: "UY",
+              city: "Canelones",
+              state: "Canelones",
+              postalCode: "90000",
+            },
+            city: "Canelones",
+            country: "UY",
+            contactName: null,
+            contactEmail: null,
+            code: null,
+            status: null,
+            createdAt: null,
+            updatedAt: null,
+            raw: {},
+            operationalSummary: { userCount: 1, deviceCount: 1, classGroupCount: 0, studentCount: 12, needsReview: false },
+          },
+        ],
+        page: 1,
+        limit: 2,
+        total: 2,
+        total_pages: 1,
+      }),
+    );
+
+    useUsersMock.mockReturnValue(
+      okQuery({
+        data: [
+          {
+            id: "user-1",
+            identityId: null,
+            email: "ana@example.com",
+            fullName: "Ana Admin",
+            firstName: "Ana",
+            lastName: "Admin",
+            roles: ["teacher"],
+            permissions: [],
+            userType: "web",
+            educationalCenterId: "ec-1",
+            status: "active",
+            phoneNumber: null,
+            address: null,
+            imageUrl: null,
+            createdAt: null,
+            updatedAt: null,
+            deletedAt: null,
+            lastLoginAt: null,
+            raw: {},
+          },
+          {
+            id: "user-2",
+            identityId: null,
+            email: "bruno@example.com",
+            fullName: "Bruno Sur",
+            firstName: "Bruno",
+            lastName: "Sur",
+            roles: ["teacher"],
+            permissions: [],
+            userType: "web",
+            educationalCenterId: "ec-2",
+            status: "active",
+            phoneNumber: null,
+            address: null,
+            imageUrl: null,
+            createdAt: null,
+            updatedAt: null,
+            deletedAt: null,
+            lastLoginAt: null,
+            raw: {},
+          },
+        ],
+        page: 1,
+        limit: 2,
+        total: 2,
+        total_pages: 1,
+      }),
+    );
+
+    useDevicesMock.mockReturnValue(
+      okQuery({
+        data: [
+          { id: "device-1", deviceId: "mb-1", name: "MagicBox Aula 1", educationalCenterId: "ec-1", assignmentScope: "institution", raw: {} },
+          { id: "device-2", deviceId: "mb-2", name: "MagicBox Sur", educationalCenterId: "ec-2", assignmentScope: "institution", raw: {} },
+        ],
+        page: 1,
+        limit: 2,
+        total: 2,
+        total_pages: 1,
+      }),
+    );
+
+    renderInstitutionsOverview();
+
+    fireEvent.change(screen.getByPlaceholderText(/Buscar por institución, email, usuario o dispositivo/i), { target: { value: "MagicBox Sur" } });
+    expect(screen.getByText("Colegio Sur")).toBeInTheDocument();
+    expect(screen.queryByText("Colegio Norte")).not.toBeInTheDocument();
+
+    fireEvent.change(screen.getByPlaceholderText(/Buscar por institución, email, usuario o dispositivo/i), { target: { value: "Ana Admin" } });
+    expect(screen.getByText("Colegio Norte")).toBeInTheDocument();
+    expect(screen.queryByText("Colegio Sur")).not.toBeInTheDocument();
+  });
+
+  it("creates institutions with normalized backend payload", async () => {
+    useAuthMock.mockReturnValue({
+      tokens: { accessToken: "token", refreshToken: "refresh" },
+      user: {
+        id: "user-current",
+        email: "admin@example.com",
+        firstName: "Iris",
+        lastName: "Admin",
+        fullName: "Iris Admin",
+        educationalCenterId: null,
+        roles: ["admin"],
+        permissions: ["educational_center:create"],
+        raw: {},
+      },
+    });
+
+    renderInstitutionsOverview();
+
+    fireEvent.click(screen.getByRole("button", { name: "Nueva institución" }));
+    fireEvent.change(screen.getByLabelText("Nombre"), { target: { value: "Colegio Sur" } });
+    fireEvent.change(screen.getByLabelText("Email"), { target: { value: "NUEVO@Example.com" } });
+    fireEvent.change(screen.getByLabelText("Teléfono"), { target: { value: "+598222222" } });
+    fireEvent.change(screen.getByLabelText("URL"), { target: { value: "https://sur.example.com" } });
+    fireEvent.change(screen.getByLabelText("Calle"), { target: { value: "Nueva 456" } });
+    fireEvent.change(screen.getByLabelText("Ciudad"), { target: { value: "Canelones" } });
+    fireEvent.change(screen.getByLabelText("País (código)"), { target: { value: "uy" } });
+    fireEvent.change(screen.getByLabelText("Departamento / estado"), { target: { value: "Canelones" } });
+    fireEvent.change(screen.getByLabelText("Código postal"), { target: { value: "90000" } });
+    fireEvent.click(screen.getByRole("button", { name: "Crear institución" }));
+
+    await waitFor(() => {
+      expect(createInstitutionMock).toHaveBeenCalledWith("token", {
+        name: "Colegio Sur",
+        email: "nuevo@example.com",
+        phoneNumber: "+598222222",
+        url: "https://sur.example.com",
+        address: {
+          addressFirstLine: "Nueva 456",
+          addressSecondLine: null,
+          countryCode: "UY",
+          city: "Canelones",
+          state: "Canelones",
+          postalCode: "90000",
+        },
+      });
+    });
   });
 });
