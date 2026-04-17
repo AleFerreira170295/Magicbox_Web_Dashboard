@@ -103,6 +103,8 @@ describe("TeacherDashboard", () => {
 
     expect(screen.getByText("Docente")).toBeInTheDocument();
     expect(screen.getByText("Período")).toBeInTheDocument();
+    expect(screen.getByText("Descargar PDF")).toBeInTheDocument();
+    expect(screen.getByText("Descargar Excel")).toBeInTheDocument();
     expect(screen.getByText("Partidas 7 días")).toBeInTheDocument();
     expect(screen.getByText("Estudiantes participantes")).toBeInTheDocument();
     expect(screen.getByText("Tiempo promedio por turno")).toBeInTheDocument();
@@ -119,6 +121,7 @@ describe("TeacherDashboard", () => {
     expect(screen.getByText("Mazos para mirar de cerca")).toBeInTheDocument();
     expect(screen.getByText("Estudiantes para acompañar")).toBeInTheDocument();
     expect(screen.getByText("Contenidos para reforzar")).toBeInTheDocument();
+    expect(screen.getByText("Detalle de la jornada")).toBeInTheDocument();
     expect(screen.getByText("Detalle de estudiante")).toBeInTheDocument();
     expect(screen.getByText("Detalle de mazo")).toBeInTheDocument();
     expect(screen.getAllByText("Ana").length).toBeGreaterThan(0);
@@ -140,6 +143,7 @@ describe("TeacherDashboard", () => {
     expect(screen.getByText("No aparecen mazos con señal de refuerzo en el período seleccionado.")).toBeInTheDocument();
     expect(screen.getByText("Todavía no hay jugadas suficientes para construir una lectura por estudiante.")).toBeInTheDocument();
     expect(screen.getByText("Aún no hay suficiente actividad para construir señales por mazo.")).toBeInTheDocument();
+    expect(screen.getByText("Seleccioná una barra de actividad para ver el detalle diario.")).toBeInTheDocument();
     expect(screen.getByText("Seleccioná un estudiante para ver su detalle.")).toBeInTheDocument();
     expect(screen.getByText("Seleccioná un mazo para ver su detalle.")).toBeInTheDocument();
   });

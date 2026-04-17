@@ -6,6 +6,7 @@ import {
   ArrowRight,
   BookOpen,
   Database,
+  Download,
   Sparkles,
   Trophy,
   Users2,
@@ -21,9 +22,15 @@ import {
 } from "recharts";
 import { SectionHeader } from "@/components/section-header";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/features/auth/auth-context";
+import {
+  buildTeacherDashboardExportData,
+  downloadTeacherDashboardExcel,
+  downloadTeacherDashboardPdf,
+} from "@/features/dashboard/teacher-dashboard-export";
 import { useGames } from "@/features/games/api";
 import type { GameRecord } from "@/features/games/types";
 import { useSyncSessions } from "@/features/syncs/api";
@@ -281,6 +288,8 @@ export function TeacherDashboard() {
   const [periodFilter, setPeriodFilter] = useState<"7d" | "30d" | "all">("7d");
   const [selectedPlayerName, setSelectedPlayerName] = useState<string | null>(null);
   const [selectedDeckName, setSelectedDeckName] = useState<string | null>(null);
+  const [selectedActivityDayKey, setSelectedActivityDayKey] = useState<string | null>(null);
+  const [exportingFormat, setExportingFormat] = useState<"pdf" | "excel" | null>(null);
 
   const isLoading = gamesQuery.isLoading || syncsQuery.isLoading;
   const error = gamesQuery.error || syncsQuery.error;
@@ -341,6 +350,42 @@ export function TeacherDashboard() {
     const deckInsights = currentAnalysis.deckDrilldowns.slice(0, 5);
     const previousPlayers = new Map(previousAnalysis.playerDrilldowns.map((item) => [item.name, item]));
     const previousDecks = new Map(previousAnalysis.deckDrilldowns.map((item) => [item.name, item]));
+    const activityDaySummary = new Map(
+      activityBuckets.map((bucket) => [bucket.key, { ...bucket, matches: 0, turns: 0, syncs: 0, decks: new Set<string>() }]),
+    );
+
+    filteredGames.forEach((game) => {
+      const date = parseDate(game.startDate || game.createdAt || game.updatedAt);
+      if (!date) return;
+      const key = date.toISOString().slice(0, 10);
+      const day = activityDaySummary.get(key);
+      if (!day) return;
+      day.matches += 1;
+      day.turns += game.turns.length;
+      day.decks.add(game.deckName || "Sin mazo");
+    });
+
+    filteredSyncs.forEach((sync) => {
+      const date = parseDate(sync.startedAt || sync.syncedAt || sync.createdAt || sync.capturedAt);
+      if (!date) return;
+      const key = date.toISOString().slice(0, 10);
+      const day = activityDaySummary.get(key);
+      if (!day) return;
+      day.syncs += 1;
+    });
+
+    const activityDayDrilldowns = activityBuckets.map((bucket) => {
+      const day = activityDaySummary.get(bucket.key);
+      return {
+        key: bucket.key,
+        name: bucket.name,
+        total: bucket.total,
+        matches: day?.matches || 0,
+        turns: day?.turns || 0,
+        syncs: day?.syncs || 0,
+        decks: Array.from(day?.decks || []).slice(0, 4),
+      };
+    });
 
     return {
       recentGames: currentAnalysis.recentGames,
@@ -349,6 +394,7 @@ export function TeacherDashboard() {
       successRate,
       deckChart: currentAnalysis.deckChart,
       activityChart: activityBuckets,
+      activityDayDrilldowns,
       hasDatedActivity: datedActivity.length > 0,
       playerStats,
       deckInsights,
@@ -376,11 +422,29 @@ export function TeacherDashboard() {
         success: describeRateTrend(successRate, previousSuccessRate),
         pace: describeDurationTrend(avgTurnTime, previousAvgTurnTime),
       },
+      exportGames: filteredGames,
     };
   }, [gamesQuery.data, periodFilter, referenceNow, syncsQuery.data]);
 
   const selectedPlayer = metrics.playerDrilldowns.find((item) => item.name === selectedPlayerName) || metrics.playerDrilldowns[0] || null;
   const selectedDeck = metrics.deckDrilldowns.find((item) => item.name === selectedDeckName) || metrics.deckDrilldowns[0] || null;
+  const selectedActivityDay = metrics.activityDayDrilldowns.find((item) => item.key === selectedActivityDayKey)
+    || metrics.activityDayDrilldowns.find((item) => item.total > 0)
+    || null;
+
+  const handleExport = async (format: "pdf" | "excel") => {
+    try {
+      setExportingFormat(format);
+      const exportData = buildTeacherDashboardExportData(metrics.exportGames);
+      if (format === "pdf") {
+        await downloadTeacherDashboardPdf(exportData);
+      } else {
+        await downloadTeacherDashboardExcel(exportData);
+      }
+    } finally {
+      setExportingFormat(null);
+    }
+  };
 
   return (
     <div className="space-y-8">
@@ -389,7 +453,7 @@ export function TeacherDashboard() {
         title="Una vista más clara para acompañar el aula"
         description="Tomamos como referencia el tono del sitio público de MagicBox para empezar a mover el dashboard hacia una experiencia más cálida, simple y pedagógica, sin perder la capa operativa que ya tenemos."
         actions={
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <span className="text-sm text-muted-foreground">Período</span>
             <select
               value={periodFilter}
@@ -400,6 +464,14 @@ export function TeacherDashboard() {
               <option value="30d">Últimos 30 días</option>
               <option value="all">Todo</option>
             </select>
+            <Button type="button" variant="outline" size="sm" onClick={() => handleExport("pdf")} disabled={exportingFormat !== null || metrics.exportGames.length === 0}>
+              <Download className="size-4" />
+              {exportingFormat === "pdf" ? "Generando PDF..." : "Descargar PDF"}
+            </Button>
+            <Button type="button" variant="outline" size="sm" onClick={() => handleExport("excel")} disabled={exportingFormat !== null || metrics.exportGames.length === 0}>
+              <Download className="size-4" />
+              {exportingFormat === "excel" ? "Generando Excel..." : "Descargar Excel"}
+            </Button>
           </div>
         }
       />
@@ -605,7 +677,13 @@ export function TeacherDashboard() {
               </div>
             ) : (
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={metrics.deckChart}>
+                <BarChart
+                  data={metrics.deckChart}
+                  onClick={(state) => {
+                    const deckName = (state as { activePayload?: Array<{ payload?: { name?: string } }> }).activePayload?.[0]?.payload?.name;
+                    if (deckName) setSelectedDeckName(deckName);
+                  }}
+                >
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e7dcc9" />
                   <XAxis dataKey="name" tickLine={false} axisLine={false} fontSize={12} />
                   <YAxis allowDecimals={false} tickLine={false} axisLine={false} />
@@ -633,7 +711,13 @@ export function TeacherDashboard() {
               </div>
             ) : (
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={metrics.activityChart}>
+                <BarChart
+                  data={metrics.activityChart}
+                  onClick={(state) => {
+                    const dayKey = (state as { activePayload?: Array<{ payload?: { key?: string } }> }).activePayload?.[0]?.payload?.key;
+                    if (dayKey) setSelectedActivityDayKey(dayKey);
+                  }}
+                >
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e7dcc9" />
                   <XAxis dataKey="name" tickLine={false} axisLine={false} fontSize={12} />
                   <YAxis allowDecimals={false} tickLine={false} axisLine={false} />
@@ -645,6 +729,46 @@ export function TeacherDashboard() {
           </CardContent>
         </Card>
       </div>
+
+      <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
+        <CardHeader>
+          <CardTitle>Detalle de la jornada</CardTitle>
+          <CardDescription>
+            Hacé clic en la gráfica de actividad para fijar un día y ver cuántas partidas, turnos y sincronizaciones quedaron registradas.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {!selectedActivityDay ? (
+            <div className="rounded-2xl bg-background/70 p-4 text-sm text-muted-foreground">
+              Seleccioná una barra de actividad para ver el detalle diario.
+            </div>
+          ) : (
+            <div className="grid gap-4 md:grid-cols-[0.9fr_1.1fr]">
+              <div className="rounded-2xl bg-background/70 p-4">
+                <p className="text-sm text-muted-foreground">Jornada seleccionada</p>
+                <p className="mt-2 text-lg font-medium text-foreground">{selectedActivityDay.name}</p>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <Badge variant="outline">{selectedActivityDay.matches} partidas</Badge>
+                  <Badge variant="outline">{selectedActivityDay.turns} turnos</Badge>
+                  <Badge variant="outline">{selectedActivityDay.syncs} syncs</Badge>
+                </div>
+              </div>
+              <div className="rounded-2xl bg-background/70 p-4">
+                <p className="text-sm font-medium text-foreground">Mazos activos ese día</p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {selectedActivityDay.decks.length === 0 ? (
+                    <Badge variant="outline">sin partidas fechadas</Badge>
+                  ) : (
+                    selectedActivityDay.decks.map((deck) => (
+                      <Badge key={deck} variant="outline">{deck}</Badge>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       <div className="grid gap-6 xl:grid-cols-2">
         <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
