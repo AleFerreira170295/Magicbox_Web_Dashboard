@@ -129,12 +129,39 @@ export async function listAccessFeatures(token: string) {
 }
 
 export async function listPermissions(token: string) {
-  const response = await apiRequest<unknown>(apiEndpoints.accessControl.permissions, {
+  const limit = 100;
+  const firstResponse = await apiRequest<unknown>(apiEndpoints.accessControl.permissions, {
     token,
-    searchParams: { page: 1, limit: 1000, sort_by: "created_at", order: "desc" },
+    searchParams: { page: 1, limit, sort_by: "created_at", order: "desc" },
   });
 
-  return normalizePaginatedResponse(response, normalizePermission);
+  const firstPage = normalizePaginatedResponse(firstResponse, normalizePermission);
+
+  if (firstPage.total_pages <= 1) {
+    return firstPage;
+  }
+
+  const remainingPages = await Promise.all(
+    Array.from({ length: firstPage.total_pages - 1 }, (_, index) =>
+      apiRequest<unknown>(apiEndpoints.accessControl.permissions, {
+        token,
+        searchParams: { page: index + 2, limit, sort_by: "created_at", order: "desc" },
+      }).then((response) => normalizePaginatedResponse(response, normalizePermission)),
+    ),
+  );
+
+  const data = [
+    ...firstPage.data,
+    ...remainingPages.flatMap((page) => page.data),
+  ];
+
+  return {
+    data,
+    page: 1,
+    limit: data.length,
+    total: firstPage.total,
+    total_pages: firstPage.total_pages,
+  };
 }
 
 export async function createPermission(token: string, payload: CreatePermissionPayload) {
