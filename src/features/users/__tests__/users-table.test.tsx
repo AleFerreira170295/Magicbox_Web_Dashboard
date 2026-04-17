@@ -205,4 +205,31 @@ describe("UsersTable", () => {
     expect(screen.getByText(/no consultar ni editar ACL detallada/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Edición bloqueada" })).toBeDisabled();
   });
+
+  it("shows institution and explicit ACL details for the selected owner", () => {
+    useAuthMock.mockReturnValue({
+      tokens: { accessToken: "token", refreshToken: "refresh" },
+      user: {
+        id: "current-user",
+        email: "admin@example.com",
+        firstName: "Iris",
+        lastName: "Admin",
+        fullName: "Iris Admin",
+        educationalCenterId: "ec-1",
+        roles: ["admin"],
+        permissions: ["user:read", "user:update", "access_control:read", "access_control:update"],
+        raw: {},
+      },
+    });
+
+    renderUsersTable();
+
+    fireEvent.click(screen.getAllByText("Juan Pérez")[0]);
+
+    expect(screen.getByText(/Institución: Colegio Norte/i)).toBeInTheDocument();
+    expect(screen.getByText(/Permisos ACL: 1/i)).toBeInTheDocument();
+    expect(screen.getByText(/user:read · Colegio Norte/i)).toBeInTheDocument();
+    expect(screen.getByText(/Bundle target: Colegio Norte/i)).toBeInTheDocument();
+    expect(screen.getByText(/Scope bloqueado a institución/i)).toBeInTheDocument();
+  });
 });
