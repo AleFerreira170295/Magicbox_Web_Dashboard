@@ -100,14 +100,26 @@ function ModuleCard({
 
 export function SuperadminDashboard() {
   const { tokens, user } = useAuth();
+  const isAdmin = user?.roles.includes("admin") || false;
+  const canSeePermissionsModule = Boolean(
+    isAdmin ||
+      (user?.roles.includes("institution-admin") &&
+        (user?.permissions.includes("access_control:read") ||
+          user?.permissions.includes("access-control:read") ||
+          user?.permissions.includes("feature:read") ||
+          user?.permissions.includes("feature:read:any"))),
+  );
+  const canSeeHealthModule = isAdmin;
+  const canSeeSettingsModule = isAdmin;
+
   const usersQuery = useUsers(tokens?.accessToken);
   const institutionsQuery = useInstitutions(tokens?.accessToken);
   const devicesQuery = useDevices(tokens?.accessToken);
   const syncsQuery = useSyncSessions(tokens?.accessToken);
   const gamesQuery = useGames(tokens?.accessToken);
   const profilesQuery = useProfilesOverview(tokens?.accessToken);
-  const healthQuery = useBasicHealth();
-  const readinessQuery = useReadinessHealth();
+  const healthQuery = useBasicHealth({ enabled: canSeeHealthModule });
+  const readinessQuery = useReadinessHealth({ enabled: canSeeHealthModule });
 
   const isLoading =
     usersQuery.isLoading ||
@@ -116,8 +128,7 @@ export function SuperadminDashboard() {
     syncsQuery.isLoading ||
     gamesQuery.isLoading ||
     profilesQuery.isLoading ||
-    healthQuery.isLoading ||
-    readinessQuery.isLoading;
+    (canSeeHealthModule && (healthQuery.isLoading || readinessQuery.isLoading));
 
   const error =
     usersQuery.error ||
@@ -126,8 +137,7 @@ export function SuperadminDashboard() {
     syncsQuery.error ||
     gamesQuery.error ||
     profilesQuery.error ||
-    healthQuery.error ||
-    readinessQuery.error;
+    (canSeeHealthModule ? healthQuery.error || readinessQuery.error : null);
 
   const metrics = useMemo(() => {
     const users = usersQuery.data?.data || [];
@@ -150,13 +160,25 @@ export function SuperadminDashboard() {
       syncsWithoutRaw: syncs.filter((sync) => (sync.rawRecordCount || sync.rawRecordIds.length || 0) === 0).length,
       profilesWithoutBindings: profiles.filter((profile) => profile.activeBindingCount === 0).length,
       degradedChecks: Object.values(readinessChecks).filter((check) => check?.status !== "healthy").length,
-      environment: healthQuery.data?.environment || "-",
-      version: healthQuery.data?.version || "-",
-      readiness: readinessQuery.data?.status || "unknown",
+      environment: canSeeHealthModule ? healthQuery.data?.environment || "-" : "scopeado",
+      version: canSeeHealthModule ? healthQuery.data?.version || "-" : "no disponible",
+      readiness: canSeeHealthModule ? readinessQuery.data?.status || "unknown" : "no disponible",
     };
-  }, [devicesQuery.data, gamesQuery.data, healthQuery.data, institutionsQuery.data, profilesQuery.data, readinessQuery.data, syncsQuery.data, usersQuery.data]);
+  }, [canSeeHealthModule, devicesQuery.data, gamesQuery.data, healthQuery.data, institutionsQuery.data, profilesQuery.data, readinessQuery.data, syncsQuery.data, usersQuery.data]);
 
   const scopeLabel = user?.roles.includes("institution-admin") ? "Institution admin" : "Superadmin";
+
+  const moduleCards = [
+    { title: "Usuarios", description: "Alta, edición, roles, ACL y revisión operativa del padrón.", icon: UserPlus, href: "/users", visible: true },
+    { title: "Permisos", description: "Catálogo ACL, acciones y reglas activas de acceso.", icon: KeyRound, href: "/permissions", visible: canSeePermissionsModule },
+    { title: "Instituciones", description: "Resumen operativo, previews y estado institucional.", icon: Building2, href: "/institutions", visible: true },
+    { title: "Dispositivos", description: "Parque real con estado, owner y alcance Home/institución.", icon: Smartphone, href: "/devices", visible: true },
+    { title: "Syncs", description: "Sesiones sincronizadas con detalle y raw reciente.", icon: ShieldCheck, href: "/syncs", visible: true },
+    { title: "Games", description: "Partidas, jugadores, turnos y lectura operativa del juego.", icon: Database, href: "/games", visible: true },
+    { title: "Profiles", description: "Perfiles Home reales con owner, bindings y sesiones.", icon: UserSquare2, href: "/profiles", visible: true },
+    { title: "Health", description: "Health técnico real y señales operativas del sistema.", icon: HeartPulse, href: "/health", visible: canSeeHealthModule },
+    { title: "Settings", description: "Runtime efectivo, OTA y catálogos ACL actuales.", icon: ShieldCheck, href: "/settings", visible: canSeeSettingsModule },
+  ].filter((module) => module.visible);
 
   return (
     <div className="space-y-8">
@@ -194,8 +216,12 @@ export function SuperadminDashboard() {
                 <p className="mt-2 text-lg font-medium">{metrics.totalSyncs} syncs, {metrics.totalGames} partidas y {metrics.totalProfiles} profiles.</p>
               </div>
               <div className="rounded-3xl bg-white/10 p-4 backdrop-blur-sm">
-                <p className="text-sm text-white/70">Salud</p>
-                <p className="mt-2 text-lg font-medium">{metrics.readiness} · {metrics.degradedChecks} checks degradados · {metrics.environment}.</p>
+                <p className="text-sm text-white/70">{canSeeHealthModule ? "Salud" : "Alcance"}</p>
+                <p className="mt-2 text-lg font-medium">
+                  {canSeeHealthModule
+                    ? `${metrics.readiness} · ${metrics.degradedChecks} checks degradados · ${metrics.environment}.`
+                    : `${scopeLabel.toLowerCase()} · ${metrics.totalInstitutions} instituciones visibles · ${metrics.totalDevices} devices.`}
+                </p>
               </div>
             </div>
           </CardContent>
@@ -235,7 +261,11 @@ export function SuperadminDashboard() {
             <SummaryCard label="Devices" value={String(metrics.totalDevices)} hint="Parque visible en dashboard." icon={Smartphone} />
             <SummaryCard label="Syncs" value={String(metrics.totalSyncs)} hint="Trazabilidad operativa actual." icon={Layers3} tone="accent" />
             <SummaryCard label="Games" value={String(metrics.totalGames)} hint="Partidas persistidas visibles." icon={Database} tone="accent" />
-            <SummaryCard label="Health" value={metrics.readiness} hint={`Backend ${metrics.version}.`} icon={HeartPulse} tone={metrics.degradedChecks === 0 ? "accent" : "warning"} />
+            {canSeeHealthModule ? (
+              <SummaryCard label="Health" value={metrics.readiness} hint={`Backend ${metrics.version}.`} icon={HeartPulse} tone={metrics.degradedChecks === 0 ? "accent" : "warning"} />
+            ) : (
+              <SummaryCard label="Profiles" value={String(metrics.totalProfiles)} hint="Perfiles Home visibles en el alcance actual." icon={UserSquare2} tone="accent" />
+            )}
           </>
         )}
       </div>
@@ -249,15 +279,9 @@ export function SuperadminDashboard() {
       ) : null}
 
       <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-        <ModuleCard title="Usuarios" description="Alta, edición, roles, ACL y revisión operativa del padrón." icon={UserPlus} href="/users" />
-        <ModuleCard title="Permisos" description="Catálogo ACL, acciones y reglas activas de acceso." icon={KeyRound} href="/permissions" />
-        <ModuleCard title="Instituciones" description="Resumen operativo, previews y estado institucional." icon={Building2} href="/institutions" />
-        <ModuleCard title="Dispositivos" description="Parque real con estado, owner y alcance Home/institución." icon={Smartphone} href="/devices" />
-        <ModuleCard title="Syncs" description="Sesiones sincronizadas con detalle y raw reciente." icon={ShieldCheck} href="/syncs" />
-        <ModuleCard title="Games" description="Partidas, jugadores, turnos y lectura operativa del juego." icon={Database} href="/games" />
-        <ModuleCard title="Profiles" description="Perfiles Home reales con owner, bindings y sesiones." icon={UserSquare2} href="/profiles" />
-        <ModuleCard title="Health" description="Health técnico real y señales operativas del sistema." icon={HeartPulse} href="/health" />
-        <ModuleCard title="Settings" description="Runtime efectivo, OTA y catálogos ACL actuales." icon={ShieldCheck} href="/settings" />
+        {moduleCards.map((module) => (
+          <ModuleCard key={module.href} title={module.title} description={module.description} icon={module.icon} href={module.href} />
+        ))}
       </div>
 
       <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">

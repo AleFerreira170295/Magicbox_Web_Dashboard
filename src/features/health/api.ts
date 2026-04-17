@@ -23,26 +23,29 @@ async function fetchHealth<T>(path: string): Promise<T> {
   return (await response.json()) as T;
 }
 
-export function useBasicHealth() {
+export function useBasicHealth(options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: ["system-health", "basic"],
     queryFn: () => fetchHealth<BasicHealthRecord>("/health"),
     refetchInterval: 30000,
+    enabled: options?.enabled ?? true,
   });
 }
 
-export function useReadinessHealth() {
+export function useReadinessHealth(options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: ["system-health", "readiness"],
     queryFn: () => fetchHealth<ReadinessHealthRecord>("/health/ready"),
     refetchInterval: 30000,
+    enabled: options?.enabled ?? true,
   });
 }
 
-export function useLivenessHealth() {
+export function useLivenessHealth(options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: ["system-health", "liveness"],
     queryFn: () => fetchHealth<LivenessHealthRecord>("/health/live"),
     refetchInterval: 30000,
+    enabled: options?.enabled ?? true,
   });
 }
