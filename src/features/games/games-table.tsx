@@ -44,7 +44,7 @@ function SummaryCard({
 }
 
 export function GamesTable() {
-  const { tokens } = useAuth();
+  const { tokens, user: currentUser } = useAuth();
   const [query, setQuery] = useState("");
   const [institutionFilter, setInstitutionFilter] = useState<string>("");
   const [playerModeFilter, setPlayerModeFilter] = useState<"all" | "manual" | "mixed" | "registered">("all");
@@ -61,11 +61,17 @@ export function GamesTable() {
   const deviceById = useMemo(() => new Map(devices.map((device) => [device.id, device])), [devices]);
   const institutionById = useMemo(() => new Map(institutions.map((institution) => [institution.id, institution])), [institutions]);
 
+  const scopedInstitutionId = institutions.length === 1 ? institutions[0]?.id || null : null;
+  const scopedInstitutionName = scopedInstitutionId ? institutions[0]?.name || scopedInstitutionId : null;
+  const isInstitutionScopedView = Boolean(scopedInstitutionId && currentUser?.educationalCenterId === scopedInstitutionId);
+
   const filtered = useMemo(() => {
     const normalized = query.trim().toLowerCase();
 
+    const effectiveInstitutionFilter = institutionFilter || scopedInstitutionId || "";
+
     return games.filter((game) => {
-      if (institutionFilter && game.educationalCenterId !== institutionFilter) return false;
+      if (effectiveInstitutionFilter && game.educationalCenterId !== effectiveInstitutionFilter) return false;
 
       const manualCount = game.players.filter((player) => player.playerSource === "manual").length;
       const registeredCount = game.players.filter((player) => player.playerSource !== "manual").length;
@@ -91,7 +97,7 @@ export function GamesTable() {
         .filter(Boolean)
         .some((value) => String(value).toLowerCase().includes(normalized));
     });
-  }, [deviceById, games, institutionById, institutionFilter, playerModeFilter, query]);
+  }, [deviceById, games, institutionById, institutionFilter, playerModeFilter, query, scopedInstitutionId]);
 
   const selectedGame = useMemo(
     () => filtered.find((game) => game.id === selectedGameId) || games.find((game) => game.id === selectedGameId) || null,
@@ -128,9 +134,13 @@ export function GamesTable() {
   return (
     <div className="space-y-6">
       <SectionHeader
-        eyebrow="Juego"
+        eyebrow={isInstitutionScopedView ? "Institution admin" : "Juego"}
         title="Partidas"
-        description="Vista operativa sobre `game-data` con contexto de institución, dispositivo, jugadores y desempeño, para seguir el tramo sync → partida sin caer en inspección cruda solamente."
+        description={
+          isInstitutionScopedView
+            ? `Vista operativa de partidas para ${scopedInstitutionName}, ya alineada con el scope real de game-data por institución.`
+            : "Vista operativa sobre `game-data` con contexto de institución, dispositivo, jugadores y desempeño, para seguir el tramo sync → partida sin caer en inspección cruda solamente."
+        }
         actions={
           <div className="flex flex-col items-stretch gap-3 md:flex-row md:items-center">
             <div className="relative min-w-72">
@@ -143,9 +153,10 @@ export function GamesTable() {
               />
             </div>
             <select
-              value={institutionFilter}
+              value={institutionFilter || scopedInstitutionId || ""}
               onChange={(event) => setInstitutionFilter(event.target.value)}
               className="h-10 min-w-48 rounded-md border border-input bg-background px-3 text-sm"
+              disabled={Boolean(scopedInstitutionId)}
             >
               <option value="">Todas las instituciones</option>
               {institutions.map((institution) => (
@@ -167,6 +178,26 @@ export function GamesTable() {
           </div>
         }
       />
+
+      <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
+        <CardContent className="flex flex-wrap items-center justify-between gap-4 p-5">
+          <div>
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="text-sm font-medium text-foreground">Alcance operativo</p>
+              <Badge variant={isInstitutionScopedView ? "secondary" : "outline"}>
+                {isInstitutionScopedView ? "institution-admin" : "multi-institución / global"}
+              </Badge>
+              <Badge variant="outline">game-data real</Badge>
+            </div>
+            <p className="mt-2 text-sm text-muted-foreground">
+              {isInstitutionScopedView
+                ? "La tabla queda anclada a la institución visible por ACL, así que el filtro institucional pasa a ser informativo y no abre otras sedes."
+                : "La vista refleja las partidas visibles según el alcance actual de game-data y permite cruzarlas con institución y dispositivo."}
+            </p>
+          </div>
+          {scopedInstitutionName ? <Badge variant="outline">Institución activa: {scopedInstitutionName}</Badge> : null}
+        </CardContent>
+      </Card>
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
         {gamesQuery.isLoading ? (
