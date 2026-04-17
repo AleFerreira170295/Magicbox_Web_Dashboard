@@ -124,4 +124,34 @@ describe("SuperadminDashboard", () => {
     expect(screen.queryByText("Health")).not.toBeInTheDocument();
     expect(screen.queryByText("Settings")).not.toBeInTheDocument();
   });
+
+  it("surfaces device totals and missing status in the executive home", () => {
+    useAuthMock.mockReturnValue({
+      tokens: { accessToken: "token", refreshToken: "refresh" },
+      user: {
+        fullName: "Ada Admin",
+        roles: ["admin"],
+        permissions: ["ble_device:read", "game_data:read"],
+      },
+    });
+
+    useDevicesMock.mockReturnValue(
+      okQuery(
+        okPaginated([
+          { id: "device-1", status: null },
+          { id: "device-2", status: "online" },
+        ]),
+      ),
+    );
+    useBasicHealthMock.mockReturnValue(okQuery({ environment: "local", version: "1.2.3" }));
+    useReadinessHealthMock.mockReturnValue(okQuery({ status: "healthy", checks: {} }));
+
+    renderDashboard();
+
+    expect(screen.getByText(/0 usuarios, 1 instituciones y 2 dispositivos visibles/i)).toBeInTheDocument();
+    expect(screen.getByText(/1 dispositivos visibles siguen sin `status` explícito/i)).toBeInTheDocument();
+    expect(screen.getByText("Devices")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Dispositivos/i })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Health/i })).toBeInTheDocument();
+  });
 });
