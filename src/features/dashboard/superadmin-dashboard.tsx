@@ -101,9 +101,12 @@ function ModuleCard({
 export function SuperadminDashboard() {
   const { tokens, user } = useAuth();
   const isAdmin = user?.roles.includes("admin") || false;
+  const isInstitutionAdmin = user?.roles.includes("institution-admin") || false;
+  const isDirector = user?.roles.includes("director") || false;
+  const canSeeUsersModule = isAdmin || isInstitutionAdmin;
   const canSeePermissionsModule = Boolean(
     isAdmin ||
-      (user?.roles.includes("institution-admin") &&
+      (isInstitutionAdmin &&
         (user?.permissions.includes("access_control:read") ||
           user?.permissions.includes("access-control:read") ||
           user?.permissions.includes("feature:read") ||
@@ -166,12 +169,12 @@ export function SuperadminDashboard() {
     };
   }, [canSeeHealthModule, devicesQuery.data, gamesQuery.data, healthQuery.data, institutionsQuery.data, profilesQuery.data, readinessQuery.data, syncsQuery.data, usersQuery.data]);
 
-  const scopeLabel = user?.roles.includes("institution-admin") ? "Institution admin" : "Superadmin";
+  const scopeLabel = isAdmin ? "Superadmin" : isInstitutionAdmin ? "Institution admin" : isDirector ? "Dirección" : "Operación";
 
   const moduleCards = [
-    { title: "Usuarios", description: "Alta, edición, roles, ACL y revisión operativa del padrón.", icon: UserPlus, href: "/users", visible: true },
+    { title: "Usuarios", description: "Alta, edición, roles, ACL y revisión operativa del padrón.", icon: UserPlus, href: "/users", visible: canSeeUsersModule },
     { title: "Permisos", description: "Catálogo ACL, acciones y reglas activas de acceso.", icon: KeyRound, href: "/permissions", visible: canSeePermissionsModule },
-    { title: "Instituciones", description: "Resumen operativo, previews y estado institucional.", icon: Building2, href: "/institutions", visible: true },
+    { title: "Instituciones", description: "Resumen operativo, previews y estado institucional.", icon: Building2, href: "/institutions", visible: isAdmin || isInstitutionAdmin || isDirector },
     { title: "Dispositivos", description: "Parque real con estado, owner y alcance Home/institución.", icon: Smartphone, href: "/devices", visible: true },
     { title: "Syncs", description: "Sesiones sincronizadas con detalle y raw reciente.", icon: ShieldCheck, href: "/syncs", visible: true },
     { title: "Games", description: "Partidas, jugadores, turnos y lectura operativa del juego.", icon: Database, href: "/games", visible: true },

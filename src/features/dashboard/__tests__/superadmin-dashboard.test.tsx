@@ -1,6 +1,6 @@
-import { render, screen } from "@testing-library/react";
+import { cleanup, render, screen } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SuperadminDashboard } from "@/features/dashboard/superadmin-dashboard";
 
 const useAuthMock = vi.fn();
@@ -83,6 +83,10 @@ describe("SuperadminDashboard", () => {
     useReadinessHealthMock.mockReturnValue({ data: null, isLoading: false, error: null });
   });
 
+  afterEach(() => {
+    cleanup();
+  });
+
   it("hides health and settings modules for institution-admin and disables health queries", () => {
     useAuthMock.mockReturnValue({
       tokens: { accessToken: "token", refreshToken: "refresh" },
@@ -100,5 +104,24 @@ describe("SuperadminDashboard", () => {
     expect(screen.getByRole("link", { name: /Profiles/i })).toBeInTheDocument();
     expect(useBasicHealthMock).toHaveBeenCalledWith({ enabled: false });
     expect(useReadinessHealthMock).toHaveBeenCalledWith({ enabled: false });
+  });
+
+  it("keeps director dashboard cards aligned with navigation visibility", () => {
+    useAuthMock.mockReturnValue({
+      tokens: { accessToken: "token", refreshToken: "refresh" },
+      user: {
+        fullName: "Dora Directora",
+        roles: ["director"],
+        permissions: ["ble_device:read", "game_data:read"],
+      },
+    });
+
+    renderDashboard();
+
+    expect(screen.getByText("Dirección")).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /Usuarios/i })).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Instituciones/i })).toBeInTheDocument();
+    expect(screen.queryByText("Health")).not.toBeInTheDocument();
+    expect(screen.queryByText("Settings")).not.toBeInTheDocument();
   });
 });
