@@ -27,6 +27,10 @@ function okQuery<T>(data: T) {
   return { data, isLoading: false, error: null };
 }
 
+function errorQuery(message: string) {
+  return { data: undefined, isLoading: false, error: new Error(message) };
+}
+
 function okPaginated(data: unknown[]) {
   return { data, total: data.length, page: 1, limit: data.length || 1, total_pages: 1 };
 }
@@ -103,5 +107,34 @@ describe("SystemHealthDashboard", () => {
     expect(screen.getByText("online")).toBeInTheDocument();
     expect(screen.getByText("v2.2")).toBeInTheDocument();
     expect(screen.getByText("v3.0")).toBeInTheDocument();
+  });
+
+  it("shows empty-state copy when there is no technical or operational data", () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <SystemHealthDashboard />
+      </QueryClientProvider>,
+    );
+
+    expect(screen.getAllByText("No hay checks técnicos para mostrar.").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("No hay dispositivos para mostrar.").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("No hay sincronizaciones para mostrar.").length).toBeGreaterThan(0);
+  });
+
+  it("shows an error banner when part of the health stack fails", () => {
+    useReadinessHealthMock.mockReturnValue(errorQuery("Readiness degradada"));
+
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <SystemHealthDashboard />
+      </QueryClientProvider>,
+    );
+
+    expect(screen.getByText(/No pude cargar una parte de la salud operativa/i)).toBeInTheDocument();
+    expect(screen.getByText(/Readiness degradada/i)).toBeInTheDocument();
   });
 });
