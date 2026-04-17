@@ -483,6 +483,167 @@ describe("UsersTable", () => {
     expect(await screen.findByText(/Bundle Teacher aplicado en Colegio Norte/i)).toBeInTheDocument();
   });
 
+  it("persists the bundle role when the scoped ACL is already complete", async () => {
+    useAuthMock.mockReturnValue({
+      tokens: { accessToken: "token", refreshToken: "refresh" },
+      user: {
+        id: "current-user",
+        email: "admin@example.com",
+        firstName: "Iris",
+        lastName: "Admin",
+        fullName: "Iris Admin",
+        educationalCenterId: null,
+        roles: ["admin"],
+        permissions: ["user:read", "user:update", "access_control:read", "access_control:create", "access_control:update"],
+        raw: {},
+      },
+    });
+
+    useUsersMock.mockReturnValue(
+      okQuery({
+        data: [
+          {
+            ...baseUser,
+            roles: [],
+          },
+        ],
+        page: 1,
+        limit: 1,
+        total: 1,
+        total_pages: 1,
+      }),
+    );
+    useInstitutionsMock.mockReturnValue(
+      okQuery({
+        data: [
+          { id: "ec-1", name: "Colegio Norte", code: null, status: null, city: null, country: null, contactName: null, contactEmail: null, createdAt: null, updatedAt: null, raw: {} },
+          { id: "ec-2", name: "Colegio Sur", code: null, status: null, city: null, country: null, contactName: null, contactEmail: null, createdAt: null, updatedAt: null, raw: {} },
+        ],
+        page: 1,
+        limit: 2,
+        total: 2,
+        total_pages: 1,
+      }),
+    );
+    usePermissionsMock.mockReturnValue(
+      okQuery({
+        data: [
+          {
+            id: "perm-user-ec-1",
+            userId: "user-1",
+            featureId: "feature-user",
+            actionId: "action-read",
+            educationalCenterId: "ec-1",
+            createdAt: "2026-04-16T12:00:00Z",
+            updatedAt: "2026-04-16T12:00:00Z",
+            deletedAt: null,
+            raw: {},
+          },
+          {
+            id: "perm-center-ec-1",
+            userId: "user-1",
+            featureId: "feature-center",
+            actionId: "action-read",
+            educationalCenterId: "ec-1",
+            createdAt: "2026-04-16T12:00:00Z",
+            updatedAt: "2026-04-16T12:00:00Z",
+            deletedAt: null,
+            raw: {},
+          },
+          {
+            id: "perm-device-ec-1",
+            userId: "user-1",
+            featureId: "feature-device",
+            actionId: "action-read",
+            educationalCenterId: "ec-1",
+            createdAt: "2026-04-16T12:00:00Z",
+            updatedAt: "2026-04-16T12:00:00Z",
+            deletedAt: null,
+            raw: {},
+          },
+          {
+            id: "perm-game-ec-1",
+            userId: "user-1",
+            featureId: "feature-game",
+            actionId: "action-read",
+            educationalCenterId: "ec-1",
+            createdAt: "2026-04-16T12:00:00Z",
+            updatedAt: "2026-04-16T12:00:00Z",
+            deletedAt: null,
+            raw: {},
+          },
+        ],
+        page: 1,
+        limit: 4,
+        total: 4,
+        total_pages: 1,
+      }),
+    );
+    useAccessActionsMock.mockReturnValue(
+      okQuery({
+        data: [{ id: "action-read", code: "read", name: "Leer", raw: {} }],
+        page: 1,
+        limit: 1,
+        total: 1,
+        total_pages: 1,
+      }),
+    );
+    useAccessFeaturesMock.mockReturnValue(
+      okQuery({
+        data: [
+          { id: "feature-user", code: "user", name: "Usuarios", raw: {} },
+          { id: "feature-center", code: "educational_center", name: "Instituciones", raw: {} },
+          { id: "feature-device", code: "ble_device", name: "Dispositivos", raw: {} },
+          { id: "feature-game", code: "game_data", name: "Partidas", raw: {} },
+        ],
+        page: 1,
+        limit: 4,
+        total: 4,
+        total_pages: 1,
+      }),
+    );
+    updateUserMock.mockResolvedValue({
+      ...baseUser,
+      roles: ["director"],
+    });
+
+    renderUsersTable();
+
+    fireEvent.click(screen.getAllByText("Juan Pérez")[0]);
+
+    const aclScopeField = screen.getByText("Scope ACL").parentElement?.querySelector("select");
+    expect(aclScopeField).toBeTruthy();
+    fireEvent.change(aclScopeField as HTMLSelectElement, { target: { value: "ec-1" } });
+
+    const directorBundleButtons = screen.getAllByRole("button", { name: "Director" });
+    fireEvent.click(directorBundleButtons[directorBundleButtons.length - 1]);
+
+    await waitFor(() => {
+      expect(updateUserMock).toHaveBeenCalledWith("token", "user-1", {
+        firstName: "Juan",
+        lastName: "Pérez",
+        email: "juan@example.com",
+        phoneNumber: "+598111111",
+        userType: "web",
+        roles: ["director"],
+        educationalCenterId: "ec-1",
+        imageUrl: null,
+        address: {
+          addressFirstLine: "Calle 1",
+          addressSecondLine: null,
+          countryCode: "UY",
+          city: "Montevideo",
+          state: null,
+          postalCode: null,
+        },
+      });
+    });
+
+    expect(createPermissionMock).not.toHaveBeenCalled();
+    expect(await screen.findByText(/Bundle Director aplicado en Colegio Norte/i)).toBeInTheDocument();
+    expect(screen.getByText(/Se agregaron 0 permisos base y se persistió el rol/i)).toBeInTheDocument();
+  });
+
   it("adds a scoped ACL permission even when the same key already exists globally", async () => {
     useAuthMock.mockReturnValue({
       tokens: { accessToken: "token", refreshToken: "refresh" },
