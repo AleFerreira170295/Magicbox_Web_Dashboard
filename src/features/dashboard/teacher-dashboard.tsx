@@ -1,14 +1,13 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import {
   Activity,
   ArrowRight,
   BookOpen,
   Database,
-  Layers3,
   Sparkles,
-  Smartphone,
+  Trophy,
   Users2,
 } from "lucide-react";
 import {
@@ -29,6 +28,19 @@ import { useDevices } from "@/features/devices/api";
 import { useGames } from "@/features/games/api";
 import { useSyncSessions } from "@/features/syncs/api";
 import { getErrorMessage, formatDurationSeconds } from "@/lib/utils";
+
+const RECENT_WINDOW_DAYS = 7;
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+function parseDate(value?: string | null) {
+  if (!value) return null;
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function formatDayLabel(date: Date) {
+  return new Intl.DateTimeFormat("es-UY", { month: "short", day: "numeric" }).format(date);
+}
 
 function MetricCard({
   label,
@@ -86,26 +98,59 @@ export function TeacherDashboard() {
   const gamesQuery = useGames(tokens?.accessToken);
   const devicesQuery = useDevices(tokens?.accessToken);
   const syncsQuery = useSyncSessions(tokens?.accessToken);
+  const [referenceNow] = useState(() => Date.now());
 
   const isLoading = gamesQuery.isLoading || devicesQuery.isLoading || syncsQuery.isLoading;
   const error = gamesQuery.error || devicesQuery.error || syncsQuery.error;
 
   const metrics = useMemo(() => {
     const games = gamesQuery.data?.data || [];
-    const devices = devicesQuery.data?.data || [];
     const syncs = syncsQuery.data?.data || [];
+    const recentThreshold = referenceNow - RECENT_WINDOW_DAYS * DAY_MS;
+    const datedGames = games.map((game) => parseDate(game.startDate || game.createdAt || game.updatedAt)).filter((value): value is Date => Boolean(value));
+    const recentGames = datedGames.length > 0
+      ? games.filter((game) => {
+          const date = parseDate(game.startDate || game.createdAt || game.updatedAt);
+          return Boolean(date && date.getTime() >= recentThreshold && date.getTime() <= referenceNow);
+        }).length
+      : games.length;
     const totalTurns = games.reduce((sum, game) => sum + game.turns.length, 0);
     const totalTurnTime = games.reduce(
       (sum, game) => sum + game.turns.reduce((turnSum, turn) => turnSum + (turn.playTimeSeconds || 0), 0),
       0,
     );
+    const successfulTurns = games.reduce((sum, game) => sum + game.turns.filter((turn) => turn.success).length, 0);
     const avgTurnTime = totalTurns > 0 ? totalTurnTime / totalTurns : 0;
+    const successRate = totalTurns > 0 ? Math.round((successfulTurns / totalTurns) * 100) : 0;
+    const activePlayers = new Set(
+      games.flatMap((game) =>
+        game.players
+          .map((player) => player.playerName || player.externalPlayerUid || player.studentId || player.id)
+          .filter(Boolean),
+      ),
+    ).size;
+    const activityBuckets = Array.from({ length: RECENT_WINDOW_DAYS }, (_, index) => {
+      const date = new Date(referenceNow - (RECENT_WINDOW_DAYS - index - 1) * DAY_MS);
+      const key = date.toISOString().slice(0, 10);
+      return { key, name: formatDayLabel(date), total: 0 };
+    });
+    const activityByKey = new Map(activityBuckets.map((bucket) => [bucket.key, bucket]));
+    const datedActivity = [
+      ...games.map((game) => parseDate(game.startDate || game.createdAt || game.updatedAt)),
+      ...syncs.map((sync) => parseDate(sync.startedAt || sync.syncedAt || sync.createdAt || sync.capturedAt)),
+    ].filter((value): value is Date => Boolean(value));
+
+    datedActivity.forEach((date) => {
+      const key = date.toISOString().slice(0, 10);
+      const bucket = activityByKey.get(key);
+      if (bucket) bucket.total += 1;
+    });
 
     return {
-      totalGames: gamesQuery.data?.total || games.length,
-      totalDevices: devicesQuery.data?.total || devices.length,
-      totalSyncs: syncsQuery.data?.total || syncs.length,
+      recentGames,
+      activePlayers,
       avgTurnTime,
+      successRate,
       deckChart: Object.entries(
         games.reduce<Record<string, number>>((acc, game) => {
           const key = game.deckName || "Sin mazo";
@@ -116,15 +161,10 @@ export function TeacherDashboard() {
         .map(([name, total]) => ({ name, total }))
         .sort((a, b) => b.total - a.total)
         .slice(0, 6),
-      syncSourceChart: Object.entries(
-        syncs.reduce<Record<string, number>>((acc, sync) => {
-          const key = sync.source || sync.sourceType || "desconocido";
-          acc[key] = (acc[key] || 0) + 1;
-          return acc;
-        }, {}),
-      ).map(([name, total]) => ({ name, total })),
+      activityChart: activityBuckets,
+      hasDatedActivity: datedActivity.length > 0,
     };
-  }, [devicesQuery.data, gamesQuery.data, syncsQuery.data]);
+  }, [gamesQuery.data, referenceNow, syncsQuery.data]);
 
   return (
     <div className="space-y-8">
@@ -180,17 +220,17 @@ export function TeacherDashboard() {
           <CardContent className="space-y-3">
             <InsightRow
               title="Actividad reciente"
-              description="Ver si hubo nuevas partidas, sincronizaciones o dispositivos activos desde la última revisión."
+              description="Ver si el grupo viene jugando en la última semana y detectar rápido si el ritmo cayó."
               icon={Sparkles}
             />
             <InsightRow
               title="Participación del grupo"
-              description="Preparar una lectura más pedagógica sobre colaboración, progreso y tiempos de respuesta."
+              description="Mirar cuántos estudiantes participaron y cómo se está repartiendo la interacción."
               icon={Users2}
             />
             <InsightRow
               title="Seguimiento por contenido"
-              description="Identificar qué mazos o desafíos están apareciendo más para ordenar el análisis didáctico."
+              description="Identificar qué mazos tienen más tracción para ordenar después la lectura didáctica."
               icon={BookOpen}
             />
           </CardContent>
@@ -203,28 +243,28 @@ export function TeacherDashboard() {
         ) : (
           <>
             <MetricCard
-              label="Partidas visibles"
-              value={String(metrics.totalGames)}
-              hint="Lectura actual desde /game-data/, útil como primer termómetro del uso real."
+              label="Partidas 7 días"
+              value={String(metrics.recentGames)}
+              hint="Volumen reciente de juego para leer continuidad de uso, no solo histórico acumulado."
               icon={Database}
             />
             <MetricCard
-              label="Dispositivos visibles"
-              value={String(metrics.totalDevices)}
-              hint="Fuente base para el mapa operativo del parque MagicBox en circulación."
-              icon={Smartphone}
-            />
-            <MetricCard
-              label="Sincronizaciones visibles"
-              value={String(metrics.totalSyncs)}
-              hint="Sirve para validar el flujo actual mientras completamos la capa lossless."
-              icon={Layers3}
+              label="Estudiantes participantes"
+              value={String(metrics.activePlayers)}
+              hint="Cuenta única de jugadores visibles en la muestra actual."
+              icon={Users2}
             />
             <MetricCard
               label="Tiempo promedio por turno"
               value={formatDurationSeconds(metrics.avgTurnTime)}
-              hint="Una señal temprana para detectar ritmo de juego y carga cognitiva."
+              hint="Sirve para detectar ritmo de juego y posibles momentos de fricción."
               icon={Activity}
+            />
+            <MetricCard
+              label="Éxito de turnos"
+              value={`${metrics.successRate}%`}
+              hint="Proporción agregada de aciertos sobre el total de jugadas visibles."
+              icon={Trophy}
             />
           </>
         )}
@@ -269,21 +309,21 @@ export function TeacherDashboard() {
 
         <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
           <CardHeader>
-            <CardTitle>Sincronizaciones por origen</CardTitle>
+            <CardTitle>Actividad reciente</CardTitle>
             <CardDescription>
-              Este bloque después puede evolucionar a salud de sincronización y consistencia de captura.
+              Últimos {RECENT_WINDOW_DAYS} días combinando partidas y sincronizaciones fechadas para leer continuidad real.
             </CardDescription>
           </CardHeader>
           <CardContent className="h-80">
             {isLoading ? (
               <Skeleton className="h-full w-full rounded-2xl" />
-            ) : metrics.syncSourceChart.length === 0 ? (
+            ) : !metrics.hasDatedActivity ? (
               <div className="flex h-full items-center justify-center rounded-2xl border border-dashed border-border text-sm text-muted-foreground">
-                No hay sincronizaciones visibles todavía.
+                Todavía no hay actividad fechada para graficar.
               </div>
             ) : (
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={metrics.syncSourceChart}>
+                <BarChart data={metrics.activityChart}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e7dcc9" />
                   <XAxis dataKey="name" tickLine={false} axisLine={false} fontSize={12} />
                   <YAxis allowDecimals={false} tickLine={false} axisLine={false} />

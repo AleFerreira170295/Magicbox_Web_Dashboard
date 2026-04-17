@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { type ComponentType, useMemo } from "react";
+import { type ComponentType, useMemo, useState } from "react";
 import {
   ArrowRight,
   Building2,
@@ -28,6 +28,15 @@ import { useProfilesOverview } from "@/features/profiles/api";
 import { useSyncSessions } from "@/features/syncs/api";
 import { useUsers } from "@/features/users/api";
 import { getErrorMessage } from "@/lib/utils";
+
+const RECENT_WINDOW_DAYS = 7;
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+function parseDate(value?: string | null) {
+  if (!value) return null;
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
 
 function SummaryCard({
   label,
@@ -123,6 +132,7 @@ export function SuperadminDashboard() {
   const profilesQuery = useProfilesOverview(tokens?.accessToken);
   const healthQuery = useBasicHealth({ enabled: canSeeHealthModule });
   const readinessQuery = useReadinessHealth({ enabled: canSeeHealthModule });
+  const [referenceNow] = useState(() => Date.now());
 
   const isLoading =
     usersQuery.isLoading ||
@@ -150,14 +160,25 @@ export function SuperadminDashboard() {
     const games = gamesQuery.data?.data || [];
     const profiles = profilesQuery.data || [];
     const readinessChecks = readinessQuery.data?.checks || {};
+    const recentThreshold = referenceNow - RECENT_WINDOW_DAYS * DAY_MS;
+    const datedGames = games.map((game) => parseDate(game.startDate || game.createdAt || game.updatedAt)).filter((value): value is Date => Boolean(value));
+    const recentGames = datedGames.length > 0
+      ? games.filter((game) => {
+          const date = parseDate(game.startDate || game.createdAt || game.updatedAt);
+          return Boolean(date && date.getTime() >= recentThreshold && date.getTime() <= referenceNow);
+        }).length
+      : games.length;
+    const onlineDevices = devices.filter((device) => (device.status || "").toLowerCase().includes("online") || (device.status || "").toLowerCase().includes("active")).length;
+    const rawReadySyncs = syncs.filter((sync) => (sync.rawRecordCount || sync.rawRecordIds.length || 0) > 0).length;
 
     return {
       totalUsers: usersQuery.data?.total || users.length,
       totalInstitutions: institutionsQuery.data?.total || institutions.length,
       totalDevices: devicesQuery.data?.total || devices.length,
-      totalSyncs: syncsQuery.data?.total || syncs.length,
-      totalGames: gamesQuery.data?.total || games.length,
       totalProfiles: profiles.length,
+      recentGames,
+      onlineDevices,
+      rawReadySyncs,
       institutionsNeedingReview: institutions.filter((institution) => institution.operationalSummary?.needsReview).length,
       devicesWithoutStatus: devices.filter((device) => !device.status).length,
       syncsWithoutRaw: syncs.filter((sync) => (sync.rawRecordCount || sync.rawRecordIds.length || 0) === 0).length,
@@ -167,7 +188,7 @@ export function SuperadminDashboard() {
       version: canSeeHealthModule ? healthQuery.data?.version || "-" : "no disponible",
       readiness: canSeeHealthModule ? readinessQuery.data?.status || "unknown" : "no disponible",
     };
-  }, [canSeeHealthModule, devicesQuery.data, gamesQuery.data, healthQuery.data, institutionsQuery.data, profilesQuery.data, readinessQuery.data, syncsQuery.data, usersQuery.data]);
+  }, [canSeeHealthModule, devicesQuery.data, gamesQuery.data, healthQuery.data, institutionsQuery.data, profilesQuery.data, readinessQuery.data, referenceNow, syncsQuery.data, usersQuery.data]);
 
   const scopeLabel = isAdmin ? "Superadmin" : isInstitutionAdmin ? "Institution admin" : isDirector ? "Dirección" : "Operación";
 
@@ -212,11 +233,11 @@ export function SuperadminDashboard() {
             <div className="mt-8 grid gap-4 md:grid-cols-3">
               <div className="rounded-3xl bg-white/10 p-4 backdrop-blur-sm">
                 <p className="text-sm text-white/70">Cobertura</p>
-                <p className="mt-2 text-lg font-medium">{metrics.totalUsers} usuarios, {metrics.totalInstitutions} instituciones y {metrics.totalDevices} dispositivos visibles.</p>
+                <p className="mt-2 text-lg font-medium">{metrics.totalUsers} usuarios, {metrics.totalInstitutions} instituciones y {metrics.onlineDevices} devices online.</p>
               </div>
               <div className="rounded-3xl bg-white/10 p-4 backdrop-blur-sm">
                 <p className="text-sm text-white/70">Actividad</p>
-                <p className="mt-2 text-lg font-medium">{metrics.totalSyncs} syncs, {metrics.totalGames} partidas y {metrics.totalProfiles} profiles.</p>
+                <p className="mt-2 text-lg font-medium">{metrics.rawReadySyncs} syncs con raw, {metrics.recentGames} partidas recientes y {metrics.totalProfiles} profiles.</p>
               </div>
               <div className="rounded-3xl bg-white/10 p-4 backdrop-blur-sm">
                 <p className="text-sm text-white/70">{canSeeHealthModule ? "Salud" : "Alcance"}</p>
@@ -261,13 +282,13 @@ export function SuperadminDashboard() {
           <>
             <SummaryCard label="Usuarios" value={String(metrics.totalUsers)} hint="Padrón operativo visible." icon={Users} />
             <SummaryCard label="Instituciones" value={String(metrics.totalInstitutions)} hint="Clientes y alcance actual." icon={Building2} />
-            <SummaryCard label="Devices" value={String(metrics.totalDevices)} hint="Parque visible en dashboard." icon={Smartphone} />
-            <SummaryCard label="Syncs" value={String(metrics.totalSyncs)} hint="Trazabilidad operativa actual." icon={Layers3} tone="accent" />
-            <SummaryCard label="Games" value={String(metrics.totalGames)} hint="Partidas persistidas visibles." icon={Database} tone="accent" />
+            <SummaryCard label="Devices online" value={String(metrics.onlineDevices)} hint={`Sobre ${metrics.totalDevices} visibles en el alcance actual.`} icon={Smartphone} />
+            <SummaryCard label="Sin estado" value={String(metrics.devicesWithoutStatus)} hint="Dispositivos que siguen sin status explícito." icon={ShieldCheck} tone={metrics.devicesWithoutStatus === 0 ? "accent" : "warning"} />
+            <SummaryCard label="Syncs con raw" value={String(metrics.rawReadySyncs)} hint={`Faltan ${metrics.syncsWithoutRaw} para cobertura completa.`} icon={Layers3} tone="accent" />
             {canSeeHealthModule ? (
               <SummaryCard label="Health" value={metrics.readiness} hint={`Backend ${metrics.version}.`} icon={HeartPulse} tone={metrics.degradedChecks === 0 ? "accent" : "warning"} />
             ) : (
-              <SummaryCard label="Profiles" value={String(metrics.totalProfiles)} hint="Perfiles Home visibles en el alcance actual." icon={UserSquare2} tone="accent" />
+              <SummaryCard label="Profiles" value={String(metrics.totalProfiles)} hint={`Partidas recientes: ${metrics.recentGames}.`} icon={UserSquare2} tone="accent" />
             )}
           </>
         )}

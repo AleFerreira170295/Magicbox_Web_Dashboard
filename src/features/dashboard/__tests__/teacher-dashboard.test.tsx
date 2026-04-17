@@ -81,6 +81,7 @@ describe("TeacherDashboard", () => {
           {
             id: "game-1",
             deckName: "Animales",
+            players: [{ id: "player-1", playerName: "Ana" }],
             turns: [{ id: "turn-1", turnNumber: 1, playTimeSeconds: 30, success: true }],
           },
         ]),
@@ -94,26 +95,28 @@ describe("TeacherDashboard", () => {
     cleanup();
   });
 
-  it("surfaces device, sync and game totals for the teacher command level", () => {
+  it("surfaces recent activity, participants and turn success for the teacher view", () => {
     renderDashboard();
 
     expect(screen.getByText("Docente")).toBeInTheDocument();
-    expect(screen.getByText("Partidas visibles")).toBeInTheDocument();
-    expect(screen.getByText("Dispositivos visibles")).toBeInTheDocument();
-    expect(screen.getByText("Sincronizaciones visibles")).toBeInTheDocument();
-    expect(screen.getAllByText("2").length).toBeGreaterThan(0);
-    expect(screen.getByText(/Fuente base para el mapa operativo del parque MagicBox en circulación/i)).toBeInTheDocument();
-    expect(screen.getByText(/Sirve para validar el flujo actual mientras completamos la capa lossless/i)).toBeInTheDocument();
+    expect(screen.getByText("Partidas 7 días")).toBeInTheDocument();
+    expect(screen.getByText("Estudiantes participantes")).toBeInTheDocument();
+    expect(screen.getByText("Tiempo promedio por turno")).toBeInTheDocument();
+    expect(screen.getByText("Éxito de turnos")).toBeInTheDocument();
+    expect(screen.getAllByText("1").length).toBeGreaterThan(0);
+    expect(screen.getByText(/Volumen reciente de juego para leer continuidad de uso/i)).toBeInTheDocument();
+    expect(screen.getByText(/Cuenta única de jugadores visibles en la muestra actual/i)).toBeInTheDocument();
+    expect(screen.getByText(/100%/i)).toBeInTheDocument();
   });
 
-  it("shows empty-state copy when the teacher view has no recent syncs", () => {
+  it("shows empty-state copy when the teacher view has no dated activity yet", () => {
     useGamesMock.mockReturnValue(okQuery(okPaginated([])));
     useDevicesMock.mockReturnValue(okQuery(okPaginated([])));
     useSyncSessionsMock.mockReturnValue(okQuery(okPaginated([])));
 
     renderDashboard();
 
-    expect(screen.getByText("No hay sincronizaciones visibles todavía.")).toBeInTheDocument();
+    expect(screen.getByText("Todavía no hay actividad fechada para graficar.")).toBeInTheDocument();
   });
 
   it("shows an error banner when one teacher dashboard feed fails", () => {

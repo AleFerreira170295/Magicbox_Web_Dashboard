@@ -151,7 +151,7 @@ describe("SuperadminDashboard", () => {
     expect(screen.queryByText("Settings")).not.toBeInTheDocument();
   });
 
-  it("surfaces device totals and missing status in the executive home", () => {
+  it("surfaces online devices, missing status and raw sync coverage in the executive home", () => {
     useAuthMock.mockReturnValue({
       tokens: { accessToken: "token", refreshToken: "refresh" },
       user: {
@@ -174,9 +174,11 @@ describe("SuperadminDashboard", () => {
 
     renderDashboard();
 
-    expect(screen.getByText(/0 usuarios, 1 instituciones y 2 dispositivos visibles/i)).toBeInTheDocument();
+    expect(screen.getByText(/0 usuarios, 1 instituciones y 1 devices online/i)).toBeInTheDocument();
     expect(screen.getByText(/1 dispositivos visibles siguen sin `status` explícito/i)).toBeInTheDocument();
-    expect(screen.getByText("Devices")).toBeInTheDocument();
+    expect(screen.getByText("Devices online")).toBeInTheDocument();
+    expect(screen.getByText("Sin estado")).toBeInTheDocument();
+    expect(screen.getByText("Syncs con raw")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /Usuarios/i })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /Permisos/i })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /Dispositivos/i })).toBeInTheDocument();
@@ -203,8 +205,8 @@ describe("SuperadminDashboard", () => {
 
     renderDashboard();
 
-    expect(screen.getByText(/0 usuarios, 0 instituciones y 0 dispositivos visibles/i)).toBeInTheDocument();
-    expect(screen.getByText(/0 syncs, 0 partidas y 0 profiles/i)).toBeInTheDocument();
+    expect(screen.getByText(/0 usuarios, 0 instituciones y 0 devices online/i)).toBeInTheDocument();
+    expect(screen.getByText(/0 syncs con raw, 0 partidas recientes y 0 profiles/i)).toBeInTheDocument();
     expect(screen.getAllByText("Profiles").length).toBeGreaterThan(0);
   });
 
