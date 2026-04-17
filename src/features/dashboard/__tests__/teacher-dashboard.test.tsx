@@ -82,7 +82,10 @@ describe("TeacherDashboard", () => {
             id: "game-1",
             deckName: "Animales",
             players: [{ id: "player-1", playerName: "Ana" }],
-            turns: [{ id: "turn-1", turnNumber: 1, playTimeSeconds: 30, success: true }],
+            turns: [
+              { id: "turn-1", turnNumber: 1, gamePlayerId: "player-1", playTimeSeconds: 30, success: true, position: 1 },
+              { id: "turn-2", turnNumber: 2, gamePlayerId: "player-1", playTimeSeconds: 40, success: false, position: 1 },
+            ],
           },
         ]),
       ),
@@ -106,7 +109,11 @@ describe("TeacherDashboard", () => {
     expect(screen.getAllByText("1").length).toBeGreaterThan(0);
     expect(screen.getByText(/Volumen reciente de juego para leer continuidad de uso/i)).toBeInTheDocument();
     expect(screen.getByText(/Cuenta única de jugadores visibles en la muestra actual/i)).toBeInTheDocument();
-    expect(screen.getByText(/100%/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/50%/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Participación del grupo").length).toBeGreaterThan(0);
+    expect(screen.getByText("Mazos para mirar de cerca")).toBeInTheDocument();
+    expect(screen.getAllByText("Ana").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Animales").length).toBeGreaterThan(0);
   });
 
   it("shows empty-state copy when the teacher view has no dated activity yet", () => {
@@ -117,6 +124,8 @@ describe("TeacherDashboard", () => {
     renderDashboard();
 
     expect(screen.getByText("Todavía no hay actividad fechada para graficar.")).toBeInTheDocument();
+    expect(screen.getByText("Todavía no hay jugadas suficientes para construir una lectura por estudiante.")).toBeInTheDocument();
+    expect(screen.getByText("Aún no hay suficiente actividad para construir señales por mazo.")).toBeInTheDocument();
   });
 
   it("shows an error banner when one teacher dashboard feed fails", () => {

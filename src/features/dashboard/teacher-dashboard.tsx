@@ -42,6 +42,18 @@ function formatDayLabel(date: Date) {
   return new Intl.DateTimeFormat("es-UY", { month: "short", day: "numeric" }).format(date);
 }
 
+function resolveTurnActor(game: { players: Array<{ id: string; playerName?: string | null; externalPlayerUid?: string | null; studentId?: string | null }> }, turn: { gamePlayerId?: string | null; externalPlayerUid?: string | null; studentId?: string | null; position?: number | null }) {
+  const matchedPlayer = game.players.find((player) => player.id === turn.gamePlayerId);
+  return (
+    matchedPlayer?.playerName ||
+    matchedPlayer?.externalPlayerUid ||
+    matchedPlayer?.studentId ||
+    turn.externalPlayerUid ||
+    turn.studentId ||
+    (turn.position ? `Jugador ${turn.position}` : "Jugador sin identificar")
+  );
+}
+
 function MetricCard({
   label,
   value,
@@ -139,12 +151,53 @@ export function TeacherDashboard() {
       ...games.map((game) => parseDate(game.startDate || game.createdAt || game.updatedAt)),
       ...syncs.map((sync) => parseDate(sync.startedAt || sync.syncedAt || sync.createdAt || sync.capturedAt)),
     ].filter((value): value is Date => Boolean(value));
+    const playerStatsMap = new Map<string, { name: string; totalTurns: number; successfulTurns: number; totalPlayTime: number }>();
+    const deckStatsMap = new Map<string, { name: string; totalGames: number; totalTurns: number; successfulTurns: number; totalPlayTime: number }>();
 
     datedActivity.forEach((date) => {
       const key = date.toISOString().slice(0, 10);
       const bucket = activityByKey.get(key);
       if (bucket) bucket.total += 1;
     });
+
+    games.forEach((game) => {
+      const deckKey = game.deckName || "Sin mazo";
+      const deckStat = deckStatsMap.get(deckKey) || { name: deckKey, totalGames: 0, totalTurns: 0, successfulTurns: 0, totalPlayTime: 0 };
+      deckStat.totalGames += 1;
+
+      game.turns.forEach((turn) => {
+        const actor = resolveTurnActor(game, turn);
+        const playerStat = playerStatsMap.get(actor) || { name: actor, totalTurns: 0, successfulTurns: 0, totalPlayTime: 0 };
+        playerStat.totalTurns += 1;
+        playerStat.successfulTurns += turn.success ? 1 : 0;
+        playerStat.totalPlayTime += turn.playTimeSeconds || 0;
+        playerStatsMap.set(actor, playerStat);
+
+        deckStat.totalTurns += 1;
+        deckStat.successfulTurns += turn.success ? 1 : 0;
+        deckStat.totalPlayTime += turn.playTimeSeconds || 0;
+      });
+
+      deckStatsMap.set(deckKey, deckStat);
+    });
+
+    const playerStats = Array.from(playerStatsMap.values())
+      .map((item) => ({
+        ...item,
+        successRate: item.totalTurns > 0 ? Math.round((item.successfulTurns / item.totalTurns) * 100) : 0,
+        avgTurnTime: item.totalTurns > 0 ? item.totalPlayTime / item.totalTurns : 0,
+      }))
+      .sort((left, right) => right.totalTurns - left.totalTurns || right.successRate - left.successRate)
+      .slice(0, 5);
+
+    const deckInsights = Array.from(deckStatsMap.values())
+      .map((item) => ({
+        ...item,
+        successRate: item.totalTurns > 0 ? Math.round((item.successfulTurns / item.totalTurns) * 100) : 0,
+        avgTurnTime: item.totalTurns > 0 ? item.totalPlayTime / item.totalTurns : 0,
+      }))
+      .sort((left, right) => left.successRate - right.successRate || right.totalTurns - left.totalTurns)
+      .slice(0, 5);
 
     return {
       recentGames,
@@ -163,6 +216,8 @@ export function TeacherDashboard() {
         .slice(0, 6),
       activityChart: activityBuckets,
       hasDatedActivity: datedActivity.length > 0,
+      playerStats,
+      deckInsights,
     };
   }, [gamesQuery.data, referenceNow, syncsQuery.data]);
 
@@ -331,6 +386,70 @@ export function TeacherDashboard() {
                   <Bar dataKey="total" fill="#3f7d6b" radius={[10, 10, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid gap-6 xl:grid-cols-2">
+        <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
+          <CardHeader>
+            <CardTitle>Participación del grupo</CardTitle>
+            <CardDescription>
+              Lectura rápida de quiénes están jugando más y con qué nivel de acierto en la muestra visible.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {metrics.playerStats.length === 0 ? (
+              <div className="rounded-2xl bg-background/70 p-4 text-sm text-muted-foreground">
+                Todavía no hay jugadas suficientes para construir una lectura por estudiante.
+              </div>
+            ) : (
+              metrics.playerStats.map((player) => (
+                <div key={player.name} className="rounded-2xl bg-background/70 p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <p className="font-medium text-foreground">{player.name}</p>
+                      <p className="text-xs text-muted-foreground">{player.totalTurns} turnos observados</p>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <Badge variant="secondary">{player.successRate}% éxito</Badge>
+                      <Badge variant="outline">{formatDurationSeconds(player.avgTurnTime)}</Badge>
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
+          <CardHeader>
+            <CardTitle>Mazos para mirar de cerca</CardTitle>
+            <CardDescription>
+              Combina volumen y desempeño para ayudar a detectar contenidos que quizá necesiten acompañamiento.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {metrics.deckInsights.length === 0 ? (
+              <div className="rounded-2xl bg-background/70 p-4 text-sm text-muted-foreground">
+                Aún no hay suficiente actividad para construir señales por mazo.
+              </div>
+            ) : (
+              metrics.deckInsights.map((deck) => (
+                <div key={deck.name} className="rounded-2xl bg-background/70 p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <p className="font-medium text-foreground">{deck.name}</p>
+                      <p className="text-xs text-muted-foreground">{deck.totalGames} partidas, {deck.totalTurns} turnos</p>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <Badge variant="secondary">{deck.successRate}% éxito</Badge>
+                      <Badge variant="outline">{formatDurationSeconds(deck.avgTurnTime)}</Badge>
+                    </div>
+                  </div>
+                </div>
+              ))
             )}
           </CardContent>
         </Card>
