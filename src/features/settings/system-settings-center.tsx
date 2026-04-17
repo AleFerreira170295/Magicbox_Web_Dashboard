@@ -104,10 +104,25 @@ export function SystemSettingsCenter() {
   return (
     <div className="space-y-6">
       <SectionHeader
-        eyebrow="Configuración"
+        eyebrow="Configuración global"
         title="Settings"
         description="Centro read-only de configuración efectiva: runtime real del backend, contexto de sesión, catálogos ACL y política OTA actual."
       />
+
+      <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
+        <CardContent className="flex flex-wrap items-center justify-between gap-4 p-5">
+          <div>
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="text-sm font-medium text-foreground">Alcance operativo</p>
+              <Badge variant="secondary">admin global</Badge>
+              <Badge variant="outline">runtime efectivo</Badge>
+            </div>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Esta pantalla resume configuración global y catálogos efectivos del backend. No funciona como una vista institucional scopeada, aunque la sesión actual sea {user?.email || "global"}.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
         {isLoading ? (

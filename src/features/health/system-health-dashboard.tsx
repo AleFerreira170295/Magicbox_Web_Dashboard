@@ -53,7 +53,7 @@ function SummaryCard({
 }
 
 export function SystemHealthDashboard() {
-  const { tokens } = useAuth();
+  const { tokens, user } = useAuth();
   const basicHealthQuery = useBasicHealth();
   const readinessQuery = useReadinessHealth();
   const livenessQuery = useLivenessHealth();
@@ -121,10 +121,25 @@ export function SystemHealthDashboard() {
   return (
     <div className="space-y-6">
       <SectionHeader
-        eyebrow="Salud"
+        eyebrow="Salud global"
         title="Health"
-        description="Combina el health técnico real del backend (`/health`, `/health/ready`, `/health/live`) con señales operativas de dispositivos, syncs, games y profiles."
+        description="Combina el health técnico real del backend (`/health`, `/health/ready`, `/health/live`) con señales operativas globales de dispositivos, syncs, games y profiles."
       />
+
+      <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
+        <CardContent className="flex flex-wrap items-center justify-between gap-4 p-5">
+          <div>
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="text-sm font-medium text-foreground">Alcance operativo</p>
+              <Badge variant="secondary">admin global</Badge>
+              <Badge variant="outline">control plane</Badge>
+            </div>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Esta pantalla consolida estado técnico y señales operativas globales. No representa una vista scopeada por institución, aunque la sesión actual sea la de {user?.email || "admin autenticado"}.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
         {isLoading ? (
