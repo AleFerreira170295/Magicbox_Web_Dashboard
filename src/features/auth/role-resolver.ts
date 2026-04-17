@@ -42,3 +42,9 @@ export function resolvePermissions(raw: JsonObject): string[] {
   }
   return [];
 }
+
+export function resolveInstitutionScopedRoleLabel(roles?: string[] | null) {
+  if (roles?.includes("director")) return "director";
+  if (roles?.includes("institution-admin")) return "institution-admin";
+  return "multi-institución / global";
+}

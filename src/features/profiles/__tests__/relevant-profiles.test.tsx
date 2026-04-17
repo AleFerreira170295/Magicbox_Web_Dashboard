@@ -96,6 +96,28 @@ describe("RelevantProfiles", () => {
     expect(screen.getAllByRole("combobox")[0]).toBeDisabled();
   });
 
+  it("labels the scoped profiles view as director when the current role is director", () => {
+    useAuthMock.mockReturnValue({
+      tokens: { accessToken: "token", refreshToken: "refresh" },
+      user: {
+        id: "user-1",
+        email: "director@example.com",
+        firstName: "Marta",
+        lastName: "Director",
+        fullName: "Marta Director",
+        educationalCenterId: "ec-1",
+        roles: ["director"],
+        permissions: ["student:read"],
+        raw: {},
+      },
+    });
+
+    renderProfiles();
+
+    expect(screen.getAllByText("Director")[0]).toBeInTheDocument();
+    expect(screen.getAllByText("director")[0]).toBeInTheDocument();
+  });
+
   it("keeps the institution-scoped explanation even when no institution-linked profiles are returned", () => {
     useProfilesOverviewMock.mockReturnValue({
       data: [],

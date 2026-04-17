@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useAuth } from "@/features/auth/auth-context";
+import { resolveInstitutionScopedRoleLabel } from "@/features/auth/role-resolver";
 import { updateDevice, useDevices } from "@/features/devices/api";
 import type { DeviceRecord, UpdateDevicePayload } from "@/features/devices/types";
 import { useInstitutions } from "@/features/institutions/api";
@@ -318,6 +319,7 @@ export function DevicesTable() {
   const scopedInstitutionId = institutions.length === 1 ? institutions[0]?.id || null : null;
   const scopedInstitutionName = scopedInstitutionId ? institutions[0]?.name || scopedInstitutionId : null;
   const isInstitutionScopedView = Boolean(scopedInstitutionId && currentUser?.educationalCenterId === scopedInstitutionId);
+  const scopedRoleLabel = resolveInstitutionScopedRoleLabel(currentUser?.roles);
 
   const currentPermissionKeys = useMemo(() => new Set(currentUser?.permissions || []), [currentUser?.permissions]);
   const hasGlobalAdminRole = currentUser?.roles.includes("admin") || false;
@@ -386,7 +388,7 @@ export function DevicesTable() {
   return (
     <div className="space-y-6">
       <SectionHeader
-        eyebrow={isInstitutionScopedView ? "Institution admin" : "Operación"}
+        eyebrow={isInstitutionScopedView ? (scopedRoleLabel === "director" ? "Director" : "Institution admin") : "Operación"}
         title="Dispositivos"
         description={
           isInstitutionScopedView
@@ -436,7 +438,7 @@ export function DevicesTable() {
             <div className="flex flex-wrap items-center gap-2">
               <p className="text-sm font-medium text-foreground">Alcance operativo</p>
               <Badge variant={isInstitutionScopedView ? "secondary" : "outline"}>
-                {isInstitutionScopedView ? "institution-admin" : "multi-institución / global"}
+                {isInstitutionScopedView ? scopedRoleLabel : "multi-institución / global"}
               </Badge>
               <Badge variant="secondary">Home explícito</Badge>
               <Badge variant={canUpdateDevices ? "secondary" : "outline"}>{canUpdateDevices ? "edición habilitada" : "solo lectura"}</Badge>

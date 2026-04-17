@@ -226,6 +226,30 @@ describe("InstitutionsOverview", () => {
     expect(screen.getByText("Sin permiso para eliminar")).toBeInTheDocument();
   });
 
+  it("labels the scoped institutions view as director when the current role is director", () => {
+    useAuthMock.mockReturnValue({
+      tokens: { accessToken: "token", refreshToken: "refresh" },
+      user: {
+        id: "user-current",
+        email: "director@example.com",
+        firstName: "Marta",
+        lastName: "Director",
+        fullName: "Marta Director",
+        educationalCenterId: "ec-1",
+        roles: ["director"],
+        permissions: ["educational_center:read"],
+        raw: {},
+      },
+    });
+
+    renderInstitutionsOverview();
+
+    expect(screen.getByText("Director")).toBeInTheDocument();
+    expect(screen.getByText(/Institución activa: Colegio Norte/)).toBeInTheDocument();
+    expect(screen.getAllByText("director")[0]).toBeInTheDocument();
+    expect(screen.queryByText("institution-admin")).not.toBeInTheDocument();
+  });
+
   it("shows device linkage in metrics, table and operational impact", () => {
     useInstitutionByIdMock.mockReturnValue(
       okQuery({

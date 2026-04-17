@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useAuth } from "@/features/auth/auth-context";
+import { resolveInstitutionScopedRoleLabel } from "@/features/auth/role-resolver";
 import { useDevices } from "@/features/devices/api";
 import { useGames } from "@/features/games/api";
 import { useInstitutions } from "@/features/institutions/api";
@@ -64,6 +65,7 @@ export function GamesTable() {
   const scopedInstitutionId = institutions.length === 1 ? institutions[0]?.id || null : null;
   const scopedInstitutionName = scopedInstitutionId ? institutions[0]?.name || scopedInstitutionId : null;
   const isInstitutionScopedView = Boolean(scopedInstitutionId && currentUser?.educationalCenterId === scopedInstitutionId);
+  const scopedRoleLabel = resolveInstitutionScopedRoleLabel(currentUser?.roles);
 
   const filtered = useMemo(() => {
     const normalized = query.trim().toLowerCase();
@@ -132,7 +134,7 @@ export function GamesTable() {
   return (
     <div className="space-y-6">
       <SectionHeader
-        eyebrow={isInstitutionScopedView ? "Institution admin" : "Juego"}
+        eyebrow={isInstitutionScopedView ? (scopedRoleLabel === "director" ? "Director" : "Institution admin") : "Juego"}
         title="Partidas"
         description={
           isInstitutionScopedView
@@ -183,7 +185,7 @@ export function GamesTable() {
             <div className="flex flex-wrap items-center gap-2">
               <p className="text-sm font-medium text-foreground">Alcance operativo</p>
               <Badge variant={isInstitutionScopedView ? "secondary" : "outline"}>
-                {isInstitutionScopedView ? "institution-admin" : "multi-institución / global"}
+                {isInstitutionScopedView ? scopedRoleLabel : "multi-institución / global"}
               </Badge>
               <Badge variant="outline">game-data real</Badge>
             </div>
