@@ -44,7 +44,7 @@ function SummaryCard({
 }
 
 export function SyncsTable() {
-  const { tokens } = useAuth();
+  const { tokens, user: currentUser } = useAuth();
   const [query, setQuery] = useState("");
   const [rawFilter, setRawFilter] = useState<"all" | "with-raw" | "without-raw">("all");
   const [selectedSyncId, setSelectedSyncId] = useState<string | null>(null);
@@ -56,6 +56,19 @@ export function SyncsTable() {
   const syncs = useMemo(() => syncsQuery.data?.data || [], [syncsQuery.data?.data]);
   const devices = useMemo(() => devicesQuery.data?.data || [], [devicesQuery.data?.data]);
   const users = useMemo(() => usersQuery.data?.data || [], [usersQuery.data?.data]);
+
+  const currentPermissionKeys = useMemo(() => new Set(currentUser?.permissions || []), [currentUser?.permissions]);
+  const hasGlobalAdminRole = currentUser?.roles.includes("admin") || false;
+  const hasResolvedCapabilities = hasGlobalAdminRole || currentPermissionKeys.size > 0;
+
+  function hasAnyPermission(...keys: string[]) {
+    if (hasGlobalAdminRole) return true;
+    if (!hasResolvedCapabilities) return true;
+    return keys.some((key) => currentPermissionKeys.has(key));
+  }
+
+  const canReadOperationalSyncs = hasAnyPermission("ble_device:read", "ble-device:read");
+  const isInstitutionAdminView = currentUser?.roles.includes("institution-admin") || false;
 
   const deviceById = useMemo(() => new Map(devices.map((device) => [device.id, device])), [devices]);
   const userById = useMemo(() => new Map(users.map((user) => [user.id, user])), [users]);
@@ -117,9 +130,13 @@ export function SyncsTable() {
   return (
     <div className="space-y-6">
       <SectionHeader
-        eyebrow="Trazabilidad"
+        eyebrow={canReadOperationalSyncs ? (isInstitutionAdminView ? "Institution admin" : "Trazabilidad") : "Mi actividad"}
         title="Sincronizaciones"
-        description="Ahora la vista usa `/sync-sessions` como superficie operativa real para dashboard, no solo como historial personal del usuario autenticado."
+        description={
+          canReadOperationalSyncs
+            ? "La vista usa `/sync-sessions` como superficie operativa real del parque visible por ACL BLE, no solo como historial personal del usuario autenticado."
+            : "Sin permiso BLE operativo, `/sync-sessions` vuelve a comportarse como historial personal del usuario autenticado."
+        }
         actions={
           <div className="flex flex-col items-stretch gap-3 md:flex-row md:items-center">
             <div className="relative min-w-72">
@@ -143,6 +160,25 @@ export function SyncsTable() {
           </div>
         }
       />
+
+      <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
+        <CardContent className="flex flex-wrap items-center justify-between gap-4 p-5">
+          <div>
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="text-sm font-medium text-foreground">Alcance visible</p>
+              <Badge variant={canReadOperationalSyncs ? "secondary" : "outline"}>
+                {canReadOperationalSyncs ? "operativo por ACL BLE" : "historial personal"}
+              </Badge>
+              {isInstitutionAdminView ? <Badge variant="outline">institution-admin</Badge> : null}
+            </div>
+            <p className="mt-2 text-sm text-muted-foreground">
+              {canReadOperationalSyncs
+                ? "Los resultados se abren al parque de dispositivos permitido por ACL. Si tu alcance está scopeado, vas a ver solo syncs de esa institución."
+                : "Esta sesión no tiene lectura operativa de BLE, así que la tabla queda limitada a tus propias sincronizaciones."}
+            </p>
+          </div>
+        </CardContent>
+      </Card>
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
         {syncsQuery.isLoading ? (
