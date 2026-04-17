@@ -44,6 +44,8 @@ We use four concrete changes because they cover the highest-value propagation pa
 
 **Automated coverage**
 - Devices propagation chain already covered in Institutions, Health, Syncs, Games, SuperadminDashboard, TeacherDashboard
+- Source-side coverage also exists in `DevicesTable` for institution-admin read-only mode, persisted scope move (`institution -> home` / reverse workflow), and owner filtering by institution while preserving global owners
+- Operational tables now also cover search/filter behavior in Syncs and Games so rename propagation is validated inside real operator flows, not only static rendering
 
 **Manual spot-check**
 - rename one device, reload `syncs` and `games`, confirm row + detail use the updated name
@@ -148,6 +150,25 @@ Run this order when validating a build:
 
 This order starts with the safest broad propagation, then ends with the most business-sensitive institutional movement.
 
+## Expanded workflow coverage
+
+Beyond device propagation, the current regression suite also covers adjacent control points that decide whether the right people can see or act on those changes:
+
+- `Profiles`: device binding and active binding counts
+- `Users`: institution/ACL detail visibility plus create/delete workflow normalization
+- `Permissions`: institution-scoped filters, review queue signals, and incomplete ACL reference surfacing
+- `Settings` + route guards: admin-only command surfaces and effective runtime visibility
+- `AuthGuard` + `LoginForm` + `AppShell`: role landing, redirects, and visible navigation by role
+- `Institutions`: cross-search by linked device/user and normalized create payloads
+
+## Latest combined regression snapshot
+
+Latest broad pass executed across touched areas:
+
+- **16 files**
+- **54 tests**
+- **54 passed**
+
 ## Exit criteria
 
 A build is green for this matrix when:
@@ -157,3 +178,5 @@ A build is green for this matrix when:
 - device rename propagates to all display surfaces
 - missing-status signals update in Health and executive home
 - institution-linked counts/previews update after scope reassignment
+- sync/game operator filters still resolve the correct device, institution, and player context
+- user and ACL review workflows remain scoped, normalized, and role-safe
