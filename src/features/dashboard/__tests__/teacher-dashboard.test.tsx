@@ -102,6 +102,7 @@ describe("TeacherDashboard", () => {
     renderDashboard();
 
     expect(screen.getByText("Docente")).toBeInTheDocument();
+    expect(screen.getByText("Período")).toBeInTheDocument();
     expect(screen.getByText("Partidas 7 días")).toBeInTheDocument();
     expect(screen.getByText("Estudiantes participantes")).toBeInTheDocument();
     expect(screen.getByText("Tiempo promedio por turno")).toBeInTheDocument();
@@ -110,8 +111,11 @@ describe("TeacherDashboard", () => {
     expect(screen.getByText(/Volumen reciente de juego para leer continuidad de uso/i)).toBeInTheDocument();
     expect(screen.getByText(/Cuenta única de jugadores visibles en la muestra actual/i)).toBeInTheDocument();
     expect(screen.getAllByText(/50%/i).length).toBeGreaterThan(0);
+    expect(screen.getByText("Señales de acompañamiento")).toBeInTheDocument();
     expect(screen.getAllByText("Participación del grupo").length).toBeGreaterThan(0);
     expect(screen.getByText("Mazos para mirar de cerca")).toBeInTheDocument();
+    expect(screen.getByText("Estudiantes para acompañar")).toBeInTheDocument();
+    expect(screen.getByText("Contenidos para reforzar")).toBeInTheDocument();
     expect(screen.getAllByText("Ana").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Animales").length).toBeGreaterThan(0);
   });
@@ -124,6 +128,8 @@ describe("TeacherDashboard", () => {
     renderDashboard();
 
     expect(screen.getByText("Todavía no hay actividad fechada para graficar.")).toBeInTheDocument();
+    expect(screen.getByText("No aparecen estudiantes con señal de apoyo en el período seleccionado.")).toBeInTheDocument();
+    expect(screen.getByText("No aparecen mazos con señal de refuerzo en el período seleccionado.")).toBeInTheDocument();
     expect(screen.getByText("Todavía no hay jugadas suficientes para construir una lectura por estudiante.")).toBeInTheDocument();
     expect(screen.getByText("Aún no hay suficiente actividad para construir señales por mazo.")).toBeInTheDocument();
   });

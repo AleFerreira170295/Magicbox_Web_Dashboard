@@ -24,7 +24,6 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/features/auth/auth-context";
-import { useDevices } from "@/features/devices/api";
 import { useGames } from "@/features/games/api";
 import { useSyncSessions } from "@/features/syncs/api";
 import { getErrorMessage, formatDurationSeconds } from "@/lib/utils";
@@ -108,48 +107,57 @@ function InsightRow({
 export function TeacherDashboard() {
   const { tokens, user } = useAuth();
   const gamesQuery = useGames(tokens?.accessToken);
-  const devicesQuery = useDevices(tokens?.accessToken);
   const syncsQuery = useSyncSessions(tokens?.accessToken);
   const [referenceNow] = useState(() => Date.now());
+  const [periodFilter, setPeriodFilter] = useState<"7d" | "30d" | "all">("7d");
 
-  const isLoading = gamesQuery.isLoading || devicesQuery.isLoading || syncsQuery.isLoading;
-  const error = gamesQuery.error || devicesQuery.error || syncsQuery.error;
+  const isLoading = gamesQuery.isLoading || syncsQuery.isLoading;
+  const error = gamesQuery.error || syncsQuery.error;
 
   const metrics = useMemo(() => {
     const games = gamesQuery.data?.data || [];
     const syncs = syncsQuery.data?.data || [];
-    const recentThreshold = referenceNow - RECENT_WINDOW_DAYS * DAY_MS;
-    const datedGames = games.map((game) => parseDate(game.startDate || game.createdAt || game.updatedAt)).filter((value): value is Date => Boolean(value));
-    const recentGames = datedGames.length > 0
+    const windowDays = periodFilter === "all" ? null : Number(periodFilter.replace("d", ""));
+    const recentThreshold = windowDays ? referenceNow - windowDays * DAY_MS : null;
+    const hasDatedGames = games.some((game) => Boolean(parseDate(game.startDate || game.createdAt || game.updatedAt)));
+    const hasDatedSyncs = syncs.some((sync) => Boolean(parseDate(sync.startedAt || sync.syncedAt || sync.createdAt || sync.capturedAt)));
+    const filteredGames = recentThreshold && hasDatedGames
       ? games.filter((game) => {
           const date = parseDate(game.startDate || game.createdAt || game.updatedAt);
           return Boolean(date && date.getTime() >= recentThreshold && date.getTime() <= referenceNow);
-        }).length
-      : games.length;
-    const totalTurns = games.reduce((sum, game) => sum + game.turns.length, 0);
-    const totalTurnTime = games.reduce(
+        })
+      : games;
+    const filteredSyncs = recentThreshold && hasDatedSyncs
+      ? syncs.filter((sync) => {
+          const date = parseDate(sync.startedAt || sync.syncedAt || sync.createdAt || sync.capturedAt);
+          return Boolean(date && date.getTime() >= recentThreshold && date.getTime() <= referenceNow);
+        })
+      : syncs;
+    const totalTurns = filteredGames.reduce((sum, game) => sum + game.turns.length, 0);
+    const totalTurnTime = filteredGames.reduce(
       (sum, game) => sum + game.turns.reduce((turnSum, turn) => turnSum + (turn.playTimeSeconds || 0), 0),
       0,
     );
-    const successfulTurns = games.reduce((sum, game) => sum + game.turns.filter((turn) => turn.success).length, 0);
+    const successfulTurns = filteredGames.reduce((sum, game) => sum + game.turns.filter((turn) => turn.success).length, 0);
     const avgTurnTime = totalTurns > 0 ? totalTurnTime / totalTurns : 0;
     const successRate = totalTurns > 0 ? Math.round((successfulTurns / totalTurns) * 100) : 0;
     const activePlayers = new Set(
-      games.flatMap((game) =>
+      filteredGames.flatMap((game) =>
         game.players
           .map((player) => player.playerName || player.externalPlayerUid || player.studentId || player.id)
           .filter(Boolean),
       ),
     ).size;
-    const activityBuckets = Array.from({ length: RECENT_WINDOW_DAYS }, (_, index) => {
-      const date = new Date(referenceNow - (RECENT_WINDOW_DAYS - index - 1) * DAY_MS);
+    const chartWindowDays = windowDays || 30;
+    const activityBuckets = Array.from({ length: chartWindowDays }, (_, index) => {
+      const date = new Date(referenceNow - (chartWindowDays - index - 1) * DAY_MS);
       const key = date.toISOString().slice(0, 10);
       return { key, name: formatDayLabel(date), total: 0 };
     });
     const activityByKey = new Map(activityBuckets.map((bucket) => [bucket.key, bucket]));
     const datedActivity = [
-      ...games.map((game) => parseDate(game.startDate || game.createdAt || game.updatedAt)),
-      ...syncs.map((sync) => parseDate(sync.startedAt || sync.syncedAt || sync.createdAt || sync.capturedAt)),
+      ...filteredGames.map((game) => parseDate(game.startDate || game.createdAt || game.updatedAt)),
+      ...filteredSyncs.map((sync) => parseDate(sync.startedAt || sync.syncedAt || sync.createdAt || sync.capturedAt)),
     ].filter((value): value is Date => Boolean(value));
     const playerStatsMap = new Map<string, { name: string; totalTurns: number; successfulTurns: number; totalPlayTime: number }>();
     const deckStatsMap = new Map<string, { name: string; totalGames: number; totalTurns: number; successfulTurns: number; totalPlayTime: number }>();
@@ -160,7 +168,7 @@ export function TeacherDashboard() {
       if (bucket) bucket.total += 1;
     });
 
-    games.forEach((game) => {
+    filteredGames.forEach((game) => {
       const deckKey = game.deckName || "Sin mazo";
       const deckStat = deckStatsMap.get(deckKey) || { name: deckKey, totalGames: 0, totalTurns: 0, successfulTurns: 0, totalPlayTime: 0 };
       deckStat.totalGames += 1;
@@ -200,12 +208,12 @@ export function TeacherDashboard() {
       .slice(0, 5);
 
     return {
-      recentGames,
+      recentGames: filteredGames.length,
       activePlayers,
       avgTurnTime,
       successRate,
       deckChart: Object.entries(
-        games.reduce<Record<string, number>>((acc, game) => {
+        filteredGames.reduce<Record<string, number>>((acc, game) => {
           const key = game.deckName || "Sin mazo";
           acc[key] = (acc[key] || 0) + 1;
           return acc;
@@ -218,8 +226,11 @@ export function TeacherDashboard() {
       hasDatedActivity: datedActivity.length > 0,
       playerStats,
       deckInsights,
+      supportPlayers: playerStats.filter((item) => item.totalTurns >= 2 && item.successRate < 60).slice(0, 3),
+      supportDecks: deckInsights.filter((item) => item.totalTurns >= 2 && item.successRate < 60).slice(0, 3),
+      periodLabel: periodFilter === "all" ? "visibles" : periodFilter === "30d" ? "30 días" : "7 días",
     };
-  }, [gamesQuery.data, referenceNow, syncsQuery.data]);
+  }, [gamesQuery.data, periodFilter, referenceNow, syncsQuery.data]);
 
   return (
     <div className="space-y-8">
@@ -227,6 +238,20 @@ export function TeacherDashboard() {
         eyebrow="Docente"
         title="Una vista más clara para acompañar el aula"
         description="Tomamos como referencia el tono del sitio público de MagicBox para empezar a mover el dashboard hacia una experiencia más cálida, simple y pedagógica, sin perder la capa operativa que ya tenemos."
+        actions={
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-muted-foreground">Período</span>
+            <select
+              value={periodFilter}
+              onChange={(event) => setPeriodFilter(event.target.value as "7d" | "30d" | "all")}
+              className="h-10 min-w-32 rounded-md border border-input bg-background px-3 text-sm"
+            >
+              <option value="7d">Últimos 7 días</option>
+              <option value="30d">Últimos 30 días</option>
+              <option value="all">Todo</option>
+            </select>
+          </div>
+        }
       />
 
       <div className="grid gap-6 xl:grid-cols-[1.4fr_0.9fr]">
@@ -298,7 +323,7 @@ export function TeacherDashboard() {
         ) : (
           <>
             <MetricCard
-              label="Partidas 7 días"
+              label={`Partidas ${metrics.periodLabel}`}
               value={String(metrics.recentGames)}
               hint="Volumen reciente de juego para leer continuidad de uso, no solo histórico acumulado."
               icon={Database}
@@ -332,6 +357,53 @@ export function TeacherDashboard() {
           </CardContent>
         </Card>
       ) : null}
+
+      <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
+        <CardHeader>
+          <CardTitle>Señales de acompañamiento</CardTitle>
+          <CardDescription>
+            Heurísticas suaves para ubicar rápido estudiantes o contenidos que merecen una segunda mirada.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="grid gap-4 md:grid-cols-2">
+          <div className="rounded-2xl bg-background/70 p-4">
+            <p className="text-sm font-medium text-foreground">Estudiantes para acompañar</p>
+            <div className="mt-3 space-y-2">
+              {metrics.supportPlayers.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No aparecen estudiantes con señal de apoyo en el período seleccionado.</p>
+              ) : (
+                metrics.supportPlayers.map((player) => (
+                  <div key={player.name} className="flex items-center justify-between gap-3 rounded-2xl bg-white/80 p-3 text-sm">
+                    <span className="font-medium text-foreground">{player.name}</span>
+                    <div className="flex flex-wrap gap-2">
+                      <Badge variant="outline">{player.totalTurns} turnos</Badge>
+                      <Badge variant="secondary">{player.successRate}% éxito</Badge>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+          <div className="rounded-2xl bg-background/70 p-4">
+            <p className="text-sm font-medium text-foreground">Contenidos para reforzar</p>
+            <div className="mt-3 space-y-2">
+              {metrics.supportDecks.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No aparecen mazos con señal de refuerzo en el período seleccionado.</p>
+              ) : (
+                metrics.supportDecks.map((deck) => (
+                  <div key={deck.name} className="flex items-center justify-between gap-3 rounded-2xl bg-white/80 p-3 text-sm">
+                    <span className="font-medium text-foreground">{deck.name}</span>
+                    <div className="flex flex-wrap gap-2">
+                      <Badge variant="outline">{deck.totalTurns} turnos</Badge>
+                      <Badge variant="secondary">{deck.successRate}% éxito</Badge>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       <div className="grid gap-6 xl:grid-cols-2">
         <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
