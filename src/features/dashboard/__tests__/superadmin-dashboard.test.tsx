@@ -218,6 +218,7 @@ describe("SuperadminDashboard", () => {
           user_type_mix: [{ key: "web", count: 1 }],
           top_institutions: [{ id: "ec-1", name: "Colegio Norte", users: 10, games: 8, turns: 14, state: "Metropolitana", city: "Santiago" }],
           top_territories: [{ key: "Metropolitana / Santiago", institutions: 1, users: 10, games: 8, turns: 14 }],
+          territorial_hierarchy: [{ key: "CL", institutions: 1, users: 10, games: 8, turns: 14, states: [{ key: "Metropolitana", institutions: 1, users: 10, games: 8, turns: 14, cities: [{ key: "Santiago", institutions: 1, users: 10, games: 8, turns: 14 }] }] }],
         },
       }),
     );
@@ -314,6 +315,7 @@ describe("SuperadminDashboard", () => {
           user_type_mix: [{ key: "web", count: 6 }],
           top_institutions: [{ id: "ec-1", name: "Colegio Norte", users: 10, games: 4, turns: 6, state: "Montevideo", city: "Montevideo" }],
           top_territories: [{ key: "Montevideo / Montevideo", institutions: 1, users: 10, games: 4, turns: 6 }],
+          territorial_hierarchy: [{ key: "UY", institutions: 1, users: 10, games: 4, turns: 6, states: [{ key: "Montevideo", institutions: 1, users: 10, games: 4, turns: 6, cities: [{ key: "Montevideo", institutions: 1, users: 10, games: 4, turns: 6 }] }] }],
         },
       }),
     );
@@ -324,6 +326,7 @@ describe("SuperadminDashboard", () => {
     expect(screen.getByText("Mini tendencias")).toBeInTheDocument();
     expect(screen.getByText("Comparativa entre períodos")).toBeInTheDocument();
     expect(screen.getByText("Semáforos operativos")).toBeInTheDocument();
+    expect(screen.getByText("Drilldown territorial")).toBeInTheDocument();
     expect(screen.getByText("Territorios con mayor actividad")).toBeInTheDocument();
     expect(screen.getByText("Instituciones destacadas en el territorio")).toBeInTheDocument();
     expect(screen.queryByText("Health")).not.toBeInTheDocument();

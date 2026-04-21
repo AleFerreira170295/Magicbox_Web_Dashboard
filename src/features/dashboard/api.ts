@@ -87,6 +87,27 @@ export type SystemDashboardSummary = {
     user_type_mix: Array<{ key: string; count: number }>;
     top_institutions: Array<{ id: string; name: string; users: number; games: number; turns: number; state?: string | null; city?: string | null }>;
     top_territories: Array<{ key: string; institutions: number; users: number; games: number; turns: number }>;
+    territorial_hierarchy: Array<{
+      key: string;
+      institutions: number;
+      users: number;
+      games: number;
+      turns: number;
+      states: Array<{
+        key: string;
+        institutions: number;
+        users: number;
+        games: number;
+        turns: number;
+        cities: Array<{
+          key: string;
+          institutions: number;
+          users: number;
+          games: number;
+          turns: number;
+        }>;
+      }>;
+    }>;
   };
 };
 

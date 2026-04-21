@@ -221,16 +221,25 @@ export function SuperadminDashboard() {
   const userTypeMix = summaryQuery.data?.segments.user_type_mix || [];
   const topInstitutions = summaryQuery.data?.segments.top_institutions || [];
   const topTerritories = summaryQuery.data?.segments.top_territories || [];
+  const territorialHierarchy = summaryQuery.data?.segments.territorial_hierarchy || [];
 
   function updateFilter(
     key: "range" | "institution_id" | "country_code" | "state" | "city" | "user_type" | "role_code",
     value: string,
   ) {
+    updateFilters({ [key]: value });
+  }
+
+  function updateFilters(
+    entries: Partial<Record<"range" | "institution_id" | "country_code" | "state" | "city" | "user_type" | "role_code", string>>,
+  ) {
     const params = new URLSearchParams(searchParams.toString());
-    if (!value) {
-      params.delete(key);
-    } else {
-      params.set(key, value);
+    for (const [key, value] of Object.entries(entries)) {
+      if (!value) {
+        params.delete(key);
+      } else {
+        params.set(key, value);
+      }
     }
     router.replace(params.toString() ? `${pathname}?${params.toString()}` : pathname);
   }
@@ -649,6 +658,70 @@ export function SuperadminDashboard() {
                 <p className="mt-2">{alert.message}</p>
               </div>
             ))}
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {isGovernmentViewer ? (
+        <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
+          <CardHeader>
+            <CardTitle>Drilldown territorial</CardTitle>
+            <CardDescription>Jerarquía país → estado → ciudad para bajar de nivel sin salir de la home.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {territorialHierarchy.length > 0 ? (
+              territorialHierarchy.map((country) => (
+                <div key={country.key} className="rounded-2xl bg-white/80 p-4 text-sm text-muted-foreground">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <p className="font-medium text-foreground">{country.key}</p>
+                      <p className="mt-1">{country.users} usuarios, {country.institutions} instituciones, {country.games} partidas, {country.turns} turnos.</p>
+                    </div>
+                    <button
+                      type="button"
+                      className="rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary"
+                      onClick={() => updateFilter("country_code", country.key)}
+                    >
+                      Filtrar país
+                    </button>
+                  </div>
+
+                  <div className="mt-4 space-y-3 border-l border-border/60 pl-4">
+                    {country.states.slice(0, 4).map((stateEntry) => (
+                      <div key={`${country.key}-${stateEntry.key}`} className="rounded-xl bg-background/70 p-3">
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                          <div>
+                            <p className="font-medium text-foreground">{stateEntry.key}</p>
+                            <p className="mt-1">{stateEntry.users} usuarios, {stateEntry.institutions} instituciones, {stateEntry.games} partidas, {stateEntry.turns} turnos.</p>
+                          </div>
+                          <button
+                            type="button"
+                            className="rounded-full bg-secondary px-3 py-1 text-xs font-medium text-secondary-foreground"
+                            onClick={() => updateFilters({ country_code: country.key, state: stateEntry.key, city: "" })}
+                          >
+                            Filtrar estado
+                          </button>
+                        </div>
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          {stateEntry.cities.slice(0, 5).map((cityEntry) => (
+                            <button
+                              key={`${stateEntry.key}-${cityEntry.key}`}
+                              type="button"
+                              className="rounded-full border border-border bg-white px-3 py-1 text-xs font-medium text-foreground"
+                              onClick={() => updateFilters({ country_code: country.key, state: stateEntry.key, city: cityEntry.key })}
+                            >
+                              {cityEntry.key} · {cityEntry.users} usuarios · {cityEntry.turns} turnos
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="rounded-2xl bg-white/80 p-4 text-sm text-muted-foreground">No hay estructura territorial suficiente para mostrar drilldown en el recorte actual.</div>
+            )}
           </CardContent>
         </Card>
       ) : null}
