@@ -108,6 +108,12 @@ export type SystemDashboardSummary = {
         }>;
       }>;
     }>;
+    territory_alerts: Array<{
+      severity: "warning" | "secondary" | "success";
+      scope: string;
+      label: string;
+      message: string;
+    }>;
   };
 };
 

@@ -222,6 +222,7 @@ export function SuperadminDashboard() {
   const topInstitutions = summaryQuery.data?.segments.top_institutions || [];
   const topTerritories = summaryQuery.data?.segments.top_territories || [];
   const territorialHierarchy = summaryQuery.data?.segments.territorial_hierarchy || [];
+  const territoryAlerts = summaryQuery.data?.segments.territory_alerts || [];
 
   function updateFilter(
     key: "range" | "institution_id" | "country_code" | "state" | "city" | "user_type" | "role_code",
@@ -721,6 +722,33 @@ export function SuperadminDashboard() {
               ))
             ) : (
               <div className="rounded-2xl bg-white/80 p-4 text-sm text-muted-foreground">No hay estructura territorial suficiente para mostrar drilldown en el recorte actual.</div>
+            )}
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {isGovernmentViewer ? (
+        <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
+          <CardHeader>
+            <CardTitle>Alertas por territorio</CardTitle>
+            <CardDescription>Focos subterritoriales que pueden quedar ocultos cuando el agregado país todavía se ve sano.</CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {territoryAlerts.length > 0 ? (
+              territoryAlerts.map((alert) => (
+                <div key={`${alert.scope}-${alert.label}`} className="rounded-2xl bg-white/80 p-4 text-sm text-muted-foreground">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="font-medium text-foreground">{alert.label}</p>
+                      <p className="mt-1 text-xs uppercase tracking-wide text-muted-foreground">{alert.scope}</p>
+                    </div>
+                    <Badge variant={alert.severity}>{alert.severity}</Badge>
+                  </div>
+                  <p className="mt-2">{alert.message}</p>
+                </div>
+              ))
+            ) : (
+              <div className="rounded-2xl bg-white/80 p-4 text-sm text-muted-foreground">No hay alertas territoriales activas con el recorte actual.</div>
             )}
           </CardContent>
         </Card>
