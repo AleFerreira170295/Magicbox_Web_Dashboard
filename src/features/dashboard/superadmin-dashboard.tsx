@@ -16,6 +16,7 @@ import {
   UserPlus,
   Users,
 } from "lucide-react";
+import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis } from "recharts";
 import { SectionHeader } from "@/components/section-header";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -142,12 +143,22 @@ export function SuperadminDashboard() {
   const canSeeSettingsModule = isAdmin;
   const selectedRange = searchParams.get("range") || "30d";
   const selectedInstitutionId = searchParams.get("institution_id");
+  const selectedCountryCode = searchParams.get("country_code");
+  const selectedState = searchParams.get("state");
+  const selectedCity = searchParams.get("city");
+  const selectedUserType = searchParams.get("user_type");
+  const selectedRoleCode = searchParams.get("role_code");
+  const summaryFilters = {
+    range: selectedRange,
+    institutionId: selectedInstitutionId,
+    countryCode: selectedCountryCode,
+    state: selectedState,
+    city: selectedCity,
+    userType: selectedUserType,
+    roleCode: selectedRoleCode,
+  };
 
-  const summaryQuery = useSystemDashboardSummary(
-    tokens?.accessToken,
-    { range: selectedRange, institutionId: selectedInstitutionId },
-    isAdmin,
-  );
+  const summaryQuery = useSystemDashboardSummary(tokens?.accessToken, summaryFilters, isAdmin);
   const usersQuery = useUsers(!isAdmin ? tokens?.accessToken : undefined);
   const institutionsQuery = useInstitutions(!isAdmin ? tokens?.accessToken : undefined);
   const devicesQuery = useDevices(!isAdmin ? tokens?.accessToken : undefined);
@@ -194,8 +205,18 @@ export function SuperadminDashboard() {
 
   const rangeOptions = summaryQuery.data?.filters.range_options || [];
   const institutionOptions = summaryQuery.data?.filters.institutions || [];
+  const countryOptions = summaryQuery.data?.filters.countries || [];
+  const stateOptions = summaryQuery.data?.filters.states || [];
+  const cityOptions = summaryQuery.data?.filters.cities || [];
+  const userTypeOptions = summaryQuery.data?.filters.user_types || [];
+  const roleCodeOptions = summaryQuery.data?.filters.role_codes || [];
+  const trendRangeLabel = summaryQuery.data?.filters.trend_range || selectedRange;
+  const trends = summaryQuery.data?.trends || [];
 
-  function updateFilter(key: "range" | "institution_id", value: string) {
+  function updateFilter(
+    key: "range" | "institution_id" | "country_code" | "state" | "city" | "user_type" | "role_code",
+    value: string,
+  ) {
     const params = new URLSearchParams(searchParams.toString());
     if (!value) {
       params.delete(key);
@@ -315,7 +336,7 @@ export function SuperadminDashboard() {
             </div>
 
             {isAdmin ? (
-              <div className="mt-6 grid gap-3 md:grid-cols-2">
+              <div className="mt-6 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
                 <label className="rounded-2xl bg-white/10 p-4 text-sm text-white/85 backdrop-blur-sm">
                   <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.2em] text-white/65">Ventana temporal</span>
                   <select
@@ -342,6 +363,86 @@ export function SuperadminDashboard() {
                     {institutionOptions.map((institution) => (
                       <option key={institution.id} value={institution.id} className="text-slate-950">
                         {institution.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label className="rounded-2xl bg-white/10 p-4 text-sm text-white/85 backdrop-blur-sm">
+                  <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.2em] text-white/65">País</span>
+                  <select
+                    className="w-full rounded-xl border border-white/15 bg-slate-950/20 px-3 py-2 text-sm text-white outline-none"
+                    value={selectedCountryCode || ""}
+                    onChange={(event) => updateFilter("country_code", event.target.value)}
+                  >
+                    <option value="" className="text-slate-950">Todos</option>
+                    {countryOptions.map((option) => (
+                      <option key={option} value={option} className="text-slate-950">
+                        {option}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label className="rounded-2xl bg-white/10 p-4 text-sm text-white/85 backdrop-blur-sm">
+                  <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.2em] text-white/65">Estado / territorio</span>
+                  <select
+                    className="w-full rounded-xl border border-white/15 bg-slate-950/20 px-3 py-2 text-sm text-white outline-none"
+                    value={selectedState || ""}
+                    onChange={(event) => updateFilter("state", event.target.value)}
+                  >
+                    <option value="" className="text-slate-950">Todos</option>
+                    {stateOptions.map((option) => (
+                      <option key={option} value={option} className="text-slate-950">
+                        {option}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label className="rounded-2xl bg-white/10 p-4 text-sm text-white/85 backdrop-blur-sm">
+                  <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.2em] text-white/65">Ciudad</span>
+                  <select
+                    className="w-full rounded-xl border border-white/15 bg-slate-950/20 px-3 py-2 text-sm text-white outline-none"
+                    value={selectedCity || ""}
+                    onChange={(event) => updateFilter("city", event.target.value)}
+                  >
+                    <option value="" className="text-slate-950">Todas</option>
+                    {cityOptions.map((option) => (
+                      <option key={option} value={option} className="text-slate-950">
+                        {option}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label className="rounded-2xl bg-white/10 p-4 text-sm text-white/85 backdrop-blur-sm">
+                  <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.2em] text-white/65">Tipo de usuario</span>
+                  <select
+                    className="w-full rounded-xl border border-white/15 bg-slate-950/20 px-3 py-2 text-sm text-white outline-none"
+                    value={selectedUserType || ""}
+                    onChange={(event) => updateFilter("user_type", event.target.value)}
+                  >
+                    <option value="" className="text-slate-950">Todos</option>
+                    {userTypeOptions.map((option) => (
+                      <option key={option} value={option} className="text-slate-950">
+                        {option}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label className="rounded-2xl bg-white/10 p-4 text-sm text-white/85 backdrop-blur-sm">
+                  <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.2em] text-white/65">Rol agrupado</span>
+                  <select
+                    className="w-full rounded-xl border border-white/15 bg-slate-950/20 px-3 py-2 text-sm text-white outline-none"
+                    value={selectedRoleCode || ""}
+                    onChange={(event) => updateFilter("role_code", event.target.value)}
+                  >
+                    <option value="" className="text-slate-950">Todos</option>
+                    {roleCodeOptions.map((option) => (
+                      <option key={option} value={option} className="text-slate-950">
+                        {option}
                       </option>
                     ))}
                   </select>
@@ -376,6 +477,17 @@ export function SuperadminDashboard() {
                     : `${scopeLabel.toLowerCase()} · ${metrics.totalInstitutions} instituciones visibles · ${metrics.totalDevices} devices.`}
                 </p>
               </div>
+              {isAdmin ? (
+                <div className="rounded-3xl bg-white/10 p-4 backdrop-blur-sm md:col-span-3">
+                  <p className="text-sm text-white/70">Scope territorial y cohortes</p>
+                  <p className="mt-2 text-lg font-medium">
+                    {selectedCountryCode || "Todos los países"} · {selectedState || "todos los territorios"} · {selectedCity || "todas las ciudades"}
+                  </p>
+                  <p className="mt-2 text-sm text-white/70">
+                    Cohortes activas: {selectedUserType || "todos los tipos de usuario"} y {selectedRoleCode || "todos los roles"}. Esta base sirve para una vista territorial tipo gobierno con permisos de solo visualización.
+                  </p>
+                </div>
+              ) : null}
             </div>
           </CardContent>
         </Card>
@@ -422,6 +534,55 @@ export function SuperadminDashboard() {
           </>
         )}
       </div>
+
+      {isAdmin ? (
+        <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
+          <CardHeader>
+            <CardTitle>Mini tendencias</CardTitle>
+            <CardDescription>
+              Evolución diaria de syncs, partidas y turnos para el recorte actual ({trendRangeLabel}). Ideal para la futura vista territorial de gobiernos.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {summaryQuery.isLoading && trends.length === 0 ? (
+              <Skeleton className="h-72 rounded-2xl" />
+            ) : trends.length > 0 ? (
+              <div className="space-y-4">
+                <div className="h-72 w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={trends}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.25)" />
+                      <XAxis dataKey="date" tick={{ fontSize: 12 }} tickMargin={8} />
+                      <Tooltip />
+                      <Line type="monotone" dataKey="syncs" stroke="#2563eb" strokeWidth={2} dot={false} />
+                      <Line type="monotone" dataKey="games" stroke="#7c3aed" strokeWidth={2} dot={false} />
+                      <Line type="monotone" dataKey="turns" stroke="#0f766e" strokeWidth={2} dot={false} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+                <div className="grid gap-3 md:grid-cols-3">
+                  <div className="rounded-2xl bg-white/80 p-4 text-sm text-muted-foreground">
+                    <p className="font-medium text-foreground">Syncs del período</p>
+                    <p className="mt-1">{trends.reduce((sum, item) => sum + item.syncs, 0)} acumulados en la serie.</p>
+                  </div>
+                  <div className="rounded-2xl bg-white/80 p-4 text-sm text-muted-foreground">
+                    <p className="font-medium text-foreground">Partidas del período</p>
+                    <p className="mt-1">{trends.reduce((sum, item) => sum + item.games, 0)} registradas en la serie.</p>
+                  </div>
+                  <div className="rounded-2xl bg-white/80 p-4 text-sm text-muted-foreground">
+                    <p className="font-medium text-foreground">Tasa de éxito reciente</p>
+                    <p className="mt-1">{trends.length ? trends[trends.length - 1]?.success_rate || 0 : 0}% en el último bucket visible.</p>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="rounded-2xl bg-white/80 p-4 text-sm text-muted-foreground">
+                No hay actividad suficiente para dibujar tendencias con el recorte actual.
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      ) : null}
 
       <div className="grid gap-5 xl:grid-cols-3">
         <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">

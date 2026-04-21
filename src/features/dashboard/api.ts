@@ -2,13 +2,34 @@ import { useQuery } from "@tanstack/react-query";
 import { apiEndpoints } from "@/lib/api/endpoints";
 import { apiRequest } from "@/lib/api/fetcher";
 
+export type DashboardSummaryFilters = {
+  range?: string;
+  institutionId?: string | null;
+  countryCode?: string | null;
+  state?: string | null;
+  city?: string | null;
+  userType?: string | null;
+  roleCode?: string | null;
+};
+
 export type SystemDashboardSummary = {
   filters: {
     selected_range: string;
     selected_institution_id: string | null;
+    selected_country_code: string | null;
+    selected_state: string | null;
+    selected_city: string | null;
+    selected_user_type: string | null;
+    selected_role_code: string | null;
     range_options: Array<{ value: string; label: string }>;
     institutions: Array<{ id: string; name: string }>;
+    countries: string[];
+    states: string[];
+    cities: string[];
+    user_types: string[];
+    role_codes: string[];
     window_start: string | null;
+    trend_range: string;
   };
   totals: {
     users: number;
@@ -34,28 +55,45 @@ export type SystemDashboardSummary = {
     profiles_with_bindings: number;
     profiles_with_sessions: number;
   };
+  trends: Array<{
+    date: string;
+    syncs: number;
+    games: number;
+    turns: number;
+    successful_turns: number;
+    success_rate: number;
+  }>;
 };
 
-export async function getSystemDashboardSummary(
-  token: string,
-  filters?: { range?: string; institutionId?: string | null },
-) {
+export async function getSystemDashboardSummary(token: string, filters?: DashboardSummaryFilters) {
   return apiRequest<SystemDashboardSummary>(apiEndpoints.dashboard.systemSummary, {
     token,
     searchParams: {
       ...(filters?.range ? { range: filters.range } : {}),
       ...(filters?.institutionId ? { institution_id: filters.institutionId } : {}),
+      ...(filters?.countryCode ? { country_code: filters.countryCode } : {}),
+      ...(filters?.state ? { state: filters.state } : {}),
+      ...(filters?.city ? { city: filters.city } : {}),
+      ...(filters?.userType ? { user_type: filters.userType } : {}),
+      ...(filters?.roleCode ? { role_code: filters.roleCode } : {}),
     },
   });
 }
 
-export function useSystemDashboardSummary(
-  token?: string,
-  filters?: { range?: string; institutionId?: string | null },
-  enabled = true,
-) {
+export function useSystemDashboardSummary(token?: string, filters?: DashboardSummaryFilters, enabled = true) {
   return useQuery({
-    queryKey: ["dashboard", "system-summary", token, filters?.range || "30d", filters?.institutionId || "all"],
+    queryKey: [
+      "dashboard",
+      "system-summary",
+      token,
+      filters?.range || "30d",
+      filters?.institutionId || "all",
+      filters?.countryCode || "all",
+      filters?.state || "all",
+      filters?.city || "all",
+      filters?.userType || "all",
+      filters?.roleCode || "all",
+    ],
     queryFn: () => getSystemDashboardSummary(token as string, filters),
     enabled: Boolean(token && enabled),
   });

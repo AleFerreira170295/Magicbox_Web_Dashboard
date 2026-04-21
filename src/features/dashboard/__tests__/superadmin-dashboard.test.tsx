@@ -152,9 +152,20 @@ describe("SuperadminDashboard", () => {
         filters: {
           selected_range: "30d",
           selected_institution_id: null,
+          selected_country_code: null,
+          selected_state: null,
+          selected_city: null,
+          selected_user_type: null,
+          selected_role_code: null,
           range_options: [{ value: "30d", label: "30 días" }],
           institutions: [{ id: "ec-1", name: "Colegio Norte" }],
+          countries: ["CL"],
+          states: ["Metropolitana"],
+          cities: ["Santiago"],
+          user_types: ["teacher"],
+          role_codes: ["admin"],
           window_start: null,
+          trend_range: "30d",
         },
         totals: {
           users: 25,
@@ -180,6 +191,9 @@ describe("SuperadminDashboard", () => {
           profiles_with_bindings: 3,
           profiles_with_sessions: 2,
         },
+        trends: [
+          { date: "2026-04-20", syncs: 1, games: 2, turns: 3, successful_turns: 2, success_rate: 66.7 },
+        ],
       }),
     );
 
@@ -187,6 +201,21 @@ describe("SuperadminDashboard", () => {
 
     expect(screen.getByText("Ventana temporal")).toBeInTheDocument();
     expect(screen.getByText("Institución")).toBeInTheDocument();
-    expect(useSystemDashboardSummaryMock).toHaveBeenCalledWith("token", { range: "30d", institutionId: null }, true);
+    expect(screen.getByText("País")).toBeInTheDocument();
+    expect(screen.getByText("Tipo de usuario")).toBeInTheDocument();
+    expect(screen.getByText("Mini tendencias")).toBeInTheDocument();
+    expect(useSystemDashboardSummaryMock).toHaveBeenCalledWith(
+      "token",
+      {
+        range: "30d",
+        institutionId: null,
+        countryCode: null,
+        state: null,
+        city: null,
+        userType: null,
+        roleCode: null,
+      },
+      true,
+    );
   });
 });
