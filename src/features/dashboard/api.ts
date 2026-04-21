@@ -114,6 +114,15 @@ export type SystemDashboardSummary = {
       label: string;
       message: string;
     }>;
+    territory_scores: Array<{
+      label: string;
+      score: number;
+      status: "warning" | "secondary" | "success";
+      users: number;
+      games: number;
+      turns: number;
+      reasons: string[];
+    }>;
   };
 };
 

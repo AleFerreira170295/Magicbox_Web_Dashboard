@@ -220,6 +220,7 @@ describe("SuperadminDashboard", () => {
           top_territories: [{ key: "Metropolitana / Santiago", institutions: 1, users: 10, games: 8, turns: 14 }],
           territorial_hierarchy: [{ key: "CL", institutions: 1, users: 10, games: 8, turns: 14, states: [{ key: "Metropolitana", institutions: 1, users: 10, games: 8, turns: 14, cities: [{ key: "Santiago", institutions: 1, users: 10, games: 8, turns: 14 }] }] }],
           territory_alerts: [],
+          territory_scores: [{ label: "Metropolitana / Santiago", score: 85, status: "success", users: 10, games: 8, turns: 14, reasons: ["Actividad registrada en el período"] }],
         },
       }),
     );
@@ -318,6 +319,7 @@ describe("SuperadminDashboard", () => {
           top_territories: [{ key: "Montevideo / Montevideo", institutions: 1, users: 10, games: 4, turns: 6 }],
           territorial_hierarchy: [{ key: "UY", institutions: 1, users: 10, games: 4, turns: 6, states: [{ key: "Montevideo", institutions: 1, users: 10, games: 4, turns: 6, cities: [{ key: "Montevideo", institutions: 1, users: 10, games: 4, turns: 6 }] }] }],
           territory_alerts: [{ severity: "warning", scope: "city", label: "UY / Montevideo / Montevideo", message: "Foco local" }],
+          territory_scores: [{ label: "Montevideo / Montevideo", score: 62, status: "secondary", users: 10, games: 4, turns: 6, reasons: ["Actividad registrada en el período"] }],
         },
       }),
     );
@@ -330,6 +332,8 @@ describe("SuperadminDashboard", () => {
     expect(screen.getByText("Semáforos operativos")).toBeInTheDocument();
     expect(screen.getByText("Drilldown territorial")).toBeInTheDocument();
     expect(screen.getByText("Alertas por territorio")).toBeInTheDocument();
+    expect(screen.getByText("Índice territorial compuesto")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Exportar CSV ejecutivo/i })).toBeInTheDocument();
     expect(screen.getByText("Territorios con mayor actividad")).toBeInTheDocument();
     expect(screen.getByText("Instituciones destacadas en el territorio")).toBeInTheDocument();
     expect(screen.queryByText("Health")).not.toBeInTheDocument();

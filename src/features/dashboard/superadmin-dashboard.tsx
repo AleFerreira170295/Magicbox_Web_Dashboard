@@ -223,6 +223,7 @@ export function SuperadminDashboard() {
   const topTerritories = summaryQuery.data?.segments.top_territories || [];
   const territorialHierarchy = summaryQuery.data?.segments.territorial_hierarchy || [];
   const territoryAlerts = summaryQuery.data?.segments.territory_alerts || [];
+  const territoryScores = summaryQuery.data?.segments.territory_scores || [];
 
   function updateFilter(
     key: "range" | "institution_id" | "country_code" | "state" | "city" | "user_type" | "role_code",
@@ -243,6 +244,53 @@ export function SuperadminDashboard() {
       }
     }
     router.replace(params.toString() ? `${pathname}?${params.toString()}` : pathname);
+  }
+
+  function downloadTerritorialReport() {
+    const browserWindow = typeof globalThis !== "undefined" ? (globalThis as typeof window) : undefined;
+    if (!summaryQuery.data || !browserWindow?.document || !browserWindow.URL) return;
+
+    const lines = [
+      ["section", "label", "status", "score", "users", "games", "turns", "message"].join(","),
+      ...territoryScores.map((item) => [
+        "territory_score",
+        item.label,
+        item.status,
+        String(item.score),
+        String(item.users),
+        String(item.games),
+        String(item.turns),
+        item.reasons.join(" | "),
+      ].map((value) => `"${String(value).replaceAll('"', '""')}"`).join(",")),
+      ...territoryAlerts.map((item) => [
+        "territory_alert",
+        item.label,
+        item.severity,
+        "",
+        "",
+        "",
+        "",
+        item.message,
+      ].map((value) => `"${String(value).replaceAll('"', '""')}"`).join(",")),
+      ...topInstitutions.map((item) => [
+        "top_institution",
+        item.name,
+        "",
+        "",
+        String(item.users),
+        String(item.games),
+        String(item.turns),
+        [item.state, item.city].filter(Boolean).join(" / "),
+      ].map((value) => `"${String(value).replaceAll('"', '""')}"`).join(",")),
+    ];
+
+    const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8" });
+    const url = browserWindow.URL.createObjectURL(blob);
+    const anchor = browserWindow.document.createElement("a");
+    anchor.href = url;
+    anchor.download = `territorial-report-${selectedRange}.csv`;
+    anchor.click();
+    browserWindow.URL.revokeObjectURL(url);
   }
 
   const metrics = useMemo(() => {
@@ -666,8 +714,19 @@ export function SuperadminDashboard() {
       {isGovernmentViewer ? (
         <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
           <CardHeader>
-            <CardTitle>Drilldown territorial</CardTitle>
-            <CardDescription>Jerarquía país → estado → ciudad para bajar de nivel sin salir de la home.</CardDescription>
+            <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+              <div>
+                <CardTitle>Drilldown territorial</CardTitle>
+                <CardDescription>Jerarquía país → estado → ciudad para bajar de nivel sin salir de la home.</CardDescription>
+              </div>
+              <button
+                type="button"
+                className="rounded-full bg-primary/10 px-4 py-2 text-sm font-medium text-primary"
+                onClick={downloadTerritorialReport}
+              >
+                Exportar CSV ejecutivo
+              </button>
+            </div>
           </CardHeader>
           <CardContent className="space-y-4">
             {territorialHierarchy.length > 0 ? (
@@ -749,6 +808,36 @@ export function SuperadminDashboard() {
               ))
             ) : (
               <div className="rounded-2xl bg-white/80 p-4 text-sm text-muted-foreground">No hay alertas territoriales activas con el recorte actual.</div>
+            )}
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {isGovernmentViewer ? (
+        <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
+          <CardHeader>
+            <CardTitle>Índice territorial compuesto</CardTitle>
+            <CardDescription>Score ejecutivo para ordenar prioridades por territorio combinando actividad, cobertura y señales de riesgo.</CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {territoryScores.length > 0 ? (
+              territoryScores.map((territory) => (
+                <div key={territory.label} className="rounded-2xl bg-white/80 p-4 text-sm text-muted-foreground">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="font-medium text-foreground">{territory.label}</p>
+                      <p className="mt-1 text-2xl font-semibold text-foreground">{territory.score}/100</p>
+                    </div>
+                    <Badge variant={territory.status}>{territory.status}</Badge>
+                  </div>
+                  <p className="mt-2">{territory.users} usuarios, {territory.games} partidas, {territory.turns} turnos.</p>
+                  <ul className="mt-3 list-disc space-y-1 pl-4 text-xs">
+                    {territory.reasons.slice(0, 3).map((reason) => <li key={reason}>{reason}</li>)}
+                  </ul>
+                </div>
+              ))
+            ) : (
+              <div className="rounded-2xl bg-white/80 p-4 text-sm text-muted-foreground">Todavía no hay suficiente señal para calcular un índice territorial útil.</div>
             )}
           </CardContent>
         </Card>
