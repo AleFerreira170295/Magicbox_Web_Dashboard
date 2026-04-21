@@ -1,6 +1,6 @@
 import type { JsonObject } from "@/lib/api/types";
 
-export type AppRole = "teacher" | "director" | "family" | "researcher" | "admin" | "institution-admin";
+export type AppRole = "teacher" | "director" | "family" | "researcher" | "admin" | "institution-admin" | "government-viewer";
 
 export interface AuthTokens {
   accessToken: string;

@@ -2,7 +2,7 @@ import { appConfig } from "@/lib/api/config";
 import type { JsonObject } from "@/lib/api/types";
 import type { AppRole } from "@/features/auth/types";
 
-const knownRoles: AppRole[] = ["teacher", "director", "family", "researcher", "admin", "institution-admin"];
+const knownRoles: AppRole[] = ["teacher", "director", "family", "researcher", "admin", "institution-admin", "government-viewer"];
 
 function normalizeRole(value: unknown): AppRole | null {
   if (typeof value !== "string") return null;

@@ -1,5 +1,6 @@
 import { cleanup, render, screen } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SuperadminDashboard } from "@/features/dashboard/superadmin-dashboard";
 
@@ -56,6 +57,15 @@ vi.mock("@/features/profiles/api", () => ({
 vi.mock("@/features/health/api", () => ({
   useBasicHealth: (...args: unknown[]) => useBasicHealthMock(...args),
   useReadinessHealth: (...args: unknown[]) => useReadinessHealthMock(...args),
+}));
+
+vi.mock("recharts", () => ({
+  ResponsiveContainer: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+  LineChart: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+  CartesianGrid: () => null,
+  XAxis: () => null,
+  Tooltip: () => null,
+  Line: () => null,
 }));
 
 function okPaginated(data: unknown[]) {
@@ -204,6 +214,84 @@ describe("SuperadminDashboard", () => {
     expect(screen.getByText("País")).toBeInTheDocument();
     expect(screen.getByText("Tipo de usuario")).toBeInTheDocument();
     expect(screen.getByText("Mini tendencias")).toBeInTheDocument();
+    expect(useSystemDashboardSummaryMock).toHaveBeenCalledWith(
+      "token",
+      {
+        range: "30d",
+        institutionId: null,
+        countryCode: null,
+        state: null,
+        city: null,
+        userType: null,
+        roleCode: null,
+      },
+      true,
+    );
+  });
+
+  it("renders the territorial government view from the summary endpoint without technical modules", () => {
+    useAuthMock.mockReturnValue({
+      tokens: { accessToken: "token", refreshToken: "refresh" },
+      user: {
+        fullName: "Gobierno Territorial",
+        roles: ["government-viewer"],
+        permissions: ["feature:read"],
+      },
+    });
+    useSystemDashboardSummaryMock.mockReturnValue(
+      okQuery({
+        filters: {
+          selected_range: "30d",
+          selected_institution_id: null,
+          selected_country_code: "UY",
+          selected_state: "Montevideo",
+          selected_city: null,
+          selected_user_type: null,
+          selected_role_code: null,
+          range_options: [{ value: "30d", label: "30 días" }],
+          institutions: [{ id: "ec-1", name: "Colegio Norte" }],
+          countries: ["UY"],
+          states: ["Montevideo"],
+          cities: ["Montevideo"],
+          user_types: ["web"],
+          role_codes: ["teacher"],
+          window_start: null,
+          trend_range: "30d",
+        },
+        totals: {
+          users: 10,
+          institutions: 1,
+          devices: 2,
+          syncs: 3,
+          games: 4,
+          profiles: 5,
+          turns: 6,
+        },
+        stats: {
+          institutions_needing_review: 0,
+          devices_without_status: 0,
+          devices_with_owner: 2,
+          devices_with_firmware: 2,
+          home_devices: 0,
+          institution_devices: 2,
+          syncs_with_raw: 3,
+          total_players: 8,
+          successful_turns: 5,
+          games_with_turns: 4,
+          active_profiles: 4,
+          profiles_with_bindings: 3,
+          profiles_with_sessions: 2,
+        },
+        trends: [{ date: "2026-04-20", syncs: 1, games: 1, turns: 2, successful_turns: 2, success_rate: 100 }],
+      }),
+    );
+
+    renderDashboard();
+
+    expect(screen.getByText("Gobierno")).toBeInTheDocument();
+    expect(screen.getByText("Mini tendencias")).toBeInTheDocument();
+    expect(screen.queryByText("Health")).not.toBeInTheDocument();
+    expect(screen.queryByText("Settings")).not.toBeInTheDocument();
     expect(useSystemDashboardSummaryMock).toHaveBeenCalledWith(
       "token",
       {
