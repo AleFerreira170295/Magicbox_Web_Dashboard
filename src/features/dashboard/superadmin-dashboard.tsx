@@ -216,6 +216,7 @@ export function SuperadminDashboard() {
   const trends = summaryQuery.data?.trends || [];
   const comparisonMetrics = summaryQuery.data?.comparisons.metrics || [];
   const comparisonWindowLabel = summaryQuery.data?.comparisons.window_label || trendRangeLabel;
+  const summaryAlerts = summaryQuery.data?.alerts || [];
   const roleMix = summaryQuery.data?.segments.role_mix || [];
   const userTypeMix = summaryQuery.data?.segments.user_type_mix || [];
   const topInstitutions = summaryQuery.data?.segments.top_institutions || [];
@@ -626,6 +627,28 @@ export function SuperadminDashboard() {
                 </div>
               );
             })}
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {usesSystemSummary ? (
+        <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
+          <CardHeader>
+            <CardTitle>Semáforos operativos</CardTitle>
+            <CardDescription>
+              Alertas rápidas construidas sobre la comparación entre períodos y el estado del recorte actual.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {summaryAlerts.map((alert) => (
+              <div key={`${alert.severity}-${alert.title}`} className="rounded-2xl bg-white/80 p-4 text-sm text-muted-foreground">
+                <div className="flex items-start justify-between gap-3">
+                  <p className="font-medium text-foreground">{alert.title}</p>
+                  <Badge variant={alert.severity}>{alert.severity}</Badge>
+                </div>
+                <p className="mt-2">{alert.message}</p>
+              </div>
+            ))}
           </CardContent>
         </Card>
       ) : null}

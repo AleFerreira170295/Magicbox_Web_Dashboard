@@ -77,6 +77,11 @@ export type SystemDashboardSummary = {
       delta_percent: number | null;
     }>;
   };
+  alerts: Array<{
+    severity: "success" | "warning" | "secondary";
+    title: string;
+    message: string;
+  }>;
   segments: {
     role_mix: Array<{ key: string; count: number }>;
     user_type_mix: Array<{ key: string; count: number }>;

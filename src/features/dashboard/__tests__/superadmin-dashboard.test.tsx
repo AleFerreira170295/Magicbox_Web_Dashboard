@@ -212,6 +212,7 @@ describe("SuperadminDashboard", () => {
           previous_end: "2026-03-20T00:00:00Z",
           metrics: [{ key: "syncs", label: "Syncs", current: 2, previous: 1, delta_percent: 100 }],
         },
+        alerts: [{ severity: "success", title: "Sin alertas críticas", message: "Todo estable" }],
         segments: {
           role_mix: [{ key: "admin", count: 1 }],
           user_type_mix: [{ key: "web", count: 1 }],
@@ -229,6 +230,7 @@ describe("SuperadminDashboard", () => {
     expect(screen.getByText("Tipo de usuario")).toBeInTheDocument();
     expect(screen.getByText("Mini tendencias")).toBeInTheDocument();
     expect(screen.getByText("Comparativa entre períodos")).toBeInTheDocument();
+    expect(screen.getByText("Semáforos operativos")).toBeInTheDocument();
     expect(useSystemDashboardSummaryMock).toHaveBeenCalledWith(
       "token",
       {
@@ -306,6 +308,7 @@ describe("SuperadminDashboard", () => {
           previous_end: "2026-03-20T00:00:00Z",
           metrics: [{ key: "turns", label: "Turnos", current: 6, previous: 4, delta_percent: 50 }],
         },
+        alerts: [{ severity: "warning", title: "Caída de actividad en turnos", message: "Atención" }],
         segments: {
           role_mix: [{ key: "teacher", count: 8 }],
           user_type_mix: [{ key: "web", count: 6 }],
@@ -320,6 +323,7 @@ describe("SuperadminDashboard", () => {
     expect(screen.getByText("Gobierno")).toBeInTheDocument();
     expect(screen.getByText("Mini tendencias")).toBeInTheDocument();
     expect(screen.getByText("Comparativa entre períodos")).toBeInTheDocument();
+    expect(screen.getByText("Semáforos operativos")).toBeInTheDocument();
     expect(screen.getByText("Territorios con mayor actividad")).toBeInTheDocument();
     expect(screen.getByText("Instituciones destacadas en el territorio")).toBeInTheDocument();
     expect(screen.queryByText("Health")).not.toBeInTheDocument();
