@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { type ComponentType, useMemo } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   ArrowRight,
   Building2,
@@ -121,6 +122,9 @@ function ModuleCard({
 }
 
 export function SuperadminDashboard() {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const { tokens, user } = useAuth();
   const isAdmin = user?.roles.includes("admin") || false;
   const isInstitutionAdmin = user?.roles.includes("institution-admin") || false;
@@ -136,8 +140,14 @@ export function SuperadminDashboard() {
   );
   const canSeeHealthModule = isAdmin;
   const canSeeSettingsModule = isAdmin;
+  const selectedRange = searchParams.get("range") || "30d";
+  const selectedInstitutionId = searchParams.get("institution_id");
 
-  const summaryQuery = useSystemDashboardSummary(tokens?.accessToken, isAdmin);
+  const summaryQuery = useSystemDashboardSummary(
+    tokens?.accessToken,
+    { range: selectedRange, institutionId: selectedInstitutionId },
+    isAdmin,
+  );
   const usersQuery = useUsers(!isAdmin ? tokens?.accessToken : undefined);
   const institutionsQuery = useInstitutions(!isAdmin ? tokens?.accessToken : undefined);
   const devicesQuery = useDevices(!isAdmin ? tokens?.accessToken : undefined);
@@ -181,6 +191,19 @@ export function SuperadminDashboard() {
     .filter(Boolean)
     .map((error) => getErrorMessage(error));
   const error = errors[0] || null;
+
+  const rangeOptions = summaryQuery.data?.filters.range_options || [];
+  const institutionOptions = summaryQuery.data?.filters.institutions || [];
+
+  function updateFilter(key: "range" | "institution_id", value: string) {
+    const params = new URLSearchParams(searchParams.toString());
+    if (!value) {
+      params.delete(key);
+    } else {
+      params.set(key, value);
+    }
+    router.replace(params.toString() ? `${pathname}?${params.toString()}` : pathname);
+  }
 
   const metrics = useMemo(() => {
     if (isAdmin && summaryQuery.data) {
@@ -290,6 +313,41 @@ export function SuperadminDashboard() {
               <Badge className="bg-white/14 text-white hover:bg-white/14">Dashboard home</Badge>
               <Badge className="bg-white/14 text-white hover:bg-white/14">MagicBox control plane</Badge>
             </div>
+
+            {isAdmin ? (
+              <div className="mt-6 grid gap-3 md:grid-cols-2">
+                <label className="rounded-2xl bg-white/10 p-4 text-sm text-white/85 backdrop-blur-sm">
+                  <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.2em] text-white/65">Ventana temporal</span>
+                  <select
+                    className="w-full rounded-xl border border-white/15 bg-slate-950/20 px-3 py-2 text-sm text-white outline-none"
+                    value={selectedRange}
+                    onChange={(event) => updateFilter("range", event.target.value)}
+                  >
+                    {rangeOptions.map((option) => (
+                      <option key={option.value} value={option.value} className="text-slate-950">
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label className="rounded-2xl bg-white/10 p-4 text-sm text-white/85 backdrop-blur-sm">
+                  <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.2em] text-white/65">Institución</span>
+                  <select
+                    className="w-full rounded-xl border border-white/15 bg-slate-950/20 px-3 py-2 text-sm text-white outline-none"
+                    value={selectedInstitutionId || ""}
+                    onChange={(event) => updateFilter("institution_id", event.target.value)}
+                  >
+                    <option value="" className="text-slate-950">Todas</option>
+                    {institutionOptions.map((institution) => (
+                      <option key={institution.id} value={institution.id} className="text-slate-950">
+                        {institution.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+            ) : null}
 
             <div className="mt-6 max-w-3xl">
               <h2 className="text-3xl font-semibold tracking-tight sm:text-4xl">

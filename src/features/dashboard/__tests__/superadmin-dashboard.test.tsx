@@ -13,9 +13,16 @@ const useProfilesOverviewMock = vi.fn();
 const useBasicHealthMock = vi.fn();
 const useReadinessHealthMock = vi.fn();
 const useSystemDashboardSummaryMock = vi.fn();
+const replaceMock = vi.fn();
 
 vi.mock("@/features/auth/auth-context", () => ({
   useAuth: () => useAuthMock(),
+}));
+
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ replace: replaceMock }),
+  usePathname: () => "/dashboard",
+  useSearchParams: () => new URLSearchParams(),
 }));
 
 vi.mock("@/features/dashboard/api", () => ({
@@ -129,5 +136,57 @@ describe("SuperadminDashboard", () => {
     expect(screen.getByRole("link", { name: /Instituciones/i })).toBeInTheDocument();
     expect(screen.queryByText("Health")).not.toBeInTheDocument();
     expect(screen.queryByText("Settings")).not.toBeInTheDocument();
+  });
+
+  it("uses the aggregated admin summary endpoint and renders filter controls", () => {
+    useAuthMock.mockReturnValue({
+      tokens: { accessToken: "token", refreshToken: "refresh" },
+      user: {
+        fullName: "Ada Admin",
+        roles: ["admin"],
+        permissions: ["feature:read", "ble_device:read"],
+      },
+    });
+    useSystemDashboardSummaryMock.mockReturnValue(
+      okQuery({
+        filters: {
+          selected_range: "30d",
+          selected_institution_id: null,
+          range_options: [{ value: "30d", label: "30 días" }],
+          institutions: [{ id: "ec-1", name: "Colegio Norte" }],
+          window_start: null,
+        },
+        totals: {
+          users: 25,
+          institutions: 1,
+          devices: 5,
+          syncs: 2,
+          games: 8,
+          profiles: 4,
+          turns: 14,
+        },
+        stats: {
+          institutions_needing_review: 0,
+          devices_without_status: 1,
+          devices_with_owner: 5,
+          devices_with_firmware: 3,
+          home_devices: 1,
+          institution_devices: 4,
+          syncs_with_raw: 2,
+          total_players: 16,
+          successful_turns: 10,
+          games_with_turns: 5,
+          active_profiles: 4,
+          profiles_with_bindings: 3,
+          profiles_with_sessions: 2,
+        },
+      }),
+    );
+
+    renderDashboard();
+
+    expect(screen.getByText("Ventana temporal")).toBeInTheDocument();
+    expect(screen.getByText("Institución")).toBeInTheDocument();
+    expect(useSystemDashboardSummaryMock).toHaveBeenCalledWith("token", { range: "30d", institutionId: null }, true);
   });
 });

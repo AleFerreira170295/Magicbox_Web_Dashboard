@@ -3,6 +3,13 @@ import { apiEndpoints } from "@/lib/api/endpoints";
 import { apiRequest } from "@/lib/api/fetcher";
 
 export type SystemDashboardSummary = {
+  filters: {
+    selected_range: string;
+    selected_institution_id: string | null;
+    range_options: Array<{ value: string; label: string }>;
+    institutions: Array<{ id: string; name: string }>;
+    window_start: string | null;
+  };
   totals: {
     users: number;
     institutions: number;
@@ -29,16 +36,27 @@ export type SystemDashboardSummary = {
   };
 };
 
-export async function getSystemDashboardSummary(token: string) {
+export async function getSystemDashboardSummary(
+  token: string,
+  filters?: { range?: string; institutionId?: string | null },
+) {
   return apiRequest<SystemDashboardSummary>(apiEndpoints.dashboard.systemSummary, {
     token,
+    searchParams: {
+      ...(filters?.range ? { range: filters.range } : {}),
+      ...(filters?.institutionId ? { institution_id: filters.institutionId } : {}),
+    },
   });
 }
 
-export function useSystemDashboardSummary(token?: string, enabled = true) {
+export function useSystemDashboardSummary(
+  token?: string,
+  filters?: { range?: string; institutionId?: string | null },
+  enabled = true,
+) {
   return useQuery({
-    queryKey: ["dashboard", "system-summary", token],
-    queryFn: () => getSystemDashboardSummary(token as string),
+    queryKey: ["dashboard", "system-summary", token, filters?.range || "30d", filters?.institutionId || "all"],
+    queryFn: () => getSystemDashboardSummary(token as string, filters),
     enabled: Boolean(token && enabled),
   });
 }
