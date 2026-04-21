@@ -63,6 +63,20 @@ export type SystemDashboardSummary = {
     successful_turns: number;
     success_rate: number;
   }>;
+  comparisons: {
+    window_label: string;
+    current_start: string;
+    current_end: string;
+    previous_start: string;
+    previous_end: string;
+    metrics: Array<{
+      key: string;
+      label: string;
+      current: number;
+      previous: number;
+      delta_percent: number | null;
+    }>;
+  };
   segments: {
     role_mix: Array<{ key: string; count: number }>;
     user_type_mix: Array<{ key: string; count: number }>;

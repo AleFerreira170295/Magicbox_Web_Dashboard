@@ -214,6 +214,8 @@ export function SuperadminDashboard() {
   const roleCodeOptions = summaryQuery.data?.filters.role_codes || [];
   const trendRangeLabel = summaryQuery.data?.filters.trend_range || selectedRange;
   const trends = summaryQuery.data?.trends || [];
+  const comparisonMetrics = summaryQuery.data?.comparisons.metrics || [];
+  const comparisonWindowLabel = summaryQuery.data?.comparisons.window_label || trendRangeLabel;
   const roleMix = summaryQuery.data?.segments.role_mix || [];
   const userTypeMix = summaryQuery.data?.segments.user_type_mix || [];
   const topInstitutions = summaryQuery.data?.segments.top_institutions || [];
@@ -594,6 +596,36 @@ export function SuperadminDashboard() {
                 No hay actividad suficiente para dibujar tendencias con el recorte actual.
               </div>
             )}
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {usesSystemSummary ? (
+        <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
+          <CardHeader>
+            <CardTitle>Comparativa entre períodos</CardTitle>
+            <CardDescription>
+              Contraste del período actual contra el bloque inmediatamente anterior ({comparisonWindowLabel}).
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            {comparisonMetrics.map((metric) => {
+              const delta = metric.delta_percent ?? 0;
+              const deltaTone = delta > 0 ? "success" : delta < 0 ? "warning" : "secondary";
+              const deltaLabel = `${delta > 0 ? "+" : ""}${delta.toFixed(1)}%`;
+              return (
+                <div key={metric.key} className="rounded-2xl bg-white/80 p-4 text-sm text-muted-foreground">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="font-medium text-foreground">{metric.label}</p>
+                      <p className="mt-1 text-2xl font-semibold text-foreground">{metric.current}</p>
+                    </div>
+                    <Badge variant={deltaTone}>{deltaLabel}</Badge>
+                  </div>
+                  <p className="mt-2">Período anterior: {metric.previous}</p>
+                </div>
+              );
+            })}
           </CardContent>
         </Card>
       ) : null}

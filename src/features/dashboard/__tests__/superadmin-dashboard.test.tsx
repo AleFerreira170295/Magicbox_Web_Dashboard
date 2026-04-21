@@ -204,6 +204,14 @@ describe("SuperadminDashboard", () => {
         trends: [
           { date: "2026-04-20", syncs: 1, games: 2, turns: 3, successful_turns: 2, success_rate: 66.7 },
         ],
+        comparisons: {
+          window_label: "30d",
+          current_start: "2026-03-20T00:00:00Z",
+          current_end: "2026-04-20T00:00:00Z",
+          previous_start: "2026-02-18T00:00:00Z",
+          previous_end: "2026-03-20T00:00:00Z",
+          metrics: [{ key: "syncs", label: "Syncs", current: 2, previous: 1, delta_percent: 100 }],
+        },
         segments: {
           role_mix: [{ key: "admin", count: 1 }],
           user_type_mix: [{ key: "web", count: 1 }],
@@ -220,6 +228,7 @@ describe("SuperadminDashboard", () => {
     expect(screen.getByText("País")).toBeInTheDocument();
     expect(screen.getByText("Tipo de usuario")).toBeInTheDocument();
     expect(screen.getByText("Mini tendencias")).toBeInTheDocument();
+    expect(screen.getByText("Comparativa entre períodos")).toBeInTheDocument();
     expect(useSystemDashboardSummaryMock).toHaveBeenCalledWith(
       "token",
       {
@@ -289,6 +298,14 @@ describe("SuperadminDashboard", () => {
           profiles_with_sessions: 2,
         },
         trends: [{ date: "2026-04-20", syncs: 1, games: 1, turns: 2, successful_turns: 2, success_rate: 100 }],
+        comparisons: {
+          window_label: "30d",
+          current_start: "2026-03-20T00:00:00Z",
+          current_end: "2026-04-20T00:00:00Z",
+          previous_start: "2026-02-18T00:00:00Z",
+          previous_end: "2026-03-20T00:00:00Z",
+          metrics: [{ key: "turns", label: "Turnos", current: 6, previous: 4, delta_percent: 50 }],
+        },
         segments: {
           role_mix: [{ key: "teacher", count: 8 }],
           user_type_mix: [{ key: "web", count: 6 }],
@@ -302,6 +319,7 @@ describe("SuperadminDashboard", () => {
 
     expect(screen.getByText("Gobierno")).toBeInTheDocument();
     expect(screen.getByText("Mini tendencias")).toBeInTheDocument();
+    expect(screen.getByText("Comparativa entre períodos")).toBeInTheDocument();
     expect(screen.getByText("Territorios con mayor actividad")).toBeInTheDocument();
     expect(screen.getByText("Instituciones destacadas en el territorio")).toBeInTheDocument();
     expect(screen.queryByText("Health")).not.toBeInTheDocument();
