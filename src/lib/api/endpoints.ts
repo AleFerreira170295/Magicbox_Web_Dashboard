@@ -39,6 +39,9 @@ export const apiEndpoints = {
     otaRelease: "/system/ota/release",
     otaReleaseLegacy: "/home/ota/release",
   },
+  dashboard: {
+    systemSummary: "/system/dashboard/summary",
+  },
   syncs: {
     list: "/sync-sessions",
     byId: (id: string) => `/sync-sessions/${id}`,

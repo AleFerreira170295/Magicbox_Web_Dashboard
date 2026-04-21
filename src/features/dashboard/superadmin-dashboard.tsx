@@ -19,6 +19,7 @@ import { SectionHeader } from "@/components/section-header";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useSystemDashboardSummary } from "@/features/dashboard/api";
 import { useAuth } from "@/features/auth/auth-context";
 import { useDevices } from "@/features/devices/api";
 import { useGames } from "@/features/games/api";
@@ -136,39 +137,44 @@ export function SuperadminDashboard() {
   const canSeeHealthModule = isAdmin;
   const canSeeSettingsModule = isAdmin;
 
-  const usersQuery = useUsers(tokens?.accessToken);
-  const institutionsQuery = useInstitutions(tokens?.accessToken);
-  const devicesQuery = useDevices(tokens?.accessToken);
-  const syncsQuery = useSyncSessions(tokens?.accessToken);
-  const gamesQuery = useGames(tokens?.accessToken);
-  const profilesQuery = useProfilesOverview(tokens?.accessToken);
+  const summaryQuery = useSystemDashboardSummary(tokens?.accessToken, isAdmin);
+  const usersQuery = useUsers(!isAdmin ? tokens?.accessToken : undefined);
+  const institutionsQuery = useInstitutions(!isAdmin ? tokens?.accessToken : undefined);
+  const devicesQuery = useDevices(!isAdmin ? tokens?.accessToken : undefined);
+  const syncsQuery = useSyncSessions(!isAdmin ? tokens?.accessToken : undefined);
+  const gamesQuery = useGames(!isAdmin ? tokens?.accessToken : undefined);
+  const profilesQuery = useProfilesOverview(!isAdmin ? tokens?.accessToken : undefined);
   const healthQuery = useBasicHealth({ enabled: canSeeHealthModule });
   const readinessQuery = useReadinessHealth({ enabled: canSeeHealthModule });
 
-  const users = usersQuery.data?.data || [];
-  const institutions = institutionsQuery.data?.data || [];
-  const devices = devicesQuery.data?.data || [];
-  const syncs = syncsQuery.data?.data || [];
-  const games = gamesQuery.data?.data || [];
-  const profiles = profilesQuery.data || [];
+  const users = isAdmin ? [] : usersQuery.data?.data || [];
+  const institutions = isAdmin ? [] : institutionsQuery.data?.data || [];
+  const devices = isAdmin ? [] : devicesQuery.data?.data || [];
+  const syncs = isAdmin ? [] : syncsQuery.data?.data || [];
+  const games = isAdmin ? [] : gamesQuery.data?.data || [];
+  const profiles = isAdmin ? [] : profilesQuery.data || [];
   const readinessChecks = readinessQuery.data?.checks || {};
 
-  const visibleQueryStates = [
-    usersQuery,
-    institutionsQuery,
-    devicesQuery,
-    syncsQuery,
-    gamesQuery,
-    profilesQuery,
-    ...(canSeeHealthModule ? [healthQuery, readinessQuery] : []),
-  ];
+  const visibleQueryStates = isAdmin
+    ? [summaryQuery, ...(canSeeHealthModule ? [healthQuery, readinessQuery] : [])]
+    : [
+        usersQuery,
+        institutionsQuery,
+        devicesQuery,
+        syncsQuery,
+        gamesQuery,
+        profilesQuery,
+        ...(canSeeHealthModule ? [healthQuery, readinessQuery] : []),
+      ];
 
   const totalSources = visibleQueryStates.length;
   const loadedSources = visibleQueryStates.filter((query) => query.data).length;
   const failedSources = visibleQueryStates.filter((query) => query.error).length;
-  const hasAnyData = [users.length, institutions.length, devices.length, syncs.length, games.length, profiles.length].some(
-    (count) => count > 0,
-  );
+  const hasAnyData = isAdmin
+    ? Boolean(summaryQuery.data)
+    : [users.length, institutions.length, devices.length, syncs.length, games.length, profiles.length].some(
+        (count) => count > 0,
+      );
   const showInitialLoading = !hasAnyData && visibleQueryStates.some((query) => query.isLoading);
   const errors = visibleQueryStates
     .map((query) => query.error)
@@ -177,6 +183,37 @@ export function SuperadminDashboard() {
   const error = errors[0] || null;
 
   const metrics = useMemo(() => {
+    if (isAdmin && summaryQuery.data) {
+      return {
+        totalUsers: summaryQuery.data.totals.users,
+        totalInstitutions: summaryQuery.data.totals.institutions,
+        totalDevices: summaryQuery.data.totals.devices,
+        totalSyncs: summaryQuery.data.totals.syncs,
+        totalGames: summaryQuery.data.totals.games,
+        totalProfiles: summaryQuery.data.totals.profiles,
+        institutionsNeedingReview: summaryQuery.data.stats.institutions_needing_review,
+        devicesWithoutStatus: summaryQuery.data.stats.devices_without_status,
+        syncsWithoutRaw: Math.max(summaryQuery.data.totals.syncs - summaryQuery.data.stats.syncs_with_raw, 0),
+        profilesWithoutBindings: Math.max(summaryQuery.data.totals.profiles - summaryQuery.data.stats.profiles_with_bindings, 0),
+        homeDevices: summaryQuery.data.stats.home_devices,
+        institutionDevices: summaryQuery.data.stats.institution_devices,
+        devicesWithOwner: summaryQuery.data.stats.devices_with_owner,
+        devicesWithFirmware: summaryQuery.data.stats.devices_with_firmware,
+        syncsWithRaw: summaryQuery.data.stats.syncs_with_raw,
+        activeProfiles: summaryQuery.data.stats.active_profiles,
+        profilesWithBindings: summaryQuery.data.stats.profiles_with_bindings,
+        profilesWithSessions: summaryQuery.data.stats.profiles_with_sessions,
+        totalTurns: summaryQuery.data.totals.turns,
+        successfulTurns: summaryQuery.data.stats.successful_turns,
+        totalPlayers: summaryQuery.data.stats.total_players,
+        gamesWithTurns: summaryQuery.data.stats.games_with_turns,
+        degradedChecks: Object.values(readinessChecks).filter((check) => check?.status !== "healthy").length,
+        environment: canSeeHealthModule ? healthQuery.data?.environment || "-" : "scopeado",
+        version: canSeeHealthModule ? healthQuery.data?.version || "-" : "no disponible",
+        readiness: canSeeHealthModule ? readinessQuery.data?.status || "unknown" : "no disponible",
+      };
+    }
+
     const gamesWithTurns = games.filter((game) => (game.turns?.length || 0) > 0);
     const totalTurns = games.reduce((sum, game) => sum + (game.turns?.length || 0), 0);
     const successfulTurns = games.reduce(
@@ -221,7 +258,7 @@ export function SuperadminDashboard() {
       version: canSeeHealthModule ? healthQuery.data?.version || "-" : "no disponible",
       readiness: canSeeHealthModule ? readinessQuery.data?.status || "unknown" : "no disponible",
     };
-  }, [canSeeHealthModule, devices, devicesQuery.data, games, gamesQuery.data, healthQuery.data, institutions, institutionsQuery.data, profiles, profilesQuery.data, readinessChecks, readinessQuery.data, syncs, syncsQuery.data, users, usersQuery.data]);
+  }, [canSeeHealthModule, devices, devicesQuery.data, games, gamesQuery.data, healthQuery.data, institutions, institutionsQuery.data, isAdmin, profiles, profilesQuery.data, readinessChecks, readinessQuery.data, summaryQuery.data, syncs, syncsQuery.data, users, usersQuery.data]);
 
   const scopeLabel = isAdmin ? "Superadmin" : isInstitutionAdmin ? "Institution admin" : isDirector ? "Dirección" : "Operación";
 
@@ -314,15 +351,15 @@ export function SuperadminDashboard() {
           Array.from({ length: 6 }).map((_, index) => <Skeleton key={index} className="h-36 rounded-2xl" />)
         ) : (
           <>
-            <SummaryCard label="Usuarios" value={String(metrics.totalUsers)} hint="Padrón operativo visible." icon={Users} isLoading={usersQuery.isLoading && users.length === 0} />
-            <SummaryCard label="Instituciones" value={String(metrics.totalInstitutions)} hint="Clientes y alcance actual." icon={Building2} isLoading={institutionsQuery.isLoading && institutions.length === 0} />
-            <SummaryCard label="Devices" value={String(metrics.totalDevices)} hint={`${metrics.homeDevices} Home y ${metrics.institutionDevices} institucionales.`} icon={Smartphone} isLoading={devicesQuery.isLoading && devices.length === 0} />
-            <SummaryCard label="Syncs" value={String(metrics.totalSyncs)} hint={`${formatPercent(metrics.syncsWithRaw, metrics.totalSyncs)} con raw visible.`} icon={Layers3} tone="accent" isLoading={syncsQuery.isLoading && syncs.length === 0} />
-            <SummaryCard label="Games" value={String(metrics.totalGames)} hint={`${formatAverage(metrics.totalPlayers, metrics.totalGames)} jugadores por partida.`} icon={Database} tone="accent" isLoading={gamesQuery.isLoading && games.length === 0} />
+            <SummaryCard label="Usuarios" value={String(metrics.totalUsers)} hint="Padrón operativo visible." icon={Users} isLoading={(isAdmin ? summaryQuery.isLoading : usersQuery.isLoading) && users.length === 0} />
+            <SummaryCard label="Instituciones" value={String(metrics.totalInstitutions)} hint="Clientes y alcance actual." icon={Building2} isLoading={(isAdmin ? summaryQuery.isLoading : institutionsQuery.isLoading) && institutions.length === 0} />
+            <SummaryCard label="Devices" value={String(metrics.totalDevices)} hint={`${metrics.homeDevices} Home y ${metrics.institutionDevices} institucionales.`} icon={Smartphone} isLoading={(isAdmin ? summaryQuery.isLoading : devicesQuery.isLoading) && devices.length === 0} />
+            <SummaryCard label="Syncs" value={String(metrics.totalSyncs)} hint={`${formatPercent(metrics.syncsWithRaw, metrics.totalSyncs)} con raw visible.`} icon={Layers3} tone="accent" isLoading={(isAdmin ? summaryQuery.isLoading : syncsQuery.isLoading) && syncs.length === 0} />
+            <SummaryCard label="Games" value={String(metrics.totalGames)} hint={`${formatAverage(metrics.totalPlayers, metrics.totalGames)} jugadores por partida.`} icon={Database} tone="accent" isLoading={(isAdmin ? summaryQuery.isLoading : gamesQuery.isLoading) && games.length === 0} />
             {canSeeHealthModule ? (
               <SummaryCard label="Health" value={metrics.readiness} hint={`Backend ${metrics.version}.`} icon={HeartPulse} tone={metrics.degradedChecks === 0 ? "accent" : "warning"} isLoading={canSeeHealthModule && healthQuery.isLoading && !healthQuery.data} />
             ) : (
-              <SummaryCard label="Profiles" value={String(metrics.totalProfiles)} hint={`${metrics.activeProfiles} activos y ${metrics.profilesWithSessions} con sesiones.`} icon={UserSquare2} tone="accent" isLoading={profilesQuery.isLoading && profiles.length === 0} />
+              <SummaryCard label="Profiles" value={String(metrics.totalProfiles)} hint={`${metrics.activeProfiles} activos y ${metrics.profilesWithSessions} con sesiones.`} icon={UserSquare2} tone="accent" isLoading={(isAdmin ? summaryQuery.isLoading : profilesQuery.isLoading) && profiles.length === 0} />
             )}
           </>
         )}

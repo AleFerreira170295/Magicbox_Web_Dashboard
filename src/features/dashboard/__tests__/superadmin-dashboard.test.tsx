@@ -12,9 +12,14 @@ const useGamesMock = vi.fn();
 const useProfilesOverviewMock = vi.fn();
 const useBasicHealthMock = vi.fn();
 const useReadinessHealthMock = vi.fn();
+const useSystemDashboardSummaryMock = vi.fn();
 
 vi.mock("@/features/auth/auth-context", () => ({
   useAuth: () => useAuthMock(),
+}));
+
+vi.mock("@/features/dashboard/api", () => ({
+  useSystemDashboardSummary: (...args: unknown[]) => useSystemDashboardSummaryMock(...args),
 }));
 
 vi.mock("@/features/users/api", () => ({
@@ -81,6 +86,7 @@ describe("SuperadminDashboard", () => {
     useProfilesOverviewMock.mockReturnValue(okQuery([{ id: "profile-1", activeBindingCount: 1 }]));
     useBasicHealthMock.mockReturnValue({ data: null, isLoading: false, error: null });
     useReadinessHealthMock.mockReturnValue({ data: null, isLoading: false, error: null });
+    useSystemDashboardSummaryMock.mockReturnValue({ data: null, isLoading: false, error: null });
   });
 
   afterEach(() => {
