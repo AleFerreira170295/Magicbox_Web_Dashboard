@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -22,6 +22,7 @@ type LoginFormValues = z.infer<typeof loginSchema>;
 
 export function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { login, status } = useAuth();
   const [error, setError] = useState<string | null>(null);
   const form = useForm<LoginFormValues>({
@@ -32,17 +33,22 @@ export function LoginForm() {
     },
   });
 
+  const nextParam = searchParams.get("next");
+  const redirectTo = nextParam && nextParam.startsWith("/") && !nextParam.startsWith("//")
+    ? nextParam
+    : "/dashboard";
+
   useEffect(() => {
     if (status === "authenticated") {
-      router.replace("/dashboard");
+      router.replace(redirectTo);
     }
-  }, [router, status]);
+  }, [redirectTo, router, status]);
 
   const onSubmit = form.handleSubmit(async (values) => {
     setError(null);
     try {
       await login(values);
-      router.replace("/dashboard");
+      router.replace(redirectTo);
     } catch (submitError) {
       setError(getErrorMessage(submitError));
     }
