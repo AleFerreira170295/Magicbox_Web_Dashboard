@@ -63,6 +63,12 @@ export type SystemDashboardSummary = {
     successful_turns: number;
     success_rate: number;
   }>;
+  segments: {
+    role_mix: Array<{ key: string; count: number }>;
+    user_type_mix: Array<{ key: string; count: number }>;
+    top_institutions: Array<{ id: string; name: string; users: number; games: number; turns: number; state?: string | null; city?: string | null }>;
+    top_territories: Array<{ key: string; institutions: number; users: number; games: number; turns: number }>;
+  };
 };
 
 export async function getSystemDashboardSummary(token: string, filters?: DashboardSummaryFilters) {

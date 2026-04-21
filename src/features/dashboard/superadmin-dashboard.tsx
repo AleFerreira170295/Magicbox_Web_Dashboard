@@ -214,6 +214,10 @@ export function SuperadminDashboard() {
   const roleCodeOptions = summaryQuery.data?.filters.role_codes || [];
   const trendRangeLabel = summaryQuery.data?.filters.trend_range || selectedRange;
   const trends = summaryQuery.data?.trends || [];
+  const roleMix = summaryQuery.data?.segments.role_mix || [];
+  const userTypeMix = summaryQuery.data?.segments.user_type_mix || [];
+  const topInstitutions = summaryQuery.data?.segments.top_institutions || [];
+  const topTerritories = summaryQuery.data?.segments.top_territories || [];
 
   function updateFilter(
     key: "range" | "institution_id" | "country_code" | "state" | "city" | "user_type" | "role_code",
@@ -594,6 +598,55 @@ export function SuperadminDashboard() {
         </Card>
       ) : null}
 
+      {isGovernmentViewer ? (
+        <div className="grid gap-5 xl:grid-cols-3">
+          <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)] xl:col-span-2">
+            <CardHeader>
+              <CardTitle>Territorios con mayor actividad</CardTitle>
+              <CardDescription>Lectura rápida de dónde se concentra hoy la población activa dentro del alcance visible.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {topTerritories.length > 0 ? (
+                topTerritories.map((territory, index) => (
+                  <div key={territory.key} className="rounded-2xl bg-white/80 p-4 text-sm text-muted-foreground">
+                    <div className="flex items-start justify-between gap-4">
+                      <div>
+                        <p className="font-medium text-foreground">{index + 1}. {territory.key}</p>
+                        <p className="mt-1">{territory.users} usuarios visibles, {territory.institutions} instituciones, {territory.games} partidas y {territory.turns} turnos.</p>
+                      </div>
+                      <Badge variant="secondary">Top territorio</Badge>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="rounded-2xl bg-white/80 p-4 text-sm text-muted-foreground">Todavía no hay suficiente señal para rankear territorios con el recorte actual.</div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
+            <CardHeader>
+              <CardTitle>Cohortes visibles</CardTitle>
+              <CardDescription>Mix resumido de roles y tipos de usuario dentro del territorio.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3 text-sm text-muted-foreground">
+              <div className="rounded-2xl bg-white/80 p-4">
+                <p className="font-medium text-foreground">Roles</p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {roleMix.length > 0 ? roleMix.slice(0, 5).map((item) => <Badge key={item.key} variant="secondary">{item.key}: {item.count}</Badge>) : <span>Sin datos</span>}
+                </div>
+              </div>
+              <div className="rounded-2xl bg-white/80 p-4">
+                <p className="font-medium text-foreground">Tipos de usuario</p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {userTypeMix.length > 0 ? userTypeMix.slice(0, 5).map((item) => <Badge key={item.key} variant="secondary">{item.key}: {item.count}</Badge>) : <span>Sin datos</span>}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      ) : null}
+
       <div className="grid gap-5 xl:grid-cols-3">
         <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
           <CardHeader>
@@ -646,6 +699,28 @@ export function SuperadminDashboard() {
           </CardContent>
         </Card>
       </div>
+
+      {isGovernmentViewer ? (
+        <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
+          <CardHeader>
+            <CardTitle>Instituciones destacadas en el territorio</CardTitle>
+            <CardDescription>Comparativa compacta para detectar dónde hay mayor actividad o cobertura.</CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {topInstitutions.length > 0 ? (
+              topInstitutions.map((institution) => (
+                <div key={institution.id} className="rounded-2xl bg-white/80 p-4 text-sm text-muted-foreground">
+                  <p className="font-medium text-foreground">{institution.name}</p>
+                  <p className="mt-1">{institution.city || institution.state || "Sin territorio detallado"}</p>
+                  <p className="mt-2">{institution.users} usuarios, {institution.games} partidas, {institution.turns} turnos.</p>
+                </div>
+              ))
+            ) : (
+              <div className="rounded-2xl bg-white/80 p-4 text-sm text-muted-foreground">No hay instituciones destacadas para el recorte actual.</div>
+            )}
+          </CardContent>
+        </Card>
+      ) : null}
 
       {error ? (
         <Card className="border-destructive/20 bg-white/85">

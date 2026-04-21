@@ -204,6 +204,12 @@ describe("SuperadminDashboard", () => {
         trends: [
           { date: "2026-04-20", syncs: 1, games: 2, turns: 3, successful_turns: 2, success_rate: 66.7 },
         ],
+        segments: {
+          role_mix: [{ key: "admin", count: 1 }],
+          user_type_mix: [{ key: "web", count: 1 }],
+          top_institutions: [{ id: "ec-1", name: "Colegio Norte", users: 10, games: 8, turns: 14, state: "Metropolitana", city: "Santiago" }],
+          top_territories: [{ key: "Metropolitana / Santiago", institutions: 1, users: 10, games: 8, turns: 14 }],
+        },
       }),
     );
 
@@ -283,6 +289,12 @@ describe("SuperadminDashboard", () => {
           profiles_with_sessions: 2,
         },
         trends: [{ date: "2026-04-20", syncs: 1, games: 1, turns: 2, successful_turns: 2, success_rate: 100 }],
+        segments: {
+          role_mix: [{ key: "teacher", count: 8 }],
+          user_type_mix: [{ key: "web", count: 6 }],
+          top_institutions: [{ id: "ec-1", name: "Colegio Norte", users: 10, games: 4, turns: 6, state: "Montevideo", city: "Montevideo" }],
+          top_territories: [{ key: "Montevideo / Montevideo", institutions: 1, users: 10, games: 4, turns: 6 }],
+        },
       }),
     );
 
@@ -290,6 +302,8 @@ describe("SuperadminDashboard", () => {
 
     expect(screen.getByText("Gobierno")).toBeInTheDocument();
     expect(screen.getByText("Mini tendencias")).toBeInTheDocument();
+    expect(screen.getByText("Territorios con mayor actividad")).toBeInTheDocument();
+    expect(screen.getByText("Instituciones destacadas en el territorio")).toBeInTheDocument();
     expect(screen.queryByText("Health")).not.toBeInTheDocument();
     expect(screen.queryByText("Settings")).not.toBeInTheDocument();
     expect(useSystemDashboardSummaryMock).toHaveBeenCalledWith(
