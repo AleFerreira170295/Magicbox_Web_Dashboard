@@ -29,18 +29,30 @@ import { useSyncSessions } from "@/features/syncs/api";
 import { useUsers } from "@/features/users/api";
 import { getErrorMessage } from "@/lib/utils";
 
+function formatPercent(value: number, total: number) {
+  if (total <= 0) return "Sin datos";
+  return `${Math.round((value / total) * 100)}%`;
+}
+
+function formatAverage(total: number, count: number, digits = 1) {
+  if (count <= 0) return "Sin datos";
+  return (total / count).toFixed(digits);
+}
+
 function SummaryCard({
   label,
   value,
   hint,
   icon: Icon,
   tone = "primary",
+  isLoading = false,
 }: {
   label: string;
   value: string;
   hint: string;
   icon: ComponentType<{ className?: string }>;
   tone?: "primary" | "accent" | "warning";
+  isLoading?: boolean;
 }) {
   const toneClass = {
     primary: "bg-primary/12 text-primary",
@@ -54,8 +66,17 @@ function SummaryCard({
         <div className="flex items-start justify-between gap-4">
           <div>
             <p className="text-sm text-muted-foreground">{label}</p>
-            <p className="mt-2 text-3xl font-semibold tracking-tight text-foreground">{value}</p>
-            <p className="mt-2 text-sm leading-6 text-muted-foreground">{hint}</p>
+            {isLoading ? (
+              <>
+                <Skeleton className="mt-3 h-8 w-20 rounded-xl" />
+                <Skeleton className="mt-3 h-4 w-40 rounded-xl" />
+              </>
+            ) : (
+              <>
+                <p className="mt-2 text-3xl font-semibold tracking-tight text-foreground">{value}</p>
+                <p className="mt-2 text-sm leading-6 text-muted-foreground">{hint}</p>
+              </>
+            )}
           </div>
           <div className={`rounded-2xl p-3 ${toneClass}`}>
             <Icon className="size-5" />
@@ -124,32 +145,53 @@ export function SuperadminDashboard() {
   const healthQuery = useBasicHealth({ enabled: canSeeHealthModule });
   const readinessQuery = useReadinessHealth({ enabled: canSeeHealthModule });
 
-  const isLoading =
-    usersQuery.isLoading ||
-    institutionsQuery.isLoading ||
-    devicesQuery.isLoading ||
-    syncsQuery.isLoading ||
-    gamesQuery.isLoading ||
-    profilesQuery.isLoading ||
-    (canSeeHealthModule && (healthQuery.isLoading || readinessQuery.isLoading));
+  const users = usersQuery.data?.data || [];
+  const institutions = institutionsQuery.data?.data || [];
+  const devices = devicesQuery.data?.data || [];
+  const syncs = syncsQuery.data?.data || [];
+  const games = gamesQuery.data?.data || [];
+  const profiles = profilesQuery.data || [];
+  const readinessChecks = readinessQuery.data?.checks || {};
 
-  const error =
-    usersQuery.error ||
-    institutionsQuery.error ||
-    devicesQuery.error ||
-    syncsQuery.error ||
-    gamesQuery.error ||
-    profilesQuery.error ||
-    (canSeeHealthModule ? healthQuery.error || readinessQuery.error : null);
+  const visibleQueryStates = [
+    usersQuery,
+    institutionsQuery,
+    devicesQuery,
+    syncsQuery,
+    gamesQuery,
+    profilesQuery,
+    ...(canSeeHealthModule ? [healthQuery, readinessQuery] : []),
+  ];
+
+  const totalSources = visibleQueryStates.length;
+  const loadedSources = visibleQueryStates.filter((query) => query.data).length;
+  const failedSources = visibleQueryStates.filter((query) => query.error).length;
+  const hasAnyData = [users.length, institutions.length, devices.length, syncs.length, games.length, profiles.length].some(
+    (count) => count > 0,
+  );
+  const showInitialLoading = !hasAnyData && visibleQueryStates.some((query) => query.isLoading);
+  const errors = visibleQueryStates
+    .map((query) => query.error)
+    .filter(Boolean)
+    .map((error) => getErrorMessage(error));
+  const error = errors[0] || null;
 
   const metrics = useMemo(() => {
-    const users = usersQuery.data?.data || [];
-    const institutions = institutionsQuery.data?.data || [];
-    const devices = devicesQuery.data?.data || [];
-    const syncs = syncsQuery.data?.data || [];
-    const games = gamesQuery.data?.data || [];
-    const profiles = profilesQuery.data || [];
-    const readinessChecks = readinessQuery.data?.checks || {};
+    const gamesWithTurns = games.filter((game) => (game.turns?.length || 0) > 0);
+    const totalTurns = games.reduce((sum, game) => sum + (game.turns?.length || 0), 0);
+    const successfulTurns = games.reduce(
+      (sum, game) => sum + (game.turns?.filter((turn) => turn.success).length || 0),
+      0,
+    );
+    const totalPlayers = games.reduce((sum, game) => sum + (game.totalPlayers || game.players?.length || 0), 0);
+    const homeDevices = devices.filter((device) => device.assignmentScope === "home").length;
+    const institutionDevices = devices.filter((device) => device.assignmentScope === "institution").length;
+    const devicesWithOwner = devices.filter((device) => device.ownerUserId || device.ownerUserEmail).length;
+    const devicesWithFirmware = devices.filter((device) => device.firmwareVersion).length;
+    const syncsWithRaw = syncs.filter((sync) => (sync.rawRecordCount || sync.rawRecordIds.length || 0) > 0).length;
+    const profilesWithBindings = profiles.filter((profile) => profile.activeBindingCount > 0).length;
+    const activeProfiles = profiles.filter((profile) => profile.isActive).length;
+    const profilesWithSessions = profiles.filter((profile) => profile.sessionCount > 0).length;
 
     return {
       totalUsers: usersQuery.data?.total || users.length,
@@ -162,12 +204,24 @@ export function SuperadminDashboard() {
       devicesWithoutStatus: devices.filter((device) => !device.status).length,
       syncsWithoutRaw: syncs.filter((sync) => (sync.rawRecordCount || sync.rawRecordIds.length || 0) === 0).length,
       profilesWithoutBindings: profiles.filter((profile) => profile.activeBindingCount === 0).length,
+      homeDevices,
+      institutionDevices,
+      devicesWithOwner,
+      devicesWithFirmware,
+      syncsWithRaw,
+      activeProfiles,
+      profilesWithBindings,
+      profilesWithSessions,
+      totalTurns,
+      successfulTurns,
+      totalPlayers,
+      gamesWithTurns: gamesWithTurns.length,
       degradedChecks: Object.values(readinessChecks).filter((check) => check?.status !== "healthy").length,
       environment: canSeeHealthModule ? healthQuery.data?.environment || "-" : "scopeado",
       version: canSeeHealthModule ? healthQuery.data?.version || "-" : "no disponible",
       readiness: canSeeHealthModule ? readinessQuery.data?.status || "unknown" : "no disponible",
     };
-  }, [canSeeHealthModule, devicesQuery.data, gamesQuery.data, healthQuery.data, institutionsQuery.data, profilesQuery.data, readinessQuery.data, syncsQuery.data, usersQuery.data]);
+  }, [canSeeHealthModule, devices, devicesQuery.data, games, gamesQuery.data, healthQuery.data, institutions, institutionsQuery.data, profiles, profilesQuery.data, readinessChecks, readinessQuery.data, syncs, syncsQuery.data, users, usersQuery.data]);
 
   const scopeLabel = isAdmin ? "Superadmin" : isInstitutionAdmin ? "Institution admin" : isDirector ? "Dirección" : "Operación";
 
@@ -213,10 +267,11 @@ export function SuperadminDashboard() {
               <div className="rounded-3xl bg-white/10 p-4 backdrop-blur-sm">
                 <p className="text-sm text-white/70">Cobertura</p>
                 <p className="mt-2 text-lg font-medium">{metrics.totalUsers} usuarios, {metrics.totalInstitutions} instituciones y {metrics.totalDevices} dispositivos visibles.</p>
+                <p className="mt-2 text-sm text-white/70">{loadedSources}/{totalSources} fuentes cargadas, {failedSources} con error.</p>
               </div>
               <div className="rounded-3xl bg-white/10 p-4 backdrop-blur-sm">
                 <p className="text-sm text-white/70">Actividad</p>
-                <p className="mt-2 text-lg font-medium">{metrics.totalSyncs} syncs, {metrics.totalGames} partidas y {metrics.totalProfiles} profiles.</p>
+                <p className="mt-2 text-lg font-medium">{metrics.totalSyncs} syncs, {metrics.totalGames} partidas, {metrics.totalTurns} turnos y {metrics.totalProfiles} profiles.</p>
               </div>
               <div className="rounded-3xl bg-white/10 p-4 backdrop-blur-sm">
                 <p className="text-sm text-white/70">{canSeeHealthModule ? "Salud" : "Alcance"}</p>
@@ -244,39 +299,92 @@ export function SuperadminDashboard() {
             </div>
             <div className="rounded-2xl bg-white/80 p-4">
               <p className="text-sm font-medium text-foreground">Dispositivos sin estado</p>
-              <p className="mt-1 text-sm leading-6 text-muted-foreground">{metrics.devicesWithoutStatus} dispositivos visibles siguen sin `status` explícito.</p>
+              <p className="mt-1 text-sm leading-6 text-muted-foreground">{metrics.devicesWithoutStatus} dispositivos visibles siguen sin `status` explícito, y {metrics.totalDevices - metrics.devicesWithOwner} no tienen owner asociado.</p>
             </div>
             <div className="rounded-2xl bg-white/80 p-4">
-              <p className="text-sm font-medium text-foreground">Syncs sin raw y profiles sin binding</p>
-              <p className="mt-1 text-sm leading-6 text-muted-foreground">{metrics.syncsWithoutRaw} syncs sin raw visible y {metrics.profilesWithoutBindings} profiles sin binding activo.</p>
+              <p className="text-sm font-medium text-foreground">Cobertura de raw y bindings</p>
+              <p className="mt-1 text-sm leading-6 text-muted-foreground">{formatPercent(metrics.syncsWithRaw, metrics.totalSyncs)} de syncs tienen raw visible y {formatPercent(metrics.profilesWithBindings, metrics.totalProfiles)} de profiles tienen binding activo.</p>
             </div>
           </CardContent>
         </Card>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-6">
-        {isLoading ? (
+        {showInitialLoading ? (
           Array.from({ length: 6 }).map((_, index) => <Skeleton key={index} className="h-36 rounded-2xl" />)
         ) : (
           <>
-            <SummaryCard label="Usuarios" value={String(metrics.totalUsers)} hint="Padrón operativo visible." icon={Users} />
-            <SummaryCard label="Instituciones" value={String(metrics.totalInstitutions)} hint="Clientes y alcance actual." icon={Building2} />
-            <SummaryCard label="Devices" value={String(metrics.totalDevices)} hint="Parque visible en dashboard." icon={Smartphone} />
-            <SummaryCard label="Syncs" value={String(metrics.totalSyncs)} hint="Trazabilidad operativa actual." icon={Layers3} tone="accent" />
-            <SummaryCard label="Games" value={String(metrics.totalGames)} hint="Partidas persistidas visibles." icon={Database} tone="accent" />
+            <SummaryCard label="Usuarios" value={String(metrics.totalUsers)} hint="Padrón operativo visible." icon={Users} isLoading={usersQuery.isLoading && users.length === 0} />
+            <SummaryCard label="Instituciones" value={String(metrics.totalInstitutions)} hint="Clientes y alcance actual." icon={Building2} isLoading={institutionsQuery.isLoading && institutions.length === 0} />
+            <SummaryCard label="Devices" value={String(metrics.totalDevices)} hint={`${metrics.homeDevices} Home y ${metrics.institutionDevices} institucionales.`} icon={Smartphone} isLoading={devicesQuery.isLoading && devices.length === 0} />
+            <SummaryCard label="Syncs" value={String(metrics.totalSyncs)} hint={`${formatPercent(metrics.syncsWithRaw, metrics.totalSyncs)} con raw visible.`} icon={Layers3} tone="accent" isLoading={syncsQuery.isLoading && syncs.length === 0} />
+            <SummaryCard label="Games" value={String(metrics.totalGames)} hint={`${formatAverage(metrics.totalPlayers, metrics.totalGames)} jugadores por partida.`} icon={Database} tone="accent" isLoading={gamesQuery.isLoading && games.length === 0} />
             {canSeeHealthModule ? (
-              <SummaryCard label="Health" value={metrics.readiness} hint={`Backend ${metrics.version}.`} icon={HeartPulse} tone={metrics.degradedChecks === 0 ? "accent" : "warning"} />
+              <SummaryCard label="Health" value={metrics.readiness} hint={`Backend ${metrics.version}.`} icon={HeartPulse} tone={metrics.degradedChecks === 0 ? "accent" : "warning"} isLoading={canSeeHealthModule && healthQuery.isLoading && !healthQuery.data} />
             ) : (
-              <SummaryCard label="Profiles" value={String(metrics.totalProfiles)} hint="Perfiles Home visibles en el alcance actual." icon={UserSquare2} tone="accent" />
+              <SummaryCard label="Profiles" value={String(metrics.totalProfiles)} hint={`${metrics.activeProfiles} activos y ${metrics.profilesWithSessions} con sesiones.`} icon={UserSquare2} tone="accent" isLoading={profilesQuery.isLoading && profiles.length === 0} />
             )}
           </>
         )}
       </div>
 
+      <div className="grid gap-5 xl:grid-cols-3">
+        <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
+          <CardHeader>
+            <CardTitle>Uso y actividad</CardTitle>
+            <CardDescription>Estadísticas rápidas para leer el movimiento real del sistema.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3 text-sm leading-6 text-muted-foreground">
+            <div className="rounded-2xl bg-white/80 p-4">
+              <p className="font-medium text-foreground">Turnos y partidas</p>
+              <p className="mt-1">{metrics.totalTurns} turnos visibles, {formatAverage(metrics.totalTurns, metrics.gamesWithTurns || metrics.totalGames)} turnos por partida con actividad.</p>
+            </div>
+            <div className="rounded-2xl bg-white/80 p-4">
+              <p className="font-medium text-foreground">Éxito de turnos</p>
+              <p className="mt-1">{formatPercent(metrics.successfulTurns, metrics.totalTurns)} de los turnos visibles terminaron en éxito.</p>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
+          <CardHeader>
+            <CardTitle>Calidad del dato</CardTitle>
+            <CardDescription>Cobertura útil para detectar dónde falta trazabilidad o vínculo operativo.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3 text-sm leading-6 text-muted-foreground">
+            <div className="rounded-2xl bg-white/80 p-4">
+              <p className="font-medium text-foreground">Dispositivos identificados</p>
+              <p className="mt-1">{formatPercent(metrics.devicesWithFirmware, metrics.totalDevices)} tienen firmware visible y {formatPercent(metrics.devicesWithOwner, metrics.totalDevices)} tienen owner asociado.</p>
+            </div>
+            <div className="rounded-2xl bg-white/80 p-4">
+              <p className="font-medium text-foreground">Profiles útiles</p>
+              <p className="mt-1">{formatPercent(metrics.profilesWithSessions, metrics.totalProfiles)} tienen sesiones y {formatPercent(metrics.profilesWithBindings, metrics.totalProfiles)} tienen binding activo.</p>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
+          <CardHeader>
+            <CardTitle>Distribución operativa</CardTitle>
+            <CardDescription>Cómo está repartido hoy el parque y el alcance visible.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3 text-sm leading-6 text-muted-foreground">
+            <div className="rounded-2xl bg-white/80 p-4">
+              <p className="font-medium text-foreground">Devices Home vs institución</p>
+              <p className="mt-1">{metrics.homeDevices} Home, {metrics.institutionDevices} institucionales.</p>
+            </div>
+            <div className="rounded-2xl bg-white/80 p-4">
+              <p className="font-medium text-foreground">Cobertura de fuentes</p>
+              <p className="mt-1">{loadedSources} fuentes respondieron correctamente, {failedSources} fallaron y la home sigue operativa con degradación parcial.</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
       {error ? (
         <Card className="border-destructive/20 bg-white/85">
           <CardContent className="p-6 text-sm text-destructive">
-            No pude cargar una parte del dashboard: {getErrorMessage(error)}
+            No pude cargar una parte del dashboard: {error}. La home sigue mostrando las fuentes que sí respondieron.
           </CardContent>
         </Card>
       ) : null}
