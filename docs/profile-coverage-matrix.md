@@ -70,15 +70,18 @@ The matrix above was checked against:
 
 Targeted verification run on 2026-04-22:
 
-- 19 test files
-- 56 tests passed
+- 21 test files
+- 69 tests passed
+- full route/access matrix now asserted across every protected app screen for every supported profile, plus the `/` and `/login` entrypoints
 - real backend validation completed after enforcing the strong contract: a temporary `institution-admin` user created through the live local API now receives `access_control:read` and `feature:read` on login and `/auth/me`
 - first UX consolidation pass completed across `games`, `syncs`, `devices`, and `profiles`, aligning teacher/director framing more consistently around classroom use, institutional follow-up, and visibility explanations
 
 ## Recommended next move
 
-If the goal is to finish profiles one by one, the best next step is:
+Frontend profile closure is effectively done.
 
-1. Choose the next surface that still deserves a dedicated closing pass, if any.
-2. Otherwise move into broader UX consolidation across the already-closed profile set.
-3. Use that pass to unify tone, readiness cues, and operational explanations across modules with similar scope patterns.
+What remains now is no longer "another profile pass", but one of these optional next lanes:
+
+1. Run live end-to-end QA against the real backend for the highest-value flows (login, filters, detail panels, and the few allowed mutations such as device/profile updates).
+2. Add browser-driven smoke coverage if we want automated UI proof on top of the current component and route matrix tests.
+3. Do a final cosmetic consistency sweep only if we want near-perfect copy/label harmony across already-closed modules.
