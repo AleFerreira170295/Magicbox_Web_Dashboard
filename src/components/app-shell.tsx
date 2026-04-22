@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Activity, BarChart3, Building2, Cable, Database, KeyRound, LogOut, Settings, Shield, ShieldAlert, Sparkles, Smartphone, UserRound, Users } from "lucide-react";
+import { Activity, BarChart3, Building2, Cable, Database, KeyRound, LogOut, Settings, ShieldAlert, Sparkles, Smartphone, UserRound, Users } from "lucide-react";
+import { BrandLogo } from "@/components/brand-logo";
 import { AuthGuard } from "@/components/auth-guard";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -193,10 +194,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <div className="grid min-h-screen lg:grid-cols-[300px_1fr]">
           <aside className="hidden border-r border-border/60 bg-sidebar/95 text-sidebar-foreground lg:flex lg:flex-col lg:backdrop-blur">
             <div className="border-b border-border/60 px-6 py-8">
-              <div className="flex items-center gap-3">
-                <div className="rounded-[22px] bg-primary p-3 text-primary-foreground shadow-[0_18px_30px_rgba(71,185,239,0.24)]">
-                  <Shield className="size-5" />
-                </div>
+              <div className="space-y-4">
+                <BrandLogo variant="icon" className="w-14" />
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-[0.28em] text-primary">MagicBox</p>
                   <p className="text-xl font-semibold tracking-[-0.03em] text-foreground">Web Dashboard</p>
