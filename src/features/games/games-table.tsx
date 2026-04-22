@@ -66,6 +66,7 @@ export function GamesTable() {
   const scopedInstitutionName = scopedInstitutionId ? institutions[0]?.name || scopedInstitutionId : null;
   const isInstitutionScopedView = Boolean(scopedInstitutionId && currentUser?.educationalCenterId === scopedInstitutionId);
   const isResearcherView = currentUser?.roles.includes("researcher") || false;
+  const isFamilyView = currentUser?.roles.includes("family") || false;
 
   const gameRows = useMemo(() => {
     const currentUserEmail = (currentUser?.email || "").trim().toLowerCase();
@@ -204,10 +205,12 @@ export function GamesTable() {
   return (
     <div className="space-y-6">
       <SectionHeader
-        eyebrow={isResearcherView ? "Researcher" : isInstitutionScopedView ? "Institution admin" : "Juego"}
+        eyebrow={isFamilyView ? "Family" : isResearcherView ? "Researcher" : isInstitutionScopedView ? "Institution admin" : "Juego"}
         title="Partidas"
         description={
-          isResearcherView
+          isFamilyView
+            ? "Vista simple de actividad visible, pensada para entender sesiones, participantes y ritmo general sin entrar en detalles técnicos de operación."
+            : isResearcherView
             ? "Vista de evidencia sobre `game-data`, pensada para leer composición de muestra, asociaciones visibles y densidad de turnos sin mezclarlo con operación de aula."
             : isInstitutionScopedView
             ? `Vista operativa de partidas para ${scopedInstitutionName}, ya alineada con el scope real de game-data por institución.`
@@ -224,40 +227,44 @@ export function GamesTable() {
                 className="pl-9"
               />
             </div>
-            <select
-              value={institutionFilter || scopedInstitutionId || ""}
-              onChange={(event) => setInstitutionFilter(event.target.value)}
-              className="h-10 min-w-48 rounded-md border border-input bg-background px-3 text-sm"
-              disabled={Boolean(scopedInstitutionId)}
-            >
-              <option value="">Todas las instituciones</option>
-              {institutions.map((institution) => (
-                <option key={institution.id} value={institution.id}>
-                  {institution.name}
-                </option>
-              ))}
-            </select>
-            <select
-              value={playerModeFilter}
-              onChange={(event) => setPlayerModeFilter(event.target.value as "all" | "manual" | "mixed" | "registered")}
-              className="h-10 min-w-44 rounded-md border border-input bg-background px-3 text-sm"
-            >
-              <option value="all">Todos los modos</option>
-              <option value="registered">Solo registrados</option>
-              <option value="manual">Solo manuales</option>
-              <option value="mixed">Mixtos</option>
-            </select>
-            <select
-              value={accessFilter}
-              onChange={(event) => setAccessFilter(event.target.value as "all" | "owned" | "institution" | "shared" | "unresolved")}
-              className="h-10 min-w-48 rounded-md border border-input bg-background px-3 text-sm"
-            >
-              <option value="all">Todos los accesos</option>
-              <option value="owned">Mis dispositivos</option>
-              <option value="institution">Institución visible</option>
-              <option value="shared">Compartidas</option>
-              <option value="unresolved">Sin asociación resuelta</option>
-            </select>
+            {isFamilyView ? null : (
+              <>
+                <select
+                  value={institutionFilter || scopedInstitutionId || ""}
+                  onChange={(event) => setInstitutionFilter(event.target.value)}
+                  className="h-10 min-w-48 rounded-md border border-input bg-background px-3 text-sm"
+                  disabled={Boolean(scopedInstitutionId)}
+                >
+                  <option value="">Todas las instituciones</option>
+                  {institutions.map((institution) => (
+                    <option key={institution.id} value={institution.id}>
+                      {institution.name}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  value={playerModeFilter}
+                  onChange={(event) => setPlayerModeFilter(event.target.value as "all" | "manual" | "mixed" | "registered")}
+                  className="h-10 min-w-44 rounded-md border border-input bg-background px-3 text-sm"
+                >
+                  <option value="all">Todos los modos</option>
+                  <option value="registered">Solo registrados</option>
+                  <option value="manual">Solo manuales</option>
+                  <option value="mixed">Mixtos</option>
+                </select>
+                <select
+                  value={accessFilter}
+                  onChange={(event) => setAccessFilter(event.target.value as "all" | "owned" | "institution" | "shared" | "unresolved")}
+                  className="h-10 min-w-48 rounded-md border border-input bg-background px-3 text-sm"
+                >
+                  <option value="all">Todos los accesos</option>
+                  <option value="owned">Mis dispositivos</option>
+                  <option value="institution">Institución visible</option>
+                  <option value="shared">Compartidas</option>
+                  <option value="unresolved">Sin asociación resuelta</option>
+                </select>
+              </>
+            )}
           </div>
         }
       />
@@ -267,13 +274,15 @@ export function GamesTable() {
           <div>
             <div className="flex flex-wrap items-center gap-2">
               <p className="text-sm font-medium text-foreground">Alcance operativo</p>
-              <Badge variant={isResearcherView || isInstitutionScopedView ? "secondary" : "outline"}>
-                {isResearcherView ? "researcher" : isInstitutionScopedView ? "institution-admin" : "multi-institución / global"}
+              <Badge variant={isFamilyView || isResearcherView || isInstitutionScopedView ? "secondary" : "outline"}>
+                {isFamilyView ? "family" : isResearcherView ? "researcher" : isInstitutionScopedView ? "institution-admin" : "multi-institución / global"}
               </Badge>
               <Badge variant="outline">game-data real</Badge>
             </div>
             <p className="mt-2 text-sm text-muted-foreground">
-              {isResearcherView
+              {isFamilyView
+                ? "La pantalla simplifica el lenguaje y deja la actividad visible en primer plano. Los cruces técnicos quedan en segundo plano para no sobrecargar la lectura." 
+                : isResearcherView
                 ? "La vista conserva el alcance visible real y deja explícita la relación entre partida, dispositivo y composición de jugadores para poder leer evidencia sin irse directo al raw."
                 : isInstitutionScopedView
                 ? "La tabla queda anclada a la institución visible por ACL, así que el filtro institucional pasa a ser informativo y no abre otras sedes."
@@ -303,39 +312,41 @@ export function GamesTable() {
         </Card>
       ) : null}
 
-      <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
-        <CardContent className="flex flex-wrap gap-2 p-5">
-          {accessSegments.map((segment) => (
-            <button
-              key={segment.key}
-              type="button"
-              onClick={() => setAccessFilter(segment.key)}
-              className={cn(
-                "inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-medium transition",
-                accessFilter === segment.key
-                  ? "border-primary bg-primary text-primary-foreground"
-                  : "border-border bg-background text-foreground hover:bg-accent",
-              )}
-            >
-              <span>{segment.label}</span>
-              <Badge variant={accessFilter === segment.key ? "secondary" : "outline"} className={accessFilter === segment.key ? "bg-white/90 text-foreground" : ""}>
-                {segment.count}
-              </Badge>
-            </button>
-          ))}
-        </CardContent>
-      </Card>
+      {isFamilyView ? null : (
+        <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
+          <CardContent className="flex flex-wrap gap-2 p-5">
+            {accessSegments.map((segment) => (
+              <button
+                key={segment.key}
+                type="button"
+                onClick={() => setAccessFilter(segment.key)}
+                className={cn(
+                  "inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-medium transition",
+                  accessFilter === segment.key
+                    ? "border-primary bg-primary text-primary-foreground"
+                    : "border-border bg-background text-foreground hover:bg-accent",
+                )}
+              >
+                <span>{segment.label}</span>
+                <Badge variant={accessFilter === segment.key ? "secondary" : "outline"} className={accessFilter === segment.key ? "bg-white/90 text-foreground" : ""}>
+                  {segment.count}
+                </Badge>
+              </button>
+            ))}
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
         {gamesQuery.isLoading ? (
           Array.from({ length: 5 }).map((_, index) => <Skeleton key={index} className="h-32 rounded-2xl" />)
         ) : (
           <>
-            <SummaryCard label={isResearcherView ? "Muestra" : "Partidas"} value={String(metrics.totalGames)} hint={isResearcherView ? "Sesiones visibles dentro de la muestra actual." : "Juegos visibles en la consulta actual."} icon={Gamepad2} />
+            <SummaryCard label={isFamilyView ? "Partidas" : isResearcherView ? "Muestra" : "Partidas"} value={String(metrics.totalGames)} hint={isFamilyView ? "Sesiones visibles dentro de esta cuenta." : isResearcherView ? "Sesiones visibles dentro de la muestra actual." : "Juegos visibles en la consulta actual."} icon={Gamepad2} />
             <SummaryCard label={isResearcherView ? "Participantes" : "Jugadores"} value={String(metrics.totalPlayers)} hint={isResearcherView ? "Volumen proyectado de participantes en la evidencia visible." : "Suma proyectada de participantes en la muestra."} icon={Users} />
-            <SummaryCard label="Turnos" value={String(metrics.totalTurns)} hint={isResearcherView ? "Eventos observables persistidos para análisis." : "Volumen operativo de interacción ya persistido."} icon={TimerReset} />
-            <SummaryCard label={isResearcherView ? "Muestra mixta" : "Mixtas"} value={String(metrics.mixedGames)} hint={isResearcherView ? "Sesiones con combinación de manuales y registrados." : "Partidas con mezcla de jugadores manuales y registrados."} icon={BookOpen} />
-            <SummaryCard label={isResearcherView ? "Éxito visible" : "Éxito"} value={`${metrics.successRate}%`} hint={isResearcherView ? "Tasa agregada de turnos exitosos dentro de la vista." : "Tasa agregada de turnos exitosos en la vista."} icon={Trophy} />
+            <SummaryCard label="Turnos" value={String(metrics.totalTurns)} hint={isFamilyView ? "Interacciones visibles dentro de las partidas." : isResearcherView ? "Eventos observables persistidos para análisis." : "Volumen operativo de interacción ya persistido."} icon={TimerReset} />
+            <SummaryCard label={isFamilyView ? "Mazos" : isResearcherView ? "Muestra mixta" : "Mixtas"} value={String(isFamilyView ? new Set(games.map((game) => game.deckName).filter(Boolean)).size : metrics.mixedGames)} hint={isFamilyView ? "Variedad de contenidos que aparecen en la cuenta." : isResearcherView ? "Sesiones con combinación de manuales y registrados." : "Partidas con mezcla de jugadores manuales y registrados."} icon={BookOpen} />
+            <SummaryCard label={isFamilyView ? "Éxito visible" : isResearcherView ? "Éxito visible" : "Éxito"} value={`${metrics.successRate}%`} hint={isFamilyView ? "Lectura agregada del desempeño visible." : isResearcherView ? "Tasa agregada de turnos exitosos dentro de la vista." : "Tasa agregada de turnos exitosos en la vista."} icon={Trophy} />
           </>
         )}
       </div>
@@ -343,9 +354,11 @@ export function GamesTable() {
       <div className="grid gap-6 xl:grid-cols-[1.2fr_1fr]">
         <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
           <CardHeader>
-            <CardTitle>{isResearcherView ? "Muestra visible de partidas" : "Listado operativo de partidas"}</CardTitle>
+            <CardTitle>{isFamilyView ? "Actividad visible" : isResearcherView ? "Muestra visible de partidas" : "Listado operativo de partidas"}</CardTitle>
             <CardDescription>
-              {isResearcherView
+              {isFamilyView
+                ? "Seleccioná una partida para ver un resumen simple de participantes, turnos y momento de inicio."
+                : isResearcherView
                 ? "Seleccioná una partida para inspeccionar composición de muestra, turnos y contexto visible sin salir del dashboard."
                 : "Seleccioná una partida para inspeccionar mezcla de jugadores, turnos y contexto institucional sin salir del dashboard."}
             </CardDescription>
@@ -363,9 +376,9 @@ export function GamesTable() {
                   <TableRow>
                     <TableHead>Game ID</TableHead>
                     <TableHead>Mazo</TableHead>
-                    <TableHead>Institución</TableHead>
-                    <TableHead>Dispositivo</TableHead>
-                    <TableHead>Acceso</TableHead>
+                    {isFamilyView ? null : <TableHead>Institución</TableHead>}
+                    {isFamilyView ? null : <TableHead>Dispositivo</TableHead>}
+                    {isFamilyView ? null : <TableHead>Acceso</TableHead>}
                     <TableHead>Jugadores</TableHead>
                     <TableHead>Turnos</TableHead>
                     <TableHead>Inicio</TableHead>
@@ -374,7 +387,7 @@ export function GamesTable() {
                 <TableBody>
                   {filtered.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={8} className="py-10 text-center text-sm text-muted-foreground">
+                      <TableCell colSpan={isFamilyView ? 5 : 8} className="py-10 text-center text-sm text-muted-foreground">
                         No hay partidas para mostrar.
                       </TableCell>
                     </TableRow>
@@ -391,14 +404,16 @@ export function GamesTable() {
                         >
                           <TableCell className="font-medium">{game.gameId || "-"}</TableCell>
                           <TableCell>{game.deckName || "-"}</TableCell>
-                          <TableCell>{game.institution?.name || game.educationalCenterId || "-"}</TableCell>
-                          <TableCell>{game.device?.name || game.device?.deviceId || game.bleDeviceId || "-"}</TableCell>
-                          <TableCell>
-                            <div className="flex flex-col gap-1">
-                              <Badge variant={game.hasUnresolvedAssociation ? "warning" : "outline"}>{game.accessRelation}</Badge>
-                              <span className="text-xs text-muted-foreground">{game.ownerLabel}</span>
-                            </div>
-                          </TableCell>
+                          {isFamilyView ? null : <TableCell>{game.institution?.name || game.educationalCenterId || "-"}</TableCell>}
+                          {isFamilyView ? null : <TableCell>{game.device?.name || game.device?.deviceId || game.bleDeviceId || "-"}</TableCell>}
+                          {isFamilyView ? null : (
+                            <TableCell>
+                              <div className="flex flex-col gap-1">
+                                <Badge variant={game.hasUnresolvedAssociation ? "warning" : "outline"}>{game.accessRelation}</Badge>
+                                <span className="text-xs text-muted-foreground">{game.ownerLabel}</span>
+                              </div>
+                            </TableCell>
+                          )}
                           <TableCell>
                             <div className="flex flex-wrap items-center gap-2">
                               <Badge variant="secondary">{game.players.length || game.totalPlayers || 0}</Badge>
@@ -422,9 +437,11 @@ export function GamesTable() {
 
         <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
           <CardHeader>
-            <CardTitle>{isResearcherView ? "Detalle de evidencia" : "Detalle de partida"}</CardTitle>
+            <CardTitle>{isFamilyView ? "Resumen de partida" : isResearcherView ? "Detalle de evidencia" : "Detalle de partida"}</CardTitle>
             <CardDescription>
-              {isResearcherView
+              {isFamilyView
+                ? "Resumen simple de participantes, turnos y ritmo visible de la partida seleccionada."
+                : isResearcherView
                 ? "Resumen rápido de composición de muestra, asociaciones visibles y últimos turnos persistidos."
                 : "Resumen rápido de desempeño, composición de jugadores y últimos turnos persistidos."}
             </CardDescription>
@@ -432,7 +449,7 @@ export function GamesTable() {
           <CardContent className="space-y-5">
             {!selectedGame ? (
               <div className="rounded-2xl bg-background/70 p-4 text-sm text-muted-foreground">
-                {isResearcherView ? "Elegí una partida para revisar su detalle de evidencia." : "Elegí una partida para revisar su detalle operativo."}
+                {isFamilyView ? "Elegí una partida para revisar un resumen simple de actividad." : isResearcherView ? "Elegí una partida para revisar su detalle de evidencia." : "Elegí una partida para revisar su detalle operativo."}
               </div>
             ) : (
               <>
@@ -448,10 +465,10 @@ export function GamesTable() {
                     </div>
                   </div>
                   <div className="mt-3 grid gap-2 text-xs text-muted-foreground sm:grid-cols-2">
-                    <p>Dispositivo: {selectedDevice?.name || selectedDevice?.deviceId || selectedGame.bleDeviceId || "-"}</p>
-                    <p>Owner del dispositivo: {selectedGame.ownerLabel}</p>
+                    {isFamilyView ? null : <p>Dispositivo: {selectedDevice?.name || selectedDevice?.deviceId || selectedGame.bleDeviceId || "-"}</p>}
+                    {isFamilyView ? null : <p>Owner del dispositivo: {selectedGame.ownerLabel}</p>}
                     <p>Inicio: {formatDateTime(selectedGame.startDate)}</p>
-                    <p>Relación de acceso: {selectedGame.accessRelation}</p>
+                    {isFamilyView ? null : <p>Relación de acceso: {selectedGame.accessRelation}</p>}
                     <p>Jugadores: {selectedGame.players.length || selectedGame.totalPlayers || 0}</p>
                     <p>Turnos: {selectedGame.turns.length}</p>
                     <p>Registrados: {selectedRegisteredCount}</p>
@@ -460,7 +477,7 @@ export function GamesTable() {
                 </div>
 
                 <div>
-                  <p className="text-sm font-medium text-foreground">{isResearcherView ? "Participantes y asociaciones visibles" : "Jugadores y asociaciones"}</p>
+                  <p className="text-sm font-medium text-foreground">{isFamilyView ? "Participantes visibles" : isResearcherView ? "Participantes y asociaciones visibles" : "Jugadores y asociaciones"}</p>
                   <div className="mt-3 space-y-3">
                     {selectedGame.players.length === 0 ? (
                       <div className="rounded-2xl bg-background/70 p-3 text-sm text-muted-foreground">Sin jugadores cargados.</div>
@@ -485,7 +502,7 @@ export function GamesTable() {
                 </div>
 
                 <div>
-                  <p className="text-sm font-medium text-foreground">{isResearcherView ? "Turnos observables" : "Últimos turnos"}</p>
+                  <p className="text-sm font-medium text-foreground">{isFamilyView ? "Momentos recientes" : isResearcherView ? "Turnos observables" : "Últimos turnos"}</p>
                   <div className="mt-3 space-y-2">
                     {selectedRecentTurns.length === 0 ? (
                       <div className="rounded-2xl bg-background/70 p-3 text-sm text-muted-foreground">Sin turnos persistidos.</div>

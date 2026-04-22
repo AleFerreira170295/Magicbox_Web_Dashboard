@@ -55,7 +55,7 @@ const navigation: NavigationItem[] = [
     href: "/games",
     label: "Partidas",
     icon: Database,
-    roles: ["teacher", "director", "researcher", "admin", "institution-admin"] satisfies NavigationRole[],
+    roles: ["teacher", "director", "researcher", "family", "admin", "institution-admin"] satisfies NavigationRole[],
   },
   {
     href: "/users",

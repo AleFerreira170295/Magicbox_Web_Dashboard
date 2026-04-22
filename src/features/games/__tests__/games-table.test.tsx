@@ -214,4 +214,33 @@ describe("GamesTable", () => {
     expect(screen.getByText("Participantes y asociaciones visibles")).toBeInTheDocument();
     expect(screen.queryAllByText("Turnos observables").length).toBeGreaterThan(0);
   });
+
+  it("adapts the games view to a simplified family reading", () => {
+    useAuthMock.mockReturnValue({
+      tokens: { accessToken: "token", refreshToken: "refresh" },
+      user: {
+        id: "user-family",
+        email: "family@example.com",
+        firstName: "Fiona",
+        lastName: "Family",
+        fullName: "Fiona Family",
+        educationalCenterId: "ec-1",
+        roles: ["family"],
+        permissions: ["game_data:read"],
+        raw: {},
+      },
+    });
+
+    renderGamesTable();
+
+    expect(screen.getByText("Family")).toBeInTheDocument();
+    expect(screen.getByText(/pensada para entender sesiones, participantes y ritmo general/i)).toBeInTheDocument();
+    expect(screen.queryByText("Todos los accesos")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByText("101"));
+
+    expect(screen.getByText("Resumen de partida")).toBeInTheDocument();
+    expect(screen.getByText("Participantes visibles")).toBeInTheDocument();
+    expect(screen.getByText("Momentos recientes")).toBeInTheDocument();
+  });
 });
