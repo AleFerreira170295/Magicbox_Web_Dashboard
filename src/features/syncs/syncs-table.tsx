@@ -75,6 +75,7 @@ export function SyncsTable() {
   const canReadOperationalSyncs = hasAnyPermission("ble_device:read", "ble-device:read");
   const isInstitutionAdminView = currentUser?.roles.includes("institution-admin") || false;
   const isResearcherView = currentUser?.roles.includes("researcher") || false;
+  const isFamilyView = currentUser?.roles.includes("family") || false;
 
   const deviceById = useMemo(() => new Map(devices.map((device) => [device.id, device])), [devices]);
   const userById = useMemo(() => new Map(users.map((user) => [user.id, user])), [users]);
@@ -206,10 +207,12 @@ export function SyncsTable() {
   return (
     <div className="space-y-6">
       <SectionHeader
-        eyebrow={isResearcherView ? "Researcher" : canReadOperationalSyncs ? (isInstitutionAdminView ? "Institution admin" : "Trazabilidad") : "Mi actividad"}
+        eyebrow={isFamilyView ? "Family" : isResearcherView ? "Researcher" : canReadOperationalSyncs ? (isInstitutionAdminView ? "Institution admin" : "Trazabilidad") : "Mi actividad"}
         title="Sincronizaciones"
         description={
-          isResearcherView
+          isFamilyView
+            ? "Vista simple para seguir la actividad de sincronización visible, con foco en si hubo captura, participantes y relación básica con las partidas."
+            : isResearcherView
             ? "Vista de evidencia sobre `/sync-sessions`, pensada para leer cobertura de captura, correlación con partidas y asociaciones visibles sin quedarse solo en el payload raw."
             : canReadOperationalSyncs
             ? "La vista usa `/sync-sessions` como superficie operativa real del parque visible por ACL BLE, no solo como historial personal del usuario autenticado."
@@ -226,26 +229,30 @@ export function SyncsTable() {
                 className="pl-9"
               />
             </div>
-            <select
-              value={rawFilter}
-              onChange={(event) => setRawFilter(event.target.value as "all" | "with-raw" | "without-raw")}
-              className="h-10 min-w-48 rounded-md border border-input bg-background px-3 text-sm"
-            >
-              <option value="all">Todas</option>
-              <option value="with-raw">Solo con raw</option>
-              <option value="without-raw">Solo sin raw</option>
-            </select>
-            <select
-              value={accessFilter}
-              onChange={(event) => setAccessFilter(event.target.value as "all" | "owned" | "institution" | "shared" | "unresolved")}
-              className="h-10 min-w-48 rounded-md border border-input bg-background px-3 text-sm"
-            >
-              <option value="all">Todos los accesos</option>
-              <option value="owned">Mis dispositivos</option>
-              <option value="institution">Institución visible</option>
-              <option value="shared">Compartidas</option>
-              <option value="unresolved">Sin asociación resuelta</option>
-            </select>
+            {isFamilyView ? null : (
+              <>
+                <select
+                  value={rawFilter}
+                  onChange={(event) => setRawFilter(event.target.value as "all" | "with-raw" | "without-raw")}
+                  className="h-10 min-w-48 rounded-md border border-input bg-background px-3 text-sm"
+                >
+                  <option value="all">Todas</option>
+                  <option value="with-raw">Solo con raw</option>
+                  <option value="without-raw">Solo sin raw</option>
+                </select>
+                <select
+                  value={accessFilter}
+                  onChange={(event) => setAccessFilter(event.target.value as "all" | "owned" | "institution" | "shared" | "unresolved")}
+                  className="h-10 min-w-48 rounded-md border border-input bg-background px-3 text-sm"
+                >
+                  <option value="all">Todos los accesos</option>
+                  <option value="owned">Mis dispositivos</option>
+                  <option value="institution">Institución visible</option>
+                  <option value="shared">Compartidas</option>
+                  <option value="unresolved">Sin asociación resuelta</option>
+                </select>
+              </>
+            )}
           </div>
         }
       />
@@ -255,13 +262,15 @@ export function SyncsTable() {
           <div>
             <div className="flex flex-wrap items-center gap-2">
               <p className="text-sm font-medium text-foreground">Alcance visible</p>
-              <Badge variant={isResearcherView || canReadOperationalSyncs ? "secondary" : "outline"}>
-                {isResearcherView ? "researcher" : canReadOperationalSyncs ? "operativo por ACL BLE" : "historial personal"}
+              <Badge variant={isFamilyView || isResearcherView || canReadOperationalSyncs ? "secondary" : "outline"}>
+                {isFamilyView ? "family" : isResearcherView ? "researcher" : canReadOperationalSyncs ? "operativo por ACL BLE" : "historial personal"}
               </Badge>
               {isInstitutionAdminView ? <Badge variant="outline">institution-admin</Badge> : null}
             </div>
             <p className="mt-2 text-sm text-muted-foreground">
-              {isResearcherView
+              {isFamilyView
+                ? "La vista simplifica la lectura y deja visibles solo las relaciones más importantes, sincronización, participantes, dispositivo y vínculo con una partida cuando existe."
+                : isResearcherView
                 ? "La vista mantiene el scope visible real y deja explícita la relación entre sync, dispositivo, usuario y partida correlacionada para revisar evidencia de captura sin bajar directo al raw completo."
                 : canReadOperationalSyncs
                 ? "Los resultados se abren al parque de dispositivos permitido por ACL. Si tu alcance está scopeado, vas a ver solo syncs de esa institución."
@@ -290,49 +299,72 @@ export function SyncsTable() {
         </Card>
       ) : null}
 
+      {isFamilyView ? (
+        <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
+          <CardContent className="grid gap-3 p-5 md:grid-cols-3">
+            <div className="rounded-2xl bg-background/70 p-4">
+              <p className="text-sm font-medium text-foreground">Actividad visible</p>
+              <p className="mt-2 text-sm leading-6 text-muted-foreground">La pantalla muestra si hubo sincronizaciones recientes y qué parte de la experiencia quedó capturada.</p>
+            </div>
+            <div className="rounded-2xl bg-background/70 p-4">
+              <p className="text-sm font-medium text-foreground">Participantes</p>
+              <p className="mt-2 text-sm leading-6 text-muted-foreground">Cuando hay información disponible, se presenta en lenguaje simple y fácil de seguir.</p>
+            </div>
+            <div className="rounded-2xl bg-background/70 p-4">
+              <p className="text-sm font-medium text-foreground">Relación con partidas</p>
+              <p className="mt-2 text-sm leading-6 text-muted-foreground">Si una sync puede vincularse con una partida visible, la conexión queda resumida sin meterse en detalles técnicos.</p>
+            </div>
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {isFamilyView ? null : (
+        <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
+          <CardContent className="flex flex-wrap gap-2 p-5">
+            {accessSegments.map((segment) => (
+              <button
+                key={segment.key}
+                type="button"
+                onClick={() => setAccessFilter(segment.key)}
+                className={cn(
+                  "inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-medium transition",
+                  accessFilter === segment.key
+                    ? "border-primary bg-primary text-primary-foreground"
+                    : "border-border bg-background text-foreground hover:bg-accent",
+                )}
+              >
+                <span>{segment.label}</span>
+                <Badge variant={accessFilter === segment.key ? "secondary" : "outline"} className={accessFilter === segment.key ? "bg-white/90 text-foreground" : ""}>
+                  {segment.count}
+                </Badge>
+              </button>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
         {syncsQuery.isLoading ? (
           Array.from({ length: 5 }).map((_, index) => <Skeleton key={index} className="h-32 rounded-2xl" />)
         ) : (
           <>
-            <SummaryCard label={isResearcherView ? "Muestra sync" : "Syncs"} value={String(metrics.total)} hint={isResearcherView ? "Sesiones visibles dentro de la evidencia actual." : "Sesiones visibles en la vista operativa actual."} icon={Activity} />
-            <SummaryCard label="Con raw" value={String(metrics.withRaw)} hint={isResearcherView ? "Cobertura observable de captura cruda." : "Ayuda a validar trazabilidad e ingestión."} icon={HardDriveDownload} />
-            <SummaryCard label={isResearcherView ? "Con participantes" : "Con participantes"} value={String(metrics.withParticipants)} hint={isResearcherView ? "Syncs con proyección de participantes usable para análisis." : "Sesiones con proyección de jugadores usable."} icon={Users} />
-            <SummaryCard label="Con dispositivo" value={String(metrics.withDeviceLink)} hint={isResearcherView ? "Sesiones enlazadas a un dispositivo visible." : "Sesiones enlazadas a BLE o device_id."} icon={Waves} />
-            <SummaryCard label={isResearcherView ? "Con firmware" : "Con firmware"} value={String(metrics.withFirmware)} hint={isResearcherView ? "Sirve para detectar sesgos o variaciones por versión." : "Útil para detectar variaciones de ingesta por versión."} icon={Cpu} />
+            <SummaryCard label={isFamilyView ? "Syncs" : isResearcherView ? "Muestra sync" : "Syncs"} value={String(metrics.total)} hint={isFamilyView ? "Sincronizaciones visibles en esta cuenta." : isResearcherView ? "Sesiones visibles dentro de la evidencia actual." : "Sesiones visibles en la vista operativa actual."} icon={Activity} />
+            <SummaryCard label="Con evidencia" value={String(metrics.withRaw)} hint={isFamilyView ? "Syncs donde quedó alguna evidencia cruda disponible." : isResearcherView ? "Cobertura observable de captura cruda." : "Ayuda a validar trazabilidad e ingestión."} icon={HardDriveDownload} />
+            <SummaryCard label="Con participantes" value={String(metrics.withParticipants)} hint={isFamilyView ? "Syncs con participantes proyectados visibles." : isResearcherView ? "Syncs con proyección de participantes usable para análisis." : "Sesiones con proyección de jugadores usable."} icon={Users} />
+            <SummaryCard label="Con dispositivo" value={String(metrics.withDeviceLink)} hint={isFamilyView ? "Sincronizaciones enlazadas a un dispositivo visible." : isResearcherView ? "Sesiones enlazadas a un dispositivo visible." : "Sesiones enlazadas a BLE o device_id."} icon={Waves} />
+            <SummaryCard label={isFamilyView ? "Con versión" : "Con firmware"} value={String(metrics.withFirmware)} hint={isFamilyView ? "Syncs donde quedó registrada alguna versión visible." : isResearcherView ? "Sirve para detectar sesgos o variaciones por versión." : "Útil para detectar variaciones de ingesta por versión."} icon={Cpu} />
           </>
         )}
       </div>
 
-      <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
-        <CardContent className="flex flex-wrap gap-2 p-5">
-          {accessSegments.map((segment) => (
-            <button
-              key={segment.key}
-              type="button"
-              onClick={() => setAccessFilter(segment.key)}
-              className={cn(
-                "inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-medium transition",
-                accessFilter === segment.key
-                  ? "border-primary bg-primary text-primary-foreground"
-                  : "border-border bg-background text-foreground hover:bg-accent",
-              )}
-            >
-              <span>{segment.label}</span>
-              <Badge variant={accessFilter === segment.key ? "secondary" : "outline"} className={accessFilter === segment.key ? "bg-white/90 text-foreground" : ""}>
-                {segment.count}
-              </Badge>
-            </button>
-          ))}
-        </CardContent>
-      </Card>
-
       <div className="grid gap-6 xl:grid-cols-[1.2fr_1fr]">
         <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
           <CardHeader>
-            <CardTitle>{isResearcherView ? "Muestra visible de sincronizaciones" : "Sesiones sincronizadas"}</CardTitle>
+            <CardTitle>{isFamilyView ? "Actividad de sincronización" : isResearcherView ? "Muestra visible de sincronizaciones" : "Sesiones sincronizadas"}</CardTitle>
             <CardDescription>
-              {isResearcherView
+              {isFamilyView
+                ? "Seleccioná una sincronización para ver un resumen simple de participantes, dispositivo y relación con la partida cuando exista."
+                : isResearcherView
                 ? "Seleccioná una sesión para inspeccionar contexto visible, participantes proyectados y correlación con partida sin salir del dashboard."
                 : "Seleccioná una sesión para inspeccionar contexto de dispositivo, usuario, participantes y payload raw más reciente."}
             </CardDescription>
@@ -351,8 +383,8 @@ export function SyncsTable() {
                     <TableHead>Sync ID</TableHead>
                     <TableHead>Origen</TableHead>
                     <TableHead>Dispositivo</TableHead>
-                    <TableHead>Usuario</TableHead>
-                    <TableHead>Acceso</TableHead>
+                    {isFamilyView ? null : <TableHead>Usuario</TableHead>}
+                    {isFamilyView ? null : <TableHead>Acceso</TableHead>}
                     <TableHead>Participantes</TableHead>
                     <TableHead>Raw</TableHead>
                     <TableHead>Sincronizado</TableHead>
@@ -361,7 +393,7 @@ export function SyncsTable() {
                 <TableBody>
                   {filtered.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={8} className="py-10 text-center text-sm text-muted-foreground">
+                      <TableCell colSpan={isFamilyView ? 6 : 8} className="py-10 text-center text-sm text-muted-foreground">
                         No hay sincronizaciones para mostrar.
                       </TableCell>
                     </TableRow>
@@ -378,13 +410,15 @@ export function SyncsTable() {
                             <Badge variant="secondary">{sync.source || sync.sourceType || "desconocido"}</Badge>
                           </TableCell>
                           <TableCell>{sync.device?.name || sync.deviceId || sync.bleDeviceId || "-"}</TableCell>
-                          <TableCell>{sync.user?.fullName || sync.user?.email || sync.userId || "-"}</TableCell>
-                          <TableCell>
-                            <div className="flex flex-col gap-1">
-                              <Badge variant={sync.hasUnresolvedAssociation ? "warning" : "outline"}>{sync.accessRelation}</Badge>
-                              {sync.matchedGame ? <span className="text-xs text-muted-foreground">partida {sync.matchedGame.gameId || sync.matchedGame.id}</span> : null}
-                            </div>
-                          </TableCell>
+                          {isFamilyView ? null : <TableCell>{sync.user?.fullName || sync.user?.email || sync.userId || "-"}</TableCell>}
+                          {isFamilyView ? null : (
+                            <TableCell>
+                              <div className="flex flex-col gap-1">
+                                <Badge variant={sync.hasUnresolvedAssociation ? "warning" : "outline"}>{sync.accessRelation}</Badge>
+                                {sync.matchedGame ? <span className="text-xs text-muted-foreground">partida {sync.matchedGame.gameId || sync.matchedGame.id}</span> : null}
+                              </div>
+                            </TableCell>
+                          )}
                           <TableCell>{sync.participants.length || sync.totalPlayers || 0}</TableCell>
                           <TableCell>
                             <Badge variant={sync.hasRaw ? "success" : "outline"}>{sync.hasRaw ? "disponible" : "pendiente"}</Badge>
@@ -402,9 +436,11 @@ export function SyncsTable() {
 
         <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
           <CardHeader>
-            <CardTitle>{isResearcherView ? "Detalle de evidencia" : "Detalle de sync"}</CardTitle>
+            <CardTitle>{isFamilyView ? "Resumen de sincronización" : isResearcherView ? "Detalle de evidencia" : "Detalle de sync"}</CardTitle>
             <CardDescription>
-              {isResearcherView
+              {isFamilyView
+                ? "Resumen simple para entender qué se sincronizó, quiénes aparecen y si hay evidencia asociada."
+                : isResearcherView
                 ? "Panel para revisar rápidamente relaciones visibles entre sync, usuario, dispositivo, participantes y evidencia cruda asociada."
                 : "Panel operativo para revisar rápidamente quién sincronizó, con qué dispositivo y qué evidencia raw quedó asociada."}
             </CardDescription>
@@ -412,7 +448,7 @@ export function SyncsTable() {
           <CardContent className="space-y-5">
             {!selectedSync ? (
               <div className="rounded-2xl bg-background/70 p-4 text-sm text-muted-foreground">
-                {isResearcherView ? "Elegí una sincronización para revisar su detalle de evidencia." : "Elegí una sincronización para revisar su detalle."}
+                {isFamilyView ? "Elegí una sincronización para revisar un resumen simple de actividad." : isResearcherView ? "Elegí una sincronización para revisar su detalle de evidencia." : "Elegí una sincronización para revisar su detalle."}
               </div>
             ) : (
               <>
@@ -430,9 +466,9 @@ export function SyncsTable() {
                     </div>
                   </div>
                   <div className="mt-3 grid gap-2 text-xs text-muted-foreground sm:grid-cols-2">
-                    <p>Usuario: {selectedUser?.fullName || selectedUser?.email || selectedSync.userId || "-"}</p>
+                    {isFamilyView ? null : <p>Usuario: {selectedUser?.fullName || selectedUser?.email || selectedSync.userId || "-"}</p>}
                     <p>Dispositivo: {selectedDevice?.name || selectedSync.deviceId || selectedSync.bleDeviceId || "-"}</p>
-                    <p>Relación de acceso: {selectedSync.accessRelation}</p>
+                    {isFamilyView ? null : <p>Relación de acceso: {selectedSync.accessRelation}</p>}
                     <p>Partida correlacionada: {selectedSync.matchedGame?.deckName || selectedSync.gameId || "sin match visible"}</p>
                     <p>Firmware: {selectedSync.firmwareVersion || "sin firmware"}</p>
                     <p>App: {selectedSync.appVersion || "sin versión"}</p>
@@ -442,7 +478,7 @@ export function SyncsTable() {
                 </div>
 
                 <div>
-                  <p className="text-sm font-medium text-foreground">{isResearcherView ? "Participantes y asociaciones visibles" : "Participantes y asociaciones"}</p>
+                  <p className="text-sm font-medium text-foreground">{isFamilyView ? "Participantes visibles" : isResearcherView ? "Participantes y asociaciones visibles" : "Participantes y asociaciones"}</p>
                   <div className="mt-3 space-y-3">
                     {selectedSync.participants.length === 0 ? (
                       <div className="rounded-2xl bg-background/70 p-3 text-sm text-muted-foreground">Sin participantes proyectados.</div>
@@ -467,7 +503,7 @@ export function SyncsTable() {
                 </div>
 
                 <div>
-                  <p className="text-sm font-medium text-foreground">{isResearcherView ? "Señales de evidencia" : "Señales de trazabilidad"}</p>
+                  <p className="text-sm font-medium text-foreground">{isFamilyView ? "Señales de sincronización" : isResearcherView ? "Señales de evidencia" : "Señales de trazabilidad"}</p>
                   <div className="mt-3 grid gap-3 sm:grid-cols-2">
                     <div className="rounded-2xl bg-background/70 p-3 text-sm text-muted-foreground">raw ids: <span className="font-medium text-foreground">{String(selectedSync.rawRecordCount || selectedSync.rawRecordIds.length || 0)}</span></div>
                     <div className="rounded-2xl bg-background/70 p-3 text-sm text-muted-foreground">fragmentos: <span className="font-medium text-foreground">{String(selectedSync.rawFragmentCount || 0)}</span></div>
@@ -477,7 +513,7 @@ export function SyncsTable() {
                 </div>
 
                 <div>
-                  <p className="text-sm font-medium text-foreground">{isResearcherView ? "Payload raw visible" : "Payload raw más reciente"}</p>
+                  <p className="text-sm font-medium text-foreground">{isFamilyView ? "Detalle visible" : isResearcherView ? "Payload raw visible" : "Payload raw más reciente"}</p>
                   <div className="mt-3 rounded-2xl bg-slate-950 p-4 text-xs text-slate-100">
                     <pre className="overflow-x-auto whitespace-pre-wrap">{JSON.stringify(selectedSync.rawPayload || {}, null, 2)}</pre>
                   </div>

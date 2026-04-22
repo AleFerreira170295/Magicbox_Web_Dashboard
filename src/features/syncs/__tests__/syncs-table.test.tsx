@@ -369,4 +369,82 @@ describe("SyncsTable", () => {
     expect(screen.getByText("Participantes y asociaciones visibles")).toBeInTheDocument();
     expect(screen.getByText("Señales de evidencia")).toBeInTheDocument();
   });
+
+  it("adapts the syncs view to a simplified family reading", () => {
+    useAuthMock.mockReturnValue({
+      tokens: { accessToken: "token", refreshToken: "refresh" },
+      user: {
+        id: "user-1",
+        email: "family@example.com",
+        firstName: "Fiona",
+        lastName: "Family",
+        fullName: "Fiona Family",
+        educationalCenterId: "ec-1",
+        roles: ["family"],
+        permissions: ["ble_device:read"],
+        raw: {},
+      },
+    });
+
+    useSyncSessionsMock.mockReturnValue(
+      okQuery({
+        data: [
+          {
+            id: "sync-1",
+            userId: "user-1",
+            syncId: "mb-sync-1",
+            source: "magicbox",
+            sourceType: "device",
+            sessionType: null,
+            status: "done",
+            bleDeviceId: "device-1",
+            deviceId: "mb-1",
+            firmwareVersion: "v2.2",
+            appVersion: "1.0.0",
+            payloadSchemaVersion: "1",
+            gameId: 201,
+            deckName: "Animales",
+            totalCards: 10,
+            totalPlayers: 2,
+            durationSeconds: 60,
+            score: 100,
+            finalResult: null,
+            gameEndReason: null,
+            startedAt: null,
+            endedAt: null,
+            syncedAt: null,
+            capturedAt: null,
+            participants: [{ id: "participant-1", profileId: "profile-1", profileName: "Luna", playerName: "Luna", cardUid: "card-1", position: 1, studentId: "student-1", externalPlayerUid: null, raw: {} }],
+            rawRecordIds: ["raw-1"],
+            rawRecordCount: 1,
+            lastRawRecordId: null,
+            rawPayload: { hello: "world" },
+            fragmentCount: 0,
+            rawFragmentCount: 0,
+            additionalFields: {},
+            receivedAt: null,
+            createdAt: null,
+            updatedAt: null,
+            raw: {},
+          },
+        ],
+        page: 1,
+        limit: 1,
+        total: 1,
+        total_pages: 1,
+      }),
+    );
+
+    renderSyncsTable();
+
+    expect(screen.getByText("Family")).toBeInTheDocument();
+    expect(screen.getByText(/seguir la actividad de sincronización visible/i)).toBeInTheDocument();
+    expect(screen.queryByText("Todos los accesos")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByText("mb-sync-1"));
+
+    expect(screen.getByText("Resumen de sincronización")).toBeInTheDocument();
+    expect(screen.getByText("Participantes visibles")).toBeInTheDocument();
+    expect(screen.getByText("Señales de sincronización")).toBeInTheDocument();
+  });
 });

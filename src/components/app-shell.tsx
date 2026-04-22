@@ -49,7 +49,7 @@ const navigation: NavigationItem[] = [
     href: "/syncs",
     label: "Sincronizaciones",
     icon: Cable,
-    roles: ["teacher", "director", "researcher", "admin", "institution-admin"] satisfies NavigationRole[],
+    roles: ["teacher", "director", "researcher", "family", "admin", "institution-admin"] satisfies NavigationRole[],
   },
   {
     href: "/games",

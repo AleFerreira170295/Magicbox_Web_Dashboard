@@ -120,7 +120,7 @@ describe("operational route guards", () => {
     expect(screen.getAllByText("Acceso restringido")).toHaveLength(3);
   });
 
-  it("allows family into dashboard and games while keeping the technical routes blocked", () => {
+  it("allows family into dashboard, games and syncs while keeping the technical routes blocked", () => {
     useAuthMock.mockReturnValue({
       user: { roles: ["family"], permissions: [] },
     });
@@ -138,11 +138,11 @@ describe("operational route guards", () => {
 
     expect(screen.getByText("dashboard-home")).toBeInTheDocument();
     expect(screen.getByText("games-table")).toBeInTheDocument();
+    expect(screen.getByText("syncs-table")).toBeInTheDocument();
     expect(screen.queryByText("devices-table")).not.toBeInTheDocument();
-    expect(screen.queryByText("syncs-table")).not.toBeInTheDocument();
     expect(screen.queryByText("territorial-alerts-center")).not.toBeInTheDocument();
     expect(screen.queryByText("territorial-overview-center")).not.toBeInTheDocument();
-    expect(screen.getAllByText("Acceso restringido")).toHaveLength(4);
+    expect(screen.getAllByText("Acceso restringido")).toHaveLength(3);
   });
 
   it("allows government-viewer into dashboard but keeps technical routes blocked", () => {

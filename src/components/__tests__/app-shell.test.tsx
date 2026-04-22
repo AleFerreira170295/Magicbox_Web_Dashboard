@@ -129,7 +129,7 @@ describe("AppShell navigation", () => {
     expect(screen.queryByText("Instituciones")).not.toBeInTheDocument();
   });
 
-  it("keeps family focused on dashboard and a simplified games view", () => {
+  it("keeps family focused on dashboard and simplified activity views", () => {
     useAuthMock.mockReturnValue({
       user: {
         fullName: "Familia Demo",
@@ -144,10 +144,10 @@ describe("AppShell navigation", () => {
 
     expect(screen.getAllByText("Dashboard").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Partidas").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Sincronizaciones").length).toBeGreaterThan(0);
     expect(screen.getByText("Vista familia")).toBeInTheDocument();
     expect(screen.getByText(/lectura simple y cuidada de actividad visible/i)).toBeInTheDocument();
 
-    expect(screen.queryByText("Sincronizaciones")).not.toBeInTheDocument();
     expect(screen.queryByText("Dispositivos")).not.toBeInTheDocument();
     expect(screen.queryByText("Usuarios")).not.toBeInTheDocument();
   });

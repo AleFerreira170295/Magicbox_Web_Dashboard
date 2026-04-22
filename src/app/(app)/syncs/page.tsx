@@ -3,7 +3,7 @@ import { SyncsTable } from "@/features/syncs/syncs-table";
 
 export default function SyncsPage() {
   return (
-    <RoleGuard allowedRoles={["teacher", "director", "researcher", "admin", "institution-admin"]}>
+    <RoleGuard allowedRoles={["teacher", "director", "researcher", "family", "admin", "institution-admin"]}>
       <SyncsTable />
     </RoleGuard>
   );
