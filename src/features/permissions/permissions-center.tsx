@@ -5,6 +5,7 @@ import type { ComponentType, SelectHTMLAttributes } from "react";
 import { AlertTriangle, KeyRound, Layers3, Search, ShieldCheck, ShieldEllipsis, UserRound } from "lucide-react";
 import { SectionHeader } from "@/components/section-header";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -209,6 +210,9 @@ export function PermissionsCenter() {
       scopedPermissions: permissions.filter((item) => item.educationalCenterId).length,
       globalPermissions: permissions.filter((item) => !item.educationalCenterId).length,
       missingReferences: permissionRows.filter((item) => item.hasReferenceGap).length,
+      scopedInstitutionalSignals: permissionRows.filter((item) => item.signal === "scope institucional").length,
+      reviewWithoutRole: reviewProfiles.filter((item) => item.signal === "sin rol").length,
+      reviewWithOverrides: reviewProfiles.filter((item) => item.signal === "override explícito").length,
       permissionRows: filteredPermissionRows,
       reviewProfiles: filteredReviewProfiles,
       allPermissionRows: permissionRows,
@@ -455,6 +459,91 @@ export function PermissionsCenter() {
               ))}
             </SelectField>
           </div>
+        </CardContent>
+      </Card>
+
+      <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
+        <CardContent className="flex flex-wrap gap-2 p-5">
+          <Button
+            type="button"
+            size="sm"
+            variant={scopeFilter === "all" && signalFilter === "all" && query === "" ? "default" : "outline"}
+            onClick={() => {
+              setQuery("");
+              setFeatureFilter("all");
+              setActionFilter("all");
+              setScopeFilter("all");
+              setSignalFilter("all");
+            }}
+          >
+            Todos
+            <Badge variant="outline">{permissions.length}</Badge>
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant={signalFilter === "scope institucional" ? "default" : "outline"}
+            onClick={() => {
+              setQuery("");
+              setScopeFilter("all");
+              setSignalFilter("scope institucional");
+            }}
+          >
+            Scope institucional
+            <Badge variant="outline">{model.scopedInstitutionalSignals}</Badge>
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant={scopeFilter === "global" ? "default" : "outline"}
+            onClick={() => {
+              setQuery("");
+              setSignalFilter("all");
+              setScopeFilter("global");
+            }}
+          >
+            Globales
+            <Badge variant="outline">{model.globalPermissions}</Badge>
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant={signalFilter === "referencia incompleta" ? "default" : "outline"}
+            onClick={() => {
+              setQuery("");
+              setScopeFilter("all");
+              setSignalFilter("referencia incompleta");
+            }}
+          >
+            Referencias incompletas
+            <Badge variant="outline">{model.missingReferences}</Badge>
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant={signalFilter === "sin rol" ? "default" : "outline"}
+            onClick={() => {
+              setQuery("");
+              setScopeFilter("all");
+              setSignalFilter("sin rol");
+            }}
+          >
+            Sin rol
+            <Badge variant="outline">{model.reviewWithoutRole}</Badge>
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant={signalFilter === "override explícito" ? "default" : "outline"}
+            onClick={() => {
+              setQuery("");
+              setScopeFilter("all");
+              setSignalFilter("override explícito");
+            }}
+          >
+            Overrides explícitos
+            <Badge variant="outline">{model.reviewWithOverrides}</Badge>
+          </Button>
         </CardContent>
       </Card>
 

@@ -1,5 +1,5 @@
-import { fireEvent, render, screen } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { PermissionsCenter } from "@/features/permissions/permissions-center";
 
 const useAuthMock = vi.fn();
@@ -177,6 +177,10 @@ describe("PermissionsCenter", () => {
     );
   });
 
+  afterEach(() => {
+    cleanup();
+  });
+
   it("shows the scoped institution-admin mode when ACL reads are available", () => {
     renderPermissionsCenter();
 
@@ -197,5 +201,14 @@ describe("PermissionsCenter", () => {
     expect(screen.getByLabelText("Feature")).toBeInTheDocument();
     expect(screen.getByLabelText("Action")).toBeInTheDocument();
     expect(screen.getByLabelText("Señal")).toBeInTheDocument();
+  });
+
+  it("applies quick governance presets for ACL review", () => {
+    renderPermissionsCenter();
+
+    fireEvent.click(screen.getAllByRole("button", { name: /Globales/i }).at(-1)!);
+
+    expect(screen.queryAllByText("Bruno Campo").length).toBeGreaterThan(0);
+    expect(screen.queryAllByText("Ana Admin")).toHaveLength(0);
   });
 });
