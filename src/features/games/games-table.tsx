@@ -48,6 +48,7 @@ export function GamesTable() {
   const [query, setQuery] = useState("");
   const [institutionFilter, setInstitutionFilter] = useState<string>("");
   const [playerModeFilter, setPlayerModeFilter] = useState<"all" | "manual" | "mixed" | "registered">("all");
+  const [accessFilter, setAccessFilter] = useState<"all" | "owned" | "institution" | "shared" | "unresolved">("all");
   const [selectedGameId, setSelectedGameId] = useState<string | null>(null);
 
   const gamesQuery = useGames(tokens?.accessToken);
@@ -65,12 +66,55 @@ export function GamesTable() {
   const scopedInstitutionName = scopedInstitutionId ? institutions[0]?.name || scopedInstitutionId : null;
   const isInstitutionScopedView = Boolean(scopedInstitutionId && currentUser?.educationalCenterId === scopedInstitutionId);
 
+  const gameRows = useMemo(() => {
+    const currentUserEmail = (currentUser?.email || "").trim().toLowerCase();
+
+    return games.map((game) => {
+      const institution = game.educationalCenterId ? institutionById.get(game.educationalCenterId) : null;
+      const device = game.bleDeviceId ? deviceById.get(game.bleDeviceId) : null;
+      const isOwnedByCurrentUser = Boolean(
+        device && (
+          (currentUser?.id && device.ownerUserId === currentUser.id)
+          || (currentUserEmail && (device.ownerUserEmail || "").trim().toLowerCase() === currentUserEmail)
+        ),
+      );
+      const isInstitutionVisible = Boolean(
+        device?.educationalCenterId
+        && currentUser?.educationalCenterId
+        && device.educationalCenterId === currentUser.educationalCenterId,
+      );
+
+      const accessRelation = isOwnedByCurrentUser
+        ? "mis dispositivos"
+        : isInstitutionVisible
+          ? "institución visible"
+          : device?.ownerUserId || device?.ownerUserEmail
+            ? "compartido visible"
+            : "sin asociación resuelta";
+
+      const ownerLabel = device?.ownerUserName || device?.ownerUserEmail || "sin responsable";
+      const playerCount = game.players.length || game.totalPlayers || 0;
+
+      return {
+        ...game,
+        institution,
+        device,
+        ownerLabel,
+        accessRelation,
+        isOwnedByCurrentUser,
+        isInstitutionVisible,
+        hasUnresolvedAssociation: !device || !game.educationalCenterId || accessRelation === "sin asociación resuelta",
+        playerCount,
+      };
+    });
+  }, [currentUser, deviceById, games, institutionById]);
+
   const filtered = useMemo(() => {
     const normalized = query.trim().toLowerCase();
 
     const effectiveInstitutionFilter = institutionFilter || scopedInstitutionId || "";
 
-    return games.filter((game) => {
+    return gameRows.filter((game) => {
       if (effectiveInstitutionFilter && game.educationalCenterId !== effectiveInstitutionFilter) return false;
 
       const manualCount = game.players.filter((player) => player.playerSource === "manual").length;
@@ -80,28 +124,32 @@ export function GamesTable() {
       if (playerModeFilter === "mixed" && !(manualCount > 0 && registeredCount > 0)) return false;
       if (playerModeFilter === "registered" && !(registeredCount > 0 && manualCount === 0)) return false;
 
-      if (!normalized) return true;
+      if (accessFilter === "owned" && !game.isOwnedByCurrentUser) return false;
+      if (accessFilter === "institution" && !game.isInstitutionVisible) return false;
+      if (accessFilter === "shared" && game.accessRelation !== "compartido visible") return false;
+      if (accessFilter === "unresolved" && !game.hasUnresolvedAssociation) return false;
 
-      const institution = game.educationalCenterId ? institutionById.get(game.educationalCenterId) : null;
-      const device = game.bleDeviceId ? deviceById.get(game.bleDeviceId) : null;
+      if (!normalized) return true;
 
       return [
         game.deckName,
         game.gameId,
         game.bleDeviceId,
-        institution?.name,
-        device?.name,
-        device?.deviceId,
+        game.institution?.name,
+        game.device?.name,
+        game.device?.deviceId,
+        game.ownerLabel,
+        game.accessRelation,
         ...game.players.map((player) => player.playerName),
       ]
         .filter(Boolean)
         .some((value) => String(value).toLowerCase().includes(normalized));
     });
-  }, [deviceById, games, institutionById, institutionFilter, playerModeFilter, query, scopedInstitutionId]);
+  }, [accessFilter, gameRows, institutionFilter, playerModeFilter, query, scopedInstitutionId]);
 
   const selectedGame = useMemo(
-    () => filtered.find((game) => game.id === selectedGameId) || games.find((game) => game.id === selectedGameId) || null,
-    [filtered, games, selectedGameId],
+    () => filtered.find((game) => game.id === selectedGameId) || gameRows.find((game) => game.id === selectedGameId) || null,
+    [filtered, gameRows, selectedGameId],
   );
 
   const metrics = useMemo(() => {
@@ -119,17 +167,38 @@ export function GamesTable() {
       totalPlayers,
       totalTurns,
       mixedGames,
+      unresolvedAssociations: gameRows.filter((game) => game.hasUnresolvedAssociation).length,
+      ownedGames: gameRows.filter((game) => game.isOwnedByCurrentUser).length,
+      institutionVisibleGames: gameRows.filter((game) => game.isInstitutionVisible).length,
       successRate: totalTurns > 0 ? Math.round((successfulTurns / totalTurns) * 100) : 0,
     };
-  }, [games]);
+  }, [gameRows, games]);
 
-  const selectedInstitution = selectedGame?.educationalCenterId ? institutionById.get(selectedGame.educationalCenterId) : null;
-  const selectedDevice = selectedGame?.bleDeviceId ? deviceById.get(selectedGame.bleDeviceId) : null;
+  const selectedInstitution = selectedGame?.institution || null;
+  const selectedDevice = selectedGame?.device || null;
   const selectedManualCount = selectedGame?.players.filter((player) => player.playerSource === "manual").length || 0;
   const selectedRegisteredCount = selectedGame?.players.filter((player) => player.playerSource !== "manual").length || 0;
   const selectedSuccessfulTurns = selectedGame?.turns.filter((turn) => turn.success).length || 0;
   const selectedTurnSuccessRate = selectedGame && selectedGame.turns.length > 0 ? Math.round((selectedSuccessfulTurns / selectedGame.turns.length) * 100) : 0;
   const selectedRecentTurns = [...(selectedGame?.turns || [])].sort((a, b) => b.turnNumber - a.turnNumber).slice(0, 6);
+  const accessSegments = [
+    { key: "all" as const, label: "Todas", count: metrics.totalGames },
+    { key: "owned" as const, label: "Mis dispositivos", count: metrics.ownedGames },
+    { key: "institution" as const, label: "Institución visible", count: metrics.institutionVisibleGames },
+    { key: "shared" as const, label: "Compartidas", count: gameRows.filter((game) => game.accessRelation === "compartido visible").length },
+    { key: "unresolved" as const, label: "Sin asociación resuelta", count: metrics.unresolvedAssociations },
+  ];
+
+  function resolveTurnPlayerLabel(gameId: string, playerId?: string | null, externalPlayerUid?: string | null, studentId?: string | null) {
+    const game = gameRows.find((item) => item.id === gameId);
+    const player = game?.players.find((item) =>
+      (playerId && item.id === playerId)
+      || (externalPlayerUid && item.externalPlayerUid === externalPlayerUid)
+      || (studentId && item.studentId === studentId),
+    );
+
+    return player?.playerName || player?.externalPlayerUid || player?.studentId || externalPlayerUid || studentId || playerId || "sin jugador enlazado";
+  }
 
   return (
     <div className="space-y-6">
@@ -175,6 +244,17 @@ export function GamesTable() {
               <option value="manual">Solo manuales</option>
               <option value="mixed">Mixtos</option>
             </select>
+            <select
+              value={accessFilter}
+              onChange={(event) => setAccessFilter(event.target.value as "all" | "owned" | "institution" | "shared" | "unresolved")}
+              className="h-10 min-w-48 rounded-md border border-input bg-background px-3 text-sm"
+            >
+              <option value="all">Todos los accesos</option>
+              <option value="owned">Mis dispositivos</option>
+              <option value="institution">Institución visible</option>
+              <option value="shared">Compartidas</option>
+              <option value="unresolved">Sin asociación resuelta</option>
+            </select>
           </div>
         }
       />
@@ -196,6 +276,16 @@ export function GamesTable() {
             </p>
           </div>
           {scopedInstitutionName ? <Badge variant="outline">Institución activa: {scopedInstitutionName}</Badge> : null}
+        </CardContent>
+      </Card>
+
+      <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
+        <CardContent className="flex flex-wrap gap-2 p-5">
+          {accessSegments.map((segment) => (
+            <Badge key={segment.key} variant={accessFilter === segment.key ? "secondary" : "outline"} className="px-3 py-1.5">
+              {segment.label}: {segment.count}
+            </Badge>
+          ))}
         </CardContent>
       </Card>
 
@@ -236,6 +326,7 @@ export function GamesTable() {
                     <TableHead>Mazo</TableHead>
                     <TableHead>Institución</TableHead>
                     <TableHead>Dispositivo</TableHead>
+                    <TableHead>Acceso</TableHead>
                     <TableHead>Jugadores</TableHead>
                     <TableHead>Turnos</TableHead>
                     <TableHead>Inicio</TableHead>
@@ -244,14 +335,12 @@ export function GamesTable() {
                 <TableBody>
                   {filtered.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={7} className="py-10 text-center text-sm text-muted-foreground">
+                      <TableCell colSpan={8} className="py-10 text-center text-sm text-muted-foreground">
                         No hay partidas para mostrar.
                       </TableCell>
                     </TableRow>
                   ) : (
                     filtered.map((game) => {
-                      const institution = game.educationalCenterId ? institutionById.get(game.educationalCenterId) : null;
-                      const device = game.bleDeviceId ? deviceById.get(game.bleDeviceId) : null;
                       const manualCount = game.players.filter((player) => player.playerSource === "manual").length;
                       const registeredCount = game.players.filter((player) => player.playerSource !== "manual").length;
 
@@ -263,8 +352,14 @@ export function GamesTable() {
                         >
                           <TableCell className="font-medium">{game.gameId || "-"}</TableCell>
                           <TableCell>{game.deckName || "-"}</TableCell>
-                          <TableCell>{institution?.name || game.educationalCenterId || "-"}</TableCell>
-                          <TableCell>{device?.name || device?.deviceId || game.bleDeviceId || "-"}</TableCell>
+                          <TableCell>{game.institution?.name || game.educationalCenterId || "-"}</TableCell>
+                          <TableCell>{game.device?.name || game.device?.deviceId || game.bleDeviceId || "-"}</TableCell>
+                          <TableCell>
+                            <div className="flex flex-col gap-1">
+                              <Badge variant={game.hasUnresolvedAssociation ? "warning" : "outline"}>{game.accessRelation}</Badge>
+                              <span className="text-xs text-muted-foreground">{game.ownerLabel}</span>
+                            </div>
+                          </TableCell>
                           <TableCell>
                             <div className="flex flex-wrap items-center gap-2">
                               <Badge variant="secondary">{game.players.length || game.totalPlayers || 0}</Badge>
@@ -313,7 +408,9 @@ export function GamesTable() {
                   </div>
                   <div className="mt-3 grid gap-2 text-xs text-muted-foreground sm:grid-cols-2">
                     <p>Dispositivo: {selectedDevice?.name || selectedDevice?.deviceId || selectedGame.bleDeviceId || "-"}</p>
+                    <p>Owner del dispositivo: {selectedGame.ownerLabel}</p>
                     <p>Inicio: {formatDateTime(selectedGame.startDate)}</p>
+                    <p>Relación de acceso: {selectedGame.accessRelation}</p>
                     <p>Jugadores: {selectedGame.players.length || selectedGame.totalPlayers || 0}</p>
                     <p>Turnos: {selectedGame.turns.length}</p>
                     <p>Registrados: {selectedRegisteredCount}</p>
@@ -322,15 +419,25 @@ export function GamesTable() {
                 </div>
 
                 <div>
-                  <p className="text-sm font-medium text-foreground">Jugadores</p>
-                  <div className="mt-3 flex flex-wrap gap-2">
+                  <p className="text-sm font-medium text-foreground">Jugadores y asociaciones</p>
+                  <div className="mt-3 space-y-3">
                     {selectedGame.players.length === 0 ? (
-                      <Badge variant="outline">sin jugadores cargados</Badge>
+                      <div className="rounded-2xl bg-background/70 p-3 text-sm text-muted-foreground">Sin jugadores cargados.</div>
                     ) : (
                       selectedGame.players.map((player, index) => (
-                        <Badge key={player.id || `${player.playerName}-${index}`} variant={player.playerSource === "manual" ? "success" : "outline"}>
-                          {player.playerName || player.externalPlayerUid || `Jugador ${index + 1}`}
-                        </Badge>
+                        <div key={player.id || `${player.playerName}-${index}`} className="rounded-2xl bg-background/70 p-3 text-sm">
+                          <div className="flex flex-wrap items-center justify-between gap-3">
+                            <div>
+                              <p className="font-medium text-foreground">{player.playerName || player.externalPlayerUid || `Jugador ${index + 1}`}</p>
+                              <p className="text-xs text-muted-foreground">{player.studentId || player.externalPlayerUid || player.id || "sin id enlazado"}</p>
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                              <Badge variant={player.playerSource === "manual" ? "success" : "outline"}>{player.playerSource === "manual" ? "manual" : "registrado"}</Badge>
+                              <Badge variant="outline">posición {player.position}</Badge>
+                              {player.cardColor ? <Badge variant="outline">{player.cardColor}</Badge> : null}
+                            </div>
+                          </div>
+                        </div>
                       ))
                     )}
                   </div>
@@ -348,13 +455,18 @@ export function GamesTable() {
                             <div>
                               <p className="font-medium text-foreground">Turno {turn.turnNumber}</p>
                               <p className="text-xs text-muted-foreground">
-                                {turn.externalPlayerUid || turn.gamePlayerId || turn.studentId || "sin jugador enlazado"}
+                                {resolveTurnPlayerLabel(selectedGame.id, turn.gamePlayerId, turn.externalPlayerUid, turn.studentId)}
                               </p>
                             </div>
                             <div className="flex flex-wrap gap-2">
                               <Badge variant={turn.success ? "success" : "outline"}>{turn.success ? "éxito" : "fallo"}</Badge>
                               <Badge variant="outline">{turn.playTimeSeconds || 0}s</Badge>
+                              {turn.difficulty ? <Badge variant="outline">{turn.difficulty}</Badge> : null}
                             </div>
+                          </div>
+                          <div className="mt-2 grid gap-1 text-xs text-muted-foreground sm:grid-cols-2">
+                            <p>Inicio del turno: {formatDateTime(turn.turnStartDate)}</p>
+                            <p>Card: {turn.cardId || "sin card"}</p>
                           </div>
                         </div>
                       ))

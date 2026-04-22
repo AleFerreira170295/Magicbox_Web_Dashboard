@@ -1,6 +1,6 @@
-import { render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { GamesTable } from "@/features/games/games-table";
 
 const useAuthMock = vi.fn();
@@ -79,8 +79,40 @@ describe("GamesTable", () => {
             startDate: null,
             createdAt: null,
             updatedAt: null,
-            players: [],
-            turns: [],
+            players: [
+              {
+                id: "player-1",
+                gameDataId: "game-1",
+                studentId: "student-1",
+                externalPlayerUid: null,
+                playerName: "Luna",
+                playerSource: "registered",
+                position: 1,
+                cardColor: "blue",
+                createdAt: null,
+                updatedAt: null,
+                raw: {},
+              },
+            ],
+            turns: [
+              {
+                id: "turn-1",
+                gameDataId: "game-1",
+                studentId: "student-1",
+                gamePlayerId: "player-1",
+                externalPlayerUid: null,
+                turnNumber: 3,
+                position: 1,
+                cardId: "card-1",
+                success: true,
+                difficulty: "medium",
+                turnStartDate: null,
+                playTimeSeconds: 45,
+                createdAt: null,
+                updatedAt: null,
+                raw: {},
+              },
+            ],
             raw: {},
           },
         ],
@@ -91,7 +123,34 @@ describe("GamesTable", () => {
       }),
     );
 
-    useDevicesMock.mockReturnValue(okQuery({ data: [], page: 1, limit: 0, total: 0, total_pages: 0 }));
+    useDevicesMock.mockReturnValue(
+      okQuery({
+        data: [
+          {
+            id: "device-1",
+            deviceId: "mb-1",
+            name: "MagicBox Aula 1",
+            educationalCenterId: "ec-1",
+            educationalCenterName: "Colegio Norte",
+            assignmentScope: "institution",
+            ownerUserId: "user-1",
+            ownerUserName: "Ines Admin",
+            ownerUserEmail: "admin@example.com",
+            firmwareVersion: null,
+            status: "online",
+            deviceMetadata: {},
+            createdAt: null,
+            updatedAt: null,
+            deletedAt: null,
+            raw: {},
+          },
+        ],
+        page: 1,
+        limit: 1,
+        total: 1,
+        total_pages: 1,
+      }),
+    );
     useInstitutionsMock.mockReturnValue(
       okQuery({
         data: [{ id: "ec-1", name: "Colegio Norte", raw: {} }],
@@ -103,6 +162,10 @@ describe("GamesTable", () => {
     );
   });
 
+  afterEach(() => {
+    cleanup();
+  });
+
   it("anchors the games view to a single institution when the session is institution-scoped", () => {
     renderGamesTable();
 
@@ -110,5 +173,17 @@ describe("GamesTable", () => {
     expect(screen.getByText(/Institución activa: Colegio Norte/)).toBeInTheDocument();
     expect(screen.getByText(/La tabla queda anclada a la institución visible por ACL/i)).toBeInTheDocument();
     expect(screen.getAllByRole("combobox")[0]).toBeDisabled();
+  });
+
+  it("shows access association context and expanded game detail", () => {
+    renderGamesTable();
+
+    fireEvent.click(screen.getByText("101"));
+
+    expect(screen.queryAllByText(/mis dispositivos/i).length).toBeGreaterThan(0);
+    expect(screen.getByText(/Owner del dispositivo: Ines Admin/i)).toBeInTheDocument();
+    expect(screen.getByText("Jugadores y asociaciones")).toBeInTheDocument();
+    expect(screen.queryAllByText("Luna").length).toBeGreaterThan(0);
+    expect(screen.queryAllByText(/medium/i).length).toBeGreaterThan(0);
   });
 });
