@@ -1,6 +1,6 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { InstitutionsOverview } from "@/features/institutions/institutions-overview";
 
 const useAuthMock = vi.fn();
@@ -176,6 +176,10 @@ describe("InstitutionsOverview", () => {
     );
   });
 
+  afterEach(() => {
+    cleanup();
+  });
+
   it("shows institution-admin scoped read-only mode for institutions", () => {
     renderInstitutionsOverview();
 
@@ -188,5 +192,89 @@ describe("InstitutionsOverview", () => {
 
     expect(screen.getByRole("button", { name: "Edición bloqueada" })).toBeDisabled();
     expect(screen.getByText("Sin permiso para eliminar")).toBeInTheDocument();
+  });
+
+  it("filters institutions with operational focus segments", () => {
+    useInstitutionsMock.mockReturnValue(
+      okQuery({
+        data: [
+          {
+            id: "ec-1",
+            name: "Colegio Norte",
+            email: "colegio@example.com",
+            phoneNumber: "+598111111",
+            url: "https://colegio.example.com",
+            address: {
+              addressFirstLine: "Calle 123",
+              addressSecondLine: null,
+              countryCode: "UY",
+              city: "Montevideo",
+              state: "Montevideo",
+              postalCode: "11000",
+            },
+            city: "Montevideo",
+            country: "UY",
+            contactName: null,
+            contactEmail: null,
+            code: null,
+            status: null,
+            createdAt: null,
+            updatedAt: null,
+            raw: {},
+            operationalSummary: {
+              userCount: 3,
+              deviceCount: 2,
+              classGroupCount: 1,
+              studentCount: 20,
+              needsReview: false,
+            },
+          },
+          {
+            id: "ec-2",
+            name: "Colegio Sur",
+            email: "sur@example.com",
+            phoneNumber: "+598222222",
+            url: "https://sur.example.com",
+            address: {
+              addressFirstLine: "Calle 999",
+              addressSecondLine: null,
+              countryCode: "UY",
+              city: "Canelones",
+              state: "Canelones",
+              postalCode: "90000",
+            },
+            city: "Canelones",
+            country: "UY",
+            contactName: null,
+            contactEmail: null,
+            code: null,
+            status: null,
+            createdAt: null,
+            updatedAt: null,
+            raw: {},
+            operationalSummary: {
+              userCount: 0,
+              deviceCount: 0,
+              classGroupCount: 0,
+              studentCount: 0,
+              needsReview: false,
+            },
+          },
+        ],
+        page: 1,
+        limit: 2,
+        total: 2,
+        total_pages: 1,
+      }),
+    );
+    useUsersMock.mockReturnValue(okQuery({ data: [], page: 1, limit: 1, total: 0, total_pages: 1 }));
+    useDevicesMock.mockReturnValue(okQuery({ data: [], page: 1, limit: 1, total: 0, total_pages: 1 }));
+
+    renderInstitutionsOverview();
+
+    fireEvent.click(screen.getByRole("button", { name: /Sin dispositivos/i }));
+
+    expect(screen.queryAllByText("Colegio Sur").length).toBeGreaterThan(0);
+    expect(screen.queryAllByText("Colegio Norte")).toHaveLength(0);
   });
 });

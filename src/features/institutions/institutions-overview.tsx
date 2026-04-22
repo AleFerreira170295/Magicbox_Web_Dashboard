@@ -59,6 +59,7 @@ function SummaryCard({
 }
 
 type FormMode = "create" | "edit";
+type InstitutionFocusFilter = "all" | "review" | "no_users" | "no_devices" | "active_operation";
 type FeedbackState = { type: "success" | "error"; message: string } | null;
 
 type InstitutionFormState = {
@@ -146,6 +147,7 @@ export function InstitutionsOverview() {
   const queryClient = useQueryClient();
 
   const [query, setQuery] = useState("");
+  const [focusFilter, setFocusFilter] = useState<InstitutionFocusFilter>("all");
   const [mode, setMode] = useState<FormMode>("edit");
   const [selectedInstitutionId, setSelectedInstitutionId] = useState<string | null>(null);
   const [form, setForm] = useState<InstitutionFormState>(emptyFormState);
@@ -271,10 +273,26 @@ export function InstitutionsOverview() {
 
   const filtered = useMemo(() => {
     const normalized = query.trim().toLowerCase();
-    if (!normalized) return institutionRows;
+    return institutionRows.filter((item) => {
+      const matchesFocus = (() => {
+        switch (focusFilter) {
+          case "review":
+            return item.needsReview;
+          case "no_users":
+            return item.userCount === 0;
+          case "no_devices":
+            return item.deviceCount === 0;
+          case "active_operation":
+            return item.userCount > 0 && item.deviceCount > 0;
+          default:
+            return true;
+        }
+      })();
 
-    return institutionRows.filter((item) =>
-      [
+      if (!matchesFocus) return false;
+      if (!normalized) return true;
+
+      return [
         item.name,
         item.email,
         item.phoneNumber,
@@ -285,9 +303,9 @@ export function InstitutionsOverview() {
         ...item.linkedDeviceNames,
       ]
         .filter(Boolean)
-        .some((value) => String(value).toLowerCase().includes(normalized)),
-    );
-  }, [institutionRows, query]);
+        .some((value) => String(value).toLowerCase().includes(normalized));
+    });
+  }, [focusFilter, institutionRows, query]);
 
   const metrics = useMemo(() => {
     return {
@@ -297,8 +315,19 @@ export function InstitutionsOverview() {
       totalClassesLinked: institutionRows.reduce((acc, item) => acc + item.classGroupCount, 0),
       totalStudentsLinked: institutionRows.reduce((acc, item) => acc + item.studentCount, 0),
       reviewInstitutions: institutionRows.filter((item) => item.needsReview).length,
+      institutionsWithoutUsers: institutionRows.filter((item) => item.userCount === 0).length,
+      institutionsWithoutDevices: institutionRows.filter((item) => item.deviceCount === 0).length,
+      institutionsWithActiveOperation: institutionRows.filter((item) => item.userCount > 0 && item.deviceCount > 0).length,
     };
   }, [institutionRows]);
+
+  const focusSegments = [
+    { key: "all" as const, label: "Todas", count: metrics.totalInstitutions },
+    { key: "review" as const, label: "Con observaciones", count: metrics.reviewInstitutions },
+    { key: "no_users" as const, label: "Sin usuarios", count: metrics.institutionsWithoutUsers },
+    { key: "no_devices" as const, label: "Sin dispositivos", count: metrics.institutionsWithoutDevices },
+    { key: "active_operation" as const, label: "Operación activa", count: metrics.institutionsWithActiveOperation },
+  ];
 
   const isSaving =
     createInstitutionMutation.isPending || updateInstitutionMutation.isPending || deleteInstitutionMutation.isPending;
@@ -465,6 +494,36 @@ export function InstitutionsOverview() {
           </>
         )}
       </div>
+
+      <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
+        <CardContent className="flex flex-wrap gap-2 p-5">
+          {focusSegments.map((segment) => (
+            <Button
+              key={segment.key}
+              type="button"
+              size="sm"
+              variant={focusFilter === segment.key ? "default" : "outline"}
+              onClick={() => setFocusFilter(segment.key)}
+            >
+              {segment.label}
+              <Badge variant={focusFilter === segment.key ? "secondary" : "outline"} className={focusFilter === segment.key ? "bg-white/90 text-foreground" : ""}>
+                {segment.count}
+              </Badge>
+            </Button>
+          ))}
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            onClick={() => {
+              setFocusFilter("all");
+              setQuery("");
+            }}
+          >
+            Limpiar foco
+          </Button>
+        </CardContent>
+      </Card>
 
       <div className="grid gap-6 xl:grid-cols-[1.25fr_0.95fr]">
         <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
