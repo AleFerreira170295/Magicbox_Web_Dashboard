@@ -24,6 +24,10 @@ vi.mock("@/features/dashboard/researcher-dashboard", () => ({
   ResearcherDashboard: () => <div>researcher-dashboard</div>,
 }));
 
+vi.mock("@/features/dashboard/family-dashboard", () => ({
+  FamilyDashboard: () => <div>family-dashboard</div>,
+}));
+
 describe("DashboardHome", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -85,6 +89,20 @@ describe("DashboardHome", () => {
     expect(screen.getByText("researcher-dashboard")).toBeInTheDocument();
     expect(screen.queryByText("teacher-dashboard")).not.toBeInTheDocument();
     expect(screen.queryByText("superadmin-dashboard")).not.toBeInTheDocument();
+  });
+
+  it("routes family users to the family dashboard home", () => {
+    useAuthMock.mockReturnValue({
+      user: {
+        roles: ["family"],
+      },
+    });
+
+    render(<DashboardHome />);
+
+    expect(screen.getByText("family-dashboard")).toBeInTheDocument();
+    expect(screen.queryByText("teacher-dashboard")).not.toBeInTheDocument();
+    expect(screen.queryByText("researcher-dashboard")).not.toBeInTheDocument();
   });
 
   it("routes director users to the institution dashboard home", () => {

@@ -128,4 +128,27 @@ describe("AppShell navigation", () => {
     expect(screen.queryByText("Permisos")).not.toBeInTheDocument();
     expect(screen.queryByText("Instituciones")).not.toBeInTheDocument();
   });
+
+  it("keeps family focused on dashboard only", () => {
+    useAuthMock.mockReturnValue({
+      user: {
+        fullName: "Familia Demo",
+        email: "family@example.com",
+        roles: ["family"],
+        permissions: ["game_data:read"],
+      },
+      logout: vi.fn(),
+    });
+
+    renderShell();
+
+    expect(screen.getAllByText("Dashboard").length).toBeGreaterThan(0);
+    expect(screen.getByText("Vista familia")).toBeInTheDocument();
+    expect(screen.getByText(/lectura simple y cuidada de actividad visible/i)).toBeInTheDocument();
+
+    expect(screen.queryByText("Partidas")).not.toBeInTheDocument();
+    expect(screen.queryByText("Sincronizaciones")).not.toBeInTheDocument();
+    expect(screen.queryByText("Dispositivos")).not.toBeInTheDocument();
+    expect(screen.queryByText("Usuarios")).not.toBeInTheDocument();
+  });
 });

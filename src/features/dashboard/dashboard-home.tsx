@@ -1,5 +1,6 @@
 "use client";
 
+import { FamilyDashboard } from "@/features/dashboard/family-dashboard";
 import { InstitutionDashboard } from "@/features/dashboard/institution-dashboard";
 import { ResearcherDashboard } from "@/features/dashboard/researcher-dashboard";
 import { TeacherDashboard } from "@/features/dashboard/teacher-dashboard";
@@ -22,6 +23,10 @@ export function DashboardHome() {
 
   if (user?.roles.includes("researcher")) {
     return <ResearcherDashboard />;
+  }
+
+  if (user?.roles.includes("family")) {
+    return <FamilyDashboard />;
   }
 
   return <TeacherDashboard />;
