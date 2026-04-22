@@ -93,8 +93,8 @@ describe("TeacherDashboard", () => {
 
     expect(screen.getByText("Home operativa para acompañar el aula")).toBeInTheDocument();
     expect(screen.getByText(/Partidas sin turnos: 1/i)).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /Partidas/i })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /Dispositivos/i })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /Sincronizaciones/i })).toBeInTheDocument();
+    expect(screen.getAllByRole("link", { name: /Partidas/i }).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole("link", { name: /Dispositivos/i }).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole("link", { name: /Sincronizaciones/i }).length).toBeGreaterThan(0);
   });
 });

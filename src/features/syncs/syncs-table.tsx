@@ -283,9 +283,22 @@ export function SyncsTable() {
       <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
         <CardContent className="flex flex-wrap gap-2 p-5">
           {accessSegments.map((segment) => (
-            <Badge key={segment.key} variant={accessFilter === segment.key ? "secondary" : "outline"} className="px-3 py-1.5">
-              {segment.label}: {segment.count}
-            </Badge>
+            <button
+              key={segment.key}
+              type="button"
+              onClick={() => setAccessFilter(segment.key)}
+              className={cn(
+                "inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-medium transition",
+                accessFilter === segment.key
+                  ? "border-primary bg-primary text-primary-foreground"
+                  : "border-border bg-background text-foreground hover:bg-accent",
+              )}
+            >
+              <span>{segment.label}</span>
+              <Badge variant={accessFilter === segment.key ? "secondary" : "outline"} className={accessFilter === segment.key ? "bg-white/90 text-foreground" : ""}>
+                {segment.count}
+              </Badge>
+            </button>
           ))}
         </CardContent>
       </Card>

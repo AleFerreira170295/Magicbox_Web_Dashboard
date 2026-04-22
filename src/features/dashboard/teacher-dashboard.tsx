@@ -115,6 +115,19 @@ function ModuleCard({
   );
 }
 
+function QuickActionLink({ href, label, value }: { href: string; label: string; value: string }) {
+  return (
+    <Link
+      href={href}
+      className="inline-flex items-center gap-2 rounded-full border border-white/18 bg-white/10 px-4 py-2 text-sm font-medium text-white transition hover:bg-white/16"
+    >
+      <span>{label}</span>
+      <span className="rounded-full bg-white/14 px-2 py-0.5 text-xs text-white/88">{value}</span>
+      <ArrowRight className="size-4" />
+    </Link>
+  );
+}
+
 export function TeacherDashboard() {
   const { tokens, user } = useAuth();
   const gamesQuery = useGames(tokens?.accessToken);
@@ -223,6 +236,12 @@ export function TeacherDashboard() {
                 <p className="text-sm text-white/70">Próxima capa</p>
                 <p className="mt-2 text-lg font-medium">Después podemos profundizar progreso por grupo y narrativa pedagógica.</p>
               </div>
+            </div>
+
+            <div className="mt-8 flex flex-wrap gap-3">
+              <QuickActionLink href="/games" label="Ir a partidas" value={String(metrics.totalGames)} />
+              <QuickActionLink href="/devices" label="Revisar dispositivos" value={String(metrics.totalDevices)} />
+              <QuickActionLink href="/syncs" label="Ver syncs" value={String(metrics.totalSyncs)} />
             </div>
           </CardContent>
         </Card>
@@ -381,14 +400,14 @@ export function TeacherDashboard() {
         <CardHeader>
           <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
             <div>
-              <CardTitle>Dirección visual sugerida para la siguiente iteración</CardTitle>
+              <CardTitle>Base visual de teacher ya encaminada</CardTitle>
               <CardDescription>
-                {user?.fullName || "La cuenta autenticada"} ya puede ver una base más alineada con la marca.
-                Lo próximo sería profundizar la pantalla con progreso por grupo, alertas suaves y narrativa por estudiante.
+                {user?.fullName || "La cuenta autenticada"} ya tiene un circuito más consistente entre home, partidas, dispositivos y syncs.
+                Si seguimos después, el siguiente salto natural sería profundizar lectura pedagógica por grupo y estudiante.
               </CardDescription>
             </div>
             <div className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-4 py-2 text-sm font-medium text-primary">
-              Siguiente paso
+              Visual base cerrada
               <ArrowRight className="size-4" />
             </div>
           </div>
