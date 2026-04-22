@@ -103,6 +103,10 @@ export function RegisterForm() {
 
   return (
     <div className="space-y-6">
+      <div className="rounded-3xl border border-sky-200 bg-sky-50 px-5 py-4 text-sm leading-6 text-sky-900">
+        El alta autónoma está pensada solo para cuentas <span className="font-semibold">family</span>. Si necesitás otro rol, debe crearlo un administrador.
+      </div>
+
       {done ? (
         <div className="rounded-3xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm text-emerald-800">
           Cuenta creada. Ya podés iniciar sesión con esos datos.

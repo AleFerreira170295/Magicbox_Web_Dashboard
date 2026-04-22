@@ -73,6 +73,10 @@ export function VerifyOtpForm() {
 
   return (
     <div className="space-y-6">
+      <div className="rounded-3xl border border-sky-100 bg-sky-50 px-5 py-4 text-sm leading-6 text-sky-900">
+        Si no lo ves en tu bandeja, revisá spam. El código expira rápido.
+      </div>
+
       {error ? (
         <div className="rounded-3xl border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-700">{error}</div>
       ) : null}

@@ -31,6 +31,10 @@ export function ForgotPasswordForm() {
 
   return (
     <div className="space-y-6">
+      <div className="rounded-3xl border border-sky-100 bg-sky-50 px-5 py-4 text-sm leading-6 text-sky-900">
+        Te enviamos un código al correo asociado a tu cuenta para continuar con el restablecimiento.
+      </div>
+
       {error ? (
         <div className="rounded-3xl border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-700">{error}</div>
       ) : null}
