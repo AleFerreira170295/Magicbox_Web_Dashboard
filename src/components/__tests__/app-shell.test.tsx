@@ -27,6 +27,18 @@ function renderShell() {
   );
 }
 
+function expectVisibleLabels(labels: string[]) {
+  labels.forEach((label) => {
+    expect(screen.getAllByText(label).length).toBeGreaterThan(0);
+  });
+}
+
+function expectHiddenLabels(labels: string[]) {
+  labels.forEach((label) => {
+    expect(screen.queryByText(label)).not.toBeInTheDocument();
+  });
+}
+
 describe("AppShell navigation", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -168,5 +180,95 @@ describe("AppShell navigation", () => {
 
     expect(screen.queryByText("Dispositivos")).not.toBeInTheDocument();
     expect(screen.queryByText("Usuarios")).not.toBeInTheDocument();
+  });
+
+  it("keeps the navigation matrix aligned across the supported profiles", () => {
+    const cases = [
+      {
+        name: "admin",
+        user: {
+          fullName: "Ada Admin",
+          email: "admin@example.com",
+          roles: ["admin"],
+          permissions: ["feature:read"],
+        },
+        visible: ["Dashboard", "Sincronizaciones", "Partidas", "Usuarios", "Permisos", "Instituciones", "Salud", "Perfiles", "Configuración", "Dispositivos"],
+        hidden: ["Alertas territoriales", "Territorios e instituciones"],
+      },
+      {
+        name: "director",
+        user: {
+          fullName: "Diana Director",
+          email: "director@example.com",
+          roles: ["director"],
+          permissions: ["game_data:read"],
+        },
+        visible: ["Dashboard", "Sincronizaciones", "Partidas", "Instituciones", "Perfiles", "Dispositivos"],
+        hidden: ["Usuarios", "Permisos", "Salud", "Configuración", "Alertas territoriales", "Territorios e instituciones"],
+      },
+      {
+        name: "institution-admin with acl read",
+        user: {
+          fullName: "Irene Institution",
+          email: "ia@example.com",
+          roles: ["institution-admin"],
+          permissions: ["access_control:read", "feature:read"],
+        },
+        visible: ["Dashboard", "Sincronizaciones", "Partidas", "Usuarios", "Permisos", "Instituciones", "Perfiles", "Dispositivos"],
+        hidden: ["Salud", "Configuración", "Alertas territoriales", "Territorios e instituciones"],
+      },
+      {
+        name: "teacher",
+        user: {
+          fullName: "Teo Teacher",
+          email: "teacher@example.com",
+          roles: ["teacher"],
+          permissions: ["game_data:read"],
+        },
+        visible: ["Dashboard", "Sincronizaciones", "Partidas", "Dispositivos"],
+        hidden: ["Usuarios", "Permisos", "Instituciones", "Salud", "Perfiles", "Configuración", "Alertas territoriales", "Territorios e instituciones"],
+      },
+      {
+        name: "researcher",
+        user: {
+          fullName: "Rita Researcher",
+          email: "research@example.com",
+          roles: ["researcher"],
+          permissions: ["game_data:read", "ble_device:read"],
+        },
+        visible: ["Dashboard", "Sincronizaciones", "Partidas"],
+        hidden: ["Dispositivos", "Usuarios", "Permisos", "Instituciones", "Salud", "Perfiles", "Configuración", "Alertas territoriales", "Territorios e instituciones"],
+      },
+      {
+        name: "family",
+        user: {
+          fullName: "Familia Demo",
+          email: "family@example.com",
+          roles: ["family"],
+          permissions: ["game_data:read"],
+        },
+        visible: ["Dashboard", "Sincronizaciones", "Partidas"],
+        hidden: ["Dispositivos", "Usuarios", "Permisos", "Instituciones", "Salud", "Perfiles", "Configuración", "Alertas territoriales", "Territorios e instituciones"],
+      },
+      {
+        name: "government-viewer",
+        user: {
+          fullName: "Gobierno Territorial",
+          email: "gov@example.com",
+          roles: ["government-viewer"],
+          permissions: ["feature:read"],
+        },
+        visible: ["Dashboard", "Alertas territoriales", "Territorios e instituciones"],
+        hidden: ["Sincronizaciones", "Partidas", "Dispositivos", "Usuarios", "Permisos", "Instituciones", "Salud", "Perfiles", "Configuración"],
+      },
+    ];
+
+    cases.forEach(({ user, visible, hidden }) => {
+      cleanup();
+      useAuthMock.mockReturnValue({ user, logout: vi.fn() });
+      renderShell();
+      expectVisibleLabels(visible);
+      expectHiddenLabels(hidden);
+    });
   });
 });

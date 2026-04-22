@@ -77,6 +77,20 @@ describe("DashboardHome", () => {
     expect(screen.queryByText("teacher-dashboard")).not.toBeInTheDocument();
   });
 
+  it("routes admin users to the executive dashboard home", () => {
+    useAuthMock.mockReturnValue({
+      user: {
+        roles: ["admin"],
+      },
+    });
+
+    render(<DashboardHome />);
+
+    expect(screen.getByText("superadmin-dashboard")).toBeInTheDocument();
+    expect(screen.queryByText("teacher-dashboard")).not.toBeInTheDocument();
+    expect(screen.queryByText("institution-dashboard")).not.toBeInTheDocument();
+  });
+
   it("routes researcher users to the researcher dashboard home", () => {
     useAuthMock.mockReturnValue({
       user: {
