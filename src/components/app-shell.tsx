@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Activity, BarChart3, Building2, Cable, Database, KeyRound, LogOut, Settings, Shield, Sparkles, Smartphone, UserRound, Users } from "lucide-react";
+import { Activity, BarChart3, Building2, Cable, Database, KeyRound, LogOut, Settings, Shield, ShieldAlert, Sparkles, Smartphone, UserRound, Users } from "lucide-react";
 import { AuthGuard } from "@/components/auth-guard";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -32,6 +32,12 @@ const navigation: NavigationItem[] = [
     label: "Dashboard",
     icon: BarChart3,
     roles: ["teacher", "director", "researcher", "admin", "institution-admin", "government-viewer"] satisfies NavigationRole[],
+  },
+  {
+    href: "/territorial-alerts",
+    label: "Alertas territoriales",
+    icon: ShieldAlert,
+    roles: ["government-viewer"] satisfies NavigationRole[],
   },
   {
     href: "/syncs",

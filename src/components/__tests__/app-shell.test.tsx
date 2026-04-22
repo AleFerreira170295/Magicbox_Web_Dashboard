@@ -92,6 +92,7 @@ describe("AppShell navigation", () => {
     renderShell();
 
     expect(screen.getAllByText("Dashboard").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Alertas territoriales").length).toBeGreaterThan(0);
     expect(screen.getByText("Vista gobierno")).toBeInTheDocument();
     expect(screen.getByText(/lectura territorial, alertas ejecutivas y seguimiento agregado/i)).toBeInTheDocument();
 
