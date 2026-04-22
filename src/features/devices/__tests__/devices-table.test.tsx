@@ -358,4 +358,67 @@ describe("DevicesTable", () => {
     expect(screen.getAllByText(/listo para aula/i).length).toBeGreaterThan(0);
     expect(screen.getByText(/Qué mirar primero/i)).toBeInTheDocument();
   });
+
+  it("frames director device review as institutional coordination", () => {
+    useAuthMock.mockReturnValue({
+      tokens: { accessToken: "token", refreshToken: "refresh" },
+      user: {
+        id: "director-1",
+        email: "director@example.com",
+        firstName: "Dora",
+        lastName: "Director",
+        fullName: "Dora Director",
+        educationalCenterId: "ec-1",
+        roles: ["director"],
+        permissions: ["ble_device:read"],
+        raw: {},
+      },
+    });
+
+    useDevicesMock.mockReturnValue(
+      okQuery({
+        data: [
+          {
+            id: "device-1",
+            deviceId: "mb-1",
+            name: "MagicBox Aula 1",
+            educationalCenterId: "ec-1",
+            educationalCenterName: "Colegio Norte",
+            assignmentScope: "institution",
+            ownerUserId: null,
+            ownerUserName: null,
+            ownerUserEmail: null,
+            firmwareVersion: "v2.2",
+            status: null,
+            deviceMetadata: {},
+            createdAt: null,
+            updatedAt: null,
+            deletedAt: null,
+            raw: {},
+          },
+        ],
+        page: 1,
+        limit: 1,
+        total: 1,
+        total_pages: 1,
+      }),
+    );
+
+    renderDevicesTable();
+
+    expect(screen.getByText("Director")).toBeInTheDocument();
+    expect(screen.getByText(/La vista directoral prioriza coordinación institucional/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/Sin responsable/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Conviene revisar/i).length).toBeGreaterThan(0);
+
+    fireEvent.click(screen.getByText("MagicBox Aula 1"));
+
+    expect(screen.getByText(/Detalle de coordinación/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/requiere seguimiento/i).length).toBeGreaterThan(0);
+    expect(screen.getByText(/Señales de coordinación/i)).toBeInTheDocument();
+    expect(screen.getByText(/sin responsable claro/i)).toBeInTheDocument();
+    expect(screen.getByText(/sin status operativo/i)).toBeInTheDocument();
+    expect(screen.getByText(/sin metadata visible/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/sin sync visible/i).length).toBeGreaterThan(0);
+  });
 });

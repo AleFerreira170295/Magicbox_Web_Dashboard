@@ -342,6 +342,7 @@ export function DevicesTable() {
   const canUpdateDevices = hasAnyPermission("ble_device:update", "ble-device:update");
   const currentUserEmail = (currentUser?.email || "").trim().toLowerCase();
   const isTeacherView = currentUser?.roles.includes("teacher") || false;
+  const isDirectorView = currentUser?.roles.includes("director") || false;
 
   const deviceRows = useMemo(() => {
     return devices.map((device) => {
@@ -515,11 +516,13 @@ export function DevicesTable() {
   return (
     <div className="space-y-6">
       <SectionHeader
-        eyebrow={isTeacherView ? "Teacher" : isInstitutionScopedView ? "Institution admin" : "Operación"}
+        eyebrow={isTeacherView ? "Teacher" : isDirectorView ? "Director" : isInstitutionScopedView ? "Institution admin" : "Operación"}
         title="Dispositivos"
         description={
           isTeacherView
             ? "Vista operativa de dispositivos visibles para el docente, aclarando si el hardware entra por ownership directo, alcance institucional o asociaciones compartidas."
+            : isDirectorView
+            ? `Vista de coordinación del parque para ${scopedInstitutionName || "la institución"}, priorizando readiness, ownership y señales de seguimiento.`
             : isInstitutionScopedView
             ? `Vista operativa de hardware para ${scopedInstitutionName}, con edición controlada para ownership, alcance y estado.`
             : "Pantalla operativa de hardware conectada al contrato real de /ble-device, distinguiendo dispositivos Home y de institución."
@@ -590,8 +593,8 @@ export function DevicesTable() {
           <div>
             <div className="flex flex-wrap items-center gap-2">
               <p className="text-sm font-medium text-foreground">Alcance operativo</p>
-              <Badge variant={isTeacherView ? "secondary" : isInstitutionScopedView ? "secondary" : "outline"}>
-                {isTeacherView ? "teacher" : isInstitutionScopedView ? "institution-admin" : "multi-institución / global"}
+              <Badge variant={isTeacherView || isDirectorView || isInstitutionScopedView ? "secondary" : "outline"}>
+                {isTeacherView ? "teacher" : isDirectorView ? "director" : isInstitutionScopedView ? "institution-admin" : "multi-institución / global"}
               </Badge>
               <Badge variant="secondary">Home explícito</Badge>
               <Badge variant={canUpdateDevices ? "secondary" : "outline"}>{canUpdateDevices ? "edición habilitada" : "solo lectura"}</Badge>
@@ -599,6 +602,8 @@ export function DevicesTable() {
             <p className="mt-2 text-sm text-muted-foreground">
               {isTeacherView
                 ? "La vista docente prioriza por qué cada dispositivo te importa hoy: ownership, actividad visible, última sync y señales rápidas para decidir si está listo para aula o conviene revisarlo."
+                : isDirectorView
+                ? "La vista directoral prioriza coordinación institucional: qué está operativo, qué requiere seguimiento y dónde falta ownership o trazabilidad antes de escalar a soporte."
                 : canUpdateDevices
                 ? "Además de distinguir Home vs institución, ahora esta pantalla puede persistir nombre, owner, firmware, estado y cambio de alcance cuando el backend lo permite."
                 : "La sesión actual puede revisar el parque visible por ACL, pero no editar dispositivos sin permiso explícito de actualización."}
@@ -636,12 +641,25 @@ export function DevicesTable() {
           Array.from({ length: 6 }).map((_, index) => <Skeleton key={index} className="h-32 rounded-2xl" />)
         ) : (
           <>
-            <SummaryCard label="Dispositivos" value={String(metrics.total)} hint="Inventario visible según ACL real." icon={Smartphone} />
-            <SummaryCard label="Home" value={String(metrics.homeDevices)} hint="Sin centro educativo asociado, por diseño." icon={Home} />
-            <SummaryCard label="Institución" value={String(metrics.institutionDevices)} hint="Asignados a una institución concreta." icon={University} />
-            <SummaryCard label="Online" value={String(metrics.onlineDevices)} hint="Lectura rápida del parque activo." icon={Wifi} />
-            <SummaryCard label="Con responsable" value={String(metrics.devicesWithOwner)} hint="Ownership ya resuelto desde backend." icon={UserRound} />
-            <SummaryCard label="Con metadata" value={String(metrics.devicesWithMetadata)} hint="Ayuda a soporte y QA manual." icon={ShieldCheck} />
+            {isDirectorView ? (
+              <>
+                <SummaryCard label="Dispositivos" value={String(metrics.total)} hint="Parque visible para coordinación institucional." icon={Smartphone} />
+                <SummaryCard label="Institución" value={String(metrics.institutionDevices)} hint="Asignados al centro que dirigís." icon={University} />
+                <SummaryCard label="Online" value={String(metrics.onlineDevices)} hint="Lectura rápida del parque activo." icon={Wifi} />
+                <SummaryCard label="Con actividad" value={String(metrics.devicesWithActivity)} hint="Tuvieron syncs o partidas visibles." icon={ShieldCheck} />
+                <SummaryCard label="Sin responsable" value={String(metrics.devicesWithoutOwner)} hint="Ownership pendiente o incompleto." icon={UserRound} />
+                <SummaryCard label="Conviene revisar" value={String(metrics.reviewDevices)} hint="Tienen alguna señal blanda para seguimiento." icon={Home} />
+              </>
+            ) : (
+              <>
+                <SummaryCard label="Dispositivos" value={String(metrics.total)} hint="Inventario visible según ACL real." icon={Smartphone} />
+                <SummaryCard label="Home" value={String(metrics.homeDevices)} hint="Sin centro educativo asociado, por diseño." icon={Home} />
+                <SummaryCard label="Institución" value={String(metrics.institutionDevices)} hint="Asignados a una institución concreta." icon={University} />
+                <SummaryCard label="Online" value={String(metrics.onlineDevices)} hint="Lectura rápida del parque activo." icon={Wifi} />
+                <SummaryCard label="Con responsable" value={String(metrics.devicesWithOwner)} hint="Ownership ya resuelto desde backend." icon={UserRound} />
+                <SummaryCard label="Con metadata" value={String(metrics.devicesWithMetadata)} hint="Ayuda a soporte y QA manual." icon={ShieldCheck} />
+              </>
+            )}
           </>
         )}
       </div>
@@ -676,6 +694,8 @@ export function DevicesTable() {
             <CardDescription>
               {isTeacherView
                 ? "Seleccioná un dispositivo para entender por qué lo ves, si tuvo actividad reciente y qué conviene revisar antes de usarlo en aula."
+                : isDirectorView
+                ? "Seleccioná un dispositivo para revisar ownership, actividad y señales de seguimiento antes de coordinar con soporte o con el equipo docente."
                 : "Seleccioná un dispositivo para revisar y editar su alcance, ownership y estado operativo."}
             </CardDescription>
           </CardHeader>
@@ -743,10 +763,12 @@ export function DevicesTable() {
 
         <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
           <CardHeader>
-            <CardTitle>{isTeacherView ? "Detalle operativo para aula" : "Detalle y edición"}</CardTitle>
+            <CardTitle>{isTeacherView ? "Detalle operativo para aula" : isDirectorView ? "Detalle de coordinación" : "Detalle y edición"}</CardTitle>
             <CardDescription>
               {isTeacherView
                 ? "Para docente, este panel deja explícitos ownership, actividad visible y señales de revisión. Si la sesión no puede editar, la lectura sigue siendo útil para decidir rápido qué dispositivo conviene usar o escalar."
+                : isDirectorView
+                ? "Para dirección, este panel deja explícitas las señales blandas de seguimiento y si el dispositivo parece estable o necesita coordinación."
                 : <>Este panel usa mutaciones reales sobre <code>/ble-device/&lt;id&gt;</code> para persistir cambios operativos mínimos sin inventar un flujo paralelo.</>}
             </CardDescription>
           </CardHeader>
@@ -766,6 +788,11 @@ export function DevicesTable() {
                         {selectedDevice.isReadyForClassroom ? "listo para aula" : "conviene revisar"}
                       </Badge>
                     ) : null}
+                    {isDirectorView ? (
+                      <Badge variant={selectedDevice.reviewReasons.length === 0 ? "secondary" : "warning"}>
+                        {selectedDevice.reviewReasons.length === 0 ? "estable para coordinar" : "requiere seguimiento"}
+                      </Badge>
+                    ) : null}
                   </div>
                   <div className="mt-3 grid gap-2 text-xs text-muted-foreground sm:grid-cols-2">
                     <p>Syncs visibles: {selectedDevice.relatedSyncCount}</p>
@@ -773,9 +800,9 @@ export function DevicesTable() {
                     <p>Última sync visible: {formatDateTime(selectedDevice.lastSyncedAt)}</p>
                     <p>Contexto: {selectedDevice.isOwnedByCurrentUser ? "owner directo" : selectedDevice.isInstitutionVisible ? "scope institucional" : selectedDevice.hasUnresolvedAssociation ? "falta asociación" : "visible por ACL compartida"}</p>
                   </div>
-                  {isTeacherView ? (
+                  {isTeacherView || isDirectorView ? (
                     <div className="mt-4 rounded-2xl bg-white/80 p-4 text-sm text-muted-foreground">
-                      <p className="font-medium text-foreground">Qué mirar primero</p>
+                      <p className="font-medium text-foreground">{isTeacherView ? "Qué mirar primero" : "Señales de coordinación"}</p>
                       {selectedDevice.reviewReasons.length ? (
                         <ul className="mt-2 space-y-1">
                           {selectedDevice.reviewReasons.map((reason) => (
@@ -783,7 +810,11 @@ export function DevicesTable() {
                           ))}
                         </ul>
                       ) : (
-                        <p className="mt-2">No aparece ninguna señal blanda fuerte. Si además respondió en la última sync visible, debería estar listo para la jornada.</p>
+                        <p className="mt-2">
+                          {isTeacherView
+                            ? "No aparece ninguna señal blanda fuerte. Si además respondió en la última sync visible, debería estar listo para la jornada."
+                            : "No aparecen señales blandas fuertes. Desde dirección, este dispositivo se ve estable para seguimiento normal sin escalamiento inmediato."}
+                        </p>
                       )}
                     </div>
                   ) : null}
