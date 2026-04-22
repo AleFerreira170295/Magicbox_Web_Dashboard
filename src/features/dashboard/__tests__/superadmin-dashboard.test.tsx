@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -15,6 +15,8 @@ const useBasicHealthMock = vi.fn();
 const useReadinessHealthMock = vi.fn();
 const useSystemDashboardSummaryMock = vi.fn();
 const replaceMock = vi.fn();
+const writeTextMock = vi.fn();
+let searchParamsMock = new URLSearchParams();
 
 vi.mock("@/features/auth/auth-context", () => ({
   useAuth: () => useAuthMock(),
@@ -23,7 +25,7 @@ vi.mock("@/features/auth/auth-context", () => ({
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ replace: replaceMock }),
   usePathname: () => "/dashboard",
-  useSearchParams: () => new URLSearchParams(),
+  useSearchParams: () => searchParamsMock,
 }));
 
 vi.mock("@/features/dashboard/api", () => ({
@@ -94,6 +96,11 @@ function renderDashboard() {
 describe("SuperadminDashboard", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    searchParamsMock = new URLSearchParams();
+    Object.defineProperty(window.navigator, "clipboard", {
+      configurable: true,
+      value: { writeText: writeTextMock },
+    });
 
     useUsersMock.mockReturnValue(okQuery(okPaginated([])));
     useInstitutionsMock.mockReturnValue(okQuery(okPaginated([{ id: "ec-1", name: "Colegio Norte", operationalSummary: { needsReview: false } }])));
@@ -355,5 +362,95 @@ describe("SuperadminDashboard", () => {
       },
       true,
     );
+  });
+
+  it("copies a shareable link with the active territorial combination", async () => {
+    searchParamsMock = new URLSearchParams("range=90d&country_code=UY&state=Montevideo&city=Centro&user_type=teacher&role_code=government&smart_preset=critical");
+
+    useAuthMock.mockReturnValue({
+      tokens: { accessToken: "token", refreshToken: "refresh" },
+      user: {
+        fullName: "Gobierno Territorial",
+        roles: ["government-viewer"],
+        permissions: ["feature:read"],
+      },
+    });
+    useSystemDashboardSummaryMock.mockReturnValue(
+      okQuery({
+        filters: {
+          selected_range: "90d",
+          selected_institution_id: null,
+          selected_country_code: "UY",
+          selected_state: "Montevideo",
+          selected_city: "Centro",
+          selected_user_type: "teacher",
+          selected_role_code: "government",
+          range_options: [{ value: "90d", label: "90 días" }],
+          institutions: [],
+          countries: ["UY"],
+          states: ["Montevideo"],
+          cities: ["Centro"],
+          user_types: ["teacher"],
+          role_codes: ["government"],
+          window_start: null,
+          trend_range: "90d",
+        },
+        totals: {
+          users: 10,
+          institutions: 1,
+          devices: 2,
+          syncs: 3,
+          games: 4,
+          profiles: 5,
+          turns: 6,
+        },
+        stats: {
+          institutions_needing_review: 0,
+          devices_without_status: 0,
+          devices_with_owner: 2,
+          devices_with_firmware: 2,
+          home_devices: 0,
+          institution_devices: 2,
+          syncs_with_raw: 3,
+          total_players: 8,
+          successful_turns: 5,
+          games_with_turns: 4,
+          active_profiles: 4,
+          profiles_with_bindings: 3,
+          profiles_with_sessions: 2,
+        },
+        trends: [],
+        comparisons: {
+          window_label: "90d",
+          current_start: "2026-01-20T00:00:00Z",
+          current_end: "2026-04-20T00:00:00Z",
+          previous_start: "2025-10-20T00:00:00Z",
+          previous_end: "2026-01-20T00:00:00Z",
+          metrics: [],
+        },
+        alerts: [],
+        segments: {
+          role_mix: [],
+          user_type_mix: [],
+          top_institutions: [],
+          top_territories: [],
+          territorial_hierarchy: [],
+          territory_alerts: [],
+          territory_scores: [],
+        },
+      }),
+    );
+
+    renderDashboard();
+
+    fireEvent.click(screen.getByRole("button", { name: /Copiar link/i }));
+
+    await waitFor(() => {
+      expect(writeTextMock).toHaveBeenCalledWith(
+        "http://localhost:3000/dashboard?range=90d&country_code=UY&state=Montevideo&city=Centro&user_type=teacher&role_code=government&smart_preset=critical",
+      );
+    });
+
+    expect(screen.getByRole("button", { name: /Link copiado/i })).toBeInTheDocument();
   });
 });

@@ -1,11 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { type ComponentType, useEffect, useMemo, useState } from "react";
+import { type ComponentType, useMemo, useState, useSyncExternalStore } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   ArrowRight,
   Building2,
+  Check,
+  Copy,
   Database,
   HeartPulse,
   KeyRound,
@@ -19,6 +21,7 @@ import {
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis } from "recharts";
 import { SectionHeader } from "@/components/section-header";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useSystemDashboardSummary } from "@/features/dashboard/api";
@@ -125,14 +128,57 @@ function ModuleCard({
 type TerritorialPreset = {
   id: string;
   name: string;
-  filters: Partial<Record<"range" | "institution_id" | "country_code" | "state" | "city" | "user_type" | "role_code", string>>;
+  filters: Partial<Record<"range" | "institution_id" | "country_code" | "state" | "city" | "user_type" | "role_code" | "smart_preset", string>>;
 };
+
+const TERRITORIAL_PRESETS_STORAGE_KEY = "magicbox:territorial-presets";
+const territorialPresetListeners = new Set<() => void>();
+
+function readStoredTerritorialPresetsSnapshot() {
+  if (typeof window === "undefined") return "[]";
+  if (typeof window.localStorage?.getItem !== "function") return "[]";
+  return window.localStorage.getItem(TERRITORIAL_PRESETS_STORAGE_KEY) || "[]";
+}
+
+function emitTerritorialPresetChange() {
+  territorialPresetListeners.forEach((listener) => listener());
+}
+
+function subscribeToTerritorialPresets(onStoreChange: () => void) {
+  territorialPresetListeners.add(onStoreChange);
+
+  if (typeof window !== "undefined") {
+    const handleStorage = (event: StorageEvent) => {
+      if (event.key && event.key !== TERRITORIAL_PRESETS_STORAGE_KEY) return;
+      onStoreChange();
+    };
+
+    window.addEventListener("storage", handleStorage);
+    return () => {
+      territorialPresetListeners.delete(onStoreChange);
+      window.removeEventListener("storage", handleStorage);
+    };
+  }
+
+  return () => {
+    territorialPresetListeners.delete(onStoreChange);
+  };
+}
 
 export function SuperadminDashboard() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const [territorialPresets, setTerritorialPresets] = useState<TerritorialPreset[]>([]);
+  const territorialPresetsSnapshot = useSyncExternalStore(subscribeToTerritorialPresets, readStoredTerritorialPresetsSnapshot, () => "[]");
+  const territorialPresets = useMemo<TerritorialPreset[]>(() => {
+    try {
+      const parsed = JSON.parse(territorialPresetsSnapshot);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }, [territorialPresetsSnapshot]);
+  const [shareLinkState, setShareLinkState] = useState<"idle" | "copied" | "error">("idle");
   const { tokens, user } = useAuth();
   const isAdmin = user?.roles.includes("admin") || false;
   const isGovernmentViewer = user?.roles.includes("government-viewer") || false;
@@ -287,29 +333,15 @@ export function SuperadminDashboard() {
     return territoryAlerts.filter((item) => [...allowed].some((label) => item.label.includes(label)));
   }, [activeSmartPreset, filteredTerritoryScores, territoryAlerts]);
 
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    try {
-      const raw = window.localStorage.getItem("magicbox:territorial-presets");
-      if (!raw) return;
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) {
-        setTerritorialPresets(parsed);
-      }
-    } catch {
-      // noop
-    }
-  }, []);
-
   function updateFilter(
-    key: "range" | "institution_id" | "country_code" | "state" | "city" | "user_type" | "role_code",
+    key: "range" | "institution_id" | "country_code" | "state" | "city" | "user_type" | "role_code" | "smart_preset",
     value: string,
   ) {
     updateFilters({ [key]: value });
   }
 
   function updateFilters(
-    entries: Partial<Record<"range" | "institution_id" | "country_code" | "state" | "city" | "user_type" | "role_code", string>>,
+    entries: Partial<Record<"range" | "institution_id" | "country_code" | "state" | "city" | "user_type" | "role_code" | "smart_preset", string>>,
   ) {
     const params = new URLSearchParams(searchParams.toString());
     for (const [key, value] of Object.entries(entries)) {
@@ -323,13 +355,48 @@ export function SuperadminDashboard() {
   }
 
   function updateSmartPreset(value: string) {
-    const params = new URLSearchParams(searchParams.toString());
-    if (!value || value === "all") {
-      params.delete("smart_preset");
-    } else {
-      params.set("smart_preset", value);
+    updateFilter("smart_preset", value === "all" ? "" : value);
+  }
+
+  function buildSharableSearchParams() {
+    const params = new URLSearchParams();
+    const entries = {
+      range: selectedRange,
+      institution_id: selectedInstitutionId || "",
+      country_code: selectedCountryCode || "",
+      state: selectedState || "",
+      city: selectedCity || "",
+      user_type: selectedUserType || "",
+      role_code: selectedRoleCode || "",
+      smart_preset: activeSmartPreset === "all" ? "" : activeSmartPreset,
+    } as const;
+
+    for (const [key, value] of Object.entries(entries)) {
+      if (value) {
+        params.set(key, value);
+      }
     }
-    router.replace(params.toString() ? `${pathname}?${params.toString()}` : pathname);
+
+    return params;
+  }
+
+  async function copyCurrentViewLink() {
+    if (typeof window === "undefined") return;
+
+    const params = buildSharableSearchParams();
+    const relativeUrl = params.toString() ? `${pathname}?${params.toString()}` : pathname;
+    const shareUrl = window.location.origin ? `${window.location.origin}${relativeUrl}` : relativeUrl;
+
+    try {
+      await window.navigator.clipboard.writeText(shareUrl);
+      setShareLinkState("copied");
+    } catch {
+      setShareLinkState("error");
+    }
+
+    window.setTimeout(() => {
+      setShareLinkState("idle");
+    }, 2200);
   }
 
   function downloadTerritorialReport() {
@@ -380,9 +447,9 @@ export function SuperadminDashboard() {
   }
 
   function persistPresets(nextPresets: TerritorialPreset[]) {
-    setTerritorialPresets(nextPresets);
-    if (typeof window !== "undefined") {
-      window.localStorage.setItem("magicbox:territorial-presets", JSON.stringify(nextPresets));
+    if (typeof window !== "undefined" && typeof window.localStorage?.setItem === "function") {
+      window.localStorage.setItem(TERRITORIAL_PRESETS_STORAGE_KEY, JSON.stringify(nextPresets));
+      emitTerritorialPresetChange();
     }
   }
 
@@ -403,6 +470,7 @@ export function SuperadminDashboard() {
         city: selectedCity || "",
         user_type: selectedUserType || "",
         role_code: selectedRoleCode || "",
+        smart_preset: activeSmartPreset === "all" ? "" : activeSmartPreset,
       },
     };
     persistPresets([nextPreset, ...territorialPresets].slice(0, 8));
@@ -863,13 +931,19 @@ export function SuperadminDashboard() {
                 <CardTitle>Vistas ejecutivas guardadas</CardTitle>
                 <CardDescription>Presets locales para recuperar rápido combinaciones territoriales que revisas seguido.</CardDescription>
               </div>
-              <button
-                type="button"
-                className="rounded-full bg-primary/10 px-4 py-2 text-sm font-medium text-primary"
-                onClick={saveCurrentPreset}
-              >
-                Guardar vista actual
-              </button>
+              <div className="flex flex-wrap gap-2">
+                <Button type="button" variant="outline" size="sm" onClick={copyCurrentViewLink}>
+                  {shareLinkState === "copied" ? <Check className="size-4" /> : <Copy className="size-4" />}
+                  {shareLinkState === "copied"
+                    ? "Link copiado"
+                    : shareLinkState === "error"
+                      ? "No pude copiar"
+                      : "Copiar link"}
+                </Button>
+                <Button type="button" variant="secondary" size="sm" onClick={saveCurrentPreset}>
+                  Guardar vista actual
+                </Button>
+              </div>
             </div>
           </CardHeader>
           <CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
