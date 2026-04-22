@@ -2,17 +2,19 @@
 
 Plataforma web de MagicBox para explorar, auditar y analizar sincronizaciones, partidas y dispositivos sin perder trazabilidad del payload original. Además de la experiencia para clientes e instituciones, esta web también debe evolucionar como consola de superadmin para gestión operativa de usuarios, permisos, instituciones, perfiles y estado del parque de dispositivos.
 
-## Estado de este primer entregable
+## Estado actual
 
-Este repo estaba vacío. En esta primera iteración queda implementado:
+Este repo arrancó vacío y ya quedó convertido en una base funcional bastante más completa.
+
+Hoy incluye:
 
 - bootstrap con Next.js + TypeScript + Tailwind
 - base de componentes estilo shadcn/ui
 - TanStack Query configurado
 - autenticación preparada para el backend Flask existente
 - navegación por roles, con resolución provisional configurable mientras el backend expone roles/permisos explícitos
-- dashboard inicial de docente
-- módulos base de sincronizaciones, partidas y dispositivos
+- dashboards y navegación diferenciados por perfil
+- módulos operativos para sincronizaciones, partidas, dispositivos, usuarios, permisos, instituciones y perfiles
 - tipos TypeScript y clientes API preparados para datos raw + normalizados
 - documentación de arquitectura lossless e inventario de endpoints/requerimientos
 
@@ -32,6 +34,65 @@ Incluye:
 - botón directo de **copiar link** para compartir la combinación actual completa de filtros, rango y smart preset activo
 
 Además, la ruta `/login` ya quedó ajustada para App Router con `Suspense`, evitando el bloqueo de build cuando `LoginForm` usa `useSearchParams()`.
+
+## Estado reciente por perfil
+
+En esta tanda se terminó de empujar la plataforma con criterio **perfil por perfil, pantalla por pantalla**, priorizando operatividad antes que polish fino.
+
+### `admin`
+
+- mantiene la vista global/ejecutiva en `/dashboard`
+- conserva acceso a módulos técnicos y de operación completa
+
+### `government-viewer`
+
+- `/dashboard` con lectura ejecutiva
+- `/territorial-alerts`
+- `/territorial-overview`
+- navegación acotada a lectura territorial y alertas
+
+### `institution-admin` / `director`
+
+- home institucional dedicada en `/dashboard`
+- módulos núcleo reforzados:
+  - `/users`
+  - `/devices`
+  - `/institutions`
+  - `/profiles`
+  - `/permissions` (para `institution-admin` cuando la ACL del backend lo permite)
+
+### `teacher`
+
+- home operativa dedicada en `/dashboard`
+- `/games` reforzado con foco en acceso visible, asociaciones y detalle legible
+- `/syncs` reforzado para cerrar mejor el tramo `sync -> game`
+- `/devices` reforzado con contexto de acceso y actividad visible
+- cierre visual consistente entre home, partidas, dispositivos y syncs
+
+### `researcher`
+
+- home dedicada en `/dashboard`
+- `/games` adaptado a lectura de evidencia y composición de muestra
+- `/syncs` adaptado a cobertura de captura, correlación con partidas y evidencia visible
+- cierre visual consistente para investigación
+
+### `family`
+
+- home simple en `/dashboard`
+- `/games` en versión simplificada y de solo lectura
+- `/syncs` en versión simplificada y de solo lectura
+- navegación deliberadamente acotada, sin abrir módulos técnicos o administrativos
+
+## QA funcional cruzado
+
+Además del trabajo de producto por perfil, se amplió la cobertura de tests para validar:
+
+- routing de `dashboard-home` por rol
+- matriz de navegación visible en el shell
+- guards de rutas por perfil
+- coherencia entre perfiles al tocar navegación o módulos compartidos
+
+La base actual ya pasa `test`, `typecheck`, `lint` y `build` tras cada frente cerrado.
 
 ## Stack
 
@@ -118,6 +179,12 @@ La web ya no debe pensarse solo como un dashboard para clientes. A partir de aho
 - `/syncs`
 - `/games`
 - `/devices`
+- `/users`
+- `/permissions`
+- `/institutions`
+- `/profiles`
+- `/territorial-alerts`
+- `/territorial-overview`
 - `/login`
 
 Dentro de `/dashboard`, la home ya contempla tanto la capa operativa de administración como la lectura territorial ejecutiva para perfiles de gobierno.
@@ -135,20 +202,9 @@ Esta versión ya consume o prepara consumo de:
 
 ## Próximo paso recomendado
 
-Además de completar la capa backend lossless mínima, la siguiente iteración de frontend debería separar explícitamente la navegación de institución y la navegación de superadmin.
+Con la base por perfiles bastante más madura, el siguiente frente natural ya no es abrir más pantallas a ciegas, sino una de estas dos líneas:
 
-Backend / datos:
+1. **QA manual transversal** por perfil sobre datos reales del backend
+2. **polish fino** de detalles visuales e interacción ahora que las funciones principales ya están operativas
 
-1. `raw_ingestion_records`
-2. `raw_ingestion_fragments`
-3. `sync_sessions` canónica multi-origen
-4. endpoint de ingestión lossless idempotente
-5. endpoint de consultas de sincronización para web
-
-Frontend / producto:
-
-6. home de superadmin con métricas globales
-7. módulo de usuarios y permisos
-8. módulo de instituciones
-9. módulo de perfiles relevantes
-10. módulo de salud de dispositivos y sincronización
+En backend, sigue siendo valioso consolidar la capa lossless canónica de ingestión y consulta para sincronizaciones.
