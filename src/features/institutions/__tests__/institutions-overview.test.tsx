@@ -194,6 +194,33 @@ describe("InstitutionsOverview", () => {
     expect(screen.getByText("Sin permiso para eliminar")).toBeInTheDocument();
   });
 
+  it("adapts institutions copy to a director-oriented follow-up view", () => {
+    useAuthMock.mockReturnValue({
+      tokens: { accessToken: "token", refreshToken: "refresh" },
+      user: {
+        id: "user-director",
+        email: "director@example.com",
+        firstName: "Dora",
+        lastName: "Director",
+        fullName: "Dora Director",
+        educationalCenterId: "ec-1",
+        roles: ["director"],
+        permissions: ["educational_center:read"],
+        raw: {},
+      },
+    });
+
+    renderInstitutionsOverview();
+
+    expect(screen.getByText("Director")).toBeInTheDocument();
+    expect(screen.getByText(/pensada para seguimiento general de operación, contacto y cobertura visible/i)).toBeInTheDocument();
+
+    fireEvent.click(screen.getAllByText("Colegio Norte")[0]);
+
+    expect(screen.getByText(/Instituciones visibles para seguimiento/i)).toBeInTheDocument();
+    expect(screen.getByText(/Detalle de seguimiento/i)).toBeInTheDocument();
+  });
+
   it("filters institutions with operational focus segments", () => {
     useInstitutionsMock.mockReturnValue(
       okQuery({

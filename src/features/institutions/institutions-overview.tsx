@@ -165,6 +165,7 @@ export function InstitutionsOverview() {
   const scopedInstitutionId = institutions.length === 1 ? institutions[0]?.id || null : null;
   const scopedInstitutionName = scopedInstitutionId ? institutions[0]?.name || scopedInstitutionId : null;
   const isInstitutionScopedView = Boolean(scopedInstitutionId && currentUser?.educationalCenterId === scopedInstitutionId);
+  const isDirectorView = currentUser?.roles.includes("director") || false;
 
   const currentPermissionKeys = useMemo(() => new Set(currentUser?.permissions || []), [currentUser?.permissions]);
   const hasGlobalAdminRole = currentUser?.roles.includes("admin") || false;
@@ -391,11 +392,13 @@ export function InstitutionsOverview() {
   return (
     <div className="space-y-6">
       <SectionHeader
-        eyebrow={isInstitutionScopedView ? "Institution admin" : "Superadmin"}
+        eyebrow={isInstitutionScopedView ? (isDirectorView ? "Director" : "Institution admin") : "Superadmin"}
         title="Instituciones"
         description={
           isInstitutionScopedView
-            ? `Vista operativa sobre ${scopedInstitutionName}. Ya cruza instituciones con usuarios y dispositivos reales.`
+            ? isDirectorView
+              ? `Vista institucional sobre ${scopedInstitutionName}, pensada para seguimiento general de operación, contacto y cobertura visible.`
+              : `Vista operativa sobre ${scopedInstitutionName}. Ya cruza instituciones con usuarios y dispositivos reales.`
             : "La vista ahora conecta instituciones reales del backend con impacto operativo en usuarios y dispositivos."
         }
         actions={
@@ -432,12 +435,14 @@ export function InstitutionsOverview() {
             <div className="flex flex-wrap items-center gap-2">
               <p className="text-sm font-medium text-foreground">Alcance operativo</p>
               <Badge variant={isInstitutionScopedView ? "secondary" : "outline"}>
-                {isInstitutionScopedView ? "institution-admin" : "multi-institución / global"}
+                {isInstitutionScopedView ? (isDirectorView ? "director" : "institution-admin") : "multi-institución / global"}
               </Badge>
             </div>
             <p className="mt-2 text-sm text-muted-foreground">
               {isInstitutionScopedView && scopedInstitutionName
-                ? `Estás operando sobre ${scopedInstitutionName}. La vista ya refleja el perímetro real expuesto por el backend.`
+                ? isDirectorView
+                  ? `Estás siguiendo ${scopedInstitutionName}. La vista deja en primer plano contacto, cobertura y señales básicas de operación sin empujarte a una lectura administrativa más profunda.`
+                  : `Estás operando sobre ${scopedInstitutionName}. La vista ya refleja el perímetro real expuesto por el backend.`
                 : "Cada institución se muestra como unidad operativa con usuarios, dispositivos y datos de contacto conectados al backend real."}
             </p>
             <div className="mt-3 flex flex-wrap gap-2">
@@ -528,9 +533,11 @@ export function InstitutionsOverview() {
       <div className="grid gap-6 xl:grid-cols-[1.25fr_0.95fr]">
         <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
           <CardHeader>
-            <CardTitle>Mapa institucional</CardTitle>
+            <CardTitle>{isDirectorView ? "Instituciones visibles para seguimiento" : "Mapa institucional"}</CardTitle>
             <CardDescription>
-              Seleccioná una institución para revisar sus datos base, su estado operativo y los vínculos con usuarios y dispositivos.
+              {isDirectorView
+                ? "Seleccioná una institución para revisar contacto, cobertura visible y señales generales de operación."
+                : "Seleccioná una institución para revisar sus datos base, su estado operativo y los vínculos con usuarios y dispositivos."}
             </CardDescription>
           </CardHeader>
           <CardContent className="overflow-x-auto p-0">
@@ -600,12 +607,14 @@ export function InstitutionsOverview() {
         <div className="space-y-6">
           <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
             <CardHeader>
-              <CardTitle>{mode === "create" ? "Alta de institución" : "Editar institución"}</CardTitle>
+              <CardTitle>{mode === "create" ? "Alta de institución" : isDirectorView ? "Detalle de seguimiento" : "Editar institución"}</CardTitle>
               <CardDescription>
                 {mode === "create"
                   ? canCreateInstitutions
                     ? "Alta conectada al endpoint real de instituciones."
                     : "Tu perfil actual no expone alta de instituciones."
+                  : isDirectorView
+                  ? "Resumen de contacto, cobertura visible y señales básicas para seguimiento institucional."
                   : canUpdateInstitutions
                     ? "Datos base del cliente, contacto y localización operativa."
                     : "Vista de solo lectura para los datos base de la institución."}
@@ -627,7 +636,7 @@ export function InstitutionsOverview() {
 
               {mode === "edit" && !selectedInstitution ? (
                 <div className="rounded-2xl bg-background/70 p-4 text-sm text-muted-foreground">
-                  Elegí una institución de la tabla para editarla o crear una nueva.
+                  {isDirectorView ? "Elegí una institución de la tabla para revisar su detalle de seguimiento." : "Elegí una institución de la tabla para editarla o crear una nueva."}
                 </div>
               ) : (
                 <>
