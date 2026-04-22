@@ -2,15 +2,17 @@
 
 import Link from "next/link";
 import { useMemo } from "react";
-import { ArrowRight, BookHeart, Clock3, Sparkles, Trophy, Users2 } from "lucide-react";
+import { ArrowRight, BookHeart, Sparkles, Smartphone, Users2, Cable } from "lucide-react";
 import { SectionHeader } from "@/components/section-header";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/features/auth/auth-context";
+import { useDevices } from "@/features/devices/api";
 import { useGames } from "@/features/games/api";
 import { useSyncSessions } from "@/features/syncs/api";
-import { formatDurationSeconds, getErrorMessage } from "@/lib/utils";
+import { useUsers } from "@/features/users/api";
+import { getErrorMessage } from "@/lib/utils";
 
 function MetricCard({
   label,
@@ -43,38 +45,34 @@ function MetricCard({
 
 export function FamilyDashboard() {
   const { tokens, user } = useAuth();
+  const devicesQuery = useDevices(tokens?.accessToken);
   const gamesQuery = useGames(tokens?.accessToken);
   const syncsQuery = useSyncSessions(tokens?.accessToken);
+  const usersQuery = useUsers(tokens?.accessToken);
 
-  const isLoading = gamesQuery.isLoading || syncsQuery.isLoading;
-  const error = gamesQuery.error || syncsQuery.error;
+  const isLoading = devicesQuery.isLoading || gamesQuery.isLoading || syncsQuery.isLoading || usersQuery.isLoading;
+  const error = devicesQuery.error || gamesQuery.error || syncsQuery.error || usersQuery.error;
 
   const metrics = useMemo(() => {
+    const devices = devicesQuery.data?.data || [];
     const games = gamesQuery.data?.data || [];
     const syncs = syncsQuery.data?.data || [];
-    const totalTurns = games.reduce((sum, game) => sum + game.turns.length, 0);
-    const totalTurnTime = games.reduce(
-      (sum, game) => sum + game.turns.reduce((turnSum, turn) => turnSum + (turn.playTimeSeconds || 0), 0),
-      0,
-    );
-    const avgTurnTime = totalTurns > 0 ? totalTurnTime / totalTurns : 0;
+    const users = usersQuery.data?.data || [];
 
     return {
+      totalDevices: devicesQuery.data?.total || devices.length,
       totalGames: gamesQuery.data?.total || games.length,
       totalSyncs: syncsQuery.data?.total || syncs.length,
-      avgTurnTime,
-      activeDecks: new Set(games.map((game) => game.deckName).filter(Boolean)).size,
-      gamesWithTurns: games.filter((game) => game.turns.length > 0).length,
-      syncsWithRaw: syncs.filter((sync) => (sync.rawRecordCount || sync.rawRecordIds.length || 0) > 0).length,
+      totalUsers: usersQuery.data?.total || users.length,
     };
-  }, [gamesQuery.data, syncsQuery.data]);
+  }, [devicesQuery.data, gamesQuery.data, syncsQuery.data, usersQuery.data]);
 
   return (
     <div className="space-y-8">
       <SectionHeader
         eyebrow="Family"
-        title="Home simple para seguir la actividad visible"
-        description="Esta vista evita módulos técnicos y se concentra en una lectura más clara de actividad reciente, participación y progreso visible."
+        title="Home simple para seguir lo visible"
+        description="Esta vista evita módulos técnicos y se concentra en una lectura clara de tus dispositivos, partidas y usuarios visibles."
       />
 
       <div className="grid gap-6 xl:grid-cols-[1.35fr_0.95fr]">
@@ -82,13 +80,13 @@ export function FamilyDashboard() {
           <CardContent className="p-8 sm:p-10">
             <div className="flex flex-wrap gap-2">
               <Badge className="bg-white/14 text-white hover:bg-white/14">Seguimiento</Badge>
-              <Badge className="bg-white/14 text-white hover:bg-white/14">Actividad visible</Badge>
-              <Badge className="bg-white/14 text-white hover:bg-white/14">Lenguaje claro</Badge>
+              <Badge className="bg-white/14 text-white hover:bg-white/14">Dispositivos propios</Badge>
+              <Badge className="bg-white/14 text-white hover:bg-white/14">Usuarios visibles</Badge>
             </div>
 
             <div className="mt-6 max-w-3xl">
               <h2 className="text-3xl font-semibold tracking-tight sm:text-4xl">
-                La vista family empieza por lo importante, qué actividad hubo y cómo se mueve la experiencia visible.
+                La vista family empieza por lo importante, tus dispositivos, partidas y usuarios visibles.
               </h2>
               <p className="mt-4 text-base leading-7 text-white/78">
                 La idea acá no es abrir operación interna, sino ofrecer un resumen amable y entendible del uso reciente.
@@ -97,21 +95,43 @@ export function FamilyDashboard() {
 
             <div className="mt-8 flex flex-wrap gap-3">
               <div className="inline-flex items-center gap-2 rounded-full border border-white/18 bg-white/10 px-4 py-2 text-sm font-medium text-white">
-                Partidas visibles
+                Dispositivos
+                <span className="rounded-full bg-white/14 px-2 py-0.5 text-xs text-white/88">{metrics.totalDevices}</span>
+              </div>
+              <div className="inline-flex items-center gap-2 rounded-full border border-white/18 bg-white/10 px-4 py-2 text-sm font-medium text-white">
+                Partidas
                 <span className="rounded-full bg-white/14 px-2 py-0.5 text-xs text-white/88">{metrics.totalGames}</span>
               </div>
               <div className="inline-flex items-center gap-2 rounded-full border border-white/18 bg-white/10 px-4 py-2 text-sm font-medium text-white">
-                Syncs visibles
+                Usuarios
+                <span className="rounded-full bg-white/14 px-2 py-0.5 text-xs text-white/88">{metrics.totalUsers}</span>
+              </div>
+              <div className="inline-flex items-center gap-2 rounded-full border border-white/18 bg-white/10 px-4 py-2 text-sm font-medium text-white">
+                Syncs
                 <span className="rounded-full bg-white/14 px-2 py-0.5 text-xs text-white/88">{metrics.totalSyncs}</span>
               </div>
             </div>
 
             <div className="mt-8 flex flex-wrap gap-3">
               <Link
+                href="/devices"
+                className="inline-flex items-center gap-2 rounded-full border border-white/18 bg-white/10 px-4 py-2 text-sm font-medium text-white transition hover:bg-white/16"
+              >
+                Ver dispositivos
+                <ArrowRight className="size-4" />
+              </Link>
+              <Link
                 href="/games"
                 className="inline-flex items-center gap-2 rounded-full border border-white/18 bg-white/10 px-4 py-2 text-sm font-medium text-white transition hover:bg-white/16"
               >
                 Ver partidas
+                <ArrowRight className="size-4" />
+              </Link>
+              <Link
+                href="/users"
+                className="inline-flex items-center gap-2 rounded-full border border-white/18 bg-white/10 px-4 py-2 text-sm font-medium text-white transition hover:bg-white/16"
+              >
+                Ver usuarios
                 <ArrowRight className="size-4" />
               </Link>
               <Link
@@ -135,7 +155,7 @@ export function FamilyDashboard() {
           <CardContent className="space-y-3">
             <div className="rounded-2xl bg-background/70 p-4">
               <p className="font-medium text-foreground">Actividad reciente</p>
-              <p className="mt-2 text-sm leading-6 text-muted-foreground">Partidas visibles, tiempo de interacción y señales simples para entender si hubo movimiento.</p>
+              <p className="mt-2 text-sm leading-6 text-muted-foreground">Partidas, dispositivos y señales simples para entender si hubo movimiento.</p>
             </div>
             <div className="rounded-2xl bg-background/70 p-4">
               <p className="font-medium text-foreground">Lenguaje no técnico</p>
@@ -154,19 +174,17 @@ export function FamilyDashboard() {
           Array.from({ length: 4 }).map((_, index) => <Skeleton key={index} className="h-36 rounded-2xl" />)
         ) : (
           <>
+            <MetricCard label="Dispositivos visibles" value={String(metrics.totalDevices)} hint="Hardware que entra en tu alcance visible." icon={Smartphone} />
             <MetricCard label="Partidas visibles" value={String(metrics.totalGames)} hint="Sesiones visibles en esta cuenta." icon={BookHeart} />
-            <MetricCard label="Con turnos" value={String(metrics.gamesWithTurns)} hint="Partidas donde ya hubo interacción observable." icon={Users2} />
-            <MetricCard label="Tiempo promedio" value={formatDurationSeconds(metrics.avgTurnTime)} hint="Señal rápida del ritmo de juego visible." icon={Clock3} />
-            <MetricCard label="Mazos activos" value={String(metrics.activeDecks)} hint="Diversidad de contenido vista recientemente." icon={Trophy} />
+            <MetricCard label="Usuarios visibles" value={String(metrics.totalUsers)} hint="Usuarios que podés ver desde esta cuenta." icon={Users2} />
+            <MetricCard label="Syncs visibles" value={String(metrics.totalSyncs)} hint="Sincronizaciones recientes vinculadas a tu alcance." icon={Cable} />
           </>
         )}
       </div>
 
       {error ? (
         <Card className="border-destructive/20 bg-white/85">
-          <CardContent className="p-6 text-sm text-destructive">
-            No pude cargar una parte del dashboard: {getErrorMessage(error)}
-          </CardContent>
+          <CardContent className="p-6 text-sm text-destructive">No pude cargar una parte del dashboard: {getErrorMessage(error)}</CardContent>
         </Card>
       ) : null}
 

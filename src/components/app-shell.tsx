@@ -135,7 +135,7 @@ const navigation: NavigationItem[] = [
     href: "/users",
     label: "Usuarios",
     icon: Users,
-    roles: ["admin", "institution-admin"] satisfies NavigationRole[],
+    roles: ["admin", "institution-admin", "family"] satisfies NavigationRole[],
   },
   {
     href: "/permissions",
@@ -172,7 +172,7 @@ const navigation: NavigationItem[] = [
     href: "/devices",
     label: "Dispositivos",
     icon: Smartphone,
-    roles: ["teacher", "director", "admin", "institution-admin"] satisfies NavigationRole[],
+    roles: ["teacher", "director", "admin", "institution-admin", "family"] satisfies NavigationRole[],
   },
 ];
 

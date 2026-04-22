@@ -3,7 +3,7 @@ import { UsersTable } from "@/features/users/users-table";
 
 export default function UsersPage() {
   return (
-    <RoleGuard allowedRoles={["admin", "institution-admin"]}>
+    <RoleGuard allowedRoles={["admin", "institution-admin", "family"]}>
       <UsersTable />
     </RoleGuard>
   );

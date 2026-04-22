@@ -178,8 +178,8 @@ describe("AppShell navigation", () => {
     expect(screen.getByText("Vista familia")).toBeInTheDocument();
     expect(screen.getByText(/lectura simple y cuidada de actividad visible/i)).toBeInTheDocument();
 
-    expect(screen.queryByText("Dispositivos")).not.toBeInTheDocument();
-    expect(screen.queryByText("Usuarios")).not.toBeInTheDocument();
+    expect(screen.getAllByText("Dispositivos").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Usuarios").length).toBeGreaterThan(0);
   });
 
   it("keeps the navigation matrix aligned across the supported profiles", () => {
@@ -258,8 +258,8 @@ describe("AppShell navigation", () => {
           roles: ["family"],
           permissions: ["game_data:read"],
         },
-        visible: ["Dashboard", "Sincronizaciones", "Partidas"],
-        hidden: ["Dispositivos", "Usuarios", "Permisos", "Instituciones", "Salud", "Perfiles", "Configuración", "Alertas territoriales", "Territorios e instituciones"],
+        visible: ["Dashboard", "Sincronizaciones", "Partidas", "Dispositivos", "Usuarios"],
+        hidden: ["Permisos", "Instituciones", "Salud", "Perfiles", "Configuración", "Alertas territoriales", "Territorios e instituciones"],
       },
       {
         name: "government-viewer",

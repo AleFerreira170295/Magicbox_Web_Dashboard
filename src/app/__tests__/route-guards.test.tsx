@@ -164,7 +164,7 @@ describe("operational route guards", () => {
     },
     {
       role: "family",
-      visible: ["dashboard-home", "games-table", "syncs-table"],
+      visible: ["dashboard-home", "devices-table", "games-table", "syncs-table", "users-table"],
     },
     {
       role: "government-viewer",

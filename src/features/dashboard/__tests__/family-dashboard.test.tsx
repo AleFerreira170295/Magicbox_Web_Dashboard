@@ -4,11 +4,17 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { FamilyDashboard } from "@/features/dashboard/family-dashboard";
 
 const useAuthMock = vi.fn();
+const useDevicesMock = vi.fn();
 const useGamesMock = vi.fn();
 const useSyncSessionsMock = vi.fn();
+const useUsersMock = vi.fn();
 
 vi.mock("@/features/auth/auth-context", () => ({
   useAuth: () => useAuthMock(),
+}));
+
+vi.mock("@/features/devices/api", () => ({
+  useDevices: (...args: unknown[]) => useDevicesMock(...args),
 }));
 
 vi.mock("@/features/games/api", () => ({
@@ -17,6 +23,10 @@ vi.mock("@/features/games/api", () => ({
 
 vi.mock("@/features/syncs/api", () => ({
   useSyncSessions: (...args: unknown[]) => useSyncSessionsMock(...args),
+}));
+
+vi.mock("@/features/users/api", () => ({
+  useUsers: (...args: unknown[]) => useUsersMock(...args),
 }));
 
 function okPaginated(data: unknown[]) {
@@ -55,6 +65,10 @@ describe("FamilyDashboard", () => {
       },
     });
 
+    useDevicesMock.mockReturnValue(okQuery(okPaginated([
+      { id: "device-1", name: "Tablet familiar", assignmentScope: "home" },
+      { id: "device-2", name: "Tablet secundaria", assignmentScope: "home" },
+    ])));
     useGamesMock.mockReturnValue(okQuery(okPaginated([
       { id: "game-1", deckName: "Lectura", turns: [{ id: "turn-1", playTimeSeconds: 90 }] },
       { id: "game-2", deckName: "Memoria", turns: [] },
@@ -62,6 +76,10 @@ describe("FamilyDashboard", () => {
     useSyncSessionsMock.mockReturnValue(okQuery(okPaginated([
       { id: "sync-1", rawRecordCount: 0, rawRecordIds: [] },
       { id: "sync-2", rawRecordCount: 2, rawRecordIds: [] },
+    ])));
+    useUsersMock.mockReturnValue(okQuery(okPaginated([
+      { id: "user-1", fullName: "Niña Demo", email: "nina@example.com" },
+      { id: "user-2", fullName: "Niño Demo", email: "nino@example.com" },
     ])));
   });
 
@@ -72,8 +90,10 @@ describe("FamilyDashboard", () => {
   it("renders a simplified family dashboard focused on visible activity", () => {
     renderDashboard();
 
-    expect(screen.getByText("Home simple para seguir la actividad visible")).toBeInTheDocument();
-    expect(screen.getByText(/lenguaje claro/i)).toBeInTheDocument();
+    expect(screen.getByText("Home simple para seguir lo visible")).toBeInTheDocument();
+    expect(screen.getAllByText(/tus dispositivos, partidas y usuarios visibles/i).length).toBeGreaterThan(0);
+    expect(screen.queryAllByText(/Dispositivos visibles/i).length).toBeGreaterThan(0);
+    expect(screen.queryAllByText(/Usuarios visibles/i).length).toBeGreaterThan(0);
     expect(screen.queryAllByText(/Partidas visibles/i).length).toBeGreaterThan(0);
     expect(screen.queryAllByText(/Syncs visibles/i).length).toBeGreaterThan(0);
   });
