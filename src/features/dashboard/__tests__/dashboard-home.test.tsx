@@ -12,6 +12,10 @@ vi.mock("@/features/dashboard/superadmin-dashboard", () => ({
   SuperadminDashboard: () => <div>superadmin-dashboard</div>,
 }));
 
+vi.mock("@/features/dashboard/institution-dashboard", () => ({
+  InstitutionDashboard: () => <div>institution-dashboard</div>,
+}));
+
 vi.mock("@/features/dashboard/teacher-dashboard", () => ({
   TeacherDashboard: () => <div>teacher-dashboard</div>,
 }));
@@ -25,7 +29,7 @@ describe("DashboardHome", () => {
     cleanup();
   });
 
-  it("routes institution-admin users to the operational dashboard home", () => {
+  it("routes institution-admin users to the institution dashboard home", () => {
     useAuthMock.mockReturnValue({
       user: {
         roles: ["institution-admin"],
@@ -34,8 +38,9 @@ describe("DashboardHome", () => {
 
     render(<DashboardHome />);
 
-    expect(screen.getByText("superadmin-dashboard")).toBeInTheDocument();
+    expect(screen.getByText("institution-dashboard")).toBeInTheDocument();
     expect(screen.queryByText("teacher-dashboard")).not.toBeInTheDocument();
+    expect(screen.queryByText("superadmin-dashboard")).not.toBeInTheDocument();
   });
 
   it("keeps teacher users on the teacher dashboard", () => {
@@ -62,5 +67,19 @@ describe("DashboardHome", () => {
 
     expect(screen.getByText("superadmin-dashboard")).toBeInTheDocument();
     expect(screen.queryByText("teacher-dashboard")).not.toBeInTheDocument();
+  });
+
+  it("routes director users to the institution dashboard home", () => {
+    useAuthMock.mockReturnValue({
+      user: {
+        roles: ["director"],
+      },
+    });
+
+    render(<DashboardHome />);
+
+    expect(screen.getByText("institution-dashboard")).toBeInTheDocument();
+    expect(screen.queryByText("teacher-dashboard")).not.toBeInTheDocument();
+    expect(screen.queryByText("superadmin-dashboard")).not.toBeInTheDocument();
   });
 });
