@@ -372,16 +372,31 @@ export function DevicesTable() {
         .filter(Boolean)
         .sort((a, b) => new Date(b as string).getTime() - new Date(a as string).getTime())[0] || null;
 
+      const hasUnresolvedAssociation = !device.ownerUserId && !device.ownerUserEmail && device.assignmentScope === "institution";
+      const hasOperationalActivity = relatedSyncs.length > 0 || relatedGames.length > 0;
+      const reviewReasons = [
+        !device.ownerUserId && !device.ownerUserEmail ? "sin responsable claro" : null,
+        !device.status ? "sin status operativo" : null,
+        Object.keys(device.deviceMetadata || {}).length === 0 ? "sin metadata visible" : null,
+        relatedSyncs.length === 0 ? "sin sync visible" : null,
+      ].filter((value): value is string => Boolean(value));
+
       return {
         ...device,
         accessRelation,
         isOwnedByCurrentUser,
         isInstitutionVisible,
-        hasUnresolvedAssociation: !device.ownerUserId && !device.ownerUserEmail && device.assignmentScope === "institution",
+        hasUnresolvedAssociation,
         relatedSyncCount: relatedSyncs.length,
         relatedGameCount: relatedGames.length,
         lastSyncedAt,
-        hasOperationalActivity: relatedSyncs.length > 0 || relatedGames.length > 0,
+        hasOperationalActivity,
+        reviewReasons,
+        isReadyForClassroom: Boolean(
+          device.status &&
+          !hasUnresolvedAssociation &&
+          hasOperationalActivity,
+        ),
       };
     });
   }, [currentUser, currentUserEmail, devices, games, syncs]);
@@ -575,14 +590,16 @@ export function DevicesTable() {
           <div>
             <div className="flex flex-wrap items-center gap-2">
               <p className="text-sm font-medium text-foreground">Alcance operativo</p>
-              <Badge variant={isInstitutionScopedView ? "secondary" : "outline"}>
-                {isInstitutionScopedView ? "institution-admin" : "multi-institución / global"}
+              <Badge variant={isTeacherView ? "secondary" : isInstitutionScopedView ? "secondary" : "outline"}>
+                {isTeacherView ? "teacher" : isInstitutionScopedView ? "institution-admin" : "multi-institución / global"}
               </Badge>
               <Badge variant="secondary">Home explícito</Badge>
               <Badge variant={canUpdateDevices ? "secondary" : "outline"}>{canUpdateDevices ? "edición habilitada" : "solo lectura"}</Badge>
             </div>
             <p className="mt-2 text-sm text-muted-foreground">
-              {canUpdateDevices
+              {isTeacherView
+                ? "La vista docente prioriza por qué cada dispositivo te importa hoy: ownership, actividad visible, última sync y señales rápidas para decidir si está listo para aula o conviene revisarlo."
+                : canUpdateDevices
                 ? "Además de distinguir Home vs institución, ahora esta pantalla puede persistir nombre, owner, firmware, estado y cambio de alcance cuando el backend lo permite."
                 : "La sesión actual puede revisar el parque visible por ACL, pero no editar dispositivos sin permiso explícito de actualización."}
             </p>
@@ -657,7 +674,9 @@ export function DevicesTable() {
           <CardHeader>
             <CardTitle>Parque de dispositivos</CardTitle>
             <CardDescription>
-              Seleccioná un dispositivo para revisar y editar su alcance, ownership y estado operativo.
+              {isTeacherView
+                ? "Seleccioná un dispositivo para entender por qué lo ves, si tuvo actividad reciente y qué conviene revisar antes de usarlo en aula."
+                : "Seleccioná un dispositivo para revisar y editar su alcance, ownership y estado operativo."}
             </CardDescription>
           </CardHeader>
           <CardContent className="overflow-x-auto p-0">
@@ -724,9 +743,11 @@ export function DevicesTable() {
 
         <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
           <CardHeader>
-            <CardTitle>Detalle y edición</CardTitle>
+            <CardTitle>{isTeacherView ? "Detalle operativo para aula" : "Detalle y edición"}</CardTitle>
             <CardDescription>
-              Este panel usa mutaciones reales sobre <code>/ble-device/&lt;id&gt;</code> para persistir cambios operativos mínimos sin inventar un flujo paralelo.
+              {isTeacherView
+                ? "Para docente, este panel deja explícitos ownership, actividad visible y señales de revisión. Si la sesión no puede editar, la lectura sigue siendo útil para decidir rápido qué dispositivo conviene usar o escalar."
+                : <>Este panel usa mutaciones reales sobre <code>/ble-device/&lt;id&gt;</code> para persistir cambios operativos mínimos sin inventar un flujo paralelo.</>}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-5">
@@ -740,6 +761,11 @@ export function DevicesTable() {
                   <div className="flex flex-wrap items-center gap-2">
                     <Badge variant={selectedDevice.hasUnresolvedAssociation ? "warning" : "outline"}>{selectedDevice.accessRelation}</Badge>
                     {selectedDevice.hasOperationalActivity ? <Badge variant="secondary">actividad visible</Badge> : <Badge variant="outline">sin actividad visible</Badge>}
+                    {isTeacherView ? (
+                      <Badge variant={selectedDevice.isReadyForClassroom ? "secondary" : "warning"}>
+                        {selectedDevice.isReadyForClassroom ? "listo para aula" : "conviene revisar"}
+                      </Badge>
+                    ) : null}
                   </div>
                   <div className="mt-3 grid gap-2 text-xs text-muted-foreground sm:grid-cols-2">
                     <p>Syncs visibles: {selectedDevice.relatedSyncCount}</p>
@@ -747,6 +773,20 @@ export function DevicesTable() {
                     <p>Última sync visible: {formatDateTime(selectedDevice.lastSyncedAt)}</p>
                     <p>Contexto: {selectedDevice.isOwnedByCurrentUser ? "owner directo" : selectedDevice.isInstitutionVisible ? "scope institucional" : selectedDevice.hasUnresolvedAssociation ? "falta asociación" : "visible por ACL compartida"}</p>
                   </div>
+                  {isTeacherView ? (
+                    <div className="mt-4 rounded-2xl bg-white/80 p-4 text-sm text-muted-foreground">
+                      <p className="font-medium text-foreground">Qué mirar primero</p>
+                      {selectedDevice.reviewReasons.length ? (
+                        <ul className="mt-2 space-y-1">
+                          {selectedDevice.reviewReasons.map((reason) => (
+                            <li key={reason}>• {reason}</li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p className="mt-2">No aparece ninguna señal blanda fuerte. Si además respondió en la última sync visible, debería estar listo para la jornada.</p>
+                      )}
+                    </div>
+                  ) : null}
                 </div>
 
                 <DeviceEditorPanel

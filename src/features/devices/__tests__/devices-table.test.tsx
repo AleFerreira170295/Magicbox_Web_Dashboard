@@ -355,5 +355,7 @@ describe("DevicesTable", () => {
     expect(screen.getByText(/Syncs visibles: 1/i)).toBeInTheDocument();
     expect(screen.getByText(/Partidas visibles: 1/i)).toBeInTheDocument();
     expect(screen.getByText(/Contexto: owner directo/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/listo para aula/i).length).toBeGreaterThan(0);
+    expect(screen.getByText(/Qué mirar primero/i)).toBeInTheDocument();
   });
 });

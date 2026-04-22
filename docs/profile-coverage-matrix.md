@@ -20,7 +20,7 @@ Status labels:
 | `admin` | `SuperadminDashboard` | `/dashboard`, `/syncs`, `/games`, `/users`, `/permissions`, `/institutions`, `/health`, `/profiles`, `/settings`, `/devices` | **closed** | Global platform suite is aligned in navigation, guards, and tests. |
 | `institution-admin` | `InstitutionDashboard` | `/dashboard`, `/syncs`, `/games`, `/users`, `/permissions`, `/institutions`, `/profiles`, `/devices` | **closed** | The strong product contract is now explicit in frontend: `Permissions` is part of the role experience, and misprovisioned sessions surface as contract gaps instead of silently hiding the module. |
 | `director` | `InstitutionDashboard` | `/dashboard`, `/syncs`, `/games`, `/institutions`, `/profiles`, `/devices` | **closed** | Institutional scope looks coherent and intentionally excludes `users`, `permissions`, `health`, and `settings`. |
-| `teacher` | `TeacherDashboard` | `/dashboard`, `/syncs`, `/games`, `/devices` | **follow-up** | Core flow is operational. Next useful check is whether `/devices` needs one more teacher-oriented pass to match the stronger work already done in `games` and `syncs`. |
+| `teacher` | `TeacherDashboard` | `/dashboard`, `/syncs`, `/games`, `/devices` | **closed** | The final teacher-oriented pass on `/devices` is done: the screen now emphasizes why a device matters today, whether it looks ready for classroom use, and what should be reviewed first. |
 | `researcher` | `ResearcherDashboard` | `/dashboard`, `/syncs`, `/games` | **closed** | Scope is intentionally narrow and already aligned with navigation/tests. |
 | `family` | `FamilyDashboard` | `/dashboard`, `/syncs`, `/games` | **closed** | Scope is intentionally simple and already aligned with navigation/tests. |
 | `government-viewer` | executive view inside `SuperadminDashboard` | `/dashboard`, `/territorial-alerts`, `/territorial-overview` | **closed** | Executive territorial experience is isolated from technical modules and covered by tests. |
@@ -78,6 +78,6 @@ Targeted verification run on 2026-04-22:
 
 If the goal is to finish profiles one by one, the best next step is:
 
-1. **Validate the backend/session provisioning** for real `institution-admin` sessions so they actually arrive with ACL/feature read as expected.
-2. **Do a final teacher pass on `/devices`** if we want the teacher experience to feel equally polished across all of its visible modules.
-3. Then move to broader UX polish only after those two checks are explicit.
+1. Choose the next profile or surface that still deserves a dedicated closing pass.
+2. If we stay in the current lane, review whether `director` needs any equivalent final polish in `/devices` or whether we jump to broader UX consolidation.
+3. Then move to broader UX polish only after those checks are explicit.
