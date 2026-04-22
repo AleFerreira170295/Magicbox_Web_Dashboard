@@ -308,6 +308,9 @@ export function SuperadminDashboard() {
     ],
     [territoryAlerts, territoryScores],
   );
+  const activeSmartPresetMeta = activeSmartPreset === "all"
+    ? null
+    : smartPresets.find((preset) => preset.key === activeSmartPreset) || null;
 
   const filteredTerritoryScores = useMemo(() => {
     switch (activeSmartPreset) {
@@ -338,16 +341,19 @@ export function SuperadminDashboard() {
 
   const activeExecutiveFilters = useMemo(
     () => [
-      selectedRange !== "30d" ? `Rango: ${selectedRange}` : null,
-      selectedInstitutionId ? `Institución: ${selectedInstitutionId}` : null,
-      selectedCountryCode ? `País: ${selectedCountryCode}` : null,
-      selectedState ? `Estado: ${selectedState}` : null,
-      selectedCity ? `Ciudad: ${selectedCity}` : null,
-      selectedUserType ? `Tipo: ${selectedUserType}` : null,
-      selectedRoleCode ? `Rol: ${selectedRoleCode}` : null,
-      activeSmartPreset !== "all" ? `Preset: ${activeSmartPreset}` : null,
+      selectedRange !== "30d"
+        ? `Rango · ${rangeOptions.find((option) => option.value === selectedRange)?.label || selectedRange}`
+        : null,
+      selectedInstitutionId
+        ? `Institución · ${institutionOptions.find((institution) => institution.id === selectedInstitutionId)?.name || selectedInstitutionId}`
+        : null,
+      selectedCountryCode ? `País · ${selectedCountryCode}` : null,
+      selectedState ? `Estado · ${selectedState}` : null,
+      selectedCity ? `Ciudad · ${selectedCity}` : null,
+      selectedUserType ? `Tipo · ${selectedUserType}` : null,
+      selectedRoleCode ? `Rol · ${selectedRoleCode}` : null,
     ].filter((value): value is string => Boolean(value)),
-    [activeSmartPreset, selectedCity, selectedCountryCode, selectedInstitutionId, selectedRange, selectedRoleCode, selectedState, selectedUserType],
+    [institutionOptions, rangeOptions, selectedCity, selectedCountryCode, selectedInstitutionId, selectedRange, selectedRoleCode, selectedState, selectedUserType],
   );
 
   function updateFilter(
@@ -746,11 +752,26 @@ export function SuperadminDashboard() {
                   </label>
                 </div>
 
-                {activeExecutiveFilters.length > 0 ? (
-                  <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-white/10 px-4 py-3 text-sm text-white/85 backdrop-blur-sm">
-                    <p>
-                      Vista afinada con {activeExecutiveFilters.length} filtro{activeExecutiveFilters.length === 1 ? "" : "s"} activo{activeExecutiveFilters.length === 1 ? "" : "s"}.
-                    </p>
+                {activeExecutiveFilters.length > 0 || activeSmartPresetMeta ? (
+                  <div className="mt-4 flex flex-wrap items-center justify-between gap-4 rounded-2xl bg-white/10 px-4 py-4 text-sm text-white/85 backdrop-blur-sm">
+                    <div className="flex-1">
+                      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-white/65">Contexto activo</p>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {activeSmartPresetMeta ? (
+                          <Badge className="border-transparent bg-white text-slate-950">
+                            Preset activo · {activeSmartPresetMeta.label}
+                          </Badge>
+                        ) : null}
+                        {activeExecutiveFilters.map((filterLabel) => (
+                          <Badge key={filterLabel} variant="outline" className="border-white/20 bg-white/10 text-white">
+                            {filterLabel}
+                          </Badge>
+                        ))}
+                      </div>
+                      <p className="mt-3 text-sm text-white/72">
+                        La vista queda etiquetada para revisar o compartir sin tener que releer todos los selectores.
+                      </p>
+                    </div>
                     <Button type="button" variant="outline" size="sm" className="border-white/20 bg-white/10 text-white hover:bg-white/15 hover:text-white" onClick={resetExecutiveView}>
                       Volver a vista general
                     </Button>

@@ -533,6 +533,11 @@ describe("SuperadminDashboard", () => {
 
     renderDashboard();
 
+    expect(screen.getByText("Contexto activo")).toBeInTheDocument();
+    expect(screen.getByText(/Preset activo · Territorios críticos/i)).toBeInTheDocument();
+    expect(screen.getByText(/País · UY/i)).toBeInTheDocument();
+    expect(screen.getByText(/Estado · Montevideo/i)).toBeInTheDocument();
+
     fireEvent.click(screen.getByRole("button", { name: /Volver a vista general/i }));
 
     expect(replaceMock).toHaveBeenCalledWith("/dashboard?range=30d");
