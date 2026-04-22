@@ -47,6 +47,21 @@ Status labels:
 
 Right now, the UI is ready for both paths. What is missing is not another screen, but the explicit product rule.
 
+## Where the contract is currently implicit in code
+
+The decision is currently spread across UI surfaces instead of being centralized:
+
+- `src/components/app-shell.tsx`: decides whether `Permissions` appears in navigation for `institution-admin`
+- `src/features/dashboard/institution-dashboard.tsx`: decides whether the `Permisos` quick access card appears
+- `src/features/permissions/permissions-center.tsx`: decides whether the screen loads real ACL data or only shows the blocked-state explanation
+- `src/features/auth/auth-context.tsx` + `src/features/auth/role-resolver.ts`: define the user/session shape that carries `roles`, `permissions`, and `educationalCenterId`
+
+That means the next clean implementation step is to centralize one helper or contract function for:
+
+- `canInstitutionAdminReadPermissions(session)`
+
+and make navigation, dashboard shortcuts, and the permissions screen depend on that single rule.
+
 ## Verification notes
 
 The matrix above was checked against:
