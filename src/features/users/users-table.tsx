@@ -82,6 +82,7 @@ const roleBundles = [
 ] as const;
 
 type FormMode = "create" | "edit";
+type UsersFocusFilter = "all" | "review" | "no_acl" | "teachers" | "admins";
 
 type FeedbackState = {
   type: "success" | "error";
@@ -308,7 +309,7 @@ export function UsersTable() {
   const [query, setQuery] = useState("");
   const [institutionFilter, setInstitutionFilter] = useState("");
   const [roleFilter, setRoleFilter] = useState("");
-  const [reviewOnly, setReviewOnly] = useState(false);
+  const [focusFilter, setFocusFilter] = useState<UsersFocusFilter>("all");
   const [mode, setMode] = useState<FormMode>("edit");
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [form, setForm] = useState<UserFormState>(emptyFormState);
@@ -461,24 +462,49 @@ export function UsersTable() {
 
       const matchesInstitution = !institutionFilter || item.educationalCenterId === institutionFilter;
       const matchesRole = !roleFilter || item.inferredRoles.includes(roleFilter);
-      const matchesReview = !reviewOnly || item.needsReview;
+      const matchesFocus = (() => {
+        switch (focusFilter) {
+          case "review":
+            return item.needsReview;
+          case "no_acl":
+            return item.explicitPermissionKeys.length === 0;
+          case "teachers":
+            return item.inferredRoles.includes("teacher");
+          case "admins":
+            return item.inferredRoles.includes("admin") || item.inferredRoles.includes("institution-admin");
+          default:
+            return true;
+        }
+      })();
 
-      return matchesQuery && matchesInstitution && matchesRole && matchesReview;
+      return matchesQuery && matchesInstitution && matchesRole && matchesFocus;
     });
-  }, [institutionFilter, institutionsById, query, reviewOnly, roleFilter, users]);
+  }, [focusFilter, institutionFilter, institutionsById, query, roleFilter, users]);
 
   const metrics = useMemo(() => {
     const permissionedUsers = users.filter((item) => item.explicitPermissionKeys.length > 0).length;
-    const adminLikeUsers = users.filter((item) => item.inferredRoles.includes("admin")).length;
+    const adminLikeUsers = users.filter((item) => item.inferredRoles.includes("admin") || item.inferredRoles.includes("institution-admin")).length;
     const reviewUsers = users.filter((item) => item.needsReview).length;
+    const usersWithoutAcl = users.filter((item) => item.explicitPermissionKeys.length === 0).length;
+    const teacherUsers = users.filter((item) => item.inferredRoles.includes("teacher")).length;
 
     return {
       totalUsers: usersQuery.data?.total || users.length,
       permissionedUsers,
       adminLikeUsers,
       reviewUsers,
+      usersWithoutAcl,
+      teacherUsers,
     };
   }, [users, usersQuery.data?.total]);
+
+  const focusSegments = [
+    { key: "all" as const, label: "Todos", count: metrics.totalUsers },
+    { key: "review" as const, label: "Con observaciones", count: metrics.reviewUsers },
+    { key: "no_acl" as const, label: "Sin ACL explícita", count: metrics.usersWithoutAcl },
+    { key: "teachers" as const, label: "Docentes", count: metrics.teacherUsers },
+    { key: "admins" as const, label: "Admins", count: metrics.adminLikeUsers },
+  ];
 
   const permissionsByFeature = useMemo(() => {
     if (!selectedUser) return [] as Array<{ featureId: string; featureName: string; featureCode: string; actions: typeof actions }>;
@@ -906,9 +932,12 @@ export function UsersTable() {
           </div>
           <div className="space-y-2">
             <Label>Enfoque</Label>
-            <SelectField value={reviewOnly ? "review" : "all"} onChange={(value) => setReviewOnly(value === "review")}>
+            <SelectField value={focusFilter} onChange={(value) => setFocusFilter(value as UsersFocusFilter)}>
               <option value="all">Todos</option>
-              <option value="review">Solo con observaciones</option>
+              <option value="review">Con observaciones</option>
+              <option value="no_acl">Sin ACL explícita</option>
+              <option value="teachers">Docentes</option>
+              <option value="admins">Admins</option>
             </SelectField>
           </div>
           <div className="flex items-end">
@@ -918,13 +947,32 @@ export function UsersTable() {
               onClick={() => {
                 setInstitutionFilter(scopedInstitutionId || "");
                 setRoleFilter("");
-                setReviewOnly(false);
+                setFocusFilter("all");
                 setQuery("");
               }}
             >
               Limpiar filtros
             </Button>
           </div>
+        </CardContent>
+      </Card>
+
+      <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
+        <CardContent className="flex flex-wrap gap-2 p-5">
+          {focusSegments.map((segment) => (
+            <Button
+              key={segment.key}
+              type="button"
+              size="sm"
+              variant={focusFilter === segment.key ? "default" : "outline"}
+              onClick={() => setFocusFilter(segment.key)}
+            >
+              {segment.label}
+              <Badge variant={focusFilter === segment.key ? "secondary" : "outline"} className={focusFilter === segment.key ? "bg-white/90 text-foreground" : ""}>
+                {segment.count}
+              </Badge>
+            </Button>
+          ))}
         </CardContent>
       </Card>
 
