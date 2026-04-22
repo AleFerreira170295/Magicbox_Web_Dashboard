@@ -13,6 +13,15 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useAccessActions, useAccessFeatures, usePermissions } from "@/features/access-control/api";
 import { useAuth } from "@/features/auth/auth-context";
+import {
+  canLoadPermissionsGovernance,
+  canReadAclContract,
+  canReadFeatureContract,
+  hasAnyUserPermission,
+  hasInstitutionAdminPermissionsContractGap,
+  isAdminSession,
+  isInstitutionAdminSession,
+} from "@/features/auth/permission-contract";
 import { useInstitutions } from "@/features/institutions/api";
 import { useUsers } from "@/features/users/api";
 import { cn, getErrorMessage } from "@/lib/utils";
@@ -63,11 +72,6 @@ function formatScopeLabel(scopeId: string | null | undefined, institutionName?: 
   return institutionName?.trim() || scopeId;
 }
 
-function hasAnyPermission(grantedPermissions: string[] | undefined, ...keys: string[]) {
-  const granted = new Set(grantedPermissions || []);
-  return keys.some((key) => granted.has(key));
-}
-
 export function PermissionsCenter() {
   const { tokens, user } = useAuth();
   const [query, setQuery] = useState("");
@@ -77,18 +81,16 @@ export function PermissionsCenter() {
   const [signalFilter, setSignalFilter] = useState("all");
 
   const currentPermissions = user?.permissions || [];
-  const isAdminView = user?.roles.includes("admin") || false;
-  const isInstitutionAdminView = !isAdminView && (user?.roles.includes("institution-admin") || false);
+  const isAdminView = isAdminSession(user);
+  const isInstitutionAdminView = !isAdminView && isInstitutionAdminSession(user);
 
-  const canReadAcl =
-    isAdminView || hasAnyPermission(currentPermissions, "access_control:read", "access-control:read");
-  const canReadFeatureCatalog =
-    isAdminView || hasAnyPermission(currentPermissions, "feature:read", "feature:read:any");
-  const canReadUsers = isAdminView || hasAnyPermission(currentPermissions, "user:read");
+  const canReadAcl = canReadAclContract(user);
+  const canReadFeatureCatalog = canReadFeatureContract(user);
+  const canReadUsers = isAdminView || hasAnyUserPermission(user, "user:read");
   const canReadInstitutions =
     isAdminView ||
-    hasAnyPermission(
-      currentPermissions,
+    hasAnyUserPermission(
+      user,
       "educational_center:read",
       "educational-center:read",
       "educational_center:read:any",
@@ -224,7 +226,8 @@ export function PermissionsCenter() {
     };
   }, [actions, featureFilter, features, institutions, permissions, query, scopeFilter, signalFilter, actionFilter, users]);
 
-  const canRenderGovernance = canReadAcl && canReadFeatureCatalog;
+  const canRenderGovernance = canLoadPermissionsGovernance(user);
+  const hasContractGap = hasInstitutionAdminPermissionsContractGap(user);
 
   return (
     <div className="space-y-6">
@@ -247,20 +250,28 @@ export function PermissionsCenter() {
           <Badge variant={canReadFeatureCatalog ? "secondary" : "outline"}>
             {canReadFeatureCatalog ? "features legibles" : "features bloqueadas"}
           </Badge>
+          {hasContractGap ? <Badge variant="warning">contrato incompleto</Badge> : null}
           <span>
-            {isInstitutionAdminView
-              ? "Si tu sesión no recibe permisos ACL/feature de lectura, el módulo queda visible pero no intenta pedir datos fuera de alcance."
+            {hasContractGap
+              ? "La sesión llegó sin ACL/feature read, aunque este perfil debería poder revisar Permissions. Esto ya se trata como desalineación de contrato, no como ausencia intencional del módulo."
+              : isInstitutionAdminView
+              ? "Esta sesión cumple el contrato esperado para revisar ACL institucional y overrides dentro del alcance visible."
               : "La pantalla ya está consolidada como lectura operativa del contrato ACL compartido entre dashboard y backend."}
           </span>
         </CardContent>
       </Card>
 
       {!canRenderGovernance ? (
-        <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
+        <Card className={cn(
+          "shadow-[0_16px_40px_rgba(31,42,55,0.06)]",
+          hasContractGap ? "border-warning/40 bg-warning/5" : "border-border/80 bg-card/95",
+        )}>
           <CardHeader>
-            <CardTitle>Lectura ACL no disponible para esta sesión</CardTitle>
+            <CardTitle>{hasContractGap ? "Sesión institution-admin sin contrato ACL completo" : "Lectura ACL no disponible para esta sesión"}</CardTitle>
             <CardDescription>
-              Esta vista necesita al menos lectura sobre access-control y feature. El módulo quedó preparado para institution-admin, pero solo se activa cuando el backend expone esos permisos en la sesión actual.
+              {hasContractGap
+                ? "Bajo el contrato actual del producto, institution-admin debería llegar con lectura de access-control y feature. La UI ya expone el módulo porque el perfil sí debe tenerlo, pero esta sesión concreta no trae las capacidades esperadas."
+                : "Esta vista necesita al menos lectura sobre access-control y feature para cargar gobernanza real."}
             </CardDescription>
           </CardHeader>
         </Card>

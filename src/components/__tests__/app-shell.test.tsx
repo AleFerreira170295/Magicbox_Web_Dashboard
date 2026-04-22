@@ -50,7 +50,7 @@ describe("AppShell navigation", () => {
     cleanup();
   });
 
-  it("shows institution-admin navigation aligned with the enabled modules", () => {
+  it("shows institution-admin navigation aligned with the enabled modules and strong permissions contract", () => {
     useAuthMock.mockReturnValue({
       user: {
         fullName: "Ana Admin",
@@ -68,8 +68,8 @@ describe("AppShell navigation", () => {
     expect(screen.getAllByText("Instituciones").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Perfiles").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Dispositivos").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Permisos").length).toBeGreaterThan(0);
 
-    expect(screen.queryByText("Permisos")).not.toBeInTheDocument();
     expect(screen.queryByText("Configuración")).not.toBeInTheDocument();
     expect(screen.queryByText("Salud")).not.toBeInTheDocument();
   });
@@ -92,7 +92,7 @@ describe("AppShell navigation", () => {
     expect(screen.getAllByText("docente").length).toBeGreaterThan(0);
   });
 
-  it("shows permissions navigation for institution-admin sessions with ACL read access", () => {
+  it("keeps permissions navigation visible for institution-admin sessions with ACL read access", () => {
     useAuthMock.mockReturnValue({
       user: {
         fullName: "Ana Admin",
@@ -213,6 +213,17 @@ describe("AppShell navigation", () => {
           email: "ia@example.com",
           roles: ["institution-admin"],
           permissions: ["access_control:read", "feature:read"],
+        },
+        visible: ["Dashboard", "Sincronizaciones", "Partidas", "Usuarios", "Permisos", "Instituciones", "Perfiles", "Dispositivos"],
+        hidden: ["Salud", "Configuración", "Alertas territoriales", "Territorios e instituciones"],
+      },
+      {
+        name: "institution-admin without acl read still sees permissions",
+        user: {
+          fullName: "Irene Institution",
+          email: "ia@example.com",
+          roles: ["institution-admin"],
+          permissions: [],
         },
         visible: ["Dashboard", "Sincronizaciones", "Partidas", "Usuarios", "Permisos", "Instituciones", "Perfiles", "Dispositivos"],
         hidden: ["Salud", "Configuración", "Alertas territoriales", "Territorios e instituciones"],

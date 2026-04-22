@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/features/auth/auth-context";
+import { canAccessPermissionsModule } from "@/features/auth/permission-contract";
 import { useDevices } from "@/features/devices/api";
 import { useGames } from "@/features/games/api";
 import { useInstitutions } from "@/features/institutions/api";
@@ -93,14 +94,7 @@ export function InstitutionDashboard() {
   const isInstitutionAdmin = user?.roles.includes("institution-admin") || false;
   const isDirector = user?.roles.includes("director") || false;
   const canSeeUsers = isInstitutionAdmin;
-  const canSeePermissions = Boolean(
-    isInstitutionAdmin && (
-      user?.permissions.includes("access_control:read")
-      || user?.permissions.includes("access-control:read")
-      || user?.permissions.includes("feature:read")
-      || user?.permissions.includes("feature:read:any")
-    ),
-  );
+  const canSeePermissions = canAccessPermissionsModule(user);
 
   const usersQuery = useUsers(tokens?.accessToken);
   const institutionsQuery = useInstitutions(tokens?.accessToken);
@@ -139,7 +133,7 @@ export function InstitutionDashboard() {
   const roleLabel = isInstitutionAdmin ? "Institution admin" : isDirector ? "Dirección" : "Institución";
   const moduleCards = [
     { title: "Usuarios", description: "Altas, revisión y lectura del padrón visible para tu institución.", href: "/users", icon: Users, visible: canSeeUsers },
-    { title: "Permisos", description: "Lectura del contrato ACL efectivo cuando la sesión lo permite.", href: "/permissions", icon: KeyRound, visible: canSeePermissions },
+    { title: "Permisos", description: "Lectura del contrato ACL efectivo y señal temprana si la sesión llega incompleta.", href: "/permissions", icon: KeyRound, visible: canSeePermissions },
     { title: "Instituciones", description: "Resumen operativo de la institución o alcance visible.", href: "/institutions", icon: Building2, visible: true },
     { title: "Dispositivos", description: "Parque de hardware visible para tu institución.", href: "/devices", icon: Smartphone, visible: true },
     { title: "Partidas", description: "Lectura de uso real y actividad de juego.", href: "/games", icon: Database, visible: true },

@@ -18,7 +18,7 @@ Status labels:
 | Profile | Dashboard home | Enabled screens | Current status | Notes / follow-up |
 | --- | --- | --- | --- | --- |
 | `admin` | `SuperadminDashboard` | `/dashboard`, `/syncs`, `/games`, `/users`, `/permissions`, `/institutions`, `/health`, `/profiles`, `/settings`, `/devices` | **closed** | Global platform suite is aligned in navigation, guards, and tests. |
-| `institution-admin` | `InstitutionDashboard` | `/dashboard`, `/syncs`, `/games`, `/users`, `/permissions`, `/institutions`, `/profiles`, `/devices` | **conditional** | Almost everything is operational already. The only real closure gap is that `Permissions` depends on ACL/feature read exposure in the live session, so the product contract is still implicit instead of explicit. |
+| `institution-admin` | `InstitutionDashboard` | `/dashboard`, `/syncs`, `/games`, `/users`, `/permissions`, `/institutions`, `/profiles`, `/devices` | **closed** | The strong product contract is now explicit in frontend: `Permissions` is part of the role experience, and misprovisioned sessions surface as contract gaps instead of silently hiding the module. |
 | `director` | `InstitutionDashboard` | `/dashboard`, `/syncs`, `/games`, `/institutions`, `/profiles`, `/devices` | **closed** | Institutional scope looks coherent and intentionally excludes `users`, `permissions`, `health`, and `settings`. |
 | `teacher` | `TeacherDashboard` | `/dashboard`, `/syncs`, `/games`, `/devices` | **follow-up** | Core flow is operational. Next useful check is whether `/devices` needs one more teacher-oriented pass to match the stronger work already done in `games` and `syncs`. |
 | `researcher` | `ResearcherDashboard` | `/dashboard`, `/syncs`, `/games` | **closed** | Scope is intentionally narrow and already aligned with navigation/tests. |
@@ -36,31 +36,28 @@ Status labels:
 | `/devices` | Operational and scoped, with ownership, assignment scope, status, metadata, and read-only cues when update permission is absent. | **closed** | Nothing critical missing for institution-admin. |
 | `/games` | Institution-scoped view is explicit and already explains why each game is visible, including access relation and owner/device context. | **closed** | Nothing critical missing. |
 | `/syncs` | Operational sync reading works when BLE read capability is present, and the UI explains whether access is personal vs ACL-expanded. | **closed** | Nothing critical missing as long as BLE read is part of the intended role contract. |
-| `/permissions` | The screen itself is operational for institutional ACL review, with scoped filters, governance presets, and graceful blocked-state copy. | **conditional** | Make the contract explicit: define whether `institution-admin` should always receive ACL/feature-read capability, or whether the product intentionally allows institution-admin sessions without `Permissions`. That backend/session rule is the only meaningful blocker to mark the profile fully closed. |
+| `/permissions` | The screen is operational for institutional ACL review, with scoped filters, governance presets, and an explicit contract-gap state when the session arrives misprovisioned. | **closed** | Frontend now treats `Permissions` as part of the role contract and exposes configuration problems instead of hiding the module. |
 
-## Exact closure condition for institution-admin
+## Chosen contract for institution-admin
 
-`institution-admin` can move from **conditional** to **closed** once the team decides and documents one of these two product contracts:
+The team chose the **guaranteed access contract**:
 
-1. **Guaranteed access contract**: every real `institution-admin` session must include the ACL/feature read capabilities needed to expose `/permissions`.
-2. **Optional access contract**: `institution-admin` is allowed to exist without `Permissions`, and the matrix/navigation should describe that as an intentional variant, not as an implicit backend dependency.
+1. every real `institution-admin` session should include the ACL/feature read capabilities needed for `/permissions`
+2. frontend must always expose the module for `institution-admin`
+3. if a session arrives without those capabilities, the UI should show an explicit contract-gap state instead of silently hiding the module
 
-Right now, the UI is ready for both paths. What is missing is not another screen, but the explicit product rule.
+That means the frontend closure work for `institution-admin` is done. Any remaining gap is now a backend/session provisioning issue, not a missing product rule in the UI.
 
 ## Where the contract is currently implicit in code
 
-The decision is currently spread across UI surfaces instead of being centralized:
+The decision used to be spread across UI surfaces and is now centralized through a shared permission-contract helper. The main touchpoints are still:
 
 - `src/components/app-shell.tsx`: decides whether `Permissions` appears in navigation for `institution-admin`
 - `src/features/dashboard/institution-dashboard.tsx`: decides whether the `Permisos` quick access card appears
 - `src/features/permissions/permissions-center.tsx`: decides whether the screen loads real ACL data or only shows the blocked-state explanation
 - `src/features/auth/auth-context.tsx` + `src/features/auth/role-resolver.ts`: define the user/session shape that carries `roles`, `permissions`, and `educationalCenterId`
 
-That means the next clean implementation step is to centralize one helper or contract function for:
-
-- `canInstitutionAdminReadPermissions(session)`
-
-and make navigation, dashboard shortcuts, and the permissions screen depend on that single rule.
+The frontend now depends on a shared helper set in `src/features/auth/permission-contract.ts`, so navigation, dashboard shortcuts, and the permissions screen follow the same rule.
 
 ## Verification notes
 
@@ -80,6 +77,6 @@ Targeted verification run on 2026-04-22:
 
 If the goal is to finish profiles one by one, the best next step is:
 
-1. **Close `institution-admin` fully** by confirming the `Permissions` contract and removing ambiguity around when it should appear.
+1. **Validate the backend/session provisioning** for real `institution-admin` sessions so they actually arrive with ACL/feature read as expected.
 2. **Do a final teacher pass on `/devices`** if we want the teacher experience to feel equally polished across all of its visible modules.
-3. Then move to broader UX polish only after those two scope edges are explicit.
+3. Then move to broader UX polish only after those two checks are explicit.

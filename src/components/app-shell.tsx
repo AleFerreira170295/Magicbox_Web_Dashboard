@@ -7,6 +7,7 @@ import { AuthGuard } from "@/components/auth-guard";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/features/auth/auth-context";
+import { canAccessPermissionsModule } from "@/features/auth/permission-contract";
 import type { AppRole } from "@/features/auth/types";
 import { appConfig } from "@/lib/api/config";
 import { cn } from "@/lib/utils";
@@ -20,11 +21,6 @@ type NavigationItem = {
   roles: NavigationRole[];
   isVisible?: (user: { roles?: string[]; permissions?: string[] } | null | undefined) => boolean;
 };
-
-function hasAnyPermission(user: { permissions?: string[] } | null | undefined, ...keys: string[]) {
-  const granted = new Set(user?.permissions || []);
-  return keys.some((key) => granted.has(key));
-}
 
 function formatRoleLabel(role: string) {
   switch (role) {
@@ -145,18 +141,7 @@ const navigation: NavigationItem[] = [
     label: "Permisos",
     icon: KeyRound,
     roles: ["admin", "institution-admin"] satisfies NavigationRole[],
-    isVisible: (user) =>
-      Boolean(
-        user?.roles?.includes("admin") ||
-          (user?.roles?.includes("institution-admin") &&
-            hasAnyPermission(
-              user,
-              "access_control:read",
-              "access-control:read",
-              "feature:read",
-              "feature:read:any",
-            )),
-      ),
+    isVisible: (user) => canAccessPermissionsModule(user),
   },
   {
     href: "/institutions",

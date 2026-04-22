@@ -211,4 +211,26 @@ describe("PermissionsCenter", () => {
     expect(screen.queryAllByText("Bruno Campo").length).toBeGreaterThan(0);
     expect(screen.queryAllByText("Ana Admin")).toHaveLength(0);
   });
+
+  it("flags a contract gap when institution-admin arrives without ACL read", () => {
+    useAuthMock.mockReturnValue({
+      tokens: { accessToken: "token", refreshToken: "refresh" },
+      user: {
+        id: "user-current",
+        email: "diego@example.com",
+        firstName: "Diego",
+        lastName: "Pereyra",
+        fullName: "Diego Pereyra",
+        educationalCenterId: "ec-1",
+        roles: ["institution-admin"],
+        permissions: ["user:read", "educational_center:read"],
+        raw: {},
+      },
+    });
+
+    renderPermissionsCenter();
+
+    expect(screen.getByText("contrato incompleto")).toBeInTheDocument();
+    expect(screen.getByText(/institution-admin debería llegar con lectura de access-control y feature/i)).toBeInTheDocument();
+  });
 });

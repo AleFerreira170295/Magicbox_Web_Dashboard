@@ -98,6 +98,22 @@ describe("InstitutionDashboard", () => {
     expect(screen.getByText(/Dispositivos sin status/i)).toBeInTheDocument();
   });
 
+  it("keeps permissions visible for institution-admin even when the session arrives without ACL read", () => {
+    useAuthMock.mockReturnValue({
+      tokens: { accessToken: "token", refreshToken: "refresh" },
+      user: {
+        fullName: "Paula Control",
+        roles: ["institution-admin"],
+        permissions: [],
+      },
+    });
+
+    renderDashboard();
+
+    expect(screen.getAllByText("Permisos").length).toBeGreaterThan(0);
+    expect(screen.getByText(/señal temprana si la sesión llega incompleta/i)).toBeInTheDocument();
+  });
+
   it("keeps director on the institutional modules without admin-only actions", () => {
     useAuthMock.mockReturnValue({
       tokens: { accessToken: "token", refreshToken: "refresh" },
