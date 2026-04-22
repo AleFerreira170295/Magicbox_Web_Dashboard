@@ -26,6 +26,83 @@ function hasAnyPermission(user: { permissions?: string[] } | null | undefined, .
   return keys.some((key) => granted.has(key));
 }
 
+function formatRoleLabel(role: string) {
+  switch (role) {
+    case "teacher":
+      return "docente";
+    case "director":
+      return "director";
+    case "researcher":
+      return "researcher";
+    case "family":
+      return "familia";
+    case "institution-admin":
+      return "institution admin";
+    case "government-viewer":
+      return "gobierno";
+    case "admin":
+      return "admin";
+    default:
+      return role;
+  }
+}
+
+function getExperienceMeta(user: { roles?: string[]; permissions?: string[] } | null | undefined) {
+  if (user?.roles?.includes("government-viewer")) {
+    return {
+      title: "Vista gobierno",
+      description:
+        "Este acceso prioriza lectura territorial, alertas ejecutivas y seguimiento agregado, sin exponer módulos técnicos u operativos que no corresponden a este perfil.",
+    };
+  }
+
+  if (user?.roles?.includes("researcher")) {
+    return {
+      title: "Vista investigación",
+      description:
+        "Este acceso prioriza evidencia visible, consistencia entre sync y partida, y lectura de muestra, manteniendo fuera los módulos administrativos o de hardware que no forman parte del trabajo investigador.",
+    };
+  }
+
+  if (user?.roles?.includes("family")) {
+    return {
+      title: "Vista familia",
+      description:
+        "Este acceso prioriza una lectura simple y cuidada de actividad visible, manteniendo fuera módulos técnicos, administrativos o de hardware que no corresponden a este perfil.",
+    };
+  }
+
+  if (user?.roles?.includes("teacher")) {
+    return {
+      title: "Vista docente",
+      description:
+        "Este acceso prioriza juego, dispositivos y sincronizaciones visibles para operar el aula con rapidez, sin mezclarlo con módulos administrativos que no aportan a la jornada.",
+    };
+  }
+
+  if (user?.roles?.includes("institution-admin") || user?.roles?.includes("director")) {
+    return {
+      title: "Vista institucional",
+      description:
+        "Este acceso se concentra en seguimiento institucional, gobernanza cotidiana y control operativo del alcance visible por ACL.",
+    };
+  }
+
+  if (user?.roles?.includes("admin")) {
+    return {
+      title: "Vista plataforma",
+      description:
+        "Este acceso mantiene visión global, módulos técnicos y superficies transversales para operar toda la plataforma.",
+    };
+  }
+
+  return {
+    title: "Vista institucional",
+    description:
+      "El dashboard va a convivir embebido con la web de MagicBox, así que empezamos a moverlo hacia un lenguaje menos técnico y más educativo.",
+  };
+}
+
 const navigation: NavigationItem[] = [
   {
     href: "/dashboard",
@@ -117,9 +194,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const { user, logout } = useAuth();
-  const isGovernmentViewer = user?.roles.includes("government-viewer") || false;
-  const isResearcher = user?.roles.includes("researcher") || false;
-  const isFamily = user?.roles.includes("family") || false;
+  const experienceMeta = getExperienceMeta(user);
 
   const visibleNavigation = navigation.filter((item) => {
     const allowedByRole = item.roles.some((role) => user?.roles.includes(role));
@@ -152,16 +227,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <div className="soft-panel rounded-[28px] p-5">
                 <div className="flex items-center gap-2 text-sm font-medium text-foreground">
                   <Sparkles className="size-4 text-primary" />
-                  {isGovernmentViewer ? "Vista gobierno" : isResearcher ? "Vista investigación" : isFamily ? "Vista familia" : "Vista institucional"}
+                  {experienceMeta.title}
                 </div>
                 <p className="mt-3 text-sm leading-7 text-muted-foreground">
-                  {isGovernmentViewer
-                    ? "Este acceso prioriza lectura territorial, alertas ejecutivas y seguimiento agregado, sin exponer módulos técnicos u operativos que no corresponden a este perfil."
-                    : isResearcher
-                      ? "Este acceso prioriza evidencia visible, consistencia entre sync y partida, y lectura de muestra, manteniendo fuera los módulos administrativos o de hardware que no forman parte del trabajo investigador."
-                      : isFamily
-                        ? "Este acceso prioriza una lectura simple y cuidada de actividad visible, manteniendo fuera módulos técnicos, administrativos o de hardware que no corresponden a este perfil."
-                    : "El dashboard va a convivir embebido con la web de MagicBox, así que empezamos a moverlo hacia un lenguaje menos técnico y más educativo."}
+                  {experienceMeta.description}
                 </p>
               </div>
             </div>
@@ -203,7 +272,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     <span>{user?.email}</span>
                     {user?.roles.map((role) => (
                       <Badge key={role} variant="secondary" className="bg-white/90">
-                        {role}
+                        {formatRoleLabel(role)}
                       </Badge>
                     ))}
                   </div>

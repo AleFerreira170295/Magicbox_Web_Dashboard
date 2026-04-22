@@ -62,6 +62,24 @@ describe("AppShell navigation", () => {
     expect(screen.queryByText("Salud")).not.toBeInTheDocument();
   });
 
+  it("shows teacher-specific shell copy and friendly role labels", () => {
+    useAuthMock.mockReturnValue({
+      user: {
+        fullName: "Teo Teacher",
+        email: "teacher@example.com",
+        roles: ["teacher"],
+        permissions: ["game_data:read"],
+      },
+      logout: vi.fn(),
+    });
+
+    renderShell();
+
+    expect(screen.getByText("Vista docente")).toBeInTheDocument();
+    expect(screen.getByText(/operar el aula con rapidez/i)).toBeInTheDocument();
+    expect(screen.getAllByText("docente").length).toBeGreaterThan(0);
+  });
+
   it("shows permissions navigation for institution-admin sessions with ACL read access", () => {
     useAuthMock.mockReturnValue({
       user: {
