@@ -29,6 +29,7 @@ import { useAuth } from "@/features/auth/auth-context";
 import { useDevices } from "@/features/devices/api";
 import { useGames } from "@/features/games/api";
 import { useBasicHealth, useReadinessHealth } from "@/features/health/api";
+import type { HealthCheckItem } from "@/features/health/types";
 import { useInstitutions } from "@/features/institutions/api";
 import { useProfilesOverview } from "@/features/profiles/api";
 import { useSyncSessions } from "@/features/syncs/api";
@@ -132,6 +133,8 @@ type TerritorialPreset = {
 };
 
 const TERRITORIAL_PRESETS_STORAGE_KEY = "magicbox:territorial-presets";
+const EMPTY_LIST: never[] = [];
+const EMPTY_HEALTH_CHECKS: Record<string, HealthCheckItem> = {};
 const territorialPresetListeners = new Set<() => void>();
 
 function readStoredTerritorialPresetsSnapshot() {
@@ -224,13 +227,13 @@ export function SuperadminDashboard() {
   const healthQuery = useBasicHealth({ enabled: canSeeHealthModule });
   const readinessQuery = useReadinessHealth({ enabled: canSeeHealthModule });
 
-  const users = usesSystemSummary ? [] : usersQuery.data?.data || [];
-  const institutions = usesSystemSummary ? [] : institutionsQuery.data?.data || [];
-  const devices = usesSystemSummary ? [] : devicesQuery.data?.data || [];
-  const syncs = usesSystemSummary ? [] : syncsQuery.data?.data || [];
-  const games = usesSystemSummary ? [] : gamesQuery.data?.data || [];
-  const profiles = usesSystemSummary ? [] : profilesQuery.data || [];
-  const readinessChecks = readinessQuery.data?.checks || {};
+  const users = usesSystemSummary ? EMPTY_LIST : usersQuery.data?.data ?? EMPTY_LIST;
+  const institutions = usesSystemSummary ? EMPTY_LIST : institutionsQuery.data?.data ?? EMPTY_LIST;
+  const devices = usesSystemSummary ? EMPTY_LIST : devicesQuery.data?.data ?? EMPTY_LIST;
+  const syncs = usesSystemSummary ? EMPTY_LIST : syncsQuery.data?.data ?? EMPTY_LIST;
+  const games = usesSystemSummary ? EMPTY_LIST : gamesQuery.data?.data ?? EMPTY_LIST;
+  const profiles = usesSystemSummary ? EMPTY_LIST : profilesQuery.data ?? EMPTY_LIST;
+  const readinessChecks = readinessQuery.data?.checks ?? EMPTY_HEALTH_CHECKS;
 
   const visibleQueryStates = usesSystemSummary
     ? [summaryQuery, ...(canSeeHealthModule ? [healthQuery, readinessQuery] : [])]
@@ -259,25 +262,25 @@ export function SuperadminDashboard() {
     .map((error) => getErrorMessage(error));
   const error = errors[0] || null;
 
-  const rangeOptions = summaryQuery.data?.filters.range_options || [];
-  const institutionOptions = summaryQuery.data?.filters.institutions || [];
-  const countryOptions = summaryQuery.data?.filters.countries || [];
-  const stateOptions = summaryQuery.data?.filters.states || [];
-  const cityOptions = summaryQuery.data?.filters.cities || [];
-  const userTypeOptions = summaryQuery.data?.filters.user_types || [];
-  const roleCodeOptions = summaryQuery.data?.filters.role_codes || [];
+  const rangeOptions = summaryQuery.data?.filters.range_options ?? EMPTY_LIST;
+  const institutionOptions = summaryQuery.data?.filters.institutions ?? EMPTY_LIST;
+  const countryOptions = summaryQuery.data?.filters.countries ?? EMPTY_LIST;
+  const stateOptions = summaryQuery.data?.filters.states ?? EMPTY_LIST;
+  const cityOptions = summaryQuery.data?.filters.cities ?? EMPTY_LIST;
+  const userTypeOptions = summaryQuery.data?.filters.user_types ?? EMPTY_LIST;
+  const roleCodeOptions = summaryQuery.data?.filters.role_codes ?? EMPTY_LIST;
   const trendRangeLabel = summaryQuery.data?.filters.trend_range || selectedRange;
-  const trends = summaryQuery.data?.trends || [];
-  const comparisonMetrics = summaryQuery.data?.comparisons.metrics || [];
+  const trends = summaryQuery.data?.trends ?? EMPTY_LIST;
+  const comparisonMetrics = summaryQuery.data?.comparisons.metrics ?? EMPTY_LIST;
   const comparisonWindowLabel = summaryQuery.data?.comparisons.window_label || trendRangeLabel;
-  const summaryAlerts = summaryQuery.data?.alerts || [];
-  const roleMix = summaryQuery.data?.segments.role_mix || [];
-  const userTypeMix = summaryQuery.data?.segments.user_type_mix || [];
-  const topInstitutions = summaryQuery.data?.segments.top_institutions || [];
-  const topTerritories = summaryQuery.data?.segments.top_territories || [];
-  const territorialHierarchy = summaryQuery.data?.segments.territorial_hierarchy || [];
-  const territoryAlerts = summaryQuery.data?.segments.territory_alerts || [];
-  const territoryScores = summaryQuery.data?.segments.territory_scores || [];
+  const summaryAlerts = summaryQuery.data?.alerts ?? EMPTY_LIST;
+  const roleMix = summaryQuery.data?.segments.role_mix ?? EMPTY_LIST;
+  const userTypeMix = summaryQuery.data?.segments.user_type_mix ?? EMPTY_LIST;
+  const topInstitutions = summaryQuery.data?.segments.top_institutions ?? EMPTY_LIST;
+  const topTerritories = summaryQuery.data?.segments.top_territories ?? EMPTY_LIST;
+  const territorialHierarchy = summaryQuery.data?.segments.territorial_hierarchy ?? EMPTY_LIST;
+  const territoryAlerts = summaryQuery.data?.segments.territory_alerts ?? EMPTY_LIST;
+  const territoryScores = summaryQuery.data?.segments.territory_scores ?? EMPTY_LIST;
 
   const smartPresets = useMemo(
     () => [
@@ -560,7 +563,7 @@ export function SuperadminDashboard() {
       version: canSeeHealthModule ? healthQuery.data?.version || "-" : "no disponible",
       readiness: canSeeHealthModule ? readinessQuery.data?.status || "unknown" : "no disponible",
     };
-  }, [canSeeHealthModule, devices, devicesQuery.data, games, gamesQuery.data, healthQuery.data, institutions, institutionsQuery.data, profiles, profilesQuery.data, readinessChecks, readinessQuery.data, summaryQuery.data, syncs, syncsQuery.data, usesSystemSummary, users, usersQuery.data]);
+  }, [canSeeHealthModule, devices, devicesQuery.data, games, gamesQuery.data, healthQuery.data, institutions, institutionsQuery.data, profiles, readinessChecks, readinessQuery.data, summaryQuery.data, syncs, syncsQuery.data, usesSystemSummary, users, usersQuery.data]);
 
   const scopeLabel = isAdmin
     ? "Superadmin"
