@@ -72,6 +72,7 @@ Targeted verification run on 2026-04-22:
 
 - 19 test files
 - 56 tests passed
+- real backend validation completed after enforcing the strong contract: a temporary `institution-admin` user created through the live local API now receives `access_control:read` and `feature:read` on login and `/auth/me`
 
 ## Recommended next move
 
