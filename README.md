@@ -16,6 +16,23 @@ Este repo estaba vacío. En esta primera iteración queda implementado:
 - tipos TypeScript y clientes API preparados para datos raw + normalizados
 - documentación de arquitectura lossless e inventario de endpoints/requerimientos
 
+## Actualizaciones recientes del dashboard operativo
+
+En la iteración más reciente se consolidó la home operativa para superadmin y gobierno sobre el endpoint agregado `GET /api/v1.0/system/dashboard/summary`, con foco en lectura ejecutiva real y filtros compartibles.
+
+Incluye:
+
+- filtros por rango, institución y jerarquía territorial (país, estado, ciudad)
+- cohortes por tipo de usuario y rol agrupado
+- mini tendencias y comparativas entre períodos
+- alertas/semaforización ejecutiva y score territorial compuesto
+- modo `government-viewer` con alcance territorial de solo lectura
+- presets inteligentes del sistema para detectar territorios críticos o con baja actividad
+- guardado local de vistas ejecutivas
+- botón directo de **copiar link** para compartir la combinación actual completa de filtros, rango y smart preset activo
+
+Además, la ruta `/login` ya quedó ajustada para App Router con `Suspense`, evitando el bloqueo de build cuando `LoginForm` usa `useSearchParams()`.
+
 ## Stack
 
 - Next.js (App Router)
@@ -102,6 +119,8 @@ La web ya no debe pensarse solo como un dashboard para clientes. A partir de aho
 - `/games`
 - `/devices`
 - `/login`
+
+Dentro de `/dashboard`, la home ya contempla tanto la capa operativa de administración como la lectura territorial ejecutiva para perfiles de gobierno.
 
 ## Reutilización del backend actual
 
