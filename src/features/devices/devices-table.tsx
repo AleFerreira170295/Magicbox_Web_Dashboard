@@ -300,11 +300,14 @@ function DeviceEditorPanel({
   );
 }
 
+type DeviceFocusFilter = "all" | "review" | "no_owner" | "no_status" | "no_metadata" | "online";
+
 export function DevicesTable() {
   const { tokens, user: currentUser } = useAuth();
   const [query, setQuery] = useState("");
   const [institutionFilter, setInstitutionFilter] = useState("all");
   const [scopeFilter, setScopeFilter] = useState<"all" | "home" | "institution">("all");
+  const [focusFilter, setFocusFilter] = useState<DeviceFocusFilter>("all");
   const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null);
 
   const devicesQuery = useDevices(tokens?.accessToken);
@@ -343,6 +346,23 @@ export function DevicesTable() {
       ) {
         return false;
       }
+      const matchesFocus = (() => {
+        switch (focusFilter) {
+          case "review":
+            return !device.ownerUserId || !device.status || Object.keys(device.deviceMetadata || {}).length === 0;
+          case "no_owner":
+            return !device.ownerUserId;
+          case "no_status":
+            return !device.status;
+          case "no_metadata":
+            return Object.keys(device.deviceMetadata || {}).length === 0;
+          case "online":
+            return (device.status || "").toLowerCase().includes("online") || (device.status || "").toLowerCase().includes("active");
+          default:
+            return true;
+        }
+      })();
+      if (!matchesFocus) return false;
       if (!normalized) return true;
 
       return [
@@ -357,7 +377,7 @@ export function DevicesTable() {
         .filter(Boolean)
         .some((value) => String(value).toLowerCase().includes(normalized));
     });
-  }, [devices, institutionFilter, query, scopeFilter, scopedInstitutionId]);
+  }, [devices, focusFilter, institutionFilter, query, scopeFilter, scopedInstitutionId]);
 
   const selectedDevice = useMemo(
     () => filtered.find((device) => device.id === selectedDeviceId) || devices.find((device) => device.id === selectedDeviceId) || null,
@@ -370,6 +390,10 @@ export function DevicesTable() {
     const institutionDevices = devices.filter((device) => device.assignmentScope === "institution").length;
     const devicesWithOwner = devices.filter((device) => Boolean(device.ownerUserId)).length;
     const devicesWithMetadata = devices.filter((device) => Object.keys(device.deviceMetadata || {}).length > 0).length;
+    const devicesWithoutOwner = devices.filter((device) => !device.ownerUserId).length;
+    const devicesWithoutStatus = devices.filter((device) => !device.status).length;
+    const devicesWithoutMetadata = devices.filter((device) => Object.keys(device.deviceMetadata || {}).length === 0).length;
+    const reviewDevices = devices.filter((device) => !device.ownerUserId || !device.status || Object.keys(device.deviceMetadata || {}).length === 0).length;
 
     return {
       total: devices.length,
@@ -378,8 +402,21 @@ export function DevicesTable() {
       institutionDevices,
       devicesWithOwner,
       devicesWithMetadata,
+      devicesWithoutOwner,
+      devicesWithoutStatus,
+      devicesWithoutMetadata,
+      reviewDevices,
     };
   }, [devices]);
+
+  const focusSegments = [
+    { key: "all" as const, label: "Todos", count: metrics.total },
+    { key: "review" as const, label: "Conviene revisar", count: metrics.reviewDevices },
+    { key: "no_owner" as const, label: "Sin responsable", count: metrics.devicesWithoutOwner },
+    { key: "no_status" as const, label: "Sin status", count: metrics.devicesWithoutStatus },
+    { key: "no_metadata" as const, label: "Sin metadata", count: metrics.devicesWithoutMetadata },
+    { key: "online" as const, label: "Online", count: metrics.onlineDevices },
+  ];
 
   const institutionFilterDisabled = Boolean(scopedInstitutionId) || scopeFilter === "home";
 
@@ -426,6 +463,18 @@ export function DevicesTable() {
                 </option>
               ))}
             </select>
+            <button
+              type="button"
+              onClick={() => {
+                setQuery("");
+                setScopeFilter("all");
+                setInstitutionFilter(scopedInstitutionId || "all");
+                setFocusFilter("all");
+              }}
+              className="inline-flex h-10 items-center justify-center rounded-md border border-input bg-background px-4 text-sm font-medium text-foreground transition hover:bg-accent"
+            >
+              Limpiar filtros
+            </button>
           </div>
         }
       />
@@ -465,6 +514,29 @@ export function DevicesTable() {
           </>
         )}
       </div>
+
+      <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
+        <CardContent className="flex flex-wrap gap-2 p-5">
+          {focusSegments.map((segment) => (
+            <button
+              key={segment.key}
+              type="button"
+              onClick={() => setFocusFilter(segment.key)}
+              className={cn(
+                "inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-medium transition",
+                focusFilter === segment.key
+                  ? "border-primary bg-primary text-primary-foreground"
+                  : "border-border bg-background text-foreground hover:bg-accent",
+              )}
+            >
+              <span>{segment.label}</span>
+              <Badge variant={focusFilter === segment.key ? "secondary" : "outline"} className={focusFilter === segment.key ? "bg-white/90 text-foreground" : ""}>
+                {segment.count}
+              </Badge>
+            </button>
+          ))}
+        </CardContent>
+      </Card>
 
       <div className="grid gap-6 xl:grid-cols-[1.15fr_1.05fr]">
         <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">

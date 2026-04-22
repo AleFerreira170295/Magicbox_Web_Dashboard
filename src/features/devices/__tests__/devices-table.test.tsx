@@ -1,6 +1,6 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DevicesTable } from "@/features/devices/devices-table";
 
 const useAuthMock = vi.fn();
@@ -139,6 +139,10 @@ describe("DevicesTable", () => {
     );
   });
 
+  afterEach(() => {
+    cleanup();
+  });
+
   it("shows institution-admin read-only mode when update permission is missing", () => {
     renderDevicesTable();
 
@@ -150,5 +154,61 @@ describe("DevicesTable", () => {
 
     expect(screen.getByRole("button", { name: "Edición bloqueada" })).toBeDisabled();
     expect(screen.getByText(/La sesión actual puede revisar el parque visible por ACL/i)).toBeInTheDocument();
+  });
+
+  it("filters devices through the operational focus segments", () => {
+    useDevicesMock.mockReturnValue(
+      okQuery({
+        data: [
+          {
+            id: "device-1",
+            deviceId: "mb-1",
+            name: "MagicBox Aula 1",
+            educationalCenterId: "ec-1",
+            educationalCenterName: "Colegio Norte",
+            assignmentScope: "institution",
+            ownerUserId: "user-1",
+            ownerUserName: "Ana Admin",
+            ownerUserEmail: "ana@example.com",
+            firmwareVersion: "v2.2",
+            status: "online",
+            deviceMetadata: { serial: "SN-1" },
+            createdAt: null,
+            updatedAt: null,
+            deletedAt: null,
+            raw: {},
+          },
+          {
+            id: "device-2",
+            deviceId: "mb-2",
+            name: "MagicBox Aula 2",
+            educationalCenterId: "ec-1",
+            educationalCenterName: "Colegio Norte",
+            assignmentScope: "institution",
+            ownerUserId: null,
+            ownerUserName: null,
+            ownerUserEmail: null,
+            firmwareVersion: null,
+            status: null,
+            deviceMetadata: {},
+            createdAt: null,
+            updatedAt: null,
+            deletedAt: null,
+            raw: {},
+          },
+        ],
+        page: 1,
+        limit: 2,
+        total: 2,
+        total_pages: 1,
+      }),
+    );
+
+    renderDevicesTable();
+
+    fireEvent.click(screen.getByRole("button", { name: /Sin responsable/i }));
+
+    expect(screen.queryAllByText("MagicBox Aula 2").length).toBeGreaterThan(0);
+    expect(screen.queryAllByText("MagicBox Aula 1")).toHaveLength(0);
   });
 });
