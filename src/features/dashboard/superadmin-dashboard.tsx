@@ -133,7 +133,6 @@ export function SuperadminDashboard() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [territorialPresets, setTerritorialPresets] = useState<TerritorialPreset[]>([]);
-  const [activeSmartPreset, setActiveSmartPreset] = useState<string>("all");
   const { tokens, user } = useAuth();
   const isAdmin = user?.roles.includes("admin") || false;
   const isGovernmentViewer = user?.roles.includes("government-viewer") || false;
@@ -158,6 +157,7 @@ export function SuperadminDashboard() {
   const selectedCity = searchParams.get("city");
   const selectedUserType = searchParams.get("user_type");
   const selectedRoleCode = searchParams.get("role_code");
+  const activeSmartPreset = searchParams.get("smart_preset") || "all";
   const summaryFilters = {
     range: selectedRange,
     institutionId: selectedInstitutionId,
@@ -318,6 +318,16 @@ export function SuperadminDashboard() {
       } else {
         params.set(key, value);
       }
+    }
+    router.replace(params.toString() ? `${pathname}?${params.toString()}` : pathname);
+  }
+
+  function updateSmartPreset(value: string) {
+    const params = new URLSearchParams(searchParams.toString());
+    if (!value || value === "all") {
+      params.delete("smart_preset");
+    } else {
+      params.set("smart_preset", value);
     }
     router.replace(params.toString() ? `${pathname}?${params.toString()}` : pathname);
   }
@@ -836,7 +846,7 @@ export function SuperadminDashboard() {
                 key={preset.key}
                 type="button"
                 className={`rounded-full px-4 py-2 text-sm font-medium ${activeSmartPreset === preset.key ? "bg-primary text-primary-foreground" : "bg-secondary text-secondary-foreground"}`}
-                onClick={() => setActiveSmartPreset(preset.key)}
+                onClick={() => updateSmartPreset(preset.key)}
               >
                 {preset.label} ({preset.count})
               </button>
