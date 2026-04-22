@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { type ComponentType, useMemo } from "react";
+import { type ComponentType, useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   ArrowRight,
@@ -122,10 +122,17 @@ function ModuleCard({
   );
 }
 
+type TerritorialPreset = {
+  id: string;
+  name: string;
+  filters: Partial<Record<"range" | "institution_id" | "country_code" | "state" | "city" | "user_type" | "role_code", string>>;
+};
+
 export function SuperadminDashboard() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const [territorialPresets, setTerritorialPresets] = useState<TerritorialPreset[]>([]);
   const { tokens, user } = useAuth();
   const isAdmin = user?.roles.includes("admin") || false;
   const isGovernmentViewer = user?.roles.includes("government-viewer") || false;
@@ -225,6 +232,20 @@ export function SuperadminDashboard() {
   const territoryAlerts = summaryQuery.data?.segments.territory_alerts || [];
   const territoryScores = summaryQuery.data?.segments.territory_scores || [];
 
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const raw = window.localStorage.getItem("magicbox:territorial-presets");
+      if (!raw) return;
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        setTerritorialPresets(parsed);
+      }
+    } catch {
+      // noop
+    }
+  }, []);
+
   function updateFilter(
     key: "range" | "institution_id" | "country_code" | "state" | "city" | "user_type" | "role_code",
     value: string,
@@ -291,6 +312,43 @@ export function SuperadminDashboard() {
     anchor.download = `territorial-report-${selectedRange}.csv`;
     anchor.click();
     browserWindow.URL.revokeObjectURL(url);
+  }
+
+  function persistPresets(nextPresets: TerritorialPreset[]) {
+    setTerritorialPresets(nextPresets);
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem("magicbox:territorial-presets", JSON.stringify(nextPresets));
+    }
+  }
+
+  function saveCurrentPreset() {
+    if (typeof window === "undefined") return;
+    const suggestedName = [selectedCountryCode, selectedState, selectedCity, selectedRange].filter(Boolean).join(" · ") || "Vista territorial";
+    const name = window.prompt("Nombre de la vista", suggestedName)?.trim();
+    if (!name) return;
+
+    const nextPreset: TerritorialPreset = {
+      id: `${Date.now()}`,
+      name,
+      filters: {
+        range: selectedRange,
+        institution_id: selectedInstitutionId || "",
+        country_code: selectedCountryCode || "",
+        state: selectedState || "",
+        city: selectedCity || "",
+        user_type: selectedUserType || "",
+        role_code: selectedRoleCode || "",
+      },
+    };
+    persistPresets([nextPreset, ...territorialPresets].slice(0, 8));
+  }
+
+  function applyPreset(preset: TerritorialPreset) {
+    updateFilters(preset.filters);
+  }
+
+  function deletePreset(id: string) {
+    persistPresets(territorialPresets.filter((preset) => preset.id !== id));
   }
 
   const metrics = useMemo(() => {
@@ -707,6 +765,54 @@ export function SuperadminDashboard() {
                 <p className="mt-2">{alert.message}</p>
               </div>
             ))}
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {isGovernmentViewer ? (
+        <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
+          <CardHeader>
+            <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+              <div>
+                <CardTitle>Vistas ejecutivas guardadas</CardTitle>
+                <CardDescription>Presets locales para recuperar rápido combinaciones territoriales que revisas seguido.</CardDescription>
+              </div>
+              <button
+                type="button"
+                className="rounded-full bg-primary/10 px-4 py-2 text-sm font-medium text-primary"
+                onClick={saveCurrentPreset}
+              >
+                Guardar vista actual
+              </button>
+            </div>
+          </CardHeader>
+          <CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {territorialPresets.length > 0 ? (
+              territorialPresets.map((preset) => (
+                <div key={preset.id} className="rounded-2xl bg-white/80 p-4 text-sm text-muted-foreground">
+                  <div className="flex items-start justify-between gap-3">
+                    <p className="font-medium text-foreground">{preset.name}</p>
+                    <button
+                      type="button"
+                      className="rounded-full bg-secondary px-3 py-1 text-xs font-medium text-secondary-foreground"
+                      onClick={() => deletePreset(preset.id)}
+                    >
+                      Borrar
+                    </button>
+                  </div>
+                  <p className="mt-2">{Object.values(preset.filters).filter(Boolean).join(" · ") || "Vista general"}</p>
+                  <button
+                    type="button"
+                    className="mt-3 rounded-full border border-border bg-white px-3 py-1 text-xs font-medium text-foreground"
+                    onClick={() => applyPreset(preset)}
+                  >
+                    Aplicar preset
+                  </button>
+                </div>
+              ))
+            ) : (
+              <div className="rounded-2xl bg-white/80 p-4 text-sm text-muted-foreground">Todavía no hay presets guardados. Puedes guardar la combinación actual de filtros y reutilizarla después.</div>
+            )}
           </CardContent>
         </Card>
       ) : null}
