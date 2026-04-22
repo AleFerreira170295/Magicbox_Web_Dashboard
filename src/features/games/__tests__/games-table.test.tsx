@@ -212,6 +212,6 @@ describe("GamesTable", () => {
 
     expect(screen.getByText("Detalle de evidencia")).toBeInTheDocument();
     expect(screen.getByText("Participantes y asociaciones visibles")).toBeInTheDocument();
-    expect(screen.getByText("Turnos observables")).toBeInTheDocument();
+    expect(screen.queryAllByText("Turnos observables").length).toBeGreaterThan(0);
   });
 });

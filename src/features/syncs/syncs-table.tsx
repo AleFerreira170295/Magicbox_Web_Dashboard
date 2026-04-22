@@ -271,6 +271,25 @@ export function SyncsTable() {
         </CardContent>
       </Card>
 
+      {isResearcherView ? (
+        <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
+          <CardContent className="grid gap-3 p-5 md:grid-cols-3">
+            <div className="rounded-2xl bg-background/70 p-4">
+              <p className="text-sm font-medium text-foreground">Cobertura de captura</p>
+              <p className="mt-2 text-sm leading-6 text-muted-foreground">Se hace explícito qué parte de la muestra tiene raw visible y qué parte todavía queda incompleta.</p>
+            </div>
+            <div className="rounded-2xl bg-background/70 p-4">
+              <p className="text-sm font-medium text-foreground">Correlación con partida</p>
+              <p className="mt-2 text-sm leading-6 text-muted-foreground">La relación entre sync y game visible ayuda a leer continuidad sin saltar entre pantallas para cada caso.</p>
+            </div>
+            <div className="rounded-2xl bg-background/70 p-4">
+              <p className="text-sm font-medium text-foreground">Asociaciones visibles</p>
+              <p className="mt-2 text-sm leading-6 text-muted-foreground">Dispositivo, usuario y participantes quedan resumidos con lenguaje de evidencia y no solo de operación.</p>
+            </div>
+          </CardContent>
+        </Card>
+      ) : null}
+
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
         {syncsQuery.isLoading ? (
           Array.from({ length: 5 }).map((_, index) => <Skeleton key={index} className="h-32 rounded-2xl" />)

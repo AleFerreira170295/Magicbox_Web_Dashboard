@@ -228,14 +228,14 @@ export function ResearcherDashboard() {
         <CardHeader>
           <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
             <div>
-              <CardTitle>Base researcher iniciada</CardTitle>
+              <CardTitle>Base visual researcher cerrada</CardTitle>
               <CardDescription>
                 {user?.fullName || "La cuenta autenticada"} ya tiene una home más alineada con trazabilidad y evidencia.
                 El siguiente paso natural sería adaptar también `Partidas` y `Sincronizaciones` con copy y focos propios de investigación.
               </CardDescription>
             </div>
             <div className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-4 py-2 text-sm font-medium text-primary">
-              Perfil en marcha
+              Visual base cerrada
               <Sparkles className="size-4" />
             </div>
           </div>

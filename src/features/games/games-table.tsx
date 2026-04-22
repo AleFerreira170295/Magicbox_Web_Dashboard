@@ -284,6 +284,25 @@ export function GamesTable() {
         </CardContent>
       </Card>
 
+      {isResearcherView ? (
+        <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
+          <CardContent className="grid gap-3 p-5 md:grid-cols-3">
+            <div className="rounded-2xl bg-background/70 p-4">
+              <p className="text-sm font-medium text-foreground">Composición de muestra</p>
+              <p className="mt-2 text-sm leading-6 text-muted-foreground">Leé rápido cuántas sesiones combinan manuales y registrados, y cómo queda representada la evidencia visible.</p>
+            </div>
+            <div className="rounded-2xl bg-background/70 p-4">
+              <p className="text-sm font-medium text-foreground">Asociaciones visibles</p>
+              <p className="mt-2 text-sm leading-6 text-muted-foreground">La relación entre partida, dispositivo y owner queda expuesta para evitar lecturas ambiguas del alcance.</p>
+            </div>
+            <div className="rounded-2xl bg-background/70 p-4">
+              <p className="text-sm font-medium text-foreground">Turnos observables</p>
+              <p className="mt-2 text-sm leading-6 text-muted-foreground">La muestra destaca densidad de turnos, éxito visible y contexto de jugador sin caer directo en inspección cruda.</p>
+            </div>
+          </CardContent>
+        </Card>
+      ) : null}
+
       <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
         <CardContent className="flex flex-wrap gap-2 p-5">
           {accessSegments.map((segment) => (
