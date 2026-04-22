@@ -186,4 +186,32 @@ describe("GamesTable", () => {
     expect(screen.queryAllByText("Luna").length).toBeGreaterThan(0);
     expect(screen.queryAllByText(/medium/i).length).toBeGreaterThan(0);
   });
+
+  it("adapts copy for researcher sessions without changing the evidence detail", () => {
+    useAuthMock.mockReturnValue({
+      tokens: { accessToken: "token", refreshToken: "refresh" },
+      user: {
+        id: "user-9",
+        email: "research@example.com",
+        firstName: "Rita",
+        lastName: "Researcher",
+        fullName: "Rita Researcher",
+        educationalCenterId: "ec-1",
+        roles: ["researcher"],
+        permissions: ["game_data:read"],
+        raw: {},
+      },
+    });
+
+    renderGamesTable();
+
+    expect(screen.getByText("Researcher")).toBeInTheDocument();
+    expect(screen.getByText(/pensada para leer composición de muestra/i)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByText("101"));
+
+    expect(screen.getByText("Detalle de evidencia")).toBeInTheDocument();
+    expect(screen.getByText("Participantes y asociaciones visibles")).toBeInTheDocument();
+    expect(screen.getByText("Turnos observables")).toBeInTheDocument();
+  });
 });

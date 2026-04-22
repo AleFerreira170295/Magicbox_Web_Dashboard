@@ -65,6 +65,7 @@ export function GamesTable() {
   const scopedInstitutionId = institutions.length === 1 ? institutions[0]?.id || null : null;
   const scopedInstitutionName = scopedInstitutionId ? institutions[0]?.name || scopedInstitutionId : null;
   const isInstitutionScopedView = Boolean(scopedInstitutionId && currentUser?.educationalCenterId === scopedInstitutionId);
+  const isResearcherView = currentUser?.roles.includes("researcher") || false;
 
   const gameRows = useMemo(() => {
     const currentUserEmail = (currentUser?.email || "").trim().toLowerCase();
@@ -203,10 +204,12 @@ export function GamesTable() {
   return (
     <div className="space-y-6">
       <SectionHeader
-        eyebrow={isInstitutionScopedView ? "Institution admin" : "Juego"}
+        eyebrow={isResearcherView ? "Researcher" : isInstitutionScopedView ? "Institution admin" : "Juego"}
         title="Partidas"
         description={
-          isInstitutionScopedView
+          isResearcherView
+            ? "Vista de evidencia sobre `game-data`, pensada para leer composición de muestra, asociaciones visibles y densidad de turnos sin mezclarlo con operación de aula."
+            : isInstitutionScopedView
             ? `Vista operativa de partidas para ${scopedInstitutionName}, ya alineada con el scope real de game-data por institución.`
             : "Vista operativa sobre `game-data` con contexto de institución, dispositivo, jugadores y desempeño, para seguir el tramo sync → partida sin caer en inspección cruda solamente."
         }
@@ -264,13 +267,15 @@ export function GamesTable() {
           <div>
             <div className="flex flex-wrap items-center gap-2">
               <p className="text-sm font-medium text-foreground">Alcance operativo</p>
-              <Badge variant={isInstitutionScopedView ? "secondary" : "outline"}>
-                {isInstitutionScopedView ? "institution-admin" : "multi-institución / global"}
+              <Badge variant={isResearcherView || isInstitutionScopedView ? "secondary" : "outline"}>
+                {isResearcherView ? "researcher" : isInstitutionScopedView ? "institution-admin" : "multi-institución / global"}
               </Badge>
               <Badge variant="outline">game-data real</Badge>
             </div>
             <p className="mt-2 text-sm text-muted-foreground">
-              {isInstitutionScopedView
+              {isResearcherView
+                ? "La vista conserva el alcance visible real y deja explícita la relación entre partida, dispositivo y composición de jugadores para poder leer evidencia sin irse directo al raw."
+                : isInstitutionScopedView
                 ? "La tabla queda anclada a la institución visible por ACL, así que el filtro institucional pasa a ser informativo y no abre otras sedes."
                 : "La vista refleja las partidas visibles según el alcance actual de game-data y permite cruzarlas con institución y dispositivo."}
             </p>
@@ -307,11 +312,11 @@ export function GamesTable() {
           Array.from({ length: 5 }).map((_, index) => <Skeleton key={index} className="h-32 rounded-2xl" />)
         ) : (
           <>
-            <SummaryCard label="Partidas" value={String(metrics.totalGames)} hint="Juegos visibles en la consulta actual." icon={Gamepad2} />
-            <SummaryCard label="Jugadores" value={String(metrics.totalPlayers)} hint="Suma proyectada de participantes en la muestra." icon={Users} />
-            <SummaryCard label="Turnos" value={String(metrics.totalTurns)} hint="Volumen operativo de interacción ya persistido." icon={TimerReset} />
-            <SummaryCard label="Mixtas" value={String(metrics.mixedGames)} hint="Partidas con mezcla de jugadores manuales y registrados." icon={BookOpen} />
-            <SummaryCard label="Éxito" value={`${metrics.successRate}%`} hint="Tasa agregada de turnos exitosos en la vista." icon={Trophy} />
+            <SummaryCard label={isResearcherView ? "Muestra" : "Partidas"} value={String(metrics.totalGames)} hint={isResearcherView ? "Sesiones visibles dentro de la muestra actual." : "Juegos visibles en la consulta actual."} icon={Gamepad2} />
+            <SummaryCard label={isResearcherView ? "Participantes" : "Jugadores"} value={String(metrics.totalPlayers)} hint={isResearcherView ? "Volumen proyectado de participantes en la evidencia visible." : "Suma proyectada de participantes en la muestra."} icon={Users} />
+            <SummaryCard label="Turnos" value={String(metrics.totalTurns)} hint={isResearcherView ? "Eventos observables persistidos para análisis." : "Volumen operativo de interacción ya persistido."} icon={TimerReset} />
+            <SummaryCard label={isResearcherView ? "Muestra mixta" : "Mixtas"} value={String(metrics.mixedGames)} hint={isResearcherView ? "Sesiones con combinación de manuales y registrados." : "Partidas con mezcla de jugadores manuales y registrados."} icon={BookOpen} />
+            <SummaryCard label={isResearcherView ? "Éxito visible" : "Éxito"} value={`${metrics.successRate}%`} hint={isResearcherView ? "Tasa agregada de turnos exitosos dentro de la vista." : "Tasa agregada de turnos exitosos en la vista."} icon={Trophy} />
           </>
         )}
       </div>
@@ -319,9 +324,11 @@ export function GamesTable() {
       <div className="grid gap-6 xl:grid-cols-[1.2fr_1fr]">
         <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
           <CardHeader>
-            <CardTitle>Listado operativo de partidas</CardTitle>
+            <CardTitle>{isResearcherView ? "Muestra visible de partidas" : "Listado operativo de partidas"}</CardTitle>
             <CardDescription>
-              Seleccioná una partida para inspeccionar mezcla de jugadores, turnos y contexto institucional sin salir del dashboard.
+              {isResearcherView
+                ? "Seleccioná una partida para inspeccionar composición de muestra, turnos y contexto visible sin salir del dashboard."
+                : "Seleccioná una partida para inspeccionar mezcla de jugadores, turnos y contexto institucional sin salir del dashboard."}
             </CardDescription>
           </CardHeader>
           <CardContent className="overflow-x-auto p-0">
@@ -396,15 +403,17 @@ export function GamesTable() {
 
         <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
           <CardHeader>
-            <CardTitle>Detalle de partida</CardTitle>
+            <CardTitle>{isResearcherView ? "Detalle de evidencia" : "Detalle de partida"}</CardTitle>
             <CardDescription>
-              Resumen rápido de desempeño, composición de jugadores y últimos turnos persistidos.
+              {isResearcherView
+                ? "Resumen rápido de composición de muestra, asociaciones visibles y últimos turnos persistidos."
+                : "Resumen rápido de desempeño, composición de jugadores y últimos turnos persistidos."}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-5">
             {!selectedGame ? (
               <div className="rounded-2xl bg-background/70 p-4 text-sm text-muted-foreground">
-                Elegí una partida para revisar su detalle operativo.
+                {isResearcherView ? "Elegí una partida para revisar su detalle de evidencia." : "Elegí una partida para revisar su detalle operativo."}
               </div>
             ) : (
               <>
@@ -432,7 +441,7 @@ export function GamesTable() {
                 </div>
 
                 <div>
-                  <p className="text-sm font-medium text-foreground">Jugadores y asociaciones</p>
+                  <p className="text-sm font-medium text-foreground">{isResearcherView ? "Participantes y asociaciones visibles" : "Jugadores y asociaciones"}</p>
                   <div className="mt-3 space-y-3">
                     {selectedGame.players.length === 0 ? (
                       <div className="rounded-2xl bg-background/70 p-3 text-sm text-muted-foreground">Sin jugadores cargados.</div>
@@ -457,7 +466,7 @@ export function GamesTable() {
                 </div>
 
                 <div>
-                  <p className="text-sm font-medium text-foreground">Últimos turnos</p>
+                  <p className="text-sm font-medium text-foreground">{isResearcherView ? "Turnos observables" : "Últimos turnos"}</p>
                   <div className="mt-3 space-y-2">
                     {selectedRecentTurns.length === 0 ? (
                       <div className="rounded-2xl bg-background/70 p-3 text-sm text-muted-foreground">Sin turnos persistidos.</div>
