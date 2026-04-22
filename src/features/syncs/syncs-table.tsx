@@ -10,6 +10,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useAuth } from "@/features/auth/auth-context";
 import { useDevices } from "@/features/devices/api";
+import { useGames } from "@/features/games/api";
+import type { GameRecord } from "@/features/games/types";
 import { useSyncSessions } from "@/features/syncs/api";
 import { useUsers } from "@/features/users/api";
 import { cn, formatDateTime, getErrorMessage } from "@/lib/utils";
@@ -47,15 +49,18 @@ export function SyncsTable() {
   const { tokens, user: currentUser } = useAuth();
   const [query, setQuery] = useState("");
   const [rawFilter, setRawFilter] = useState<"all" | "with-raw" | "without-raw">("all");
+  const [accessFilter, setAccessFilter] = useState<"all" | "owned" | "institution" | "shared" | "unresolved">("all");
   const [selectedSyncId, setSelectedSyncId] = useState<string | null>(null);
 
   const syncsQuery = useSyncSessions(tokens?.accessToken);
   const devicesQuery = useDevices(tokens?.accessToken);
   const usersQuery = useUsers(tokens?.accessToken);
+  const gamesQuery = useGames(tokens?.accessToken);
 
   const syncs = useMemo(() => syncsQuery.data?.data || [], [syncsQuery.data?.data]);
   const devices = useMemo(() => devicesQuery.data?.data || [], [devicesQuery.data?.data]);
   const users = useMemo(() => usersQuery.data?.data || [], [usersQuery.data?.data]);
+  const games = useMemo(() => gamesQuery.data?.data || [], [gamesQuery.data?.data]);
 
   const currentPermissionKeys = useMemo(() => new Set(currentUser?.permissions || []), [currentUser?.permissions]);
   const hasGlobalAdminRole = currentUser?.roles.includes("admin") || false;
@@ -72,18 +77,75 @@ export function SyncsTable() {
 
   const deviceById = useMemo(() => new Map(devices.map((device) => [device.id, device])), [devices]);
   const userById = useMemo(() => new Map(users.map((user) => [user.id, user])), [users]);
+  const gameById = useMemo(() => {
+    const entries: Array<[string, GameRecord]> = [];
+
+    games.forEach((game) => {
+      entries.push([String(game.id), game]);
+      if (game.gameId != null) {
+        entries.push([String(game.gameId), game]);
+      }
+    });
+
+    return new Map<string, GameRecord>(entries);
+  }, [games]);
+
+  const syncRows = useMemo(() => {
+    const currentUserEmail = (currentUser?.email || "").trim().toLowerCase();
+
+    return syncs.map((sync) => {
+      const device = sync.bleDeviceId ? deviceById.get(sync.bleDeviceId) : null;
+      const user = sync.userId ? userById.get(sync.userId) : null;
+      const matchedGame = sync.gameId ? gameById.get(String(sync.gameId)) : null;
+      const hasRaw = (sync.rawRecordCount || sync.rawRecordIds.length || 0) > 0 || Object.keys(sync.rawPayload || {}).length > 0;
+
+      const isOwnedByCurrentUser = Boolean(
+        device && (
+          (currentUser?.id && device.ownerUserId === currentUser.id)
+          || (currentUserEmail && (device.ownerUserEmail || "").trim().toLowerCase() === currentUserEmail)
+        ),
+      );
+      const isInstitutionVisible = Boolean(
+        device?.educationalCenterId
+        && currentUser?.educationalCenterId
+        && device.educationalCenterId === currentUser.educationalCenterId,
+      );
+
+      const accessRelation = !canReadOperationalSyncs
+        ? "historial personal"
+        : isOwnedByCurrentUser
+          ? "mis dispositivos"
+          : isInstitutionVisible
+            ? "institución visible"
+            : device?.ownerUserId || device?.ownerUserEmail
+              ? "compartido visible"
+              : "sin asociación resuelta";
+
+      return {
+        ...sync,
+        device,
+        user,
+        matchedGame,
+        hasRaw,
+        accessRelation,
+        isOwnedByCurrentUser,
+        isInstitutionVisible,
+        hasUnresolvedAssociation: !device || accessRelation === "sin asociación resuelta",
+      };
+    });
+  }, [canReadOperationalSyncs, currentUser, deviceById, gameById, syncs, userById]);
 
   const filtered = useMemo(() => {
     const normalized = query.trim().toLowerCase();
 
-    return syncs.filter((sync) => {
-      const hasRaw = (sync.rawRecordCount || sync.rawRecordIds.length || 0) > 0 || Object.keys(sync.rawPayload || {}).length > 0;
-      if (rawFilter === "with-raw" && !hasRaw) return false;
-      if (rawFilter === "without-raw" && hasRaw) return false;
+    return syncRows.filter((sync) => {
+      if (rawFilter === "with-raw" && !sync.hasRaw) return false;
+      if (rawFilter === "without-raw" && sync.hasRaw) return false;
+      if (accessFilter === "owned" && !sync.isOwnedByCurrentUser) return false;
+      if (accessFilter === "institution" && !sync.isInstitutionVisible) return false;
+      if (accessFilter === "shared" && sync.accessRelation !== "compartido visible") return false;
+      if (accessFilter === "unresolved" && !sync.hasUnresolvedAssociation) return false;
       if (!normalized) return true;
-
-      const device = sync.bleDeviceId ? deviceById.get(sync.bleDeviceId) : null;
-      const user = sync.userId ? userById.get(sync.userId) : null;
 
       return [
         sync.syncId,
@@ -93,19 +155,21 @@ export function SyncsTable() {
         sync.deviceId,
         sync.bleDeviceId,
         sync.firmwareVersion,
-        device?.name,
-        device?.deviceId,
-        user?.fullName,
-        user?.email,
+        sync.device?.name,
+        sync.device?.deviceId,
+        sync.user?.fullName,
+        sync.user?.email,
+        sync.accessRelation,
+        sync.matchedGame?.deckName,
       ]
         .filter(Boolean)
         .some((value) => String(value).toLowerCase().includes(normalized));
     });
-  }, [deviceById, query, rawFilter, syncs, userById]);
+  }, [accessFilter, query, rawFilter, syncRows]);
 
   const selectedSync = useMemo(
-    () => filtered.find((sync) => sync.id === selectedSyncId) || syncs.find((sync) => sync.id === selectedSyncId) || null,
-    [filtered, selectedSyncId, syncs],
+    () => filtered.find((sync) => sync.id === selectedSyncId) || syncRows.find((sync) => sync.id === selectedSyncId) || null,
+    [filtered, selectedSyncId, syncRows],
   );
 
   const metrics = useMemo(() => {
@@ -120,12 +184,23 @@ export function SyncsTable() {
       withParticipants,
       withDeviceLink,
       withFirmware,
+      ownedSyncs: syncRows.filter((sync) => sync.isOwnedByCurrentUser).length,
+      institutionSyncs: syncRows.filter((sync) => sync.isInstitutionVisible).length,
+      unresolvedAssociations: syncRows.filter((sync) => sync.hasUnresolvedAssociation).length,
+      matchedGames: syncRows.filter((sync) => Boolean(sync.matchedGame)).length,
     };
-  }, [syncs]);
+  }, [syncRows, syncs]);
 
-  const selectedDevice = selectedSync?.bleDeviceId ? deviceById.get(selectedSync.bleDeviceId) : null;
-  const selectedUser = selectedSync?.userId ? userById.get(selectedSync.userId) : null;
+  const selectedDevice = selectedSync?.device || null;
+  const selectedUser = selectedSync?.user || null;
   const selectedRawKeys = Object.keys(selectedSync?.rawPayload || {});
+  const accessSegments = [
+    { key: "all" as const, label: "Todas", count: metrics.total },
+    { key: "owned" as const, label: "Mis dispositivos", count: metrics.ownedSyncs },
+    { key: "institution" as const, label: "Institución visible", count: metrics.institutionSyncs },
+    { key: "shared" as const, label: "Compartidas", count: syncRows.filter((sync) => sync.accessRelation === "compartido visible").length },
+    { key: "unresolved" as const, label: "Sin asociación resuelta", count: metrics.unresolvedAssociations },
+  ];
 
   return (
     <div className="space-y-6">
@@ -156,6 +231,17 @@ export function SyncsTable() {
               <option value="all">Todas</option>
               <option value="with-raw">Solo con raw</option>
               <option value="without-raw">Solo sin raw</option>
+            </select>
+            <select
+              value={accessFilter}
+              onChange={(event) => setAccessFilter(event.target.value as "all" | "owned" | "institution" | "shared" | "unresolved")}
+              className="h-10 min-w-48 rounded-md border border-input bg-background px-3 text-sm"
+            >
+              <option value="all">Todos los accesos</option>
+              <option value="owned">Mis dispositivos</option>
+              <option value="institution">Institución visible</option>
+              <option value="shared">Compartidas</option>
+              <option value="unresolved">Sin asociación resuelta</option>
             </select>
           </div>
         }
@@ -194,6 +280,16 @@ export function SyncsTable() {
         )}
       </div>
 
+      <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
+        <CardContent className="flex flex-wrap gap-2 p-5">
+          {accessSegments.map((segment) => (
+            <Badge key={segment.key} variant={accessFilter === segment.key ? "secondary" : "outline"} className="px-3 py-1.5">
+              {segment.label}: {segment.count}
+            </Badge>
+          ))}
+        </CardContent>
+      </Card>
+
       <div className="grid gap-6 xl:grid-cols-[1.2fr_1fr]">
         <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
           <CardHeader>
@@ -217,6 +313,7 @@ export function SyncsTable() {
                     <TableHead>Origen</TableHead>
                     <TableHead>Dispositivo</TableHead>
                     <TableHead>Usuario</TableHead>
+                    <TableHead>Acceso</TableHead>
                     <TableHead>Participantes</TableHead>
                     <TableHead>Raw</TableHead>
                     <TableHead>Sincronizado</TableHead>
@@ -225,16 +322,12 @@ export function SyncsTable() {
                 <TableBody>
                   {filtered.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={7} className="py-10 text-center text-sm text-muted-foreground">
+                      <TableCell colSpan={8} className="py-10 text-center text-sm text-muted-foreground">
                         No hay sincronizaciones para mostrar.
                       </TableCell>
                     </TableRow>
                   ) : (
                     filtered.map((sync) => {
-                      const device = sync.bleDeviceId ? deviceById.get(sync.bleDeviceId) : null;
-                      const user = sync.userId ? userById.get(sync.userId) : null;
-                      const hasRaw = (sync.rawRecordCount || sync.rawRecordIds.length || 0) > 0 || Object.keys(sync.rawPayload || {}).length > 0;
-
                       return (
                         <TableRow
                           key={sync.id}
@@ -245,11 +338,17 @@ export function SyncsTable() {
                           <TableCell>
                             <Badge variant="secondary">{sync.source || sync.sourceType || "desconocido"}</Badge>
                           </TableCell>
-                          <TableCell>{device?.name || sync.deviceId || sync.bleDeviceId || "-"}</TableCell>
-                          <TableCell>{user?.fullName || user?.email || sync.userId || "-"}</TableCell>
+                          <TableCell>{sync.device?.name || sync.deviceId || sync.bleDeviceId || "-"}</TableCell>
+                          <TableCell>{sync.user?.fullName || sync.user?.email || sync.userId || "-"}</TableCell>
+                          <TableCell>
+                            <div className="flex flex-col gap-1">
+                              <Badge variant={sync.hasUnresolvedAssociation ? "warning" : "outline"}>{sync.accessRelation}</Badge>
+                              {sync.matchedGame ? <span className="text-xs text-muted-foreground">partida {sync.matchedGame.gameId || sync.matchedGame.id}</span> : null}
+                            </div>
+                          </TableCell>
                           <TableCell>{sync.participants.length || sync.totalPlayers || 0}</TableCell>
                           <TableCell>
-                            <Badge variant={hasRaw ? "success" : "outline"}>{hasRaw ? "disponible" : "pendiente"}</Badge>
+                            <Badge variant={sync.hasRaw ? "success" : "outline"}>{sync.hasRaw ? "disponible" : "pendiente"}</Badge>
                           </TableCell>
                           <TableCell>{formatDateTime(sync.syncedAt || sync.receivedAt || sync.startedAt)}</TableCell>
                         </TableRow>
@@ -292,6 +391,8 @@ export function SyncsTable() {
                   <div className="mt-3 grid gap-2 text-xs text-muted-foreground sm:grid-cols-2">
                     <p>Usuario: {selectedUser?.fullName || selectedUser?.email || selectedSync.userId || "-"}</p>
                     <p>Dispositivo: {selectedDevice?.name || selectedSync.deviceId || selectedSync.bleDeviceId || "-"}</p>
+                    <p>Relación de acceso: {selectedSync.accessRelation}</p>
+                    <p>Partida correlacionada: {selectedSync.matchedGame?.deckName || selectedSync.gameId || "sin match visible"}</p>
                     <p>Firmware: {selectedSync.firmwareVersion || "sin firmware"}</p>
                     <p>App: {selectedSync.appVersion || "sin versión"}</p>
                     <p>Participantes: {selectedSync.participants.length || selectedSync.totalPlayers || 0}</p>
@@ -300,15 +401,25 @@ export function SyncsTable() {
                 </div>
 
                 <div>
-                  <p className="text-sm font-medium text-foreground">Participantes</p>
-                  <div className="mt-3 flex flex-wrap gap-2">
+                  <p className="text-sm font-medium text-foreground">Participantes y asociaciones</p>
+                  <div className="mt-3 space-y-3">
                     {selectedSync.participants.length === 0 ? (
-                      <Badge variant="outline">sin participantes proyectados</Badge>
+                      <div className="rounded-2xl bg-background/70 p-3 text-sm text-muted-foreground">Sin participantes proyectados.</div>
                     ) : (
                       selectedSync.participants.map((participant, index) => (
-                        <Badge key={`${participant.id || participant.profileId || participant.playerName || index}`} variant="outline">
-                          {participant.playerName || participant.profileName || participant.profileId || `Jugador ${index + 1}`}
-                        </Badge>
+                        <div key={`${participant.id || participant.profileId || participant.playerName || index}`} className="rounded-2xl bg-background/70 p-3 text-sm">
+                          <div className="flex flex-wrap items-center justify-between gap-3">
+                            <div>
+                              <p className="font-medium text-foreground">{participant.playerName || participant.profileName || participant.profileId || `Jugador ${index + 1}`}</p>
+                              <p className="text-xs text-muted-foreground">{participant.studentId || participant.externalPlayerUid || participant.id || "sin id enlazado"}</p>
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                              {participant.cardUid ? <Badge variant="outline">card {participant.cardUid}</Badge> : null}
+                              {participant.position != null ? <Badge variant="outline">posición {participant.position}</Badge> : null}
+                              {participant.profileId ? <Badge variant="secondary">perfil vinculado</Badge> : <Badge variant="outline">sin perfil</Badge>}
+                            </div>
+                          </div>
+                        </div>
                       ))
                     )}
                   </div>
@@ -316,10 +427,11 @@ export function SyncsTable() {
 
                 <div>
                   <p className="text-sm font-medium text-foreground">Señales de trazabilidad</p>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    <Badge variant="outline">raw ids: {String(selectedSync.rawRecordCount || selectedSync.rawRecordIds.length || 0)}</Badge>
-                    <Badge variant="outline">fragmentos: {String(selectedSync.rawFragmentCount || 0)}</Badge>
-                    <Badge variant="outline">payload keys: {String(selectedRawKeys.length)}</Badge>
+                  <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                    <div className="rounded-2xl bg-background/70 p-3 text-sm text-muted-foreground">raw ids: <span className="font-medium text-foreground">{String(selectedSync.rawRecordCount || selectedSync.rawRecordIds.length || 0)}</span></div>
+                    <div className="rounded-2xl bg-background/70 p-3 text-sm text-muted-foreground">fragmentos: <span className="font-medium text-foreground">{String(selectedSync.rawFragmentCount || 0)}</span></div>
+                    <div className="rounded-2xl bg-background/70 p-3 text-sm text-muted-foreground">payload keys: <span className="font-medium text-foreground">{String(selectedRawKeys.length)}</span></div>
+                    <div className="rounded-2xl bg-background/70 p-3 text-sm text-muted-foreground">match con partida: <span className="font-medium text-foreground">{selectedSync.matchedGame ? "sí" : "no"}</span></div>
                   </div>
                 </div>
 
