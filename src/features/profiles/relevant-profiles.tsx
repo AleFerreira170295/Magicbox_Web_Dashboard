@@ -54,6 +54,7 @@ export function RelevantProfiles() {
 
   const profilesQuery = useProfilesOverview(tokens?.accessToken);
   const profiles = useMemo(() => profilesQuery.data || [], [profilesQuery.data]);
+  const isDirectorView = currentUser?.roles.includes("director") || false;
   const isScopedActor = Boolean(
     currentUser?.roles.includes("institution-admin") || currentUser?.roles.includes("director"),
   );
@@ -153,11 +154,13 @@ export function RelevantProfiles() {
   return (
     <div className="space-y-6">
       <SectionHeader
-        eyebrow={isInstitutionScopedView ? "Institution admin" : "Perfiles Home"}
+        eyebrow={isInstitutionScopedView ? (isDirectorView ? "Director" : "Institution admin") : "Perfiles Home"}
         title="Profiles"
         description={
           isInstitutionScopedView
-            ? `Vista operativa real de perfiles Home para ${scopedInstitutionName}, ya alineada con el alcance institucional visible.`
+            ? isDirectorView
+              ? `Vista institucional de perfiles Home para ${scopedInstitutionName}, pensada para seguimiento general de owners, tarjetas y actividad visible.`
+              : `Vista operativa real de perfiles Home para ${scopedInstitutionName}, ya alineada con el alcance institucional visible.`
             : "Vista operativa real de perfiles Home, con ownership, bindings y actividad de sesiones. Ya no usa `users` como proxy del módulo."
         }
         actions={
@@ -203,13 +206,15 @@ export function RelevantProfiles() {
             <div className="flex flex-wrap items-center gap-2">
               <p className="text-sm font-medium text-foreground">Alcance operativo</p>
               <Badge variant={isInstitutionScopedView ? "secondary" : "outline"}>
-                {isInstitutionScopedView ? "institution-admin" : "multi-institución / global"}
+                {isInstitutionScopedView ? (isDirectorView ? "director" : "institution-admin") : "multi-institución / global"}
               </Badge>
               <Badge variant="outline">profiles reales</Badge>
             </div>
             <p className="mt-2 text-sm text-muted-foreground">
               {isInstitutionScopedView
-                ? "La tabla queda anclada a la institución visible por ACL, así que el filtro institucional pasa a ser informativo y no abre otras sedes."
+                ? isDirectorView
+                  ? "La lectura directoral deja en primer plano owners, tarjetas activas y actividad visible para seguimiento institucional, sin convertir perfiles en una pantalla técnica de administración." 
+                  : "La tabla queda anclada a la institución visible por ACL, así que el filtro institucional pasa a ser informativo y no abre otras sedes."
                 : "La vista refleja perfiles reales con ownership, cards y bindings visibles según el alcance actual."}
             </p>
           </div>
@@ -264,9 +269,11 @@ export function RelevantProfiles() {
       <div className="grid gap-6 xl:grid-cols-[1.2fr_1fr]">
         <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
           <CardHeader>
-            <CardTitle>Listado de perfiles</CardTitle>
+            <CardTitle>{isDirectorView ? "Perfiles visibles para seguimiento" : "Listado de perfiles"}</CardTitle>
             <CardDescription>
-              Seleccioná un perfil para revisar ownership, tarjetas, dispositivos vinculados y actividad reciente.
+              {isDirectorView
+                ? "Seleccioná un perfil para revisar owner, tarjetas activas y señales de actividad visibles desde una lectura institucional."
+                : "Seleccioná un perfil para revisar ownership, tarjetas, dispositivos vinculados y actividad reciente."}
             </CardDescription>
           </CardHeader>
           <CardContent className="overflow-x-auto p-0">
@@ -335,15 +342,17 @@ export function RelevantProfiles() {
 
         <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
           <CardHeader>
-            <CardTitle>Detalle de perfil</CardTitle>
+            <CardTitle>{isDirectorView ? "Detalle de seguimiento" : "Detalle de perfil"}</CardTitle>
             <CardDescription>
-              Resumen rápido del perfil, su owner y señales de uso relevantes para operación.
+              {isDirectorView
+                ? "Resumen rápido del perfil, su owner y señales visibles de uso para seguimiento institucional."
+                : "Resumen rápido del perfil, su owner y señales de uso relevantes para operación."}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-5">
             {!selectedProfile ? (
               <div className="rounded-2xl bg-background/70 p-4 text-sm text-muted-foreground">
-                Elegí un perfil para revisar su detalle operativo.
+                {isDirectorView ? "Elegí un perfil para revisar su detalle de seguimiento." : "Elegí un perfil para revisar su detalle operativo."}
               </div>
             ) : (
               <>

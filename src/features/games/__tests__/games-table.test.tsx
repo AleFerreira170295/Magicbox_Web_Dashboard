@@ -215,6 +215,34 @@ describe("GamesTable", () => {
     expect(screen.queryAllByText("Turnos observables").length).toBeGreaterThan(0);
   });
 
+  it("adapts the games view to a teacher-oriented classroom reading", () => {
+    useAuthMock.mockReturnValue({
+      tokens: { accessToken: "token", refreshToken: "refresh" },
+      user: {
+        id: "user-teacher",
+        email: "teacher@example.com",
+        firstName: "Teo",
+        lastName: "Teacher",
+        fullName: "Teo Teacher",
+        educationalCenterId: "ec-1",
+        roles: ["teacher"],
+        permissions: ["game_data:read"],
+        raw: {},
+      },
+    });
+
+    renderGamesTable();
+
+    expect(screen.getByText("Teacher")).toBeInTheDocument();
+    expect(screen.getByText(/priorizando qué se jugó, con quién y desde qué dispositivo/i)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByText("101"));
+
+    expect(screen.getByText(/Detalle para aula/i)).toBeInTheDocument();
+    expect(screen.getByText(/Participantes y contexto de aula/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/Ritmo visible/i).length).toBeGreaterThan(0);
+  });
+
   it("adapts the games view to a simplified family reading", () => {
     useAuthMock.mockReturnValue({
       tokens: { accessToken: "token", refreshToken: "refresh" },

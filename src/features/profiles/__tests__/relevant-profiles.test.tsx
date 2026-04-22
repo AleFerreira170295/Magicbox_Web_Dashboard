@@ -92,6 +92,33 @@ describe("RelevantProfiles", () => {
     expect(screen.getAllByRole("combobox")[0]).toBeDisabled();
   });
 
+  it("adapts profiles copy to a director-oriented institutional reading", () => {
+    useAuthMock.mockReturnValue({
+      tokens: { accessToken: "token", refreshToken: "refresh" },
+      user: {
+        id: "user-director",
+        email: "director@example.com",
+        firstName: "Dora",
+        lastName: "Director",
+        fullName: "Dora Director",
+        educationalCenterId: "ec-1",
+        roles: ["director"],
+        permissions: ["profile:read"],
+        raw: {},
+      },
+    });
+
+    renderProfiles();
+
+    expect(screen.getByText("Director")).toBeInTheDocument();
+    expect(screen.getByText(/pensada para seguimiento general de owners, tarjetas y actividad visible/i)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByText("Tomi"));
+
+    expect(screen.getByText(/Perfiles visibles para seguimiento/i)).toBeInTheDocument();
+    expect(screen.getByText(/Detalle de seguimiento/i)).toBeInTheDocument();
+  });
+
   it("keeps the institution-scoped explanation even when no institution-linked profiles are returned", () => {
     useProfilesOverviewMock.mockReturnValue({
       data: [],

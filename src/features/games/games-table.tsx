@@ -67,6 +67,8 @@ export function GamesTable() {
   const isInstitutionScopedView = Boolean(scopedInstitutionId && currentUser?.educationalCenterId === scopedInstitutionId);
   const isResearcherView = currentUser?.roles.includes("researcher") || false;
   const isFamilyView = currentUser?.roles.includes("family") || false;
+  const isTeacherView = currentUser?.roles.includes("teacher") || false;
+  const isDirectorView = currentUser?.roles.includes("director") || false;
 
   const gameRows = useMemo(() => {
     const currentUserEmail = (currentUser?.email || "").trim().toLowerCase();
@@ -205,13 +207,17 @@ export function GamesTable() {
   return (
     <div className="space-y-6">
       <SectionHeader
-        eyebrow={isFamilyView ? "Family" : isResearcherView ? "Researcher" : isInstitutionScopedView ? "Institution admin" : "Juego"}
+        eyebrow={isFamilyView ? "Family" : isResearcherView ? "Researcher" : isTeacherView ? "Teacher" : isDirectorView ? "Director" : isInstitutionScopedView ? "Institution admin" : "Juego"}
         title="Partidas"
         description={
           isFamilyView
             ? "Vista simple de actividad visible, pensada para entender sesiones, participantes y ritmo general sin entrar en detalles técnicos de operación."
             : isResearcherView
             ? "Vista de evidencia sobre `game-data`, pensada para leer composición de muestra, asociaciones visibles y densidad de turnos sin mezclarlo con operación de aula."
+            : isTeacherView
+            ? "Vista de aula sobre partidas visibles para el docente, priorizando qué se jugó, con quién y desde qué dispositivo para poder conectar rápido actividad y contexto."
+            : isDirectorView
+            ? `Vista de seguimiento institucional de partidas para ${scopedInstitutionName || "la institución"}, pensada para leer volumen, mezcla de participantes y señales generales sin caer en detalle técnico innecesario.`
             : isInstitutionScopedView
             ? `Vista operativa de partidas para ${scopedInstitutionName}, ya alineada con el scope real de game-data por institución.`
             : "Vista operativa sobre `game-data` con contexto de institución, dispositivo, jugadores y desempeño, para seguir el tramo sync → partida sin caer en inspección cruda solamente."
@@ -274,16 +280,20 @@ export function GamesTable() {
           <div>
             <div className="flex flex-wrap items-center gap-2">
               <p className="text-sm font-medium text-foreground">Alcance operativo</p>
-              <Badge variant={isFamilyView || isResearcherView || isInstitutionScopedView ? "secondary" : "outline"}>
-                {isFamilyView ? "family" : isResearcherView ? "researcher" : isInstitutionScopedView ? "institution-admin" : "multi-institución / global"}
+              <Badge variant={isFamilyView || isResearcherView || isTeacherView || isDirectorView || isInstitutionScopedView ? "secondary" : "outline"}>
+                {isFamilyView ? "family" : isResearcherView ? "researcher" : isTeacherView ? "teacher" : isDirectorView ? "director" : isInstitutionScopedView ? "institution-admin" : "multi-institución / global"}
               </Badge>
               <Badge variant="outline">game-data real</Badge>
             </div>
             <p className="mt-2 text-sm text-muted-foreground">
               {isFamilyView
-                ? "La pantalla simplifica el lenguaje y deja la actividad visible en primer plano. Los cruces técnicos quedan en segundo plano para no sobrecargar la lectura." 
+                ? "La pantalla simplifica el lenguaje y deja la actividad visible en primer plano. Los cruces técnicos quedan en segundo plano para no sobrecargar la lectura."
                 : isResearcherView
                 ? "La vista conserva el alcance visible real y deja explícita la relación entre partida, dispositivo y composición de jugadores para poder leer evidencia sin irse directo al raw."
+                : isTeacherView
+                ? "La vista docente deja explícito por qué la partida entra en tu scope, qué dispositivo la sostiene y cómo se compone la sesión para conectar rápido juego y aula."
+                : isDirectorView
+                ? "La vista directoral deja en primer plano volumen, mezcla de participantes y contexto institucional para seguimiento general, sin pedirte leer turnos como si fuera una consola técnica."
                 : isInstitutionScopedView
                 ? "La tabla queda anclada a la institución visible por ACL, así que el filtro institucional pasa a ser informativo y no abre otras sedes."
                 : "La vista refleja las partidas visibles según el alcance actual de game-data y permite cruzarlas con institución y dispositivo."}
@@ -354,12 +364,16 @@ export function GamesTable() {
       <div className="grid gap-6 xl:grid-cols-[1.2fr_1fr]">
         <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
           <CardHeader>
-            <CardTitle>{isFamilyView ? "Actividad visible" : isResearcherView ? "Muestra visible de partidas" : "Listado operativo de partidas"}</CardTitle>
+            <CardTitle>{isFamilyView ? "Actividad visible" : isResearcherView ? "Muestra visible de partidas" : isTeacherView ? "Partidas visibles para aula" : isDirectorView ? "Partidas visibles para seguimiento" : "Listado operativo de partidas"}</CardTitle>
             <CardDescription>
               {isFamilyView
                 ? "Seleccioná una partida para ver un resumen simple de participantes, turnos y momento de inicio."
                 : isResearcherView
                 ? "Seleccioná una partida para inspeccionar composición de muestra, turnos y contexto visible sin salir del dashboard."
+                : isTeacherView
+                ? "Seleccioná una partida para entender rápido dispositivo, participantes y ritmo visible antes de bajar a más detalle."
+                : isDirectorView
+                ? "Seleccioná una partida para revisar contexto institucional, volumen de participación y señales generales de seguimiento."
                 : "Seleccioná una partida para inspeccionar mezcla de jugadores, turnos y contexto institucional sin salir del dashboard."}
             </CardDescription>
           </CardHeader>
@@ -437,19 +451,23 @@ export function GamesTable() {
 
         <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
           <CardHeader>
-            <CardTitle>{isFamilyView ? "Resumen de partida" : isResearcherView ? "Detalle de evidencia" : "Detalle de partida"}</CardTitle>
+            <CardTitle>{isFamilyView ? "Resumen de partida" : isResearcherView ? "Detalle de evidencia" : isTeacherView ? "Detalle para aula" : isDirectorView ? "Detalle de seguimiento" : "Detalle de partida"}</CardTitle>
             <CardDescription>
               {isFamilyView
                 ? "Resumen simple de participantes, turnos y ritmo visible de la partida seleccionada."
                 : isResearcherView
                 ? "Resumen rápido de composición de muestra, asociaciones visibles y últimos turnos persistidos."
+                : isTeacherView
+                ? "Resumen rápido de dispositivo, composición de jugadores y ritmo visible para lectura docente."
+                : isDirectorView
+                ? "Resumen rápido de participación, contexto institucional y señales generales útiles para seguimiento."
                 : "Resumen rápido de desempeño, composición de jugadores y últimos turnos persistidos."}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-5">
             {!selectedGame ? (
               <div className="rounded-2xl bg-background/70 p-4 text-sm text-muted-foreground">
-                {isFamilyView ? "Elegí una partida para revisar un resumen simple de actividad." : isResearcherView ? "Elegí una partida para revisar su detalle de evidencia." : "Elegí una partida para revisar su detalle operativo."}
+                {isFamilyView ? "Elegí una partida para revisar un resumen simple de actividad." : isResearcherView ? "Elegí una partida para revisar su detalle de evidencia." : isTeacherView ? "Elegí una partida para revisar su detalle de aula." : isDirectorView ? "Elegí una partida para revisar su detalle de seguimiento." : "Elegí una partida para revisar su detalle operativo."}
               </div>
             ) : (
               <>
@@ -477,7 +495,7 @@ export function GamesTable() {
                 </div>
 
                 <div>
-                  <p className="text-sm font-medium text-foreground">{isFamilyView ? "Participantes visibles" : isResearcherView ? "Participantes y asociaciones visibles" : "Jugadores y asociaciones"}</p>
+                  <p className="text-sm font-medium text-foreground">{isFamilyView ? "Participantes visibles" : isResearcherView ? "Participantes y asociaciones visibles" : isTeacherView ? "Participantes y contexto de aula" : isDirectorView ? "Participantes y contexto institucional" : "Jugadores y asociaciones"}</p>
                   <div className="mt-3 space-y-3">
                     {selectedGame.players.length === 0 ? (
                       <div className="rounded-2xl bg-background/70 p-3 text-sm text-muted-foreground">Sin jugadores cargados.</div>
@@ -502,7 +520,7 @@ export function GamesTable() {
                 </div>
 
                 <div>
-                  <p className="text-sm font-medium text-foreground">{isFamilyView ? "Momentos recientes" : isResearcherView ? "Turnos observables" : "Últimos turnos"}</p>
+                  <p className="text-sm font-medium text-foreground">{isFamilyView ? "Momentos recientes" : isResearcherView ? "Turnos observables" : isTeacherView ? "Ritmo visible" : isDirectorView ? "Turnos visibles para seguimiento" : "Últimos turnos"}</p>
                   <div className="mt-3 space-y-2">
                     {selectedRecentTurns.length === 0 ? (
                       <div className="rounded-2xl bg-background/70 p-3 text-sm text-muted-foreground">Sin turnos persistidos.</div>

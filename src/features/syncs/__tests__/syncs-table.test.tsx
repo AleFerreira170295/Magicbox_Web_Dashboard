@@ -212,12 +212,12 @@ describe("SyncsTable", () => {
 
     renderSyncsTable();
 
-    expect(screen.getByText("Mi actividad")).toBeInTheDocument();
+    expect(screen.getByText("Teacher")).toBeInTheDocument();
     expect(screen.queryAllByText("historial personal").length).toBeGreaterThan(0);
     expect(screen.getByText(/la tabla queda limitada a tus propias sincronizaciones/i)).toBeInTheDocument();
   });
 
-  it("shows access association and readable sync detail when BLE read is available", () => {
+  it("adapts operational sync reading to a teacher-oriented framing", () => {
     useAuthMock.mockReturnValue({
       tokens: { accessToken: "token", refreshToken: "refresh" },
       user: {
@@ -228,6 +228,83 @@ describe("SyncsTable", () => {
         fullName: "Teo Teacher",
         educationalCenterId: "ec-1",
         roles: ["teacher"],
+        permissions: ["ble_device:read"],
+        raw: {},
+      },
+    });
+
+    useSyncSessionsMock.mockReturnValue(
+      okQuery({
+        data: [
+          {
+            id: "sync-1",
+            userId: "user-1",
+            syncId: "mb-sync-1",
+            source: "magicbox",
+            sourceType: "device",
+            sessionType: null,
+            status: "done",
+            bleDeviceId: "device-1",
+            deviceId: "mb-1",
+            firmwareVersion: "v2.2",
+            appVersion: "1.0.0",
+            payloadSchemaVersion: "1",
+            gameId: 201,
+            deckName: "Animales",
+            totalCards: 10,
+            totalPlayers: 2,
+            durationSeconds: 60,
+            score: 100,
+            finalResult: null,
+            gameEndReason: null,
+            startedAt: null,
+            endedAt: null,
+            syncedAt: null,
+            capturedAt: null,
+            participants: [{ id: "participant-1", profileId: "profile-1", profileName: "Luna", playerName: "Luna", cardUid: "card-1", position: 1, studentId: "student-1", externalPlayerUid: null, raw: {} }],
+            rawRecordIds: ["raw-1"],
+            rawRecordCount: 1,
+            lastRawRecordId: null,
+            rawPayload: { hello: "world" },
+            fragmentCount: 0,
+            rawFragmentCount: 0,
+            additionalFields: {},
+            receivedAt: null,
+            createdAt: null,
+            updatedAt: null,
+            raw: {},
+          },
+        ],
+        page: 1,
+        limit: 1,
+        total: 1,
+        total_pages: 1,
+      }),
+    );
+
+    renderSyncsTable();
+
+    expect(screen.getByText("Teacher")).toBeInTheDocument();
+    expect(screen.getByText(/pensada para conectar captura, participantes y dispositivo/i)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByText("mb-sync-1"));
+
+    expect(screen.getByText(/Detalle para aula/i)).toBeInTheDocument();
+    expect(screen.getByText(/Participantes y contexto de aula/i)).toBeInTheDocument();
+    expect(screen.getByText(/Señales útiles para aula/i)).toBeInTheDocument();
+  });
+
+  it("shows access association and readable sync detail when BLE read is available", () => {
+    useAuthMock.mockReturnValue({
+      tokens: { accessToken: "token", refreshToken: "refresh" },
+      user: {
+        id: "user-1",
+        email: "teacher@example.com",
+        firstName: "Ines",
+        lastName: "Admin",
+        fullName: "Ines Admin",
+        educationalCenterId: "ec-1",
+        roles: ["institution-admin"],
         permissions: ["ble_device:read"],
         raw: {},
       },

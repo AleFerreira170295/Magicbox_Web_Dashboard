@@ -76,6 +76,8 @@ export function SyncsTable() {
   const isInstitutionAdminView = currentUser?.roles.includes("institution-admin") || false;
   const isResearcherView = currentUser?.roles.includes("researcher") || false;
   const isFamilyView = currentUser?.roles.includes("family") || false;
+  const isTeacherView = currentUser?.roles.includes("teacher") || false;
+  const isDirectorView = currentUser?.roles.includes("director") || false;
 
   const deviceById = useMemo(() => new Map(devices.map((device) => [device.id, device])), [devices]);
   const userById = useMemo(() => new Map(users.map((user) => [user.id, user])), [users]);
@@ -207,7 +209,7 @@ export function SyncsTable() {
   return (
     <div className="space-y-6">
       <SectionHeader
-        eyebrow={isFamilyView ? "Family" : isResearcherView ? "Researcher" : canReadOperationalSyncs ? (isInstitutionAdminView ? "Institution admin" : "Trazabilidad") : "Mi actividad"}
+        eyebrow={isFamilyView ? "Family" : isResearcherView ? "Researcher" : canReadOperationalSyncs ? (isTeacherView ? "Teacher" : isDirectorView ? "Director" : isInstitutionAdminView ? "Institution admin" : "Trazabilidad") : isTeacherView ? "Teacher" : "Mi actividad"}
         title="Sincronizaciones"
         description={
           isFamilyView
@@ -215,7 +217,11 @@ export function SyncsTable() {
             : isResearcherView
             ? "Vista de evidencia sobre `/sync-sessions`, pensada para leer cobertura de captura, correlación con partidas y asociaciones visibles sin quedarse solo en el payload raw."
             : canReadOperationalSyncs
-            ? "La vista usa `/sync-sessions` como superficie operativa real del parque visible por ACL BLE, no solo como historial personal del usuario autenticado."
+            ? isTeacherView
+              ? "Vista docente de sincronizaciones visibles, pensada para conectar captura, participantes y dispositivo sin convertir la lectura en una consola técnica."
+              : isDirectorView
+              ? "Vista directoral de sincronizaciones visibles, útil para seguir captura, correlación con partidas y señales generales de trazabilidad a nivel institución."
+              : "La vista usa `/sync-sessions` como superficie operativa real del parque visible por ACL BLE, no solo como historial personal del usuario autenticado."
             : "Sin permiso BLE operativo, `/sync-sessions` vuelve a comportarse como historial personal del usuario autenticado."
         }
         actions={
@@ -265,6 +271,8 @@ export function SyncsTable() {
               <Badge variant={isFamilyView || isResearcherView || canReadOperationalSyncs ? "secondary" : "outline"}>
                 {isFamilyView ? "family" : isResearcherView ? "researcher" : canReadOperationalSyncs ? "operativo por ACL BLE" : "historial personal"}
               </Badge>
+              {isTeacherView && canReadOperationalSyncs ? <Badge variant="outline">teacher</Badge> : null}
+              {isDirectorView && canReadOperationalSyncs ? <Badge variant="outline">director</Badge> : null}
               {isInstitutionAdminView ? <Badge variant="outline">institution-admin</Badge> : null}
             </div>
             <p className="mt-2 text-sm text-muted-foreground">
@@ -273,7 +281,11 @@ export function SyncsTable() {
                 : isResearcherView
                 ? "La vista mantiene el scope visible real y deja explícita la relación entre sync, dispositivo, usuario y partida correlacionada para revisar evidencia de captura sin bajar directo al raw completo."
                 : canReadOperationalSyncs
-                ? "Los resultados se abren al parque de dispositivos permitido por ACL. Si tu alcance está scopeado, vas a ver solo syncs de esa institución."
+                ? isTeacherView
+                  ? "La lectura docente deja explícito por qué la sync entra en tu alcance, qué dispositivo la originó y si ya se puede conectar con participantes o una partida visible."
+                  : isDirectorView
+                  ? "La lectura directoral deja en primer plano cobertura, correlación con partidas y señales generales de trazabilidad para seguimiento institucional."
+                  : "Los resultados se abren al parque de dispositivos permitido por ACL. Si tu alcance está scopeado, vas a ver solo syncs de esa institución."
                 : "Esta sesión no tiene lectura operativa de BLE, así que la tabla queda limitada a tus propias sincronizaciones."}
             </p>
           </div>
@@ -360,12 +372,16 @@ export function SyncsTable() {
       <div className="grid gap-6 xl:grid-cols-[1.2fr_1fr]">
         <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
           <CardHeader>
-            <CardTitle>{isFamilyView ? "Actividad de sincronización" : isResearcherView ? "Muestra visible de sincronizaciones" : "Sesiones sincronizadas"}</CardTitle>
+            <CardTitle>{isFamilyView ? "Actividad de sincronización" : isResearcherView ? "Muestra visible de sincronizaciones" : isTeacherView ? "Sincronizaciones visibles para aula" : isDirectorView ? "Sincronizaciones visibles para seguimiento" : "Sesiones sincronizadas"}</CardTitle>
             <CardDescription>
               {isFamilyView
                 ? "Seleccioná una sincronización para ver un resumen simple de participantes, dispositivo y relación con la partida cuando exista."
                 : isResearcherView
                 ? "Seleccioná una sesión para inspeccionar contexto visible, participantes proyectados y correlación con partida sin salir del dashboard."
+                : isTeacherView
+                ? "Seleccioná una sincronización para entender rápido dispositivo, participantes y vínculo con partida desde una lectura docente."
+                : isDirectorView
+                ? "Seleccioná una sincronización para revisar trazabilidad general, correlación con partida y contexto institucional visible."
                 : "Seleccioná una sesión para inspeccionar contexto de dispositivo, usuario, participantes y payload raw más reciente."}
             </CardDescription>
           </CardHeader>
@@ -436,19 +452,23 @@ export function SyncsTable() {
 
         <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
           <CardHeader>
-            <CardTitle>{isFamilyView ? "Resumen de sincronización" : isResearcherView ? "Detalle de evidencia" : "Detalle de sync"}</CardTitle>
+            <CardTitle>{isFamilyView ? "Resumen de sincronización" : isResearcherView ? "Detalle de evidencia" : isTeacherView ? "Detalle para aula" : isDirectorView ? "Detalle de seguimiento" : "Detalle de sync"}</CardTitle>
             <CardDescription>
               {isFamilyView
                 ? "Resumen simple para entender qué se sincronizó, quiénes aparecen y si hay evidencia asociada."
                 : isResearcherView
                 ? "Panel para revisar rápidamente relaciones visibles entre sync, usuario, dispositivo, participantes y evidencia cruda asociada."
+                : isTeacherView
+                ? "Panel docente para revisar rápido quién sincronizó, con qué dispositivo y si ya hay participantes o partida visible asociada."
+                : isDirectorView
+                ? "Panel de seguimiento para revisar correlación visible entre sync, dispositivo, participantes y evidencia cruda sin entrar en lectura excesivamente técnica."
                 : "Panel operativo para revisar rápidamente quién sincronizó, con qué dispositivo y qué evidencia raw quedó asociada."}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-5">
             {!selectedSync ? (
               <div className="rounded-2xl bg-background/70 p-4 text-sm text-muted-foreground">
-                {isFamilyView ? "Elegí una sincronización para revisar un resumen simple de actividad." : isResearcherView ? "Elegí una sincronización para revisar su detalle de evidencia." : "Elegí una sincronización para revisar su detalle."}
+                {isFamilyView ? "Elegí una sincronización para revisar un resumen simple de actividad." : isResearcherView ? "Elegí una sincronización para revisar su detalle de evidencia." : isTeacherView ? "Elegí una sincronización para revisar su detalle de aula." : isDirectorView ? "Elegí una sincronización para revisar su detalle de seguimiento." : "Elegí una sincronización para revisar su detalle."}
               </div>
             ) : (
               <>
@@ -478,7 +498,7 @@ export function SyncsTable() {
                 </div>
 
                 <div>
-                  <p className="text-sm font-medium text-foreground">{isFamilyView ? "Participantes visibles" : isResearcherView ? "Participantes y asociaciones visibles" : "Participantes y asociaciones"}</p>
+                  <p className="text-sm font-medium text-foreground">{isFamilyView ? "Participantes visibles" : isResearcherView ? "Participantes y asociaciones visibles" : isTeacherView ? "Participantes y contexto de aula" : isDirectorView ? "Participantes y contexto institucional" : "Participantes y asociaciones"}</p>
                   <div className="mt-3 space-y-3">
                     {selectedSync.participants.length === 0 ? (
                       <div className="rounded-2xl bg-background/70 p-3 text-sm text-muted-foreground">Sin participantes proyectados.</div>
@@ -503,7 +523,7 @@ export function SyncsTable() {
                 </div>
 
                 <div>
-                  <p className="text-sm font-medium text-foreground">{isFamilyView ? "Señales de sincronización" : isResearcherView ? "Señales de evidencia" : "Señales de trazabilidad"}</p>
+                  <p className="text-sm font-medium text-foreground">{isFamilyView ? "Señales de sincronización" : isResearcherView ? "Señales de evidencia" : isTeacherView ? "Señales útiles para aula" : isDirectorView ? "Señales de seguimiento" : "Señales de trazabilidad"}</p>
                   <div className="mt-3 grid gap-3 sm:grid-cols-2">
                     <div className="rounded-2xl bg-background/70 p-3 text-sm text-muted-foreground">raw ids: <span className="font-medium text-foreground">{String(selectedSync.rawRecordCount || selectedSync.rawRecordIds.length || 0)}</span></div>
                     <div className="rounded-2xl bg-background/70 p-3 text-sm text-muted-foreground">fragmentos: <span className="font-medium text-foreground">{String(selectedSync.rawFragmentCount || 0)}</span></div>
