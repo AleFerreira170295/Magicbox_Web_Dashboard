@@ -7,6 +7,8 @@ const useAuthMock = vi.fn();
 const useDevicesMock = vi.fn();
 const useInstitutionsMock = vi.fn();
 const useUsersMock = vi.fn();
+const useGamesMock = vi.fn();
+const useSyncSessionsMock = vi.fn();
 
 vi.mock("@/features/auth/auth-context", () => ({
   useAuth: () => useAuthMock(),
@@ -19,6 +21,14 @@ vi.mock("@/features/devices/api", () => ({
 
 vi.mock("@/features/institutions/api", () => ({
   useInstitutions: (...args: unknown[]) => useInstitutionsMock(...args),
+}));
+
+vi.mock("@/features/games/api", () => ({
+  useGames: (...args: unknown[]) => useGamesMock(...args),
+}));
+
+vi.mock("@/features/syncs/api", () => ({
+  useSyncSessions: (...args: unknown[]) => useSyncSessionsMock(...args),
 }));
 
 vi.mock("@/features/users/api", () => ({
@@ -137,6 +147,9 @@ describe("DevicesTable", () => {
         total_pages: 1,
       }),
     );
+
+    useGamesMock.mockReturnValue(okQuery({ data: [], page: 1, limit: 0, total: 0, total_pages: 0 }));
+    useSyncSessionsMock.mockReturnValue(okQuery({ data: [], page: 1, limit: 0, total: 0, total_pages: 0 }));
   });
 
   afterEach(() => {
@@ -210,5 +223,137 @@ describe("DevicesTable", () => {
 
     expect(screen.queryAllByText("MagicBox Aula 2").length).toBeGreaterThan(0);
     expect(screen.queryAllByText("MagicBox Aula 1")).toHaveLength(0);
+  });
+
+  it("clarifies teacher access and visible activity per device", () => {
+    useAuthMock.mockReturnValue({
+      tokens: { accessToken: "token", refreshToken: "refresh" },
+      user: {
+        id: "user-1",
+        email: "ana@example.com",
+        firstName: "Ana",
+        lastName: "Teacher",
+        fullName: "Ana Teacher",
+        educationalCenterId: "ec-1",
+        roles: ["teacher"],
+        permissions: ["ble_device:read"],
+        raw: {},
+      },
+    });
+
+    useDevicesMock.mockReturnValue(
+      okQuery({
+        data: [
+          {
+            id: "device-1",
+            deviceId: "mb-1",
+            name: "MagicBox Aula 1",
+            educationalCenterId: "ec-1",
+            educationalCenterName: "Colegio Norte",
+            assignmentScope: "institution",
+            ownerUserId: "user-1",
+            ownerUserName: "Ana Teacher",
+            ownerUserEmail: "ana@example.com",
+            firmwareVersion: "v2.2",
+            status: "online",
+            deviceMetadata: { serial: "SN-1" },
+            createdAt: null,
+            updatedAt: null,
+            deletedAt: null,
+            raw: {},
+          },
+        ],
+        page: 1,
+        limit: 1,
+        total: 1,
+        total_pages: 1,
+      }),
+    );
+
+    useGamesMock.mockReturnValue(
+      okQuery({
+        data: [
+          {
+            id: "game-1",
+            educationalCenterId: "ec-1",
+            bleDeviceId: "device-1",
+            gameId: 301,
+            deckName: "Animales",
+            totalPlayers: 2,
+            startDate: null,
+            createdAt: null,
+            updatedAt: null,
+            players: [],
+            turns: [],
+            raw: {},
+          },
+        ],
+        page: 1,
+        limit: 1,
+        total: 1,
+        total_pages: 1,
+      }),
+    );
+
+    useSyncSessionsMock.mockReturnValue(
+      okQuery({
+        data: [
+          {
+            id: "sync-1",
+            userId: "user-1",
+            syncId: "mb-sync-1",
+            source: "magicbox",
+            sourceType: "device",
+            sessionType: null,
+            status: "done",
+            bleDeviceId: "device-1",
+            deviceId: "mb-1",
+            firmwareVersion: "v2.2",
+            appVersion: "1.0.0",
+            payloadSchemaVersion: "1",
+            gameId: 301,
+            deckName: "Animales",
+            totalCards: 10,
+            totalPlayers: 2,
+            durationSeconds: 60,
+            score: 100,
+            finalResult: null,
+            gameEndReason: null,
+            startedAt: null,
+            endedAt: null,
+            syncedAt: "2026-04-22T03:00:00.000Z",
+            capturedAt: null,
+            participants: [],
+            rawRecordIds: [],
+            rawRecordCount: 0,
+            lastRawRecordId: null,
+            rawPayload: {},
+            fragmentCount: 0,
+            rawFragmentCount: 0,
+            additionalFields: {},
+            receivedAt: null,
+            createdAt: null,
+            updatedAt: null,
+            raw: {},
+          },
+        ],
+        page: 1,
+        limit: 1,
+        total: 1,
+        total_pages: 1,
+      }),
+    );
+
+    renderDevicesTable();
+
+    expect(screen.getByText("Teacher")).toBeInTheDocument();
+    expect(screen.queryAllByText(/mis dispositivos/i).length).toBeGreaterThan(0);
+    expect(screen.getByText(/Con actividad/i)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByText("MagicBox Aula 1"));
+
+    expect(screen.getByText(/Syncs visibles: 1/i)).toBeInTheDocument();
+    expect(screen.getByText(/Partidas visibles: 1/i)).toBeInTheDocument();
+    expect(screen.getByText(/Contexto: owner directo/i)).toBeInTheDocument();
   });
 });

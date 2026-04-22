@@ -13,7 +13,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { useAuth } from "@/features/auth/auth-context";
 import { updateDevice, useDevices } from "@/features/devices/api";
 import type { DeviceRecord, UpdateDevicePayload } from "@/features/devices/types";
+import { useGames } from "@/features/games/api";
 import { useInstitutions } from "@/features/institutions/api";
+import { useSyncSessions } from "@/features/syncs/api";
 import { useUsers } from "@/features/users/api";
 import { cn, formatDateTime, getErrorMessage } from "@/lib/utils";
 
@@ -300,7 +302,7 @@ function DeviceEditorPanel({
   );
 }
 
-type DeviceFocusFilter = "all" | "review" | "no_owner" | "no_status" | "no_metadata" | "online";
+type DeviceFocusFilter = "all" | "review" | "no_owner" | "no_status" | "no_metadata" | "online" | "with_activity" | "without_sync";
 
 export function DevicesTable() {
   const { tokens, user: currentUser } = useAuth();
@@ -308,15 +310,20 @@ export function DevicesTable() {
   const [institutionFilter, setInstitutionFilter] = useState("all");
   const [scopeFilter, setScopeFilter] = useState<"all" | "home" | "institution">("all");
   const [focusFilter, setFocusFilter] = useState<DeviceFocusFilter>("all");
+  const [accessFilter, setAccessFilter] = useState<"all" | "owned" | "institution" | "shared" | "unresolved">("all");
   const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null);
 
   const devicesQuery = useDevices(tokens?.accessToken);
   const institutionsQuery = useInstitutions(tokens?.accessToken);
   const usersQuery = useUsers(tokens?.accessToken);
+  const gamesQuery = useGames(tokens?.accessToken);
+  const syncsQuery = useSyncSessions(tokens?.accessToken);
 
   const devices = useMemo(() => devicesQuery.data?.data || [], [devicesQuery.data]);
   const institutions = useMemo(() => institutionsQuery.data?.data || [], [institutionsQuery.data]);
   const users = useMemo(() => usersQuery.data?.data || [], [usersQuery.data]);
+  const games = useMemo(() => gamesQuery.data?.data || [], [gamesQuery.data]);
+  const syncs = useMemo(() => syncsQuery.data?.data || [], [syncsQuery.data]);
 
   const scopedInstitutionId = institutions.length === 1 ? institutions[0]?.id || null : null;
   const scopedInstitutionName = scopedInstitutionId ? institutions[0]?.name || scopedInstitutionId : null;
@@ -333,12 +340,57 @@ export function DevicesTable() {
   }
 
   const canUpdateDevices = hasAnyPermission("ble_device:update", "ble-device:update");
+  const currentUserEmail = (currentUser?.email || "").trim().toLowerCase();
+  const isTeacherView = currentUser?.roles.includes("teacher") || false;
+
+  const deviceRows = useMemo(() => {
+    return devices.map((device) => {
+      const relatedSyncs = syncs.filter(
+        (sync) => sync.bleDeviceId === device.id || (sync.deviceId && sync.deviceId === device.deviceId),
+      );
+      const relatedGames = games.filter((game) => game.bleDeviceId === device.id);
+      const isOwnedByCurrentUser = Boolean(
+        (currentUser?.id && device.ownerUserId === currentUser.id)
+        || (currentUserEmail && (device.ownerUserEmail || "").trim().toLowerCase() === currentUserEmail),
+      );
+      const isInstitutionVisible = Boolean(
+        device.educationalCenterId
+        && currentUser?.educationalCenterId
+        && device.educationalCenterId === currentUser.educationalCenterId,
+      );
+
+      const accessRelation = isOwnedByCurrentUser
+        ? "mis dispositivos"
+        : isInstitutionVisible
+          ? "institución visible"
+          : device.ownerUserId || device.ownerUserEmail
+            ? "compartido visible"
+            : "sin asociación resuelta";
+
+      const lastSyncedAt = relatedSyncs
+        .map((sync) => sync.syncedAt || sync.receivedAt || sync.startedAt || null)
+        .filter(Boolean)
+        .sort((a, b) => new Date(b as string).getTime() - new Date(a as string).getTime())[0] || null;
+
+      return {
+        ...device,
+        accessRelation,
+        isOwnedByCurrentUser,
+        isInstitutionVisible,
+        hasUnresolvedAssociation: !device.ownerUserId && !device.ownerUserEmail && device.assignmentScope === "institution",
+        relatedSyncCount: relatedSyncs.length,
+        relatedGameCount: relatedGames.length,
+        lastSyncedAt,
+        hasOperationalActivity: relatedSyncs.length > 0 || relatedGames.length > 0,
+      };
+    });
+  }, [currentUser, currentUserEmail, devices, games, syncs]);
 
   const filtered = useMemo(() => {
     const normalized = query.trim().toLowerCase();
     const effectiveInstitutionFilter = institutionFilter === "all" && scopedInstitutionId ? scopedInstitutionId : institutionFilter;
 
-    return devices.filter((device) => {
+    return deviceRows.filter((device) => {
       if (scopeFilter !== "all" && device.assignmentScope !== scopeFilter) return false;
       if (
         effectiveInstitutionFilter !== "all" &&
@@ -346,6 +398,10 @@ export function DevicesTable() {
       ) {
         return false;
       }
+      if (accessFilter === "owned" && !device.isOwnedByCurrentUser) return false;
+      if (accessFilter === "institution" && !device.isInstitutionVisible) return false;
+      if (accessFilter === "shared" && device.accessRelation !== "compartido visible") return false;
+      if (accessFilter === "unresolved" && !device.hasUnresolvedAssociation) return false;
       const matchesFocus = (() => {
         switch (focusFilter) {
           case "review":
@@ -358,6 +414,10 @@ export function DevicesTable() {
             return Object.keys(device.deviceMetadata || {}).length === 0;
           case "online":
             return (device.status || "").toLowerCase().includes("online") || (device.status || "").toLowerCase().includes("active");
+          case "with_activity":
+            return device.hasOperationalActivity;
+          case "without_sync":
+            return device.relatedSyncCount === 0;
           default:
             return true;
         }
@@ -373,30 +433,31 @@ export function DevicesTable() {
         device.ownerUserEmail,
         device.firmwareVersion,
         device.status,
+        device.accessRelation,
       ]
         .filter(Boolean)
         .some((value) => String(value).toLowerCase().includes(normalized));
     });
-  }, [devices, focusFilter, institutionFilter, query, scopeFilter, scopedInstitutionId]);
+  }, [accessFilter, deviceRows, focusFilter, institutionFilter, query, scopeFilter, scopedInstitutionId]);
 
   const selectedDevice = useMemo(
-    () => filtered.find((device) => device.id === selectedDeviceId) || devices.find((device) => device.id === selectedDeviceId) || null,
-    [devices, filtered, selectedDeviceId],
+    () => filtered.find((device) => device.id === selectedDeviceId) || deviceRows.find((device) => device.id === selectedDeviceId) || null,
+    [deviceRows, filtered, selectedDeviceId],
   );
 
   const metrics = useMemo(() => {
-    const onlineDevices = devices.filter((device) => (device.status || "").toLowerCase().includes("online")).length;
-    const homeDevices = devices.filter((device) => device.assignmentScope === "home").length;
-    const institutionDevices = devices.filter((device) => device.assignmentScope === "institution").length;
-    const devicesWithOwner = devices.filter((device) => Boolean(device.ownerUserId)).length;
-    const devicesWithMetadata = devices.filter((device) => Object.keys(device.deviceMetadata || {}).length > 0).length;
-    const devicesWithoutOwner = devices.filter((device) => !device.ownerUserId).length;
-    const devicesWithoutStatus = devices.filter((device) => !device.status).length;
-    const devicesWithoutMetadata = devices.filter((device) => Object.keys(device.deviceMetadata || {}).length === 0).length;
-    const reviewDevices = devices.filter((device) => !device.ownerUserId || !device.status || Object.keys(device.deviceMetadata || {}).length === 0).length;
+    const onlineDevices = deviceRows.filter((device) => (device.status || "").toLowerCase().includes("online") || (device.status || "").toLowerCase().includes("active")).length;
+    const homeDevices = deviceRows.filter((device) => device.assignmentScope === "home").length;
+    const institutionDevices = deviceRows.filter((device) => device.assignmentScope === "institution").length;
+    const devicesWithOwner = deviceRows.filter((device) => Boolean(device.ownerUserId)).length;
+    const devicesWithMetadata = deviceRows.filter((device) => Object.keys(device.deviceMetadata || {}).length > 0).length;
+    const devicesWithoutOwner = deviceRows.filter((device) => !device.ownerUserId).length;
+    const devicesWithoutStatus = deviceRows.filter((device) => !device.status).length;
+    const devicesWithoutMetadata = deviceRows.filter((device) => Object.keys(device.deviceMetadata || {}).length === 0).length;
+    const reviewDevices = deviceRows.filter((device) => !device.ownerUserId || !device.status || Object.keys(device.deviceMetadata || {}).length === 0).length;
 
     return {
-      total: devices.length,
+      total: deviceRows.length,
       onlineDevices,
       homeDevices,
       institutionDevices,
@@ -406,8 +467,14 @@ export function DevicesTable() {
       devicesWithoutStatus,
       devicesWithoutMetadata,
       reviewDevices,
+      ownedDevices: deviceRows.filter((device) => device.isOwnedByCurrentUser).length,
+      institutionVisibleDevices: deviceRows.filter((device) => device.isInstitutionVisible).length,
+      sharedDevices: deviceRows.filter((device) => device.accessRelation === "compartido visible").length,
+      unresolvedDevices: deviceRows.filter((device) => device.hasUnresolvedAssociation).length,
+      devicesWithActivity: deviceRows.filter((device) => device.hasOperationalActivity).length,
+      devicesWithoutSync: deviceRows.filter((device) => device.relatedSyncCount === 0).length,
     };
-  }, [devices]);
+  }, [deviceRows]);
 
   const focusSegments = [
     { key: "all" as const, label: "Todos", count: metrics.total },
@@ -416,6 +483,16 @@ export function DevicesTable() {
     { key: "no_status" as const, label: "Sin status", count: metrics.devicesWithoutStatus },
     { key: "no_metadata" as const, label: "Sin metadata", count: metrics.devicesWithoutMetadata },
     { key: "online" as const, label: "Online", count: metrics.onlineDevices },
+    { key: "with_activity" as const, label: "Con actividad", count: metrics.devicesWithActivity },
+    { key: "without_sync" as const, label: "Sin sync visible", count: metrics.devicesWithoutSync },
+  ];
+
+  const accessSegments = [
+    { key: "all" as const, label: "Todos", count: metrics.total },
+    { key: "owned" as const, label: "Mis dispositivos", count: metrics.ownedDevices },
+    { key: "institution" as const, label: "Institución visible", count: metrics.institutionVisibleDevices },
+    { key: "shared" as const, label: "Compartidos", count: metrics.sharedDevices },
+    { key: "unresolved" as const, label: "Sin asociación resuelta", count: metrics.unresolvedDevices },
   ];
 
   const institutionFilterDisabled = Boolean(scopedInstitutionId) || scopeFilter === "home";
@@ -423,10 +500,12 @@ export function DevicesTable() {
   return (
     <div className="space-y-6">
       <SectionHeader
-        eyebrow={isInstitutionScopedView ? "Institution admin" : "Operación"}
+        eyebrow={isTeacherView ? "Teacher" : isInstitutionScopedView ? "Institution admin" : "Operación"}
         title="Dispositivos"
         description={
-          isInstitutionScopedView
+          isTeacherView
+            ? "Vista operativa de dispositivos visibles para el docente, aclarando si el hardware entra por ownership directo, alcance institucional o asociaciones compartidas."
+            : isInstitutionScopedView
             ? `Vista operativa de hardware para ${scopedInstitutionName}, con edición controlada para ownership, alcance y estado.`
             : "Pantalla operativa de hardware conectada al contrato real de /ble-device, distinguiendo dispositivos Home y de institución."
         }
@@ -463,6 +542,17 @@ export function DevicesTable() {
                 </option>
               ))}
             </select>
+            <select
+              value={accessFilter}
+              onChange={(event) => setAccessFilter(event.target.value as "all" | "owned" | "institution" | "shared" | "unresolved")}
+              className="h-10 min-w-56 rounded-md border border-input bg-background px-3 text-sm"
+            >
+              <option value="all">Todos los accesos</option>
+              <option value="owned">Mis dispositivos</option>
+              <option value="institution">Institución visible</option>
+              <option value="shared">Compartidos</option>
+              <option value="unresolved">Sin asociación resuelta</option>
+            </select>
             <button
               type="button"
               onClick={() => {
@@ -470,6 +560,7 @@ export function DevicesTable() {
                 setScopeFilter("all");
                 setInstitutionFilter(scopedInstitutionId || "all");
                 setFocusFilter("all");
+                setAccessFilter("all");
               }}
               className="inline-flex h-10 items-center justify-center rounded-md border border-input bg-background px-4 text-sm font-medium text-foreground transition hover:bg-accent"
             >
@@ -497,6 +588,16 @@ export function DevicesTable() {
             </p>
           </div>
           {scopedInstitutionName ? <Badge variant="outline">Institución activa: {scopedInstitutionName}</Badge> : null}
+        </CardContent>
+      </Card>
+
+      <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
+        <CardContent className="flex flex-wrap gap-2 p-5">
+          {accessSegments.map((segment) => (
+            <Badge key={segment.key} variant={accessFilter === segment.key ? "secondary" : "outline"} className="px-3 py-1.5">
+              {segment.label}: {segment.count}
+            </Badge>
+          ))}
         </CardContent>
       </Card>
 
@@ -562,13 +663,14 @@ export function DevicesTable() {
                     <TableHead>Alcance</TableHead>
                     <TableHead>Ubicación</TableHead>
                     <TableHead>Responsable</TableHead>
+                    <TableHead>Acceso</TableHead>
                     <TableHead>Estado</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filtered.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={6} className="py-10 text-center text-sm text-muted-foreground">
+                      <TableCell colSpan={7} className="py-10 text-center text-sm text-muted-foreground">
                         No hay dispositivos para mostrar.
                       </TableCell>
                     </TableRow>
@@ -584,6 +686,14 @@ export function DevicesTable() {
                         <TableCell>{scopeBadge(device)}</TableCell>
                         <TableCell>{locationLabel(device)}</TableCell>
                         <TableCell>{device.ownerUserName || device.ownerUserEmail || "sin responsable"}</TableCell>
+                        <TableCell>
+                          <div className="flex flex-col gap-1">
+                            <Badge variant={device.hasUnresolvedAssociation ? "warning" : "outline"}>{device.accessRelation}</Badge>
+                            <span className="text-xs text-muted-foreground">
+                              {device.relatedSyncCount} syncs, {device.relatedGameCount} partidas
+                            </span>
+                          </div>
+                        </TableCell>
                         <TableCell>
                           <div className="flex flex-col gap-1">
                             <Badge variant={device.status ? "secondary" : "outline"}>{statusLabel(device.status)}</Badge>
@@ -612,21 +722,36 @@ export function DevicesTable() {
                 Elegí un dispositivo para revisar y editar su contexto operativo.
               </div>
             ) : (
-              <DeviceEditorPanel
-                key={`${selectedDevice.id}:${scopedInstitutionId || "global"}`}
-                selectedDevice={selectedDevice}
-                scopedInstitutionId={scopedInstitutionId}
-                institutions={institutions.map((institution) => ({ id: institution.id, name: institution.name }))}
-                users={users.map((user) => ({
-                  id: user.id,
-                  fullName: user.fullName,
-                  email: user.email,
-                  educationalCenterId: user.educationalCenterId,
-                }))}
-                token={tokens?.accessToken}
-                canUpdateDevices={canUpdateDevices}
-                onUpdated={(deviceId) => setSelectedDeviceId(deviceId)}
-              />
+              <>
+                <div className="rounded-2xl bg-background/70 p-4">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge variant={selectedDevice.hasUnresolvedAssociation ? "warning" : "outline"}>{selectedDevice.accessRelation}</Badge>
+                    {selectedDevice.hasOperationalActivity ? <Badge variant="secondary">actividad visible</Badge> : <Badge variant="outline">sin actividad visible</Badge>}
+                  </div>
+                  <div className="mt-3 grid gap-2 text-xs text-muted-foreground sm:grid-cols-2">
+                    <p>Syncs visibles: {selectedDevice.relatedSyncCount}</p>
+                    <p>Partidas visibles: {selectedDevice.relatedGameCount}</p>
+                    <p>Última sync visible: {formatDateTime(selectedDevice.lastSyncedAt)}</p>
+                    <p>Contexto: {selectedDevice.isOwnedByCurrentUser ? "owner directo" : selectedDevice.isInstitutionVisible ? "scope institucional" : selectedDevice.hasUnresolvedAssociation ? "falta asociación" : "visible por ACL compartida"}</p>
+                  </div>
+                </div>
+
+                <DeviceEditorPanel
+                  key={`${selectedDevice.id}:${scopedInstitutionId || "global"}`}
+                  selectedDevice={selectedDevice}
+                  scopedInstitutionId={scopedInstitutionId}
+                  institutions={institutions.map((institution) => ({ id: institution.id, name: institution.name }))}
+                  users={users.map((user) => ({
+                    id: user.id,
+                    fullName: user.fullName,
+                    email: user.email,
+                    educationalCenterId: user.educationalCenterId,
+                  }))}
+                  token={tokens?.accessToken}
+                  canUpdateDevices={canUpdateDevices}
+                  onUpdated={(deviceId) => setSelectedDeviceId(deviceId)}
+                />
+              </>
             )}
           </CardContent>
         </Card>
