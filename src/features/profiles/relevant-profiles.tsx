@@ -4,6 +4,7 @@ import { type ComponentType, useMemo, useState } from "react";
 import { BadgeCheck, CreditCard, Search, UserRound, Users, Waves } from "lucide-react";
 import { SectionHeader } from "@/components/section-header";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -11,6 +12,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { useAuth } from "@/features/auth/auth-context";
 import { useProfilesOverview } from "@/features/profiles/api";
 import { cn, formatDateTime, getErrorMessage } from "@/lib/utils";
+
+type ProfilesFocusFilter = "all" | "no_cards" | "no_sessions" | "no_owner" | "institution_linked";
 
 function SummaryCard({
   label,
@@ -46,6 +49,7 @@ export function RelevantProfiles() {
   const [query, setQuery] = useState("");
   const [institutionFilter, setInstitutionFilter] = useState<string>("");
   const [activityFilter, setActivityFilter] = useState<"all" | "active" | "inactive">("all");
+  const [focusFilter, setFocusFilter] = useState<ProfilesFocusFilter>("all");
   const [selectedProfileId, setSelectedProfileId] = useState<string | null>(null);
 
   const profilesQuery = useProfilesOverview(tokens?.accessToken);
@@ -82,6 +86,21 @@ export function RelevantProfiles() {
       if (effectiveInstitutionFilter && profile.educationalCenterId !== effectiveInstitutionFilter) return false;
       if (activityFilter === "active" && !profile.isActive) return false;
       if (activityFilter === "inactive" && profile.isActive) return false;
+      const matchesFocus = (() => {
+        switch (focusFilter) {
+          case "no_cards":
+            return profile.activeBindingCount === 0;
+          case "no_sessions":
+            return profile.sessionCount === 0;
+          case "no_owner":
+            return !(profile.userId || profile.userName || profile.userEmail);
+          case "institution_linked":
+            return Boolean(profile.educationalCenterId);
+          default:
+            return true;
+        }
+      })();
+      if (!matchesFocus) return false;
       if (!normalized) return true;
 
       return [
@@ -95,7 +114,7 @@ export function RelevantProfiles() {
         .filter(Boolean)
         .some((value) => String(value).toLowerCase().includes(normalized));
     });
-  }, [activityFilter, institutionFilter, profiles, query, scopedInstitutionId]);
+  }, [activityFilter, focusFilter, institutionFilter, profiles, query, scopedInstitutionId]);
 
   const selectedProfile = useMemo(
     () => filtered.find((profile) => profile.id === selectedProfileId) || profiles.find((profile) => profile.id === selectedProfileId) || null,
@@ -107,6 +126,9 @@ export function RelevantProfiles() {
     const withBindings = profiles.filter((profile) => profile.activeBindingCount > 0).length;
     const withSessions = profiles.filter((profile) => profile.sessionCount > 0).length;
     const institutionLinked = profiles.filter((profile) => Boolean(profile.educationalCenterId)).length;
+    const profilesWithoutCards = profiles.filter((profile) => profile.activeBindingCount === 0).length;
+    const profilesWithoutSessions = profiles.filter((profile) => profile.sessionCount === 0).length;
+    const profilesWithoutOwner = profiles.filter((profile) => !(profile.userId || profile.userName || profile.userEmail)).length;
 
     return {
       total: profiles.length,
@@ -114,8 +136,19 @@ export function RelevantProfiles() {
       withBindings,
       withSessions,
       institutionLinked,
+      profilesWithoutCards,
+      profilesWithoutSessions,
+      profilesWithoutOwner,
     };
   }, [profiles]);
+
+  const focusSegments = [
+    { key: "all" as const, label: "Todos", count: metrics.total },
+    { key: "no_cards" as const, label: "Sin tarjeta", count: metrics.profilesWithoutCards },
+    { key: "no_sessions" as const, label: "Sin sesiones", count: metrics.profilesWithoutSessions },
+    { key: "no_owner" as const, label: "Sin owner", count: metrics.profilesWithoutOwner },
+    { key: "institution_linked" as const, label: "Institucionales", count: metrics.institutionLinked },
+  ];
 
   return (
     <div className="space-y-6">
@@ -197,6 +230,36 @@ export function RelevantProfiles() {
           </>
         )}
       </div>
+
+      <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
+        <CardContent className="flex flex-wrap gap-2 p-5">
+          {focusSegments.map((segment) => (
+            <Button
+              key={segment.key}
+              type="button"
+              size="sm"
+              variant={focusFilter === segment.key ? "default" : "outline"}
+              onClick={() => setFocusFilter(segment.key)}
+            >
+              {segment.label}
+              <Badge variant={focusFilter === segment.key ? "secondary" : "outline"} className={focusFilter === segment.key ? "bg-white/90 text-foreground" : ""}>
+                {segment.count}
+              </Badge>
+            </Button>
+          ))}
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            onClick={() => {
+              setFocusFilter("all");
+              setQuery("");
+            }}
+          >
+            Limpiar foco
+          </Button>
+        </CardContent>
+      </Card>
 
       <div className="grid gap-6 xl:grid-cols-[1.2fr_1fr]">
         <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
