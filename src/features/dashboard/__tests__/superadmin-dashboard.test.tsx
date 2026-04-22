@@ -334,6 +334,8 @@ describe("SuperadminDashboard", () => {
     expect(screen.getByText("Alertas por territorio")).toBeInTheDocument();
     expect(screen.getByText("Índice territorial compuesto")).toBeInTheDocument();
     expect(screen.getByText("Vistas ejecutivas guardadas")).toBeInTheDocument();
+    expect(screen.getByText("Presets inteligentes del sistema")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Territorios críticos/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Guardar vista actual/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Exportar CSV ejecutivo/i })).toBeInTheDocument();
     expect(screen.getByText("Territorios con mayor actividad")).toBeInTheDocument();

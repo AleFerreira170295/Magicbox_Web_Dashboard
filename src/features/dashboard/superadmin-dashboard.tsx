@@ -133,6 +133,7 @@ export function SuperadminDashboard() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [territorialPresets, setTerritorialPresets] = useState<TerritorialPreset[]>([]);
+  const [activeSmartPreset, setActiveSmartPreset] = useState<string>("all");
   const { tokens, user } = useAuth();
   const isAdmin = user?.roles.includes("admin") || false;
   const isGovernmentViewer = user?.roles.includes("government-viewer") || false;
@@ -231,6 +232,60 @@ export function SuperadminDashboard() {
   const territorialHierarchy = summaryQuery.data?.segments.territorial_hierarchy || [];
   const territoryAlerts = summaryQuery.data?.segments.territory_alerts || [];
   const territoryScores = summaryQuery.data?.segments.territory_scores || [];
+
+  const smartPresets = useMemo(
+    () => [
+      { key: "all", label: "Vista general", count: territoryScores.length },
+      {
+        key: "critical",
+        label: "Territorios críticos",
+        count: territoryScores.filter((item) => item.status === "warning" || territoryAlerts.some((alert) => alert.label.includes(item.label))).length,
+      },
+      {
+        key: "score_lt_60",
+        label: "Score < 60",
+        count: territoryScores.filter((item) => item.score < 60).length,
+      },
+      {
+        key: "no_turns",
+        label: "Sin turnos",
+        count: territoryScores.filter((item) => item.users > 0 && item.turns === 0).length,
+      },
+      {
+        key: "high_population_low_activity",
+        label: "Alta población, baja actividad",
+        count: territoryScores.filter((item) => item.users >= 10 && item.turns / Math.max(item.users, 1) < 0.25).length,
+      },
+    ],
+    [territoryAlerts, territoryScores],
+  );
+
+  const filteredTerritoryScores = useMemo(() => {
+    switch (activeSmartPreset) {
+      case "critical":
+        return territoryScores.filter((item) => item.status === "warning" || territoryAlerts.some((alert) => alert.label.includes(item.label)));
+      case "score_lt_60":
+        return territoryScores.filter((item) => item.score < 60);
+      case "no_turns":
+        return territoryScores.filter((item) => item.users > 0 && item.turns === 0);
+      case "high_population_low_activity":
+        return territoryScores.filter((item) => item.users >= 10 && item.turns / Math.max(item.users, 1) < 0.25);
+      default:
+        return territoryScores;
+    }
+  }, [activeSmartPreset, territoryAlerts, territoryScores]);
+
+  const filteredTopTerritories = useMemo(() => {
+    if (activeSmartPreset === "all") return topTerritories;
+    const allowed = new Set(filteredTerritoryScores.map((item) => item.label));
+    return topTerritories.filter((item) => allowed.has(item.key));
+  }, [activeSmartPreset, filteredTerritoryScores, topTerritories]);
+
+  const filteredTerritoryAlerts = useMemo(() => {
+    if (activeSmartPreset === "all") return territoryAlerts;
+    const allowed = new Set(filteredTerritoryScores.map((item) => item.label));
+    return territoryAlerts.filter((item) => [...allowed].some((label) => item.label.includes(label)));
+  }, [activeSmartPreset, filteredTerritoryScores, territoryAlerts]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -772,6 +827,27 @@ export function SuperadminDashboard() {
       {isGovernmentViewer ? (
         <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
           <CardHeader>
+            <CardTitle>Presets inteligentes del sistema</CardTitle>
+            <CardDescription>Vistas ejecutivas de fábrica para priorizar territorios sin tener que construir filtros manuales.</CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-wrap gap-2">
+            {smartPresets.map((preset) => (
+              <button
+                key={preset.key}
+                type="button"
+                className={`rounded-full px-4 py-2 text-sm font-medium ${activeSmartPreset === preset.key ? "bg-primary text-primary-foreground" : "bg-secondary text-secondary-foreground"}`}
+                onClick={() => setActiveSmartPreset(preset.key)}
+              >
+                {preset.label} ({preset.count})
+              </button>
+            ))}
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {isGovernmentViewer ? (
+        <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
+          <CardHeader>
             <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
               <div>
                 <CardTitle>Vistas ejecutivas guardadas</CardTitle>
@@ -899,8 +975,8 @@ export function SuperadminDashboard() {
             <CardDescription>Focos subterritoriales que pueden quedar ocultos cuando el agregado país todavía se ve sano.</CardDescription>
           </CardHeader>
           <CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-            {territoryAlerts.length > 0 ? (
-              territoryAlerts.map((alert) => (
+            {filteredTerritoryAlerts.length > 0 ? (
+              filteredTerritoryAlerts.map((alert) => (
                 <div key={`${alert.scope}-${alert.label}`} className="rounded-2xl bg-white/80 p-4 text-sm text-muted-foreground">
                   <div className="flex items-start justify-between gap-3">
                     <div>
@@ -926,8 +1002,8 @@ export function SuperadminDashboard() {
             <CardDescription>Score ejecutivo para ordenar prioridades por territorio combinando actividad, cobertura y señales de riesgo.</CardDescription>
           </CardHeader>
           <CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-            {territoryScores.length > 0 ? (
-              territoryScores.map((territory) => (
+            {filteredTerritoryScores.length > 0 ? (
+              filteredTerritoryScores.map((territory) => (
                 <div key={territory.label} className="rounded-2xl bg-white/80 p-4 text-sm text-muted-foreground">
                   <div className="flex items-start justify-between gap-3">
                     <div>
@@ -957,8 +1033,8 @@ export function SuperadminDashboard() {
               <CardDescription>Lectura rápida de dónde se concentra hoy la población activa dentro del alcance visible.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
-              {topTerritories.length > 0 ? (
-                topTerritories.map((territory, index) => (
+            {filteredTopTerritories.length > 0 ? (
+                filteredTopTerritories.map((territory, index) => (
                   <div key={territory.key} className="rounded-2xl bg-white/80 p-4 text-sm text-muted-foreground">
                     <div className="flex items-start justify-between gap-4">
                       <div>
