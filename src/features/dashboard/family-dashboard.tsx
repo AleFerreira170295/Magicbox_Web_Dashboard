@@ -1,7 +1,8 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo } from "react";
-import { BookHeart, Clock3, Sparkles, Trophy, Users2 } from "lucide-react";
+import { ArrowRight, BookHeart, Clock3, Sparkles, Trophy, Users2 } from "lucide-react";
 import { SectionHeader } from "@/components/section-header";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -104,6 +105,23 @@ export function FamilyDashboard() {
                 <span className="rounded-full bg-white/14 px-2 py-0.5 text-xs text-white/88">{metrics.totalSyncs}</span>
               </div>
             </div>
+
+            <div className="mt-8 flex flex-wrap gap-3">
+              <Link
+                href="/games"
+                className="inline-flex items-center gap-2 rounded-full border border-white/18 bg-white/10 px-4 py-2 text-sm font-medium text-white transition hover:bg-white/16"
+              >
+                Ver partidas
+                <ArrowRight className="size-4" />
+              </Link>
+              <Link
+                href="/syncs"
+                className="inline-flex items-center gap-2 rounded-full border border-white/18 bg-white/10 px-4 py-2 text-sm font-medium text-white transition hover:bg-white/16"
+              >
+                Ver sincronizaciones
+                <ArrowRight className="size-4" />
+              </Link>
+            </div>
           </CardContent>
         </Card>
 
@@ -156,14 +174,14 @@ export function FamilyDashboard() {
         <CardHeader>
           <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
             <div>
-              <CardTitle>Base family iniciada</CardTitle>
+              <CardTitle>Base visual family cerrada</CardTitle>
               <CardDescription>
                 {user?.fullName || "La cuenta autenticada"} ya tiene una entrada más cuidada y entendible.
                 El siguiente paso sería decidir si este perfil necesita solo dashboard o alguna vista adicional de seguimiento simplificado.
               </CardDescription>
             </div>
             <div className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-4 py-2 text-sm font-medium text-primary">
-              Perfil en marcha
+              Visual base cerrada
               <Sparkles className="size-4" />
             </div>
           </div>
