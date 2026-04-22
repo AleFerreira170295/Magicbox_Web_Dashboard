@@ -1,4 +1,14 @@
 export const apiEndpoints = {
+  identity: {
+    login: "/identity/login",
+    register: "/identity/register",
+    me: "/identity/me",
+    logout: "/identity/logout",
+    refresh: "/identity/refresh-token",
+    forgotPassword: "/identity/forgot-password",
+    verifyOtp: "/identity/verify-otp-code",
+    resetPassword: "/identity/reset-password",
+  },
   auth: {
     login: "/auth/login",
     me: "/auth/me",

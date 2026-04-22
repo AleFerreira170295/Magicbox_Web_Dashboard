@@ -31,7 +31,9 @@ describe("app entrypoints", () => {
   it("renders the login entrypoint shell", () => {
     render(<LoginPage />);
 
+    expect(screen.getByText("MagicBox")).toBeInTheDocument();
     expect(screen.getByText("login-form")).toBeInTheDocument();
     expect(screen.queryByText("Cargando acceso al dashboard...")).not.toBeInTheDocument();
+    expect(screen.queryByText(/Observabilidad total/i)).not.toBeInTheDocument();
   });
 });

@@ -1,12 +1,12 @@
 import { Suspense } from "react";
 import { AuthShell } from "@/components/auth-shell";
-import { LoginForm } from "@/features/auth/login-form";
+import { ResetPasswordForm } from "@/features/auth/reset-password-form";
 
-export default function LoginPage() {
+export default function ResetPasswordPage() {
   return (
-    <AuthShell title="MagicBox">
+    <AuthShell title="Nueva contraseña">
       <Suspense fallback={<div className="text-sm text-muted-foreground">Cargando formulario...</div>}>
-        <LoginForm />
+        <ResetPasswordForm />
       </Suspense>
     </AuthShell>
   );

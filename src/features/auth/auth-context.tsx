@@ -6,18 +6,12 @@ import {
   useEffect,
   useReducer,
 } from "react";
-import { apiEndpoints } from "@/lib/api/endpoints";
-import { apiRequest, ApiError } from "@/lib/api/fetcher";
-import type { JsonObject } from "@/lib/api/types";
+import { clearStoredSession, readStoredSession, writeStoredSession } from "@/features/auth/storage";
 import {
-  clearStoredSession,
-  readStoredSession,
-  writeStoredSession,
-} from "@/features/auth/storage";
-import {
-  resolvePermissions,
-  resolveRoles,
-} from "@/features/auth/role-resolver";
+  getMe,
+  login as loginRequest,
+  logout as logoutRequest,
+} from "@/features/auth/auth-api";
 import type { AuthTokens, AuthUser, LoginPayload } from "@/features/auth/types";
 
 interface AuthContextValue {
@@ -86,58 +80,6 @@ function authReducer(state: AuthState, action: AuthAction): AuthState {
   }
 }
 
-function asRecord(value: unknown): JsonObject {
-  if (value && typeof value === "object" && !Array.isArray(value)) {
-    return value as JsonObject;
-  }
-  return {};
-}
-
-function readString(record: JsonObject, ...keys: string[]) {
-  for (const key of keys) {
-    const value = record[key];
-    if (typeof value === "string" && value.trim().length > 0) {
-      return value;
-    }
-  }
-  return "";
-}
-
-function normalizeUser(input: unknown): AuthUser {
-  const record = asRecord(input);
-  const firstName = readString(record, "first_name", "firstName");
-  const lastName = readString(record, "last_name", "lastName");
-  const fullName =
-    [firstName, lastName].filter(Boolean).join(" ").trim() ||
-    readString(record, "name", "display_name");
-
-  return {
-    id: readString(record, "user_id", "id"),
-    identityId: readString(record, "identity_id") || null,
-    email: readString(record, "email"),
-    firstName,
-    lastName,
-    fullName,
-    imageUrl: readString(record, "image_url", "imageUrl") || null,
-    userType: readString(record, "user_type", "userType") || null,
-    educationalCenterId:
-      readString(record, "educational_center_id", "educationalCenterId") || null,
-    roles: resolveRoles(record),
-    permissions: resolvePermissions(record),
-    raw: record,
-  };
-}
-
-async function fetchProfile(accessToken: string) {
-  const payload = await apiRequest<{ identity?: unknown; user?: unknown }>(
-    apiEndpoints.auth.me,
-    {
-      token: accessToken,
-    },
-  );
-  return payload?.user ? normalizeUser(payload.user) : null;
-}
-
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(authReducer, initialState);
 
@@ -154,42 +96,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   async function login(payload: LoginPayload) {
-    const response = await apiRequest<{
-      access_token: string;
-      refresh_token: string;
-      user?: unknown;
-    }>(apiEndpoints.auth.login, {
-      method: "POST",
-      body: payload,
-    });
-
-    const nextTokens: AuthTokens = {
-      accessToken: response.access_token,
-      refreshToken: response.refresh_token,
-    };
-
-    let nextUser = response.user ? normalizeUser(response.user) : null;
-    try {
-      const profile = await fetchProfile(nextTokens.accessToken);
-      if (profile) nextUser = profile;
-    } catch {
-      // noop, dejamos el payload del login si `/auth/me` falla.
-    }
-
-    if (!nextUser) {
-      throw new ApiError("No se pudo resolver el perfil autenticado", 500);
-    }
-
-    persist(nextTokens, nextUser);
+    const result = await loginRequest(payload);
+    persist(result.tokens, result.user);
   }
 
   async function logout() {
     if (state.tokens?.refreshToken) {
       try {
-        await apiRequest(apiEndpoints.auth.logout, {
-          method: "POST",
-          body: { refresh_token: state.tokens.refreshToken },
-        });
+        await logoutRequest(state.tokens.refreshToken);
       } catch {
         // noop
       }
@@ -200,9 +114,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   async function refreshProfile() {
     if (!state.tokens?.accessToken) return;
-    const profile = await fetchProfile(state.tokens.accessToken);
-    if (profile) {
-      persist(state.tokens, profile);
+    try {
+      const profile = await getMe(state.tokens.accessToken);
+      if (profile) {
+        persist(state.tokens, profile);
+      }
+    } catch {
+      // noop
     }
   }
 
