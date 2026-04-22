@@ -1,11 +1,13 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo } from "react";
 import {
   Activity,
   ArrowRight,
   BookOpen,
   Database,
+  Link2,
   Layers3,
   Sparkles,
   Smartphone,
@@ -81,6 +83,38 @@ function InsightRow({
   );
 }
 
+function ModuleCard({
+  href,
+  title,
+  description,
+  icon: Icon,
+}: {
+  href: string;
+  title: string;
+  description: string;
+  icon: React.ComponentType<{ className?: string }>;
+}) {
+  return (
+    <Link href={href}>
+      <Card className="h-full border-border/80 bg-card/95 transition-transform duration-150 hover:-translate-y-0.5 hover:shadow-[0_18px_44px_rgba(31,42,55,0.08)]">
+        <CardContent className="flex h-full flex-col p-5">
+          <div className="flex items-start justify-between gap-4">
+            <div className="rounded-2xl bg-primary/12 p-3 text-primary">
+              <Icon className="size-5" />
+            </div>
+            <Badge variant="outline">Docente</Badge>
+          </div>
+          <div className="mt-5">
+            <h3 className="text-lg font-semibold text-foreground">{title}</h3>
+            <p className="mt-2 text-sm leading-6 text-muted-foreground">{description}</p>
+          </div>
+          <div className="mt-auto pt-5 text-sm font-medium text-primary">Abrir módulo</div>
+        </CardContent>
+      </Card>
+    </Link>
+  );
+}
+
 export function TeacherDashboard() {
   const { tokens, user } = useAuth();
   const gamesQuery = useGames(tokens?.accessToken);
@@ -106,6 +140,9 @@ export function TeacherDashboard() {
       totalDevices: devicesQuery.data?.total || devices.length,
       totalSyncs: syncsQuery.data?.total || syncs.length,
       avgTurnTime,
+      devicesWithoutStatus: devices.filter((device) => !device.status).length,
+      gamesWithoutTurns: games.filter((game) => game.turns.length === 0).length,
+      syncsWithoutRaw: syncs.filter((sync) => (sync.rawRecordCount || sync.rawRecordIds.length || 0) === 0).length,
       deckChart: Object.entries(
         games.reduce<Record<string, number>>((acc, game) => {
           const key = game.deckName || "Sin mazo";
@@ -126,12 +163,33 @@ export function TeacherDashboard() {
     };
   }, [devicesQuery.data, gamesQuery.data, syncsQuery.data]);
 
+  const priorities = [
+    {
+      title: "Partidas sin turnos",
+      value: metrics.gamesWithoutTurns,
+      description: "Ayuda a detectar sesiones que se crean pero no terminan de arrancar en aula.",
+      icon: Database,
+    },
+    {
+      title: "Dispositivos sin status",
+      value: metrics.devicesWithoutStatus,
+      description: "Conviene revisar parque visible antes de la próxima clase o instancia de uso.",
+      icon: Smartphone,
+    },
+    {
+      title: "Syncs sin raw",
+      value: metrics.syncsWithoutRaw,
+      description: "Sirve como alerta temprana para trazabilidad incompleta o captura parcial.",
+      icon: Layers3,
+    },
+  ].filter((item) => item.value > 0);
+
   return (
     <div className="space-y-8">
       <SectionHeader
         eyebrow="Docente"
-        title="Una vista más clara para acompañar el aula"
-        description="Tomamos como referencia el tono del sitio público de MagicBox para empezar a mover el dashboard hacia una experiencia más cálida, simple y pedagógica, sin perder la capa operativa que ya tenemos."
+        title="Home operativa para acompañar el aula"
+        description="La base visual puede seguir mejorando después, pero esta pantalla ya prioriza lo que una cuenta docente necesita ver para operar: partidas, dispositivos, sincronizaciones y señales concretas de revisión."
       />
 
       <div className="grid gap-6 xl:grid-cols-[1.4fr_0.9fr]">
@@ -145,26 +203,25 @@ export function TeacherDashboard() {
 
             <div className="mt-6 max-w-3xl">
               <h2 className="text-3xl font-semibold tracking-tight sm:text-4xl">
-                La pantalla docente tiene que sentirse tan confiable y amable como la propuesta educativa.
+                La home docente ya no es solo una dirección visual, ahora también sirve para operar el día.
               </h2>
               <p className="mt-4 text-base leading-7 text-white/78">
-                Este primer frente combina una lectura institucional con los indicadores operativos ya disponibles,
-                para que luego podamos refinar módulos, profundidad analítica y la experiencia embebida.
+                Ordena rápido la actividad visible, señala fricciones comunes y deja accesos directos a los módulos que una sesión docente realmente usa.
               </p>
             </div>
 
             <div className="mt-8 grid gap-4 md:grid-cols-3">
               <div className="rounded-3xl bg-white/10 p-4 backdrop-blur-sm">
                 <p className="text-sm text-white/70">Visión general</p>
-                <p className="mt-2 text-lg font-medium">Panorama rápido del aula y de la actividad reciente.</p>
+                <p className="mt-2 text-lg font-medium">Panorama rápido de juego, parque y sincronización reciente.</p>
               </div>
               <div className="rounded-3xl bg-white/10 p-4 backdrop-blur-sm">
-                <p className="text-sm text-white/70">Tono visual</p>
-                <p className="mt-2 text-lg font-medium">Menos tablero industrial, más herramienta educativa.</p>
+                <p className="text-sm text-white/70">Operación cotidiana</p>
+                <p className="mt-2 text-lg font-medium">Qué revisar antes de una clase o de una nueva ronda de uso.</p>
               </div>
               <div className="rounded-3xl bg-white/10 p-4 backdrop-blur-sm">
                 <p className="text-sm text-white/70">Próxima capa</p>
-                <p className="mt-2 text-lg font-medium">Métricas, progreso y narrativas por grupo y estudiante.</p>
+                <p className="mt-2 text-lg font-medium">Después podemos profundizar progreso por grupo y narrativa pedagógica.</p>
               </div>
             </div>
           </CardContent>
@@ -174,25 +231,33 @@ export function TeacherDashboard() {
           <CardHeader>
             <CardTitle>Qué mirar hoy</CardTitle>
             <CardDescription>
-              Una primera columna de lectura rápida para docentes y coordinación.
+              Señales concretas para ordenar la revisión diaria sin entrar todavía a cada módulo.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
-            <InsightRow
-              title="Actividad reciente"
-              description="Ver si hubo nuevas partidas, sincronizaciones o dispositivos activos desde la última revisión."
-              icon={Sparkles}
-            />
-            <InsightRow
-              title="Participación del grupo"
-              description="Preparar una lectura más pedagógica sobre colaboración, progreso y tiempos de respuesta."
-              icon={Users2}
-            />
-            <InsightRow
-              title="Seguimiento por contenido"
-              description="Identificar qué mazos o desafíos están apareciendo más para ordenar el análisis didáctico."
-              icon={BookOpen}
-            />
+            {priorities.length > 0 ? (
+              priorities.map((item) => (
+                <InsightRow key={item.title} title={`${item.title}: ${item.value}`} description={item.description} icon={item.icon} />
+              ))
+            ) : (
+              <>
+                <InsightRow
+                  title="Actividad reciente"
+                  description="Ver si hubo nuevas partidas, sincronizaciones o dispositivos activos desde la última revisión."
+                  icon={Sparkles}
+                />
+                <InsightRow
+                  title="Participación del grupo"
+                  description="Preparar una lectura más pedagógica sobre colaboración, progreso y tiempos de respuesta."
+                  icon={Users2}
+                />
+                <InsightRow
+                  title="Seguimiento por contenido"
+                  description="Identificar qué mazos o desafíos están apareciendo más para ordenar el análisis didáctico."
+                  icon={BookOpen}
+                />
+              </>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -237,6 +302,22 @@ export function TeacherDashboard() {
           </CardContent>
         </Card>
       ) : null}
+
+      <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
+        <CardHeader>
+          <CardTitle>Módulos principales</CardTitle>
+          <CardDescription>
+            Accesos rápidos a los frentes operativos que este perfil usa de verdad.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-5 md:grid-cols-3">
+            <ModuleCard href="/games" title="Partidas" description="Lectura del uso real, mazos activos y sesiones visibles." icon={Database} />
+            <ModuleCard href="/devices" title="Dispositivos" description="Chequeo rápido del parque visible y de señales de hardware para el aula." icon={Smartphone} />
+            <ModuleCard href="/syncs" title="Sincronizaciones" description="Validación del flujo reciente y trazabilidad básica de la captura." icon={Link2} />
+          </div>
+        </CardContent>
+      </Card>
 
       <div className="grid gap-6 xl:grid-cols-2">
         <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
