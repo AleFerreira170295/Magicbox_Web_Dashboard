@@ -40,6 +40,12 @@ const navigation: NavigationItem[] = [
     roles: ["government-viewer"] satisfies NavigationRole[],
   },
   {
+    href: "/territorial-overview",
+    label: "Territorios e instituciones",
+    icon: Building2,
+    roles: ["government-viewer"] satisfies NavigationRole[],
+  },
+  {
     href: "/syncs",
     label: "Sincronizaciones",
     icon: Cable,

@@ -5,6 +5,7 @@ import DevicesPage from "@/app/(app)/devices/page";
 import GamesPage from "@/app/(app)/games/page";
 import SyncsPage from "@/app/(app)/syncs/page";
 import TerritorialAlertsPage from "@/app/(app)/territorial-alerts/page";
+import TerritorialOverviewPage from "@/app/(app)/territorial-overview/page";
 
 const useAuthMock = vi.fn();
 
@@ -32,6 +33,10 @@ vi.mock("@/features/dashboard/territorial-alerts-center", () => ({
   TerritorialAlertsCenter: () => <div>territorial-alerts-center</div>,
 }));
 
+vi.mock("@/features/dashboard/territorial-overview-center", () => ({
+  TerritorialOverviewCenter: () => <div>territorial-overview-center</div>,
+}));
+
 describe("operational route guards", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -53,6 +58,7 @@ describe("operational route guards", () => {
         <GamesPage />
         <SyncsPage />
         <TerritorialAlertsPage />
+        <TerritorialOverviewPage />
       </>,
     );
 
@@ -61,7 +67,8 @@ describe("operational route guards", () => {
     expect(screen.queryByText("games-table")).not.toBeInTheDocument();
     expect(screen.queryByText("syncs-table")).not.toBeInTheDocument();
     expect(screen.queryByText("territorial-alerts-center")).not.toBeInTheDocument();
-    expect(screen.getAllByText("Acceso restringido")).toHaveLength(5);
+    expect(screen.queryByText("territorial-overview-center")).not.toBeInTheDocument();
+    expect(screen.getAllByText("Acceso restringido")).toHaveLength(6);
   });
 
   it("allows teacher access to the routes enabled for that role", () => {
@@ -76,6 +83,7 @@ describe("operational route guards", () => {
         <GamesPage />
         <SyncsPage />
         <TerritorialAlertsPage />
+        <TerritorialOverviewPage />
       </>,
     );
 
@@ -84,6 +92,7 @@ describe("operational route guards", () => {
     expect(screen.getByText("games-table")).toBeInTheDocument();
     expect(screen.getByText("syncs-table")).toBeInTheDocument();
     expect(screen.queryByText("territorial-alerts-center")).not.toBeInTheDocument();
+    expect(screen.queryByText("territorial-overview-center")).not.toBeInTheDocument();
   });
 
   it("allows government-viewer into dashboard but keeps technical routes blocked", () => {
@@ -98,11 +107,13 @@ describe("operational route guards", () => {
         <GamesPage />
         <SyncsPage />
         <TerritorialAlertsPage />
+        <TerritorialOverviewPage />
       </>,
     );
 
     expect(screen.getByText("dashboard-home")).toBeInTheDocument();
     expect(screen.getByText("territorial-alerts-center")).toBeInTheDocument();
+    expect(screen.getByText("territorial-overview-center")).toBeInTheDocument();
     expect(screen.queryByText("devices-table")).not.toBeInTheDocument();
     expect(screen.queryByText("games-table")).not.toBeInTheDocument();
     expect(screen.queryByText("syncs-table")).not.toBeInTheDocument();
