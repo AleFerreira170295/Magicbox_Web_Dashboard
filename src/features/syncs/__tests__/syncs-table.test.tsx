@@ -292,4 +292,81 @@ describe("SyncsTable", () => {
     expect(screen.queryAllByText("Luna").length).toBeGreaterThan(0);
     expect(screen.getByText(/match con partida:/i)).toBeInTheDocument();
   });
+
+  it("adapts copy for researcher sessions while preserving evidence detail", () => {
+    useAuthMock.mockReturnValue({
+      tokens: { accessToken: "token", refreshToken: "refresh" },
+      user: {
+        id: "user-1",
+        email: "teacher@example.com",
+        firstName: "Rita",
+        lastName: "Researcher",
+        fullName: "Rita Researcher",
+        educationalCenterId: "ec-1",
+        roles: ["researcher"],
+        permissions: ["ble_device:read"],
+        raw: {},
+      },
+    });
+
+    useSyncSessionsMock.mockReturnValue(
+      okQuery({
+        data: [
+          {
+            id: "sync-1",
+            userId: "user-1",
+            syncId: "mb-sync-1",
+            source: "magicbox",
+            sourceType: "device",
+            sessionType: null,
+            status: "done",
+            bleDeviceId: "device-1",
+            deviceId: "mb-1",
+            firmwareVersion: "v2.2",
+            appVersion: "1.0.0",
+            payloadSchemaVersion: "1",
+            gameId: 201,
+            deckName: "Animales",
+            totalCards: 10,
+            totalPlayers: 2,
+            durationSeconds: 60,
+            score: 100,
+            finalResult: null,
+            gameEndReason: null,
+            startedAt: null,
+            endedAt: null,
+            syncedAt: null,
+            capturedAt: null,
+            participants: [{ id: "participant-1", profileId: "profile-1", profileName: "Luna", playerName: "Luna", cardUid: "card-1", position: 1, studentId: "student-1", externalPlayerUid: null, raw: {} }],
+            rawRecordIds: ["raw-1"],
+            rawRecordCount: 1,
+            lastRawRecordId: null,
+            rawPayload: { hello: "world" },
+            fragmentCount: 0,
+            rawFragmentCount: 0,
+            additionalFields: {},
+            receivedAt: null,
+            createdAt: null,
+            updatedAt: null,
+            raw: {},
+          },
+        ],
+        page: 1,
+        limit: 1,
+        total: 1,
+        total_pages: 1,
+      }),
+    );
+
+    renderSyncsTable();
+
+    expect(screen.getByText("Researcher")).toBeInTheDocument();
+    expect(screen.getByText(/pensada para leer cobertura de captura/i)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByText("mb-sync-1"));
+
+    expect(screen.getByText("Detalle de evidencia")).toBeInTheDocument();
+    expect(screen.getByText("Participantes y asociaciones visibles")).toBeInTheDocument();
+    expect(screen.getByText("Señales de evidencia")).toBeInTheDocument();
+  });
 });

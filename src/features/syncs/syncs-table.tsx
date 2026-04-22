@@ -74,6 +74,7 @@ export function SyncsTable() {
 
   const canReadOperationalSyncs = hasAnyPermission("ble_device:read", "ble-device:read");
   const isInstitutionAdminView = currentUser?.roles.includes("institution-admin") || false;
+  const isResearcherView = currentUser?.roles.includes("researcher") || false;
 
   const deviceById = useMemo(() => new Map(devices.map((device) => [device.id, device])), [devices]);
   const userById = useMemo(() => new Map(users.map((user) => [user.id, user])), [users]);
@@ -205,10 +206,12 @@ export function SyncsTable() {
   return (
     <div className="space-y-6">
       <SectionHeader
-        eyebrow={canReadOperationalSyncs ? (isInstitutionAdminView ? "Institution admin" : "Trazabilidad") : "Mi actividad"}
+        eyebrow={isResearcherView ? "Researcher" : canReadOperationalSyncs ? (isInstitutionAdminView ? "Institution admin" : "Trazabilidad") : "Mi actividad"}
         title="Sincronizaciones"
         description={
-          canReadOperationalSyncs
+          isResearcherView
+            ? "Vista de evidencia sobre `/sync-sessions`, pensada para leer cobertura de captura, correlación con partidas y asociaciones visibles sin quedarse solo en el payload raw."
+            : canReadOperationalSyncs
             ? "La vista usa `/sync-sessions` como superficie operativa real del parque visible por ACL BLE, no solo como historial personal del usuario autenticado."
             : "Sin permiso BLE operativo, `/sync-sessions` vuelve a comportarse como historial personal del usuario autenticado."
         }
@@ -252,13 +255,15 @@ export function SyncsTable() {
           <div>
             <div className="flex flex-wrap items-center gap-2">
               <p className="text-sm font-medium text-foreground">Alcance visible</p>
-              <Badge variant={canReadOperationalSyncs ? "secondary" : "outline"}>
-                {canReadOperationalSyncs ? "operativo por ACL BLE" : "historial personal"}
+              <Badge variant={isResearcherView || canReadOperationalSyncs ? "secondary" : "outline"}>
+                {isResearcherView ? "researcher" : canReadOperationalSyncs ? "operativo por ACL BLE" : "historial personal"}
               </Badge>
               {isInstitutionAdminView ? <Badge variant="outline">institution-admin</Badge> : null}
             </div>
             <p className="mt-2 text-sm text-muted-foreground">
-              {canReadOperationalSyncs
+              {isResearcherView
+                ? "La vista mantiene el scope visible real y deja explícita la relación entre sync, dispositivo, usuario y partida correlacionada para revisar evidencia de captura sin bajar directo al raw completo."
+                : canReadOperationalSyncs
                 ? "Los resultados se abren al parque de dispositivos permitido por ACL. Si tu alcance está scopeado, vas a ver solo syncs de esa institución."
                 : "Esta sesión no tiene lectura operativa de BLE, así que la tabla queda limitada a tus propias sincronizaciones."}
             </p>
@@ -271,11 +276,11 @@ export function SyncsTable() {
           Array.from({ length: 5 }).map((_, index) => <Skeleton key={index} className="h-32 rounded-2xl" />)
         ) : (
           <>
-            <SummaryCard label="Syncs" value={String(metrics.total)} hint="Sesiones visibles en la vista operativa actual." icon={Activity} />
-            <SummaryCard label="Con raw" value={String(metrics.withRaw)} hint="Ayuda a validar trazabilidad e ingestión." icon={HardDriveDownload} />
-            <SummaryCard label="Con participantes" value={String(metrics.withParticipants)} hint="Sesiones con proyección de jugadores usable." icon={Users} />
-            <SummaryCard label="Con dispositivo" value={String(metrics.withDeviceLink)} hint="Sesiones enlazadas a BLE o device_id." icon={Waves} />
-            <SummaryCard label="Con firmware" value={String(metrics.withFirmware)} hint="Útil para detectar variaciones de ingesta por versión." icon={Cpu} />
+            <SummaryCard label={isResearcherView ? "Muestra sync" : "Syncs"} value={String(metrics.total)} hint={isResearcherView ? "Sesiones visibles dentro de la evidencia actual." : "Sesiones visibles en la vista operativa actual."} icon={Activity} />
+            <SummaryCard label="Con raw" value={String(metrics.withRaw)} hint={isResearcherView ? "Cobertura observable de captura cruda." : "Ayuda a validar trazabilidad e ingestión."} icon={HardDriveDownload} />
+            <SummaryCard label={isResearcherView ? "Con participantes" : "Con participantes"} value={String(metrics.withParticipants)} hint={isResearcherView ? "Syncs con proyección de participantes usable para análisis." : "Sesiones con proyección de jugadores usable."} icon={Users} />
+            <SummaryCard label="Con dispositivo" value={String(metrics.withDeviceLink)} hint={isResearcherView ? "Sesiones enlazadas a un dispositivo visible." : "Sesiones enlazadas a BLE o device_id."} icon={Waves} />
+            <SummaryCard label={isResearcherView ? "Con firmware" : "Con firmware"} value={String(metrics.withFirmware)} hint={isResearcherView ? "Sirve para detectar sesgos o variaciones por versión." : "Útil para detectar variaciones de ingesta por versión."} icon={Cpu} />
           </>
         )}
       </div>
@@ -306,9 +311,11 @@ export function SyncsTable() {
       <div className="grid gap-6 xl:grid-cols-[1.2fr_1fr]">
         <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
           <CardHeader>
-            <CardTitle>Sesiones sincronizadas</CardTitle>
+            <CardTitle>{isResearcherView ? "Muestra visible de sincronizaciones" : "Sesiones sincronizadas"}</CardTitle>
             <CardDescription>
-              Seleccioná una sesión para inspeccionar contexto de dispositivo, usuario, participantes y payload raw más reciente.
+              {isResearcherView
+                ? "Seleccioná una sesión para inspeccionar contexto visible, participantes proyectados y correlación con partida sin salir del dashboard."
+                : "Seleccioná una sesión para inspeccionar contexto de dispositivo, usuario, participantes y payload raw más reciente."}
             </CardDescription>
           </CardHeader>
           <CardContent className="overflow-x-auto p-0">
@@ -376,15 +383,17 @@ export function SyncsTable() {
 
         <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
           <CardHeader>
-            <CardTitle>Detalle de sync</CardTitle>
+            <CardTitle>{isResearcherView ? "Detalle de evidencia" : "Detalle de sync"}</CardTitle>
             <CardDescription>
-              Panel operativo para revisar rápidamente quién sincronizó, con qué dispositivo y qué evidencia raw quedó asociada.
+              {isResearcherView
+                ? "Panel para revisar rápidamente relaciones visibles entre sync, usuario, dispositivo, participantes y evidencia cruda asociada."
+                : "Panel operativo para revisar rápidamente quién sincronizó, con qué dispositivo y qué evidencia raw quedó asociada."}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-5">
             {!selectedSync ? (
               <div className="rounded-2xl bg-background/70 p-4 text-sm text-muted-foreground">
-                Elegí una sincronización para revisar su detalle.
+                {isResearcherView ? "Elegí una sincronización para revisar su detalle de evidencia." : "Elegí una sincronización para revisar su detalle."}
               </div>
             ) : (
               <>
@@ -414,7 +423,7 @@ export function SyncsTable() {
                 </div>
 
                 <div>
-                  <p className="text-sm font-medium text-foreground">Participantes y asociaciones</p>
+                  <p className="text-sm font-medium text-foreground">{isResearcherView ? "Participantes y asociaciones visibles" : "Participantes y asociaciones"}</p>
                   <div className="mt-3 space-y-3">
                     {selectedSync.participants.length === 0 ? (
                       <div className="rounded-2xl bg-background/70 p-3 text-sm text-muted-foreground">Sin participantes proyectados.</div>
@@ -439,7 +448,7 @@ export function SyncsTable() {
                 </div>
 
                 <div>
-                  <p className="text-sm font-medium text-foreground">Señales de trazabilidad</p>
+                  <p className="text-sm font-medium text-foreground">{isResearcherView ? "Señales de evidencia" : "Señales de trazabilidad"}</p>
                   <div className="mt-3 grid gap-3 sm:grid-cols-2">
                     <div className="rounded-2xl bg-background/70 p-3 text-sm text-muted-foreground">raw ids: <span className="font-medium text-foreground">{String(selectedSync.rawRecordCount || selectedSync.rawRecordIds.length || 0)}</span></div>
                     <div className="rounded-2xl bg-background/70 p-3 text-sm text-muted-foreground">fragmentos: <span className="font-medium text-foreground">{String(selectedSync.rawFragmentCount || 0)}</span></div>
@@ -449,7 +458,7 @@ export function SyncsTable() {
                 </div>
 
                 <div>
-                  <p className="text-sm font-medium text-foreground">Payload raw más reciente</p>
+                  <p className="text-sm font-medium text-foreground">{isResearcherView ? "Payload raw visible" : "Payload raw más reciente"}</p>
                   <div className="mt-3 rounded-2xl bg-slate-950 p-4 text-xs text-slate-100">
                     <pre className="overflow-x-auto whitespace-pre-wrap">{JSON.stringify(selectedSync.rawPayload || {}, null, 2)}</pre>
                   </div>
