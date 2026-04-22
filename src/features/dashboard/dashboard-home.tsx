@@ -1,6 +1,7 @@
 "use client";
 
 import { InstitutionDashboard } from "@/features/dashboard/institution-dashboard";
+import { ResearcherDashboard } from "@/features/dashboard/researcher-dashboard";
 import { TeacherDashboard } from "@/features/dashboard/teacher-dashboard";
 import { SuperadminDashboard } from "@/features/dashboard/superadmin-dashboard";
 import { useAuth } from "@/features/auth/auth-context";
@@ -17,6 +18,10 @@ export function DashboardHome() {
 
   if (user?.roles.includes("institution-admin") || user?.roles.includes("director")) {
     return <InstitutionDashboard />;
+  }
+
+  if (user?.roles.includes("researcher")) {
+    return <ResearcherDashboard />;
   }
 
   return <TeacherDashboard />;

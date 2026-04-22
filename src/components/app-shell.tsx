@@ -118,6 +118,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const { user, logout } = useAuth();
   const isGovernmentViewer = user?.roles.includes("government-viewer") || false;
+  const isResearcher = user?.roles.includes("researcher") || false;
 
   const visibleNavigation = navigation.filter((item) => {
     const allowedByRole = item.roles.some((role) => user?.roles.includes(role));
@@ -150,11 +151,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <div className="soft-panel rounded-[28px] p-5">
                 <div className="flex items-center gap-2 text-sm font-medium text-foreground">
                   <Sparkles className="size-4 text-primary" />
-                  {isGovernmentViewer ? "Vista gobierno" : "Vista institucional"}
+                  {isGovernmentViewer ? "Vista gobierno" : isResearcher ? "Vista investigación" : "Vista institucional"}
                 </div>
                 <p className="mt-3 text-sm leading-7 text-muted-foreground">
                   {isGovernmentViewer
                     ? "Este acceso prioriza lectura territorial, alertas ejecutivas y seguimiento agregado, sin exponer módulos técnicos u operativos que no corresponden a este perfil."
+                    : isResearcher
+                      ? "Este acceso prioriza evidencia visible, consistencia entre sync y partida, y lectura de muestra, manteniendo fuera los módulos administrativos o de hardware que no forman parte del trabajo investigador."
                     : "El dashboard va a convivir embebido con la web de MagicBox, así que empezamos a moverlo hacia un lenguaje menos técnico y más educativo."}
                 </p>
               </div>

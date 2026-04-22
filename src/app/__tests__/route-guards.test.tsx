@@ -95,6 +95,31 @@ describe("operational route guards", () => {
     expect(screen.queryByText("territorial-overview-center")).not.toBeInTheDocument();
   });
 
+  it("allows researcher into dashboard, games and syncs while keeping devices blocked", () => {
+    useAuthMock.mockReturnValue({
+      user: { roles: ["researcher"], permissions: [] },
+    });
+
+    render(
+      <>
+        <DashboardPage />
+        <DevicesPage />
+        <GamesPage />
+        <SyncsPage />
+        <TerritorialAlertsPage />
+        <TerritorialOverviewPage />
+      </>,
+    );
+
+    expect(screen.getByText("dashboard-home")).toBeInTheDocument();
+    expect(screen.getByText("games-table")).toBeInTheDocument();
+    expect(screen.getByText("syncs-table")).toBeInTheDocument();
+    expect(screen.queryByText("devices-table")).not.toBeInTheDocument();
+    expect(screen.queryByText("territorial-alerts-center")).not.toBeInTheDocument();
+    expect(screen.queryByText("territorial-overview-center")).not.toBeInTheDocument();
+    expect(screen.getAllByText("Acceso restringido")).toHaveLength(3);
+  });
+
   it("allows government-viewer into dashboard but keeps technical routes blocked", () => {
     useAuthMock.mockReturnValue({
       user: { roles: ["government-viewer"], permissions: [] },

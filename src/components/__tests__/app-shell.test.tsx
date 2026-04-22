@@ -103,4 +103,29 @@ describe("AppShell navigation", () => {
     expect(screen.queryByText("Dispositivos")).not.toBeInTheDocument();
     expect(screen.queryByText("Configuración")).not.toBeInTheDocument();
   });
+
+  it("keeps researcher focused on dashboard, games and syncs", () => {
+    useAuthMock.mockReturnValue({
+      user: {
+        fullName: "Rita Researcher",
+        email: "research@example.com",
+        roles: ["researcher"],
+        permissions: ["game_data:read", "ble_device:read"],
+      },
+      logout: vi.fn(),
+    });
+
+    renderShell();
+
+    expect(screen.getAllByText("Dashboard").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Partidas").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Sincronizaciones").length).toBeGreaterThan(0);
+    expect(screen.getByText("Vista investigación")).toBeInTheDocument();
+    expect(screen.getByText(/evidencia visible, consistencia entre sync y partida/i)).toBeInTheDocument();
+
+    expect(screen.queryByText("Dispositivos")).not.toBeInTheDocument();
+    expect(screen.queryByText("Usuarios")).not.toBeInTheDocument();
+    expect(screen.queryByText("Permisos")).not.toBeInTheDocument();
+    expect(screen.queryByText("Instituciones")).not.toBeInTheDocument();
+  });
 });
