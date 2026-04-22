@@ -1,5 +1,5 @@
-import { render, screen } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { cleanup, render, screen } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import DashboardPage from "@/app/(app)/dashboard/page";
 import DevicesPage from "@/app/(app)/devices/page";
 import GamesPage from "@/app/(app)/games/page";
@@ -30,6 +30,10 @@ vi.mock("@/features/syncs/syncs-table", () => ({
 describe("operational route guards", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    cleanup();
   });
 
   it("blocks direct access for roles outside the allowed navigation contract", () => {
@@ -71,5 +75,26 @@ describe("operational route guards", () => {
     expect(screen.getByText("devices-table")).toBeInTheDocument();
     expect(screen.getByText("games-table")).toBeInTheDocument();
     expect(screen.getByText("syncs-table")).toBeInTheDocument();
+  });
+
+  it("allows government-viewer into dashboard but keeps technical routes blocked", () => {
+    useAuthMock.mockReturnValue({
+      user: { roles: ["government-viewer"], permissions: [] },
+    });
+
+    render(
+      <>
+        <DashboardPage />
+        <DevicesPage />
+        <GamesPage />
+        <SyncsPage />
+      </>,
+    );
+
+    expect(screen.getByText("dashboard-home")).toBeInTheDocument();
+    expect(screen.queryByText("devices-table")).not.toBeInTheDocument();
+    expect(screen.queryByText("games-table")).not.toBeInTheDocument();
+    expect(screen.queryByText("syncs-table")).not.toBeInTheDocument();
+    expect(screen.getAllByText("Acceso restringido")).toHaveLength(3);
   });
 });

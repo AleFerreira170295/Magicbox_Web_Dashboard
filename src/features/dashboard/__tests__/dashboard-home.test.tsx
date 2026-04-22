@@ -50,4 +50,17 @@ describe("DashboardHome", () => {
     expect(screen.getByText("teacher-dashboard")).toBeInTheDocument();
     expect(screen.queryByText("superadmin-dashboard")).not.toBeInTheDocument();
   });
+
+  it("routes government-viewer users to the executive dashboard home", () => {
+    useAuthMock.mockReturnValue({
+      user: {
+        roles: ["government-viewer"],
+      },
+    });
+
+    render(<DashboardHome />);
+
+    expect(screen.getByText("superadmin-dashboard")).toBeInTheDocument();
+    expect(screen.queryByText("teacher-dashboard")).not.toBeInTheDocument();
+  });
 });

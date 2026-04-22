@@ -1,5 +1,5 @@
-import { render, screen } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { cleanup, render, screen } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AppShell } from "@/components/app-shell";
 
 const useAuthMock = vi.fn();
@@ -32,6 +32,10 @@ describe("AppShell navigation", () => {
     vi.clearAllMocks();
     usePathnameMock.mockReturnValue("/dashboard");
     useRouterMock.mockReturnValue({ replace: vi.fn() });
+  });
+
+  afterEach(() => {
+    cleanup();
   });
 
   it("shows institution-admin navigation aligned with the enabled modules", () => {
@@ -72,5 +76,29 @@ describe("AppShell navigation", () => {
     renderShell();
 
     expect(screen.getAllByText("Permisos").length).toBeGreaterThan(0);
+  });
+
+  it("keeps government-viewer focused on the executive dashboard only", () => {
+    useAuthMock.mockReturnValue({
+      user: {
+        fullName: "Gobierno Territorial",
+        email: "gobierno@example.com",
+        roles: ["government-viewer"],
+        permissions: ["feature:read"],
+      },
+      logout: vi.fn(),
+    });
+
+    renderShell();
+
+    expect(screen.getAllByText("Dashboard").length).toBeGreaterThan(0);
+    expect(screen.getByText("Vista gobierno")).toBeInTheDocument();
+    expect(screen.getByText(/lectura territorial, alertas ejecutivas y seguimiento agregado/i)).toBeInTheDocument();
+
+    expect(screen.queryByText("Usuarios")).not.toBeInTheDocument();
+    expect(screen.queryByText("Permisos")).not.toBeInTheDocument();
+    expect(screen.queryByText("Instituciones")).not.toBeInTheDocument();
+    expect(screen.queryByText("Dispositivos")).not.toBeInTheDocument();
+    expect(screen.queryByText("Configuración")).not.toBeInTheDocument();
   });
 });
