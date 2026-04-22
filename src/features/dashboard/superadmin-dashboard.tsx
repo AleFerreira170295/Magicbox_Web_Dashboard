@@ -336,6 +336,20 @@ export function SuperadminDashboard() {
     return territoryAlerts.filter((item) => [...allowed].some((label) => item.label.includes(label)));
   }, [activeSmartPreset, filteredTerritoryScores, territoryAlerts]);
 
+  const activeExecutiveFilters = useMemo(
+    () => [
+      selectedRange !== "30d" ? `Rango: ${selectedRange}` : null,
+      selectedInstitutionId ? `Institución: ${selectedInstitutionId}` : null,
+      selectedCountryCode ? `País: ${selectedCountryCode}` : null,
+      selectedState ? `Estado: ${selectedState}` : null,
+      selectedCity ? `Ciudad: ${selectedCity}` : null,
+      selectedUserType ? `Tipo: ${selectedUserType}` : null,
+      selectedRoleCode ? `Rol: ${selectedRoleCode}` : null,
+      activeSmartPreset !== "all" ? `Preset: ${activeSmartPreset}` : null,
+    ].filter((value): value is string => Boolean(value)),
+    [activeSmartPreset, selectedCity, selectedCountryCode, selectedInstitutionId, selectedRange, selectedRoleCode, selectedState, selectedUserType],
+  );
+
   function updateFilter(
     key: "range" | "institution_id" | "country_code" | "state" | "city" | "user_type" | "role_code" | "smart_preset",
     value: string,
@@ -381,6 +395,19 @@ export function SuperadminDashboard() {
     }
 
     return params;
+  }
+
+  function resetExecutiveView() {
+    updateFilters({
+      range: "30d",
+      institution_id: "",
+      country_code: "",
+      state: "",
+      city: "",
+      user_type: "",
+      role_code: "",
+      smart_preset: "",
+    });
   }
 
   async function copyCurrentViewLink() {
@@ -605,118 +632,131 @@ export function SuperadminDashboard() {
             </div>
 
             {usesSystemSummary ? (
-              <div className="mt-6 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                <label className="rounded-2xl bg-white/10 p-4 text-sm text-white/85 backdrop-blur-sm">
-                  <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.2em] text-white/65">Ventana temporal</span>
-                  <select
-                    className="w-full rounded-xl border border-white/15 bg-slate-950/20 px-3 py-2 text-sm text-white outline-none"
-                    value={selectedRange}
-                    onChange={(event) => updateFilter("range", event.target.value)}
-                  >
-                    {rangeOptions.map((option) => (
-                      <option key={option.value} value={option.value} className="text-slate-950">
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+              <>
+                <div className="mt-6 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                  <label className="rounded-2xl bg-white/10 p-4 text-sm text-white/85 backdrop-blur-sm">
+                    <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.2em] text-white/65">Ventana temporal</span>
+                    <select
+                      className="w-full rounded-xl border border-white/15 bg-slate-950/20 px-3 py-2 text-sm text-white outline-none"
+                      value={selectedRange}
+                      onChange={(event) => updateFilter("range", event.target.value)}
+                    >
+                      {rangeOptions.map((option) => (
+                        <option key={option.value} value={option.value} className="text-slate-950">
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
 
-                <label className="rounded-2xl bg-white/10 p-4 text-sm text-white/85 backdrop-blur-sm">
-                  <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.2em] text-white/65">Institución</span>
-                  <select
-                    className="w-full rounded-xl border border-white/15 bg-slate-950/20 px-3 py-2 text-sm text-white outline-none"
-                    value={selectedInstitutionId || ""}
-                    onChange={(event) => updateFilter("institution_id", event.target.value)}
-                  >
-                    <option value="" className="text-slate-950">Todas</option>
-                    {institutionOptions.map((institution) => (
-                      <option key={institution.id} value={institution.id} className="text-slate-950">
-                        {institution.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+                  <label className="rounded-2xl bg-white/10 p-4 text-sm text-white/85 backdrop-blur-sm">
+                    <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.2em] text-white/65">Institución</span>
+                    <select
+                      className="w-full rounded-xl border border-white/15 bg-slate-950/20 px-3 py-2 text-sm text-white outline-none"
+                      value={selectedInstitutionId || ""}
+                      onChange={(event) => updateFilter("institution_id", event.target.value)}
+                    >
+                      <option value="" className="text-slate-950">Todas</option>
+                      {institutionOptions.map((institution) => (
+                        <option key={institution.id} value={institution.id} className="text-slate-950">
+                          {institution.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
 
-                <label className="rounded-2xl bg-white/10 p-4 text-sm text-white/85 backdrop-blur-sm">
-                  <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.2em] text-white/65">País</span>
-                  <select
-                    className="w-full rounded-xl border border-white/15 bg-slate-950/20 px-3 py-2 text-sm text-white outline-none"
-                    value={selectedCountryCode || ""}
-                    onChange={(event) => updateFilter("country_code", event.target.value)}
-                  >
-                    <option value="" className="text-slate-950">Todos</option>
-                    {countryOptions.map((option) => (
-                      <option key={option} value={option} className="text-slate-950">
-                        {option}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+                  <label className="rounded-2xl bg-white/10 p-4 text-sm text-white/85 backdrop-blur-sm">
+                    <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.2em] text-white/65">País</span>
+                    <select
+                      className="w-full rounded-xl border border-white/15 bg-slate-950/20 px-3 py-2 text-sm text-white outline-none"
+                      value={selectedCountryCode || ""}
+                      onChange={(event) => updateFilter("country_code", event.target.value)}
+                    >
+                      <option value="" className="text-slate-950">Todos</option>
+                      {countryOptions.map((option) => (
+                        <option key={option} value={option} className="text-slate-950">
+                          {option}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
 
-                <label className="rounded-2xl bg-white/10 p-4 text-sm text-white/85 backdrop-blur-sm">
-                  <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.2em] text-white/65">Estado / territorio</span>
-                  <select
-                    className="w-full rounded-xl border border-white/15 bg-slate-950/20 px-3 py-2 text-sm text-white outline-none"
-                    value={selectedState || ""}
-                    onChange={(event) => updateFilter("state", event.target.value)}
-                  >
-                    <option value="" className="text-slate-950">Todos</option>
-                    {stateOptions.map((option) => (
-                      <option key={option} value={option} className="text-slate-950">
-                        {option}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+                  <label className="rounded-2xl bg-white/10 p-4 text-sm text-white/85 backdrop-blur-sm">
+                    <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.2em] text-white/65">Estado / territorio</span>
+                    <select
+                      className="w-full rounded-xl border border-white/15 bg-slate-950/20 px-3 py-2 text-sm text-white outline-none"
+                      value={selectedState || ""}
+                      onChange={(event) => updateFilter("state", event.target.value)}
+                    >
+                      <option value="" className="text-slate-950">Todos</option>
+                      {stateOptions.map((option) => (
+                        <option key={option} value={option} className="text-slate-950">
+                          {option}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
 
-                <label className="rounded-2xl bg-white/10 p-4 text-sm text-white/85 backdrop-blur-sm">
-                  <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.2em] text-white/65">Ciudad</span>
-                  <select
-                    className="w-full rounded-xl border border-white/15 bg-slate-950/20 px-3 py-2 text-sm text-white outline-none"
-                    value={selectedCity || ""}
-                    onChange={(event) => updateFilter("city", event.target.value)}
-                  >
-                    <option value="" className="text-slate-950">Todas</option>
-                    {cityOptions.map((option) => (
-                      <option key={option} value={option} className="text-slate-950">
-                        {option}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+                  <label className="rounded-2xl bg-white/10 p-4 text-sm text-white/85 backdrop-blur-sm">
+                    <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.2em] text-white/65">Ciudad</span>
+                    <select
+                      className="w-full rounded-xl border border-white/15 bg-slate-950/20 px-3 py-2 text-sm text-white outline-none"
+                      value={selectedCity || ""}
+                      onChange={(event) => updateFilter("city", event.target.value)}
+                    >
+                      <option value="" className="text-slate-950">Todas</option>
+                      {cityOptions.map((option) => (
+                        <option key={option} value={option} className="text-slate-950">
+                          {option}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
 
-                <label className="rounded-2xl bg-white/10 p-4 text-sm text-white/85 backdrop-blur-sm">
-                  <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.2em] text-white/65">Tipo de usuario</span>
-                  <select
-                    className="w-full rounded-xl border border-white/15 bg-slate-950/20 px-3 py-2 text-sm text-white outline-none"
-                    value={selectedUserType || ""}
-                    onChange={(event) => updateFilter("user_type", event.target.value)}
-                  >
-                    <option value="" className="text-slate-950">Todos</option>
-                    {userTypeOptions.map((option) => (
-                      <option key={option} value={option} className="text-slate-950">
-                        {option}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+                  <label className="rounded-2xl bg-white/10 p-4 text-sm text-white/85 backdrop-blur-sm">
+                    <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.2em] text-white/65">Tipo de usuario</span>
+                    <select
+                      className="w-full rounded-xl border border-white/15 bg-slate-950/20 px-3 py-2 text-sm text-white outline-none"
+                      value={selectedUserType || ""}
+                      onChange={(event) => updateFilter("user_type", event.target.value)}
+                    >
+                      <option value="" className="text-slate-950">Todos</option>
+                      {userTypeOptions.map((option) => (
+                        <option key={option} value={option} className="text-slate-950">
+                          {option}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
 
-                <label className="rounded-2xl bg-white/10 p-4 text-sm text-white/85 backdrop-blur-sm">
-                  <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.2em] text-white/65">Rol agrupado</span>
-                  <select
-                    className="w-full rounded-xl border border-white/15 bg-slate-950/20 px-3 py-2 text-sm text-white outline-none"
-                    value={selectedRoleCode || ""}
-                    onChange={(event) => updateFilter("role_code", event.target.value)}
-                  >
-                    <option value="" className="text-slate-950">Todos</option>
-                    {roleCodeOptions.map((option) => (
-                      <option key={option} value={option} className="text-slate-950">
-                        {option}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              </div>
+                  <label className="rounded-2xl bg-white/10 p-4 text-sm text-white/85 backdrop-blur-sm">
+                    <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.2em] text-white/65">Rol agrupado</span>
+                    <select
+                      className="w-full rounded-xl border border-white/15 bg-slate-950/20 px-3 py-2 text-sm text-white outline-none"
+                      value={selectedRoleCode || ""}
+                      onChange={(event) => updateFilter("role_code", event.target.value)}
+                    >
+                      <option value="" className="text-slate-950">Todos</option>
+                      {roleCodeOptions.map((option) => (
+                        <option key={option} value={option} className="text-slate-950">
+                          {option}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+
+                {activeExecutiveFilters.length > 0 ? (
+                  <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-white/10 px-4 py-3 text-sm text-white/85 backdrop-blur-sm">
+                    <p>
+                      Vista afinada con {activeExecutiveFilters.length} filtro{activeExecutiveFilters.length === 1 ? "" : "s"} activo{activeExecutiveFilters.length === 1 ? "" : "s"}.
+                    </p>
+                    <Button type="button" variant="outline" size="sm" className="border-white/20 bg-white/10 text-white hover:bg-white/15 hover:text-white" onClick={resetExecutiveView}>
+                      Volver a vista general
+                    </Button>
+                  </div>
+                ) : null}
+              </>
             ) : null}
 
             <div className="mt-6 max-w-3xl">
