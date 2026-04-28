@@ -24,6 +24,7 @@ export function LoginForm() {
   const searchParams = useSearchParams();
   const { login, status } = useAuth();
   const [error, setError] = useState<string | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
@@ -64,7 +65,25 @@ export function LoginForm() {
 
       <div className="space-y-2">
         <Label htmlFor="password">Contraseña</Label>
-        <Input id="password" type="password" autoComplete="current-password" placeholder="••••••••" {...form.register("password")} />
+        <div className="relative">
+          <Input
+            id="password"
+            type={showPassword ? "text" : "password"}
+            autoComplete="current-password"
+            placeholder="••••••••"
+            className="pr-20"
+            {...form.register("password")}
+          />
+          <button
+            type="button"
+            className="absolute inset-y-0 right-3 text-sm font-medium text-primary hover:underline"
+            onClick={() => setShowPassword((current) => !current)}
+            aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+            aria-pressed={showPassword}
+          >
+            {showPassword ? "Ocultar" : "Mostrar"}
+          </button>
+        </div>
         {form.formState.errors.password ? <p className="text-sm text-destructive">{form.formState.errors.password.message}</p> : null}
       </div>
 

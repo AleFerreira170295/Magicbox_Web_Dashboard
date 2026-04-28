@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useMemo, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { Activity, BarChart3, Building2, Cable, Database, KeyRound, LogOut, Settings, ShieldAlert, Sparkles, Smartphone, UserRound, Users } from "lucide-react";
 import { BrandLogo } from "@/components/brand-logo";
@@ -10,6 +11,8 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "@/features/auth/auth-context";
 import { canAccessPermissionsModule } from "@/features/auth/permission-contract";
 import type { AppRole } from "@/features/auth/types";
+import { completeTutorial, hasCompletedTutorial } from "@/features/tutorial/storage";
+import { WebOnboardingTour } from "@/features/tutorial/web-onboarding-tour";
 import { appConfig } from "@/lib/api/config";
 import { cn } from "@/lib/utils";
 
@@ -180,17 +183,33 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const { user, logout } = useAuth();
+  const [isTutorialOpen, setIsTutorialOpen] = useState(false);
   const experienceMeta = getExperienceMeta(user);
+  const shouldAutoOpenTutorial = Boolean(user?.id && !hasCompletedTutorial(user.id));
+  const tutorialVisible = isTutorialOpen || shouldAutoOpenTutorial;
 
-  const visibleNavigation = navigation.filter((item) => {
-    const allowedByRole = item.roles.some((role) => user?.roles.includes(role));
-    if (!allowedByRole) return false;
-    return item.isVisible ? item.isVisible(user) : true;
-  });
+  const visibleNavigation = useMemo(
+    () =>
+      navigation.filter((item) => {
+        const allowedByRole = item.roles.some((role) => user?.roles.includes(role));
+        if (!allowedByRole) return false;
+        return item.isVisible ? item.isVisible(user) : true;
+      }),
+    [user],
+  );
+
+  function finishTutorial() {
+    if (user?.id) {
+      completeTutorial(user.id);
+    }
+    setIsTutorialOpen(false);
+  }
 
   return (
     <AuthGuard>
       <div className="min-h-screen bg-background">
+        {tutorialVisible ? <WebOnboardingTour user={user} onSkip={finishTutorial} onComplete={finishTutorial} /> : null}
+
         <div className="grid min-h-screen lg:grid-cols-[300px_1fr]">
           <aside className="hidden border-r border-border/60 bg-sidebar/95 text-sidebar-foreground lg:flex lg:flex-col lg:backdrop-blur">
             <div className="border-b border-border/60 px-6 py-8">
@@ -213,9 +232,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   <Sparkles className="size-4 text-primary" />
                   {experienceMeta.title}
                 </div>
-                <p className="mt-3 text-sm leading-7 text-muted-foreground">
-                  {experienceMeta.description}
-                </p>
+                <p className="mt-3 text-sm leading-7 text-muted-foreground">{experienceMeta.description}</p>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="mt-4 px-0 text-primary hover:bg-transparent"
+                  onClick={() => setIsTutorialOpen(true)}
+                >
+                  Ver tutorial
+                </Button>
               </div>
             </div>
 
@@ -273,28 +299,27 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   Salir
                 </Button>
               </div>
+
               <div className="container-shell flex gap-2 overflow-x-auto pb-4 lg:hidden">
                 {visibleNavigation.map((item) => {
                   const Icon = item.icon;
                   const active = pathname === item.href;
                   return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    className={cn(
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      className={cn(
                         "inline-flex items-center gap-2 rounded-full border px-3 py-2 text-sm font-medium whitespace-nowrap shadow-[0_8px_18px_rgba(66,128,164,0.08)]",
-                        active
-                          ? "border-primary bg-primary text-white"
-                          : "border-border bg-white text-foreground",
+                        active ? "border-primary bg-primary text-white" : "border-border bg-white text-foreground",
                       )}
-                  >
-                    <Icon className="size-4" />
-                    {item.label}
-                  </Link>
-                );
-              })}
-            </div>
-          </header>
+                    >
+                      <Icon className="size-4" />
+                      {item.label}
+                    </Link>
+                  );
+                })}
+              </div>
+            </header>
 
             <main className="container-shell flex-1 py-10">{children}</main>
           </div>
