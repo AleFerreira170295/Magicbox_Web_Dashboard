@@ -1486,19 +1486,8 @@ export function InstitutionsOverview() {
                           const isSelected = selectedStudent?.id === student.id;
 
                           return (
-                            <div key={student.id} className={cn(isSelected ? "bg-primary/4" : "") }>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  if (isSelected) {
-                                    setSelectedStudentId(null);
-                                    setAnalyticsScope("group");
-                                    return;
-                                  }
-
-                                  setSelectedStudentId(student.id);
-                                  setAnalyticsScope("student");
-                                }}
+                            <div key={student.id} className={cn("overflow-hidden", isSelected ? "bg-primary/4" : "") }>
+                              <div
                                 className={cn(
                                   "grid w-full gap-3 px-4 py-4 text-left transition md:grid-cols-[minmax(0,1.8fr)_minmax(0,1fr)_120px_120px_110px] md:items-center",
                                   isSelected ? "bg-primary/8" : "hover:bg-primary/5",
@@ -1514,14 +1503,29 @@ export function InstitutionsOverview() {
                                   </div>
                                   <div className="min-w-0 flex-1">
                                     <div className="flex flex-wrap items-center gap-2">
-                                      <p className="truncate text-sm font-semibold text-foreground">{student.fullName}</p>
+                                      <button
+                                        type="button"
+                                        aria-expanded={isSelected}
+                                        aria-controls={`student-accordion-${student.id}`}
+                                        onClick={() => {
+                                          if (isSelected) {
+                                            setSelectedStudentId(null);
+                                            setAnalyticsScope("group");
+                                            return;
+                                          }
+
+                                          setSelectedStudentId(student.id);
+                                          setAnalyticsScope("student");
+                                        }}
+                                        className="inline-flex max-w-full items-center gap-2 rounded-md text-left text-sm font-semibold text-foreground transition hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+                                      >
+                                        <span className="truncate">{student.fullName}</span>
+                                        {isSelected ? <ChevronUp className="size-4 shrink-0" /> : <ChevronDown className="size-4 shrink-0" />}
+                                      </button>
                                       {isSelected ? <Badge variant="secondary">seleccionado</Badge> : null}
                                     </div>
                                     <p className="mt-1 text-xs text-muted-foreground">Última actividad: {formatDateTime(entry.lastParticipation)}</p>
-                                  </div>
-                                  <div className="mt-0.5 flex shrink-0 items-center gap-2 text-xs text-muted-foreground">
-                                    <span>{isSelected ? "Ocultar detalle" : "Ver detalle"}</span>
-                                    {isSelected ? <ChevronUp className="size-4" /> : <ChevronDown className="size-4" />}
+                                    <p className="mt-1 text-xs text-muted-foreground">{isSelected ? "Ocultar detalle" : "Ver detalle"}</p>
                                   </div>
                                 </div>
                                 <div className="text-sm text-foreground">
@@ -1540,10 +1544,10 @@ export function InstitutionsOverview() {
                                   <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground md:hidden">Acierto</p>
                                   <Badge variant={entry.successRate >= 70 ? "success" : entry.successRate >= 40 ? "secondary" : "outline"}>{entry.successRate}%</Badge>
                                 </div>
-                              </button>
+                              </div>
 
                               {isSelected ? (
-                                <div className="border-t border-border/70 bg-background/40 px-4 py-4">
+                                <div id={`student-accordion-${student.id}`} className="border-t border-border/70 bg-background/40 px-4 py-4 md:pl-[5.2rem]">
                                   <div className="grid gap-4">
                                     <div className="rounded-2xl border border-border/70 bg-white/85 p-4">
                                       <div className="flex flex-wrap items-start justify-between gap-3">
