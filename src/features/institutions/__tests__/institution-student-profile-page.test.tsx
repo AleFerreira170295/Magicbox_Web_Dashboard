@@ -186,6 +186,8 @@ describe("InstitutionStudentProfilePage", () => {
     expect(screen.getByRole("heading", { name: "Luna Pérez", level: 1 })).toBeInTheDocument();
     expect(screen.getByText(/Documento \/ ID: luna_001/)).toBeInTheDocument();
     expect(screen.getByText("Analítica temporal")).toBeInTheDocument();
+    expect(screen.getByText("Contexto y navegación")).toBeInTheDocument();
+    expect(screen.getByText("Con actividad")).toBeInTheDocument();
     expect(screen.getByText("Turnos por fecha")).toBeInTheDocument();
     expect(screen.getByText("Partidas en las que participó")).toBeInTheDocument();
     expect(screen.getByText(/Memoria #101/)).toBeInTheDocument();
@@ -197,6 +199,7 @@ describe("InstitutionStudentProfilePage", () => {
       "href",
       "/institutions/student?institutionId=ec-1&groupId=group-1&studentId=student-2",
     );
+    expect(screen.getByText(/Mostrando 1 partidas visibles para este estudiante./i)).toBeInTheDocument();
   });
 
   it("permite cambiar el alcance de la analítica", () => {
