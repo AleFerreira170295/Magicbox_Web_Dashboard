@@ -8,6 +8,9 @@ const useInstitutionsMock = vi.fn();
 const useInstitutionByIdMock = vi.fn();
 const useUsersMock = vi.fn();
 const useDevicesMock = vi.fn();
+const useClassGroupsMock = vi.fn();
+const useStudentsMock = vi.fn();
+const useGamesMock = vi.fn();
 
 vi.mock("@/features/auth/auth-context", () => ({
   useAuth: () => useAuthMock(),
@@ -27,6 +30,22 @@ vi.mock("@/features/users/api", () => ({
 
 vi.mock("@/features/devices/api", () => ({
   useDevices: (...args: unknown[]) => useDevicesMock(...args),
+}));
+
+vi.mock("@/features/class-groups/api", () => ({
+  useClassGroups: (...args: unknown[]) => useClassGroupsMock(...args),
+}));
+
+vi.mock("@/features/students/api", () => ({
+  useStudents: (...args: unknown[]) => useStudentsMock(...args),
+}));
+
+vi.mock("@/features/games/api", () => ({
+  useGames: (...args: unknown[]) => useGamesMock(...args),
+}));
+
+vi.mock("@/features/class-groups/student-import-panel", () => ({
+  StudentImportPanel: () => <div data-testid="student-import-panel" />,
 }));
 
 function okQuery<T>(data: T) {
@@ -174,6 +193,85 @@ describe("InstitutionsOverview", () => {
         total_pages: 1,
       }),
     );
+
+    useClassGroupsMock.mockReturnValue(
+      okQuery({
+        data: [
+          {
+            id: "group-1",
+            educationalCenterId: "ec-1",
+            userId: null,
+            name: "Quinto A",
+            code: "quinto_a",
+            updatedAt: null,
+          },
+        ],
+        page: 1,
+        limit: 1,
+        total: 1,
+        total_pages: 1,
+      }),
+    );
+
+    useStudentsMock.mockReturnValue(
+      okQuery({
+        data: [
+          {
+            id: "student-1",
+            classGroupId: "group-1",
+            firstName: "Luna",
+            lastName: "Pérez",
+            fullName: "Luna Pérez",
+            fileNumber: "luna_001",
+            imageUrl: null,
+            updatedAt: null,
+          },
+          {
+            id: "student-2",
+            classGroupId: "group-1",
+            firstName: "Mateo",
+            lastName: "Ruiz",
+            fullName: "Mateo Ruiz",
+            fileNumber: "mateo_002",
+            imageUrl: null,
+            updatedAt: null,
+          },
+        ],
+        page: 1,
+        limit: 2,
+        total: 2,
+        total_pages: 1,
+      }),
+    );
+
+    useGamesMock.mockReturnValue(
+      okQuery({
+        data: [
+          {
+            id: "game-1",
+            educationalCenterId: "ec-1",
+            bleDeviceId: "device-1",
+            gameId: 101,
+            deckName: "Memoria",
+            startDate: "2026-04-29T12:00:00Z",
+            updatedAt: "2026-04-29T12:10:00Z",
+            createdAt: "2026-04-29T12:00:00Z",
+            players: [
+              { id: "player-1", gameDataId: "game-1", studentId: "student-1", playerName: "Luna Pérez", playerSource: "registered", position: 1, raw: {} },
+            ],
+            turns: [
+              { id: "turn-1", gameDataId: "game-1", studentId: "student-1", turnNumber: 1, position: 1, success: true, playTimeSeconds: 12, raw: {} },
+              { id: "turn-2", gameDataId: "game-1", studentId: "student-1", turnNumber: 2, position: 1, success: false, playTimeSeconds: 18, raw: {} },
+            ],
+            raw: {},
+          },
+        ],
+        page: 1,
+        limit: 1,
+        total: 1,
+        total_pages: 1,
+      }),
+    );
   });
 
   afterEach(() => {
@@ -185,8 +283,23 @@ describe("InstitutionsOverview", () => {
 
     expect(screen.getByText("Institution admin")).toBeInTheDocument();
     expect(screen.getByText(/Institución activa: Colegio Norte/)).toBeInTheDocument();
-    expect(screen.getByText("Alta no disponible")).toBeDisabled();
+    expect(screen.getAllByRole("button", { name: "Alta no disponible" })[0]).toBeDisabled();
     expect(screen.getByText("solo lectura")).toBeInTheDocument();
+    expect(screen.getByTestId("student-import-panel")).toBeInTheDocument();
+    expect(screen.getByText("Grupos y perfiles de jugadores")).toBeInTheDocument();
+    expect(screen.getAllByText("Quinto A").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Luna Pérez").length).toBeGreaterThan(0);
+    expect(screen.queryByText("Analítica temporal")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /Luna Pérez/i }));
+
+    expect(screen.getAllByText(/Documento \/ ID: luna_001/).length).toBeGreaterThan(0);
+    expect(screen.getByText("Analítica temporal")).toBeInTheDocument();
+    expect(screen.getByText("Turnos por fecha")).toBeInTheDocument();
+    expect(screen.getByText("Partidas por fecha")).toBeInTheDocument();
+    expect(screen.getByText("Porcentaje de acierto")).toBeInTheDocument();
+    expect(screen.getAllByText(/50% aciertos/).length).toBeGreaterThan(0);
+    expect(screen.getByText(/Memoria #101/)).toBeInTheDocument();
 
     fireEvent.click(screen.getAllByText("Colegio Norte")[0]);
 
@@ -303,5 +416,42 @@ describe("InstitutionsOverview", () => {
 
     expect(screen.queryAllByText("Colegio Sur").length).toBeGreaterThan(0);
     expect(screen.queryAllByText("Colegio Norte")).toHaveLength(0);
+  });
+
+  it("permite buscar y filtrar estudiantes dentro del grupo seleccionado", () => {
+    renderInstitutionsOverview();
+
+    expect(screen.getAllByText("Luna Pérez").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Mateo Ruiz").length).toBeGreaterThan(0);
+
+    fireEvent.change(screen.getByPlaceholderText("Buscar estudiante por nombre o documento / ID"), {
+      target: { value: "mateo" },
+    });
+
+    expect(screen.getAllByText("Mateo Ruiz").length).toBeGreaterThan(0);
+    expect(screen.queryByText("Luna Pérez")).not.toBeInTheDocument();
+
+    fireEvent.change(screen.getByPlaceholderText("Buscar estudiante por nombre o documento / ID"), {
+      target: { value: "" },
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Sin partidas" }));
+
+    expect(screen.getAllByText("Mateo Ruiz").length).toBeGreaterThan(0);
+    expect(screen.queryByText("Luna Pérez")).not.toBeInTheDocument();
+  });
+
+  it("abre y cierra el detalle inline del estudiante desde su fila", () => {
+    renderInstitutionsOverview();
+
+    expect(screen.queryByText("Analítica temporal")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /Luna Pérez/i }));
+
+    expect(screen.getByText(/Luna Pérez: La lectura temporal usa solo las partidas y turnos del estudiante activo./i)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /Luna Pérez/i }));
+
+    expect(screen.queryByText("Analítica temporal")).not.toBeInTheDocument();
   });
 });

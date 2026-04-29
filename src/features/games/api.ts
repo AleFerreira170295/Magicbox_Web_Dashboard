@@ -4,6 +4,14 @@ import { apiRequest } from "@/lib/api/fetcher";
 import type { JsonObject, PaginatedResponse } from "@/lib/api/types";
 import type { GamePlayerRecord, GameRecord, GameTurnRecord } from "@/features/games/types";
 
+export interface ListGamesParams {
+  institutionId?: string | null;
+  page?: number;
+  limit?: number;
+  sortBy?: string;
+  order?: "asc" | "desc";
+}
+
 function asRecord(value: unknown): JsonObject {
   if (value && typeof value === "object" && !Array.isArray(value)) return value as JsonObject;
   return {};
@@ -67,10 +75,18 @@ function normalizeGame(input: unknown): GameRecord {
   };
 }
 
-export async function listGames(token: string) {
+export async function listGames(token: string, params: ListGamesParams = {}) {
+  const safeLimit = Math.min(Math.max(params.limit ?? 50, 1), 100);
+
   const response = await apiRequest<PaginatedResponse<unknown>>(apiEndpoints.games.list, {
     token,
-    searchParams: { page: 1, limit: 50, sort_by: "created_at", order: "desc" },
+    searchParams: {
+      institution_id: params.institutionId || undefined,
+      page: params.page ?? 1,
+      limit: safeLimit,
+      sort_by: params.sortBy ?? "created_at",
+      order: params.order ?? "desc",
+    },
   });
 
   return {
@@ -79,10 +95,12 @@ export async function listGames(token: string) {
   } as PaginatedResponse<GameRecord>;
 }
 
-export function useGames(token?: string) {
+export function useGames(token?: string, params?: ListGamesParams) {
+  const safeLimit = Math.min(Math.max(params?.limit ?? 50, 1), 100);
+
   return useQuery({
-    queryKey: ["games", token],
-    queryFn: () => listGames(token as string),
+    queryKey: ["games", token, params?.institutionId ?? null, params?.page ?? 1, safeLimit, params?.sortBy ?? "created_at", params?.order ?? "desc"],
+    queryFn: () => listGames(token as string, params),
     enabled: Boolean(token),
   });
 }

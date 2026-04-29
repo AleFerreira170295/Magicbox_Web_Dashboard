@@ -2,9 +2,10 @@
 
 /* eslint-disable @next/next/no-img-element */
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Building2, Globe, Mail, MapPin, Phone, Search, ShieldCheck, Smartphone, Trash2, UserPlus, Users } from "lucide-react";
+import { Building2, ChevronDown, ChevronUp, Globe, GraduationCap, Mail, MapPin, Phone, Search, ShieldCheck, Smartphone, Trash2, UserPlus, Users } from "lucide-react";
+import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { SectionHeader } from "@/components/section-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -12,11 +13,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { ImageUploadField } from "@/components/ui/image-upload-field";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Modal } from "@/components/ui/modal";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useAuth } from "@/features/auth/auth-context";
+import { useClassGroups } from "@/features/class-groups/api";
+import { StudentImportPanel } from "@/features/class-groups/student-import-panel";
 import { useDevices } from "@/features/devices/api";
+import { useGames } from "@/features/games/api";
 import {
   createInstitution,
   deleteInstitution,
@@ -31,8 +34,9 @@ import type {
   InstitutionRecord,
   UpdateInstitutionPayload,
 } from "@/features/institutions/types";
+import { useStudents } from "@/features/students/api";
 import { useUsers } from "@/features/users/api";
-import { cn, formatDateTime, getErrorMessage } from "@/lib/utils";
+import { cn, formatDateTime, formatDurationSeconds, getErrorMessage } from "@/lib/utils";
 
 function SummaryCard({
   label,
@@ -65,6 +69,9 @@ function SummaryCard({
 
 type FormMode = "create" | "edit";
 type InstitutionFocusFilter = "all" | "review" | "no_logo" | "no_users" | "no_devices" | "active_operation";
+type StudentVisibilityFilter = "all" | "with_games" | "without_games";
+type StudentSortOption = "activity" | "name" | "performance";
+type AnalyticsScope = "group" | "student";
 type FeedbackState = { type: "success" | "error"; message: string } | null;
 
 type InstitutionFormState = {
@@ -162,6 +169,28 @@ function getInstitutionInitials(name: string) {
   return parts.map((part) => part.slice(0, 1).toUpperCase()).join("");
 }
 
+function getPersonInitials(name: string) {
+  const parts = name
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2);
+
+  if (parts.length === 0) return "ST";
+  return parts.map((part) => part.slice(0, 1).toUpperCase()).join("");
+}
+
+function getDateBucketLabel(value?: string | null) {
+  if (!value) return "Sin fecha";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+
+  return new Intl.DateTimeFormat("es-UY", {
+    day: "2-digit",
+    month: "2-digit",
+  }).format(date);
+}
+
 function InstitutionAvatar({
   name,
   imageUrl,
@@ -195,13 +224,18 @@ export function InstitutionsOverview() {
   const [focusFilter, setFocusFilter] = useState<InstitutionFocusFilter>("all");
   const [mode, setMode] = useState<FormMode>("edit");
   const [selectedInstitutionId, setSelectedInstitutionId] = useState<string | null>(null);
+  const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
+  const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
+  const [studentSearchQuery, setStudentSearchQuery] = useState("");
+  const [studentVisibilityFilter, setStudentVisibilityFilter] = useState<StudentVisibilityFilter>("all");
+  const [studentSort, setStudentSort] = useState<StudentSortOption>("activity");
+  const [studentGamesSearchQuery, setStudentGamesSearchQuery] = useState("");
+  const [analyticsScope, setAnalyticsScope] = useState<AnalyticsScope>("group");
   const [form, setForm] = useState<InstitutionFormState>(emptyFormState);
   const [feedback, setFeedback] = useState<FeedbackState>(null);
-  const [isFormModalOpen, setIsFormModalOpen] = useState(false);
   const [imageFile, setImageFile] = useState<File | null>(null);
 
   const institutionsQuery = useInstitutions(tokens?.accessToken);
-  const institutionDetailQuery = useInstitutionById(tokens?.accessToken, selectedInstitutionId);
   const usersQuery = useUsers(tokens?.accessToken);
   const devicesQuery = useDevices(tokens?.accessToken);
 
@@ -210,6 +244,17 @@ export function InstitutionsOverview() {
   const devices = useMemo(() => devicesQuery.data?.data ?? [], [devicesQuery.data?.data]);
 
   const scopedInstitutionId = institutions.length === 1 ? institutions[0]?.id || null : null;
+  const activeInstitutionId = selectedInstitutionId ?? scopedInstitutionId;
+  const gamesQuery = useGames(tokens?.accessToken, {
+    institutionId: activeInstitutionId,
+    page: 1,
+    limit: 100,
+    sortBy: "created_at",
+    order: "desc",
+  });
+  const institutionGames = useMemo(() => gamesQuery.data?.data ?? [], [gamesQuery.data?.data]);
+  const institutionDetailQuery = useInstitutionById(tokens?.accessToken, activeInstitutionId);
+  const institutionClassGroupsQuery = useClassGroups(tokens?.accessToken, activeInstitutionId);
   const scopedInstitutionName = scopedInstitutionId ? institutions[0]?.name || scopedInstitutionId : null;
   const isInstitutionScopedView = Boolean(scopedInstitutionId && currentUser?.educationalCenterId === scopedInstitutionId);
   const isDirectorView = currentUser?.roles.includes("director") || false;
@@ -248,7 +293,6 @@ export function InstitutionsOverview() {
       setForm(formFromInstitution(created));
       setImageFile(null);
       setFeedback({ type: "success", message: `Institución ${created.name} creada.` });
-      setIsFormModalOpen(false);
     },
     onError: (error) => setFeedback({ type: "error", message: getErrorMessage(error) }),
   });
@@ -271,7 +315,6 @@ export function InstitutionsOverview() {
       setForm(formFromInstitution(updated));
       setImageFile(null);
       setFeedback({ type: "success", message: `Institución ${updated.name} actualizada.` });
-      setIsFormModalOpen(false);
     },
     onError: (error) => setFeedback({ type: "error", message: getErrorMessage(error) }),
   });
@@ -286,7 +329,6 @@ export function InstitutionsOverview() {
       setForm(emptyFormState());
       setImageFile(null);
       setFeedback({ type: "success", message: "Institución eliminada." });
-      setIsFormModalOpen(false);
     },
     onError: (error) => setFeedback({ type: "error", message: getErrorMessage(error) }),
   });
@@ -337,13 +379,220 @@ export function InstitutionsOverview() {
   }, [devicesByInstitutionId, institutions, usersByInstitutionId]);
 
   const selectedInstitution = useMemo(
-    () => institutionRows.find((item) => item.id === selectedInstitutionId) || null,
-    [institutionRows, selectedInstitutionId],
+    () => institutionRows.find((item) => item.id === activeInstitutionId) || null,
+    [activeInstitutionId, institutionRows],
   );
   const selectedInstitutionDetail = institutionDetailQuery.data || null;
   const previewUsers = selectedInstitutionDetail?.operationalPreview?.users || [];
   const previewDevices = selectedInstitutionDetail?.operationalPreview?.devices || [];
   const previewClassGroups = selectedInstitutionDetail?.operationalPreview?.classGroups || [];
+  const institutionClassGroups = useMemo(() => institutionClassGroupsQuery.data?.data ?? [], [institutionClassGroupsQuery.data?.data]);
+
+  useEffect(() => {
+    setSelectedGroupId(null);
+    setSelectedStudentId(null);
+  }, [activeInstitutionId]);
+
+  useEffect(() => {
+    if (institutionClassGroups.length === 0) {
+      setSelectedGroupId(null);
+      return;
+    }
+
+    const hasCurrentSelection = selectedGroupId && institutionClassGroups.some((group) => group.id === selectedGroupId);
+    if (!hasCurrentSelection) {
+      setSelectedGroupId(institutionClassGroups[0].id);
+    }
+  }, [institutionClassGroups, selectedGroupId]);
+
+  const selectedGroup = useMemo(
+    () => institutionClassGroups.find((group) => group.id === selectedGroupId) ?? null,
+    [institutionClassGroups, selectedGroupId],
+  );
+
+  const studentsQuery = useStudents(tokens?.accessToken, {
+    institutionId: activeInstitutionId,
+    classGroupId: selectedGroup?.id ?? null,
+    page: 1,
+    limit: 100,
+    sortBy: "updated_at",
+    order: "desc",
+  });
+  const selectedGroupStudents = useMemo(() => studentsQuery.data?.data ?? [], [studentsQuery.data?.data]);
+
+  useEffect(() => {
+    setSelectedStudentId(null);
+    setStudentSearchQuery("");
+    setStudentVisibilityFilter("all");
+    setStudentSort("activity");
+    setStudentGamesSearchQuery("");
+    setAnalyticsScope("group");
+  }, [selectedGroup?.id]);
+
+  const studentPerformanceRows = useMemo(() => {
+    return selectedGroupStudents.map((student) => {
+      const games = institutionGames.filter((game) => game.players.some((player) => player.studentId === student.id) || game.turns.some((turn) => turn.studentId === student.id));
+      const turns = games.flatMap((game) => game.turns.filter((turn) => turn.studentId === student.id));
+      const successfulTurns = turns.filter((turn) => turn.success).length;
+      const totalTurnSeconds = turns.reduce((sum, turn) => sum + (turn.playTimeSeconds || 0), 0);
+      const lastParticipation = games
+        .map((game) => game.startDate || game.updatedAt || game.createdAt)
+        .filter((value): value is string => Boolean(value))
+        .sort()
+        .at(-1) || null;
+
+      return {
+        student,
+        gamesCount: games.length,
+        turnsCount: turns.length,
+        successfulTurns,
+        successRate: turns.length > 0 ? Math.round((successfulTurns / turns.length) * 100) : 0,
+        averageTurnSeconds: turns.length > 0 ? totalTurnSeconds / turns.length : 0,
+        lastParticipation,
+        games,
+        turns,
+      };
+    });
+  }, [institutionGames, selectedGroupStudents]);
+
+  const filteredStudentPerformanceRows = useMemo(() => {
+    const normalizedSearch = studentSearchQuery.trim().toLowerCase();
+
+    const filteredRows = studentPerformanceRows.filter((entry) => {
+      const matchesSearch = !normalizedSearch || [entry.student.fullName, entry.student.fileNumber, entry.student.firstName, entry.student.lastName]
+        .filter(Boolean)
+        .some((value) => value.toLowerCase().includes(normalizedSearch));
+
+      if (!matchesSearch) return false;
+
+      switch (studentVisibilityFilter) {
+        case "with_games":
+          return entry.gamesCount > 0;
+        case "without_games":
+          return entry.gamesCount === 0;
+        default:
+          return true;
+      }
+    });
+
+    return [...filteredRows].sort((a, b) => {
+      switch (studentSort) {
+        case "name":
+          return a.student.fullName.localeCompare(b.student.fullName, "es");
+        case "performance":
+          return b.successRate - a.successRate || b.gamesCount - a.gamesCount || a.student.fullName.localeCompare(b.student.fullName, "es");
+        case "activity":
+        default:
+          return b.gamesCount - a.gamesCount || b.turnsCount - a.turnsCount || a.student.fullName.localeCompare(b.student.fullName, "es");
+      }
+    });
+  }, [studentPerformanceRows, studentSearchQuery, studentSort, studentVisibilityFilter]);
+
+  useEffect(() => {
+    if (filteredStudentPerformanceRows.length === 0) {
+      setSelectedStudentId(null);
+      return;
+    }
+
+    const hasCurrentSelection = selectedStudentId && filteredStudentPerformanceRows.some((entry) => entry.student.id === selectedStudentId);
+    if (!hasCurrentSelection) {
+      setSelectedStudentId(null);
+    }
+  }, [filteredStudentPerformanceRows, selectedStudentId]);
+
+  const selectedStudent = useMemo(
+    () => filteredStudentPerformanceRows.find((entry) => entry.student.id === selectedStudentId)?.student ?? null,
+    [filteredStudentPerformanceRows, selectedStudentId],
+  );
+
+  const selectedStudentPerformance = useMemo(
+    () => studentPerformanceRows.find((entry) => entry.student.id === selectedStudent?.id) ?? null,
+    [selectedStudent?.id, studentPerformanceRows],
+  );
+
+  const selectedGroupStudentIds = useMemo(() => new Set(selectedGroupStudents.map((student) => student.id)), [selectedGroupStudents]);
+
+  const analyticsSeries = useMemo(() => {
+    const aggregation = new Map<string, { name: string; games: number; turns: number; successfulTurns: number; sortValue: number }>();
+
+    for (const game of institutionGames) {
+      const relevantTurns = analyticsScope === "student"
+        ? game.turns.filter((turn) => turn.studentId === selectedStudent?.id)
+        : game.turns.filter((turn) => turn.studentId && selectedGroupStudentIds.has(turn.studentId));
+
+      const hasRelevantPlayers = analyticsScope === "student"
+        ? game.players.some((player) => player.studentId === selectedStudent?.id)
+        : game.players.some((player) => player.studentId && selectedGroupStudentIds.has(player.studentId));
+
+      if (!hasRelevantPlayers && relevantTurns.length === 0) continue;
+
+      const bucketSource = game.startDate || game.createdAt || game.updatedAt || relevantTurns[0]?.turnStartDate || relevantTurns[0]?.createdAt || null;
+      const bucketDate = bucketSource ? new Date(bucketSource) : null;
+      const bucketKey = bucketDate && !Number.isNaN(bucketDate.getTime()) ? bucketDate.toISOString().slice(0, 10) : game.id;
+      const bucket = aggregation.get(bucketKey) ?? {
+        name: getDateBucketLabel(bucketSource),
+        games: 0,
+        turns: 0,
+        successfulTurns: 0,
+        sortValue: bucketDate && !Number.isNaN(bucketDate.getTime()) ? bucketDate.getTime() : 0,
+      };
+
+      bucket.games += 1;
+      bucket.turns += relevantTurns.length;
+      bucket.successfulTurns += relevantTurns.filter((turn) => turn.success).length;
+      aggregation.set(bucketKey, bucket);
+    }
+
+    return [...aggregation.values()]
+      .sort((a, b) => a.sortValue - b.sortValue)
+      .map((entry) => ({
+        name: entry.name,
+        partidas: entry.games,
+        turnos: entry.turns,
+        acierto: entry.turns > 0 ? Math.round((entry.successfulTurns / entry.turns) * 100) : 0,
+      }));
+  }, [analyticsScope, institutionGames, selectedGroupStudentIds, selectedStudent?.id]);
+
+  const analyticsTitle = analyticsScope === "student"
+    ? selectedStudent?.fullName || "estudiante seleccionado"
+    : selectedGroup?.name || "grupo seleccionado";
+
+  const analyticsDescription = analyticsScope === "student"
+    ? "La lectura temporal usa solo las partidas y turnos del estudiante activo."
+    : "La lectura temporal consolida las partidas y turnos visibles de todo el grupo.";
+
+  const selectedStudentGames = selectedStudentPerformance?.games ?? [];
+  const selectedStudentGameRows = useMemo(
+    () => selectedStudentGames.map((game) => {
+      const turns = game.turns.filter((turn) => turn.studentId === selectedStudent?.id);
+      const successfulTurns = turns.filter((turn) => turn.success).length;
+      const avgTurnSeconds = turns.length > 0
+        ? turns.reduce((sum, turn) => sum + (turn.playTimeSeconds || 0), 0) / turns.length
+        : 0;
+
+      return {
+        id: game.id,
+        label: `${game.deckName || "Partida"} #${game.gameId || "-"}`,
+        playedAt: game.startDate || game.updatedAt || game.createdAt || null,
+        turnCount: turns.length,
+        successRate: turns.length > 0 ? Math.round((successfulTurns / turns.length) * 100) : 0,
+        avgTurnSeconds,
+        rawGame: game,
+      };
+    }),
+    [selectedStudent?.id, selectedStudentGames],
+  );
+
+  const filteredSelectedStudentGameRows = useMemo(() => {
+    const normalizedSearch = studentGamesSearchQuery.trim().toLowerCase();
+    if (!normalizedSearch) return selectedStudentGameRows;
+
+    return selectedStudentGameRows.filter((game) => {
+      return [game.label, game.playedAt]
+        .filter(Boolean)
+        .some((value) => String(value).toLowerCase().includes(normalizedSearch));
+    });
+  }, [selectedStudentGameRows, studentGamesSearchQuery]);
 
   const filtered = useMemo(() => {
     const normalized = query.trim().toLowerCase();
@@ -428,7 +677,6 @@ export function InstitutionsOverview() {
     setForm(emptyFormState());
     setImageFile(null);
     setFeedback(null);
-    setIsFormModalOpen(true);
   }
 
   function openEditInstitutionForm() {
@@ -438,12 +686,6 @@ export function InstitutionsOverview() {
     setForm(formFromInstitution(selectedInstitution));
     setImageFile(null);
     setFeedback(null);
-    setIsFormModalOpen(true);
-  }
-
-  function closeInstitutionForm() {
-    setIsFormModalOpen(false);
-    setImageFile(null);
   }
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -503,12 +745,12 @@ export function InstitutionsOverview() {
           <CardDescription>
             {mode === "create"
               ? canCreateInstitutions
-                ? "Alta conectada al endpoint real de instituciones."
+                ? "Alta conectada al endpoint real de instituciones, ahora en el cuerpo central del módulo."
                 : "Tu perfil actual no expone alta de instituciones."
               : isDirectorView
                 ? "Resumen de contacto, cobertura visible y señales básicas para seguimiento institucional."
                 : canUpdateInstitutions
-                  ? "Datos base del cliente, contacto y localización operativa."
+                  ? "Datos base del cliente, contacto y localización operativa, sin sacar la edición del cuerpo principal."
                   : "Vista de solo lectura para los datos base de la institución."}
           </CardDescription>
         </CardHeader>
@@ -638,7 +880,6 @@ export function InstitutionsOverview() {
                         setMode("edit");
                         if (selectedInstitution) setForm(formFromInstitution(selectedInstitution));
                         setFeedback(null);
-                        closeInstitutionForm();
                       }}
                     >
                       Cancelar
@@ -811,15 +1052,28 @@ export function InstitutionsOverview() {
         </CardContent>
       </Card>
 
-      <div className="grid gap-6 2xl:grid-cols-[minmax(0,1.4fr)_420px]">
+      <div className="space-y-6">
         <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
           <CardHeader>
-            <CardTitle>{isDirectorView ? "Instituciones visibles para seguimiento" : "Mapa institucional"}</CardTitle>
-            <CardDescription>
-              {isDirectorView
-                ? "Seleccioná una institución para revisar contacto, cobertura visible y señales generales de operación."
-                : "Seleccioná una institución para revisar sus datos base, su estado operativo y los vínculos con usuarios y dispositivos."}
-            </CardDescription>
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <CardTitle>{isDirectorView ? "Instituciones visibles para seguimiento" : "Mapa institucional"}</CardTitle>
+                <CardDescription>
+                  {isDirectorView
+                    ? "Seleccioná una institución para revisar contacto, cobertura visible y señales generales de operación."
+                    : "Seleccioná una institución para trabajar desde el cuerpo central: ver detalle, editar y operar sin saltar a barras laterales."}
+                </CardDescription>
+              </div>
+              <div className="flex flex-wrap gap-3">
+                <Button type="button" onClick={openCreateInstitutionForm} disabled={!canCreateInstitutions}>
+                  <UserPlus className="size-4" />
+                  {canCreateInstitutions ? "Nueva institución" : "Alta no disponible"}
+                </Button>
+                <Button type="button" variant="outline" onClick={openEditInstitutionForm} disabled={!selectedInstitution || mode === "create"}>
+                  Editar seleccionada
+                </Button>
+              </div>
+            </div>
           </CardHeader>
           <CardContent className="overflow-x-auto p-0">
             {institutionsQuery.isLoading ? (
@@ -849,7 +1103,7 @@ export function InstitutionsOverview() {
                     </TableRow>
                   ) : (
                     filtered.map((item) => {
-                      const active = mode === "edit" && selectedInstitutionId === item.id;
+                      const active = mode === "edit" && selectedInstitution?.id === item.id;
                       return (
                         <TableRow key={item.id} className={cn("cursor-pointer", active && "border-primary/30 bg-primary/8")} onClick={() => selectInstitution(item)}>
                           <TableCell>
@@ -889,223 +1143,163 @@ export function InstitutionsOverview() {
           </CardContent>
         </Card>
 
-        <div className="space-y-6">
-          <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
-            <CardHeader>
-              <CardTitle>Alta y edición</CardTitle>
-              <CardDescription>
-                Los formularios de instituciones ahora priorizan pop-up en anchos intermedios para que el mapa operativo no quede comprimido.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {mode === "edit" && selectedInstitution ? (
-                <div className="rounded-2xl border border-border/70 bg-white/80 p-4">
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div className="flex min-w-0 items-center gap-3">
-                      <InstitutionAvatar name={selectedInstitution.name} imageUrl={selectedInstitution.imageUrl} className="size-12 text-xs" />
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-semibold text-foreground">{selectedInstitution.name}</p>
-                        <p className="mt-1 truncate text-sm text-muted-foreground">{selectedInstitution.email}</p>
-                      </div>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      <Badge variant={selectedInstitution.status === "active" ? "success" : "outline"}>
-                        {selectedInstitution.status === "active" ? "activa" : "eliminada"}
-                      </Badge>
-                      <Badge variant={selectedInstitution.imageUrl ? "secondary" : "outline"}>
-                        {selectedInstitution.imageUrl ? "logo cargado" : "sin logo"}
-                      </Badge>
-                      {selectedInstitution.needsReview ? <Badge variant="outline">revisar</Badge> : null}
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <div className="rounded-2xl border border-border/70 bg-white/80 p-4 text-sm leading-6 text-muted-foreground">
-                  Seleccioná una institución para editarla o usá el alta rápida para abrir el formulario sin perder el contexto del listado.
-                </div>
-              )}
+        {renderInstitutionEditorPanel()}
 
-              <div className="flex flex-wrap gap-3">
-                <Button type="button" onClick={openCreateInstitutionForm} disabled={!canCreateInstitutions}>
-                  <UserPlus className="size-4" />
-                  {canCreateInstitutions ? "Nueva institución" : "Alta no disponible"}
-                </Button>
-                <Button type="button" variant="outline" onClick={openEditInstitutionForm} disabled={!selectedInstitution}>
-                  Editar seleccionada
-                </Button>
+        <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
+          <CardHeader>
+            <CardTitle>Impacto operativo</CardTitle>
+            <CardDescription>
+              Cruce rápido entre la institución seleccionada, las personas vinculadas y el parque de dispositivos asociado.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-5">
+            {!selectedInstitution ? (
+              <div className="rounded-2xl bg-background/70 p-4 text-sm text-muted-foreground">
+                Seleccioná una institución para revisar sus vínculos operativos.
               </div>
-
-              <div className={cn("hidden 2xl:block", isFormModalOpen && "2xl:hidden")}>{renderInstitutionEditorPanel()}</div>
-            </CardContent>
-          </Card>
-
-          <Modal
-            open={isFormModalOpen}
-            onClose={closeInstitutionForm}
-            title={mode === "create" ? "Alta de institución" : "Editar institución"}
-            description={mode === "create" ? "Completá el formulario sin salir del módulo." : "Ajustá contacto, cobertura y datos base dentro de un pop-up más cómodo para edición."}
-            className="max-w-[1120px]"
-            hideHeader
-          >
-            {renderInstitutionEditorPanel()}
-          </Modal>
-
-          <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
-            <CardHeader>
-              <CardTitle>Impacto operativo</CardTitle>
-              <CardDescription>
-                Cruce rápido entre la institución seleccionada, las personas vinculadas y el parque de dispositivos asociado.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-5">
-              {!selectedInstitution ? (
-                <div className="rounded-2xl bg-background/70 p-4 text-sm text-muted-foreground">
-                  Seleccioná una institución para revisar sus vínculos operativos.
-                </div>
-              ) : (
-                <>
-                  <div className="rounded-2xl bg-background/70 p-4">
-                    <div className="flex flex-wrap items-start gap-3">
-                      <InstitutionAvatar name={selectedInstitution.name} imageUrl={selectedInstitution.imageUrl} className="size-16 text-base" />
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-semibold text-foreground">{selectedInstitution.name}</p>
-                        <div className="mt-2 flex items-center gap-2 text-sm font-medium text-foreground">
-                          <MapPin className="size-4 text-primary" />
-                          <span className="min-w-0 truncate">{selectedInstitution.address?.addressFirstLine || "Sin dirección cargada"}</span>
-                        </div>
+            ) : (
+              <>
+                <div className="rounded-2xl bg-background/70 p-4">
+                  <div className="flex flex-wrap items-start gap-3">
+                    <InstitutionAvatar name={selectedInstitution.name} imageUrl={selectedInstitution.imageUrl} className="size-16 text-base" />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-semibold text-foreground">{selectedInstitution.name}</p>
+                      <div className="mt-2 flex items-center gap-2 text-sm font-medium text-foreground">
+                        <MapPin className="size-4 text-primary" />
+                        <span className="min-w-0 truncate">{selectedInstitution.address?.addressFirstLine || "Sin dirección cargada"}</span>
                       </div>
                     </div>
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      <Badge variant={selectedInstitution.imageUrl ? "secondary" : "outline"}>
-                        {selectedInstitution.imageUrl ? "logo institucional cargado" : "logo pendiente"}
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <Badge variant={selectedInstitution.imageUrl ? "secondary" : "outline"}>
+                      {selectedInstitution.imageUrl ? "logo institucional cargado" : "logo pendiente"}
+                    </Badge>
+                    {selectedInstitution.url ? (
+                      <Badge variant="outline">
+                        <Globe className="mr-1 size-3" />
+                        {selectedInstitution.url}
                       </Badge>
-                      {selectedInstitution.url ? (
-                        <Badge variant="outline">
-                          <Globe className="mr-1 size-3" />
-                          {selectedInstitution.url}
-                        </Badge>
-                      ) : null}
-                      {selectedInstitution.email ? (
-                        <Badge variant="outline">
-                          <Mail className="mr-1 size-3" />
-                          {selectedInstitution.email}
-                        </Badge>
-                      ) : null}
-                      {selectedInstitution.phoneNumber ? (
-                        <Badge variant="outline">
-                          <Phone className="mr-1 size-3" />
-                          {selectedInstitution.phoneNumber}
-                        </Badge>
-                      ) : null}
-                    </div>
+                    ) : null}
+                    {selectedInstitution.email ? (
+                      <Badge variant="outline">
+                        <Mail className="mr-1 size-3" />
+                        {selectedInstitution.email}
+                      </Badge>
+                    ) : null}
+                    {selectedInstitution.phoneNumber ? (
+                      <Badge variant="outline">
+                        <Phone className="mr-1 size-3" />
+                        {selectedInstitution.phoneNumber}
+                      </Badge>
+                    ) : null}
                   </div>
+                </div>
 
-                  <div>
-                    <p className="text-sm font-medium text-foreground">Usuarios vinculados</p>
-                    <div className="mt-3 grid gap-3">
-                      {previewUsers.length > 0 ? (
-                        previewUsers.map((user) => (
-                          <div key={user.id} className="rounded-2xl bg-background/70 p-3">
-                            <div className="flex flex-wrap items-center justify-between gap-3">
-                              <div className="flex min-w-0 items-center gap-3">
-                                <div className="flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-border/70 bg-white text-xs font-semibold text-primary">
-                                  {user.imageUrl ? (
-                                    <img src={user.imageUrl} alt={user.fullName} className="h-full w-full object-cover" />
-                                  ) : (
-                                    user.fullName.slice(0, 1).toUpperCase()
-                                  )}
-                                </div>
-                                <div className="min-w-0">
-                                  <p className="truncate text-sm font-medium text-foreground">{user.fullName}</p>
-                                  <p className="mt-1 truncate text-xs text-muted-foreground">{user.email}</p>
-                                </div>
+                <div>
+                  <p className="text-sm font-medium text-foreground">Usuarios vinculados</p>
+                  <div className="mt-3 grid gap-3">
+                    {previewUsers.length > 0 ? (
+                      previewUsers.map((user) => (
+                        <div key={user.id} className="rounded-2xl bg-background/70 p-3">
+                          <div className="flex flex-wrap items-center justify-between gap-3">
+                            <div className="flex min-w-0 items-center gap-3">
+                              <div className="flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-border/70 bg-white text-xs font-semibold text-primary">
+                                {user.imageUrl ? (
+                                  <img src={user.imageUrl} alt={user.fullName} className="h-full w-full object-cover" />
+                                ) : (
+                                  user.fullName.slice(0, 1).toUpperCase()
+                                )}
                               </div>
-                              <Badge variant="secondary">{user.userType}</Badge>
+                              <div className="min-w-0">
+                                <p className="truncate text-sm font-medium text-foreground">{user.fullName}</p>
+                                <p className="mt-1 truncate text-xs text-muted-foreground">{user.email}</p>
+                              </div>
                             </div>
-                            <div className="mt-2 flex flex-wrap gap-2">
-                              {user.roleCodes.map((roleCode) => (
-                                <Badge key={roleCode} variant="outline">{roleCode}</Badge>
-                              ))}
-                              {user.updatedAt ? <Badge variant="outline">act. {formatDateTime(user.updatedAt)}</Badge> : null}
-                            </div>
+                            <Badge variant="secondary">{user.userType}</Badge>
                           </div>
-                        ))
-                      ) : selectedInstitution.linkedUserNames.length > 0 ? (
-                        <div className="flex flex-wrap gap-2">
-                          {selectedInstitution.linkedUserNames.slice(0, 8).map((name) => (
-                            <Badge key={name} variant="secondary">{name}</Badge>
-                          ))}
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            {user.roleCodes.map((roleCode) => (
+                              <Badge key={roleCode} variant="outline">{roleCode}</Badge>
+                            ))}
+                            {user.updatedAt ? <Badge variant="outline">act. {formatDateTime(user.updatedAt)}</Badge> : null}
+                          </div>
                         </div>
-                      ) : (
-                        <Badge variant="outline">sin usuarios vinculados</Badge>
-                      )}
-                    </div>
+                      ))
+                    ) : selectedInstitution.linkedUserNames.length > 0 ? (
+                      <div className="flex flex-wrap gap-2">
+                        {selectedInstitution.linkedUserNames.slice(0, 8).map((name) => (
+                          <Badge key={name} variant="secondary">{name}</Badge>
+                        ))}
+                      </div>
+                    ) : (
+                      <Badge variant="outline">sin usuarios vinculados</Badge>
+                    )}
                   </div>
+                </div>
 
-                  <div>
-                    <p className="text-sm font-medium text-foreground">Dispositivos vinculados</p>
-                    <div className="mt-3 grid gap-3">
-                      {previewDevices.length > 0 ? (
-                        previewDevices.map((device) => (
-                          <div key={device.id} className="rounded-2xl bg-background/70 p-3">
-                            <p className="text-sm font-medium text-foreground">{device.name}</p>
-                            <div className="mt-2 flex flex-wrap gap-2 text-xs text-muted-foreground">
-                              <Badge variant="outline">{device.deviceId}</Badge>
-                              {device.updatedAt ? <Badge variant="outline">act. {formatDateTime(device.updatedAt)}</Badge> : null}
-                            </div>
+                <div>
+                  <p className="text-sm font-medium text-foreground">Dispositivos vinculados</p>
+                  <div className="mt-3 grid gap-3">
+                    {previewDevices.length > 0 ? (
+                      previewDevices.map((device) => (
+                        <div key={device.id} className="rounded-2xl bg-background/70 p-3">
+                          <p className="text-sm font-medium text-foreground">{device.name}</p>
+                          <div className="mt-2 flex flex-wrap gap-2 text-xs text-muted-foreground">
+                            <Badge variant="outline">{device.deviceId}</Badge>
+                            {device.updatedAt ? <Badge variant="outline">act. {formatDateTime(device.updatedAt)}</Badge> : null}
                           </div>
-                        ))
-                      ) : selectedInstitution.linkedDeviceNames.length > 0 ? (
-                        <div className="flex flex-wrap gap-2">
-                          {selectedInstitution.linkedDeviceNames.slice(0, 8).map((name) => (
-                            <Badge key={name} variant="outline">{name}</Badge>
-                          ))}
                         </div>
-                      ) : (
-                        <Badge variant="outline">sin dispositivos vinculados</Badge>
-                      )}
-                    </div>
+                      ))
+                    ) : selectedInstitution.linkedDeviceNames.length > 0 ? (
+                      <div className="flex flex-wrap gap-2">
+                        {selectedInstitution.linkedDeviceNames.slice(0, 8).map((name) => (
+                          <Badge key={name} variant="outline">{name}</Badge>
+                        ))}
+                      </div>
+                    ) : (
+                      <Badge variant="outline">sin dispositivos vinculados</Badge>
+                    )}
                   </div>
+                </div>
 
-                  <div>
-                    <p className="text-sm font-medium text-foreground">Grupos vinculados</p>
-                    <div className="mt-3 grid gap-3">
-                      {previewClassGroups.length > 0 ? (
-                        previewClassGroups.map((classGroup) => (
-                          <div key={classGroup.id} className="rounded-2xl bg-background/70 p-3">
-                            <div className="flex flex-wrap items-center justify-between gap-2">
-                              <p className="text-sm font-medium text-foreground">{classGroup.name}</p>
-                              <Badge variant="secondary">{classGroup.studentCount} estudiantes</Badge>
-                            </div>
-                            <div className="mt-2 flex flex-wrap gap-2">
-                              <Badge variant="outline">{classGroup.code}</Badge>
-                              {classGroup.updatedAt ? <Badge variant="outline">act. {formatDateTime(classGroup.updatedAt)}</Badge> : null}
-                            </div>
+                <div>
+                  <p className="text-sm font-medium text-foreground">Grupos vinculados</p>
+                  <div className="mt-3 grid gap-3">
+                    {previewClassGroups.length > 0 ? (
+                      previewClassGroups.map((classGroup) => (
+                        <div key={classGroup.id} className="rounded-2xl bg-background/70 p-3">
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <p className="text-sm font-medium text-foreground">{classGroup.name}</p>
+                            <Badge variant="secondary">{classGroup.studentCount} estudiantes</Badge>
                           </div>
-                        ))
-                      ) : (
-                        <Badge variant="outline">sin grupos vinculados</Badge>
-                      )}
-                    </div>
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            <Badge variant="outline">{classGroup.code}</Badge>
+                            {classGroup.updatedAt ? <Badge variant="outline">act. {formatDateTime(classGroup.updatedAt)}</Badge> : null}
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <Badge variant="outline">sin grupos vinculados</Badge>
+                    )}
                   </div>
+                </div>
 
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <div className="rounded-2xl bg-background/70 p-4">
-                      <p className="text-xs uppercase tracking-[0.24em] text-muted-foreground">grupos</p>
-                      <p className="mt-2 text-2xl font-semibold text-foreground">{selectedInstitution.classGroupCount}</p>
-                      <p className="mt-1 text-sm text-muted-foreground">Conteo expuesto por el backend compartido.</p>
-                    </div>
-                    <div className="rounded-2xl bg-background/70 p-4">
-                      <p className="text-xs uppercase tracking-[0.24em] text-muted-foreground">estudiantes</p>
-                      <p className="mt-2 text-2xl font-semibold text-foreground">{selectedInstitution.studentCount}</p>
-                      <p className="mt-1 text-sm text-muted-foreground">Sirve para entender el peso real de la institución.</p>
-                    </div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="rounded-2xl bg-background/70 p-4">
+                    <p className="text-xs uppercase tracking-[0.24em] text-muted-foreground">grupos</p>
+                    <p className="mt-2 text-2xl font-semibold text-foreground">{selectedInstitution.classGroupCount}</p>
+                    <p className="mt-1 text-sm text-muted-foreground">Conteo expuesto por el backend compartido.</p>
                   </div>
-                </>
-              )}
-            </CardContent>
-          </Card>
-        </div>
+                  <div className="rounded-2xl bg-background/70 p-4">
+                    <p className="text-xs uppercase tracking-[0.24em] text-muted-foreground">estudiantes</p>
+                    <p className="mt-2 text-2xl font-semibold text-foreground">{selectedInstitution.studentCount}</p>
+                    <p className="mt-1 text-sm text-muted-foreground">Sirve para entender el peso real de la institución.</p>
+                  </div>
+                </div>
+              </>
+            )}
+          </CardContent>
+        </Card>
       </div>
 
       <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
@@ -1148,6 +1342,430 @@ export function InstitutionsOverview() {
           )}
         </CardContent>
       </Card>
+
+      <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <GraduationCap className="size-5 text-primary" />
+            Grupos y perfiles de jugadores
+          </CardTitle>
+          <CardDescription>
+            Sin cambiar la base ni los contratos actuales: esta vista toma los grupos visibles y te deja ver los estudiantes/perfiles que quedaron dentro de cada uno.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-5">
+          {!selectedInstitution ? (
+            <div className="rounded-2xl border border-dashed border-border/80 bg-muted/20 p-4 text-sm text-muted-foreground">
+              Seleccioná una institución para ver sus grupos y los perfiles/jugadores asociados.
+            </div>
+          ) : (
+            <>
+              <div className="rounded-[26px] border border-border/70 bg-background/65 p-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-medium text-foreground">Grupos visibles</p>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      Elegí un grupo para ver quiénes quedaron cargados dentro.
+                    </p>
+                  </div>
+                  <Badge variant="secondary">{selectedInstitution.classGroupCount} grupos</Badge>
+                </div>
+
+                <div className="mt-4 grid gap-3">
+                  {institutionClassGroupsQuery.isLoading ? (
+                    Array.from({ length: 3 }).map((_, index) => <Skeleton key={index} className="h-20 rounded-2xl" />)
+                  ) : institutionClassGroups.length > 0 ? (
+                    institutionClassGroups.map((group) => {
+                      const preview = previewClassGroups.find((item) => item.id === group.id);
+                      const count = preview?.studentCount ?? 0;
+                      const isSelected = selectedGroup?.id === group.id;
+
+                      return (
+                        <button
+                          key={group.id}
+                          type="button"
+                          onClick={() => setSelectedGroupId(group.id)}
+                          className={cn(
+                            "rounded-2xl border p-4 text-left transition",
+                            isSelected
+                              ? "border-primary/40 bg-primary/8 shadow-[0_12px_28px_rgba(66,128,164,0.14)]"
+                              : "border-border bg-white/85 hover:border-primary/30 hover:bg-primary/5",
+                          )}
+                        >
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <p className="text-sm font-semibold text-foreground">{group.name}</p>
+                            <Badge variant={isSelected ? "secondary" : "outline"}>{count} perfiles</Badge>
+                          </div>
+                          <div className="mt-2 flex flex-wrap gap-2 text-xs text-muted-foreground">
+                            <Badge variant="outline">{group.code}</Badge>
+                            {group.updatedAt ? <Badge variant="outline">act. {formatDateTime(group.updatedAt)}</Badge> : null}
+                          </div>
+                        </button>
+                      );
+                    })
+                  ) : (
+                    <div className="rounded-2xl border border-dashed border-border/80 bg-muted/20 p-4 text-sm text-muted-foreground">
+                      Esta institución todavía no tiene grupos visibles. Podés crearlos abajo desde la carga por Excel.
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="rounded-[26px] border border-border/70 bg-background/65 p-4">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-medium text-foreground">Perfiles dentro del grupo</p>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        {selectedGroup
+                          ? `Grupo activo: ${selectedGroup.name}. Elegí un estudiante para ver su detalle, partidas y rendimiento.`
+                          : "Elegí un grupo a la izquierda para ver los perfiles cargados."}
+                      </p>
+                    </div>
+                    {selectedGroup ? <Badge variant="secondary">{filteredStudentPerformanceRows.length} visibles</Badge> : null}
+                  </div>
+
+                  {selectedGroup ? (
+                    <div className="mt-4 grid gap-3 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-center">
+                      <div className="relative">
+                        <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+                        <Input
+                          value={studentSearchQuery}
+                          onChange={(event) => setStudentSearchQuery(event.target.value)}
+                          placeholder="Buscar estudiante por nombre o documento / ID"
+                          className="pl-9"
+                        />
+                      </div>
+
+                      <div className="flex flex-wrap gap-2">
+                        <Button type="button" size="sm" variant={studentVisibilityFilter === "all" ? "secondary" : "outline"} onClick={() => setStudentVisibilityFilter("all")}>
+                          Todos
+                        </Button>
+                        <Button type="button" size="sm" variant={studentVisibilityFilter === "with_games" ? "secondary" : "outline"} onClick={() => setStudentVisibilityFilter("with_games")}>
+                          Con partidas
+                        </Button>
+                        <Button type="button" size="sm" variant={studentVisibilityFilter === "without_games" ? "secondary" : "outline"} onClick={() => setStudentVisibilityFilter("without_games")}>
+                          Sin partidas
+                        </Button>
+                        <Button type="button" size="sm" variant={studentSort === "activity" ? "secondary" : "outline"} onClick={() => setStudentSort("activity")}>
+                          Más actividad
+                        </Button>
+                        <Button type="button" size="sm" variant={studentSort === "name" ? "secondary" : "outline"} onClick={() => setStudentSort("name")}>
+                          A-Z
+                        </Button>
+                        <Button type="button" size="sm" variant={studentSort === "performance" ? "secondary" : "outline"} onClick={() => setStudentSort("performance")}>
+                          Mejor rendimiento
+                        </Button>
+                      </div>
+                    </div>
+                  ) : null}
+
+                  {!selectedGroup ? (
+                    <div className="mt-4 rounded-2xl border border-dashed border-border/80 bg-muted/20 p-4 text-sm text-muted-foreground">
+                      Todavía no hay un grupo seleccionado.
+                    </div>
+                  ) : studentsQuery.error ? (
+                    <div className="mt-4 rounded-2xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
+                      No pude recuperar los estudiantes del grupo. {getErrorMessage(studentsQuery.error)}
+                    </div>
+                  ) : studentsQuery.isLoading ? (
+                    <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                      {Array.from({ length: 4 }).map((_, index) => <Skeleton key={index} className="h-24 rounded-2xl" />)}
+                    </div>
+                  ) : filteredStudentPerformanceRows.length > 0 ? (
+                    <div className="mt-4 overflow-hidden rounded-2xl border border-border/70 bg-white/85">
+                      <div className="hidden grid-cols-[minmax(0,1.8fr)_minmax(0,1fr)_120px_120px_110px] gap-3 border-b border-border/70 bg-muted/30 px-4 py-3 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground md:grid">
+                        <p>Estudiante</p>
+                        <p>Documento / ID</p>
+                        <p>Partidas</p>
+                        <p>Turnos</p>
+                        <p>Acierto</p>
+                      </div>
+                      <div className="divide-y divide-border/70">
+                        {filteredStudentPerformanceRows.map((entry) => {
+                          const student = entry.student;
+                          const isSelected = selectedStudent?.id === student.id;
+
+                          return (
+                            <div key={student.id} className={cn(isSelected ? "bg-primary/4" : "") }>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (isSelected) {
+                                    setSelectedStudentId(null);
+                                    setAnalyticsScope("group");
+                                    return;
+                                  }
+
+                                  setSelectedStudentId(student.id);
+                                  setAnalyticsScope("student");
+                                }}
+                                className={cn(
+                                  "grid w-full gap-3 px-4 py-4 text-left transition md:grid-cols-[minmax(0,1.8fr)_minmax(0,1fr)_120px_120px_110px] md:items-center",
+                                  isSelected ? "bg-primary/8" : "hover:bg-primary/5",
+                                )}
+                              >
+                                <div className="flex min-w-0 items-start gap-3">
+                                  <div className="flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-border/70 bg-primary/10 font-semibold text-primary">
+                                    {student.imageUrl ? (
+                                      <img src={student.imageUrl} alt={student.fullName} className="h-full w-full object-cover" />
+                                    ) : (
+                                      <span>{getPersonInitials(student.fullName)}</span>
+                                    )}
+                                  </div>
+                                  <div className="min-w-0 flex-1">
+                                    <div className="flex flex-wrap items-center gap-2">
+                                      <p className="truncate text-sm font-semibold text-foreground">{student.fullName}</p>
+                                      {isSelected ? <Badge variant="secondary">seleccionado</Badge> : null}
+                                    </div>
+                                    <p className="mt-1 text-xs text-muted-foreground">Última actividad: {formatDateTime(entry.lastParticipation)}</p>
+                                  </div>
+                                  <div className="mt-0.5 flex shrink-0 items-center gap-2 text-xs text-muted-foreground">
+                                    <span>{isSelected ? "Ocultar detalle" : "Ver detalle"}</span>
+                                    {isSelected ? <ChevronUp className="size-4" /> : <ChevronDown className="size-4" />}
+                                  </div>
+                                </div>
+                                <div className="text-sm text-foreground">
+                                  <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground md:hidden">Documento / ID</p>
+                                  <p className="font-medium">{student.fileNumber || "-"}</p>
+                                </div>
+                                <div className="text-sm text-foreground">
+                                  <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground md:hidden">Partidas</p>
+                                  <p className="font-medium">{entry.gamesCount}</p>
+                                </div>
+                                <div className="text-sm text-foreground">
+                                  <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground md:hidden">Turnos</p>
+                                  <p className="font-medium">{entry.turnsCount}</p>
+                                </div>
+                                <div className="text-sm text-foreground">
+                                  <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground md:hidden">Acierto</p>
+                                  <Badge variant={entry.successRate >= 70 ? "success" : entry.successRate >= 40 ? "secondary" : "outline"}>{entry.successRate}%</Badge>
+                                </div>
+                              </button>
+
+                              {isSelected ? (
+                                <div className="border-t border-border/70 bg-background/40 px-4 py-4">
+                                  <div className="grid gap-4">
+                                    <div className="rounded-2xl border border-border/70 bg-white/85 p-4">
+                                      <div className="flex flex-wrap items-start justify-between gap-3">
+                                        <div>
+                                          <p className="text-sm font-medium text-foreground">Analítica temporal</p>
+                                          <p className="mt-1 text-sm text-muted-foreground">
+                                            {analyticsTitle}: {analyticsDescription}
+                                          </p>
+                                        </div>
+                                        <div className="flex flex-wrap gap-2">
+                                          <Button type="button" size="sm" variant={analyticsScope === "group" ? "secondary" : "outline"} onClick={() => setAnalyticsScope("group")}>
+                                            Ver grupo
+                                          </Button>
+                                          <Button type="button" size="sm" variant={analyticsScope === "student" ? "secondary" : "outline"} onClick={() => setAnalyticsScope("student")}>
+                                            Ver estudiante
+                                          </Button>
+                                        </div>
+                                      </div>
+
+                                      <div className="mt-4 grid gap-4 xl:grid-cols-3">
+                                        <div className="rounded-2xl bg-background/70 p-4">
+                                          <p className="text-sm font-medium text-foreground">Turnos por fecha</p>
+                                          <p className="mt-1 text-sm text-muted-foreground">Cantidad de turnos visibles a lo largo del tiempo.</p>
+                                          <div className="mt-4 h-60">
+                                            {gamesQuery.error ? (
+                                              <div className="flex h-full items-center justify-center rounded-2xl border border-dashed border-destructive/40 bg-destructive/5 px-4 text-center text-sm text-destructive">
+                                                No pude cargar la serie temporal. {getErrorMessage(gamesQuery.error)}
+                                              </div>
+                                            ) : analyticsSeries.length > 0 ? (
+                                              <ResponsiveContainer width="100%" height="100%">
+                                                <BarChart data={analyticsSeries}>
+                                                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e7dcc9" />
+                                                  <XAxis dataKey="name" tickLine={false} axisLine={false} fontSize={12} />
+                                                  <YAxis tickLine={false} axisLine={false} fontSize={12} width={30} />
+                                                  <Tooltip />
+                                                  <Bar dataKey="turnos" fill="#47b9ef" radius={[8, 8, 0, 0]} />
+                                                </BarChart>
+                                              </ResponsiveContainer>
+                                            ) : (
+                                              <div className="flex h-full items-center justify-center rounded-2xl border border-dashed border-border text-sm text-muted-foreground">
+                                                Todavía no hay turnos visibles para graficar.
+                                              </div>
+                                            )}
+                                          </div>
+                                        </div>
+
+                                        <div className="rounded-2xl bg-background/70 p-4">
+                                          <p className="text-sm font-medium text-foreground">Partidas por fecha</p>
+                                          <p className="mt-1 text-sm text-muted-foreground">Permite ver la frecuencia de uso por día.</p>
+                                          <div className="mt-4 h-60">
+                                            {gamesQuery.error ? (
+                                              <div className="flex h-full items-center justify-center rounded-2xl border border-dashed border-destructive/40 bg-destructive/5 px-4 text-center text-sm text-destructive">
+                                                No pude cargar la serie temporal. {getErrorMessage(gamesQuery.error)}
+                                              </div>
+                                            ) : analyticsSeries.length > 0 ? (
+                                              <ResponsiveContainer width="100%" height="100%">
+                                                <BarChart data={analyticsSeries}>
+                                                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e7dcc9" />
+                                                  <XAxis dataKey="name" tickLine={false} axisLine={false} fontSize={12} />
+                                                  <YAxis tickLine={false} axisLine={false} fontSize={12} width={30} />
+                                                  <Tooltip />
+                                                  <Bar dataKey="partidas" fill="#1f2a37" radius={[8, 8, 0, 0]} />
+                                                </BarChart>
+                                              </ResponsiveContainer>
+                                            ) : (
+                                              <div className="flex h-full items-center justify-center rounded-2xl border border-dashed border-border text-sm text-muted-foreground">
+                                                Todavía no hay partidas visibles para graficar.
+                                              </div>
+                                            )}
+                                          </div>
+                                        </div>
+
+                                        <div className="rounded-2xl bg-background/70 p-4">
+                                          <p className="text-sm font-medium text-foreground">Porcentaje de acierto</p>
+                                          <p className="mt-1 text-sm text-muted-foreground">Evolución de aciertos según el período visible.</p>
+                                          <div className="mt-4 h-60">
+                                            {gamesQuery.error ? (
+                                              <div className="flex h-full items-center justify-center rounded-2xl border border-dashed border-destructive/40 bg-destructive/5 px-4 text-center text-sm text-destructive">
+                                                No pude cargar la serie temporal. {getErrorMessage(gamesQuery.error)}
+                                              </div>
+                                            ) : analyticsSeries.length > 0 ? (
+                                              <ResponsiveContainer width="100%" height="100%">
+                                                <BarChart data={analyticsSeries}>
+                                                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e7dcc9" />
+                                                  <XAxis dataKey="name" tickLine={false} axisLine={false} fontSize={12} />
+                                                  <YAxis domain={[0, 100]} tickLine={false} axisLine={false} fontSize={12} width={30} />
+                                                  <Tooltip />
+                                                  <Bar dataKey="acierto" fill="#6d5efc" radius={[8, 8, 0, 0]} />
+                                                </BarChart>
+                                              </ResponsiveContainer>
+                                            ) : (
+                                              <div className="flex h-full items-center justify-center rounded-2xl border border-dashed border-border text-sm text-muted-foreground">
+                                                Todavía no hay porcentaje de acierto para graficar.
+                                              </div>
+                                            )}
+                                          </div>
+                                        </div>
+                                      </div>
+                                    </div>
+
+                                    <div className="grid gap-4 lg:grid-cols-[0.95fr_1.05fr]">
+                                      <div className="rounded-2xl border border-border/70 bg-white/85 p-4">
+                                        <div className="flex items-start gap-3">
+                                          <div className="flex size-14 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-border/70 bg-primary/10 font-semibold text-primary">
+                                            {selectedStudent?.imageUrl ? (
+                                              <img src={selectedStudent.imageUrl} alt={selectedStudent.fullName} className="h-full w-full object-cover" />
+                                            ) : (
+                                              <span>{getPersonInitials(selectedStudent?.fullName || student.fullName)}</span>
+                                            )}
+                                          </div>
+                                          <div className="min-w-0 flex-1">
+                                            <p className="truncate text-base font-semibold text-foreground">{selectedStudent?.fullName || student.fullName}</p>
+                                            <div className="mt-2 flex flex-wrap gap-2">
+                                              <Badge variant="outline">Documento / ID: {selectedStudent?.fileNumber || student.fileNumber}</Badge>
+                                              <Badge variant="secondary">{selectedGroup?.name}</Badge>
+                                              {selectedStudent?.updatedAt ? <Badge variant="outline">act. {formatDateTime(selectedStudent.updatedAt)}</Badge> : null}
+                                            </div>
+                                          </div>
+                                        </div>
+
+                                        <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                                          <div className="rounded-2xl bg-background/70 p-3">
+                                            <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Partidas</p>
+                                            <p className="mt-2 text-2xl font-semibold text-foreground">{selectedStudentPerformance?.gamesCount ?? 0}</p>
+                                          </div>
+                                          <div className="rounded-2xl bg-background/70 p-3">
+                                            <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Turnos</p>
+                                            <p className="mt-2 text-2xl font-semibold text-foreground">{selectedStudentPerformance?.turnsCount ?? 0}</p>
+                                          </div>
+                                          <div className="rounded-2xl bg-background/70 p-3">
+                                            <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Acierto</p>
+                                            <p className="mt-2 text-2xl font-semibold text-foreground">{selectedStudentPerformance?.successRate ?? 0}%</p>
+                                          </div>
+                                          <div className="rounded-2xl bg-background/70 p-3">
+                                            <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Tiempo medio</p>
+                                            <p className="mt-2 text-2xl font-semibold text-foreground">{formatDurationSeconds(selectedStudentPerformance?.averageTurnSeconds ?? 0)}</p>
+                                          </div>
+                                        </div>
+
+                                        <div className="mt-4 grid gap-2 text-sm text-muted-foreground sm:grid-cols-2">
+                                          <p>Última participación: {formatDateTime(selectedStudentPerformance?.lastParticipation)}</p>
+                                          <p>Partidas con datos visibles: {selectedStudentGameRows.length}</p>
+                                        </div>
+                                      </div>
+
+                                      <div className="rounded-2xl border border-border/70 bg-white/85 p-4">
+                                        <p className="text-sm font-medium text-foreground">Partidas en las que participó</p>
+                                        <p className="mt-1 text-sm text-muted-foreground">Listado operativo para ver cuándo jugó, cuántos turnos tuvo y cómo rindió en cada partida.</p>
+                                        {selectedStudentGameRows.length > 0 ? (
+                                          <div className="relative mt-4">
+                                            <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+                                            <Input
+                                              value={studentGamesSearchQuery}
+                                              onChange={(event) => setStudentGamesSearchQuery(event.target.value)}
+                                              placeholder="Buscar partida por nombre o fecha"
+                                              className="pl-9"
+                                            />
+                                          </div>
+                                        ) : null}
+                                        <div className="mt-4 grid gap-3">
+                                          {gamesQuery.error ? (
+                                            <div className="rounded-2xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
+                                              No pude recuperar las partidas visibles de este estudiante. {getErrorMessage(gamesQuery.error)}
+                                            </div>
+                                          ) : gamesQuery.isLoading ? (
+                                            Array.from({ length: 3 }).map((_, index) => <Skeleton key={index} className="h-20 rounded-2xl" />)
+                                          ) : filteredSelectedStudentGameRows.length > 0 ? (
+                                            filteredSelectedStudentGameRows.map((game) => (
+                                              <div key={game.id} className="rounded-2xl bg-background/70 p-4">
+                                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                                  <p className="text-sm font-semibold text-foreground">{game.label}</p>
+                                                  <Badge variant="secondary">{game.successRate}% aciertos</Badge>
+                                                </div>
+                                                <div className="mt-2 flex flex-wrap gap-2">
+                                                  <Badge variant="outline">{game.turnCount} turnos</Badge>
+                                                  <Badge variant="outline">tiempo medio {formatDurationSeconds(game.avgTurnSeconds)}</Badge>
+                                                  {game.playedAt ? <Badge variant="outline">{formatDateTime(game.playedAt)}</Badge> : null}
+                                                </div>
+                                              </div>
+                                            ))
+                                          ) : selectedStudentGameRows.length > 0 ? (
+                                            <div className="rounded-2xl border border-dashed border-border/80 bg-muted/20 p-4 text-sm text-muted-foreground">
+                                              No encontré partidas que coincidan con la búsqueda activa para este estudiante.
+                                            </div>
+                                          ) : (
+                                            <div className="rounded-2xl border border-dashed border-border/80 bg-muted/20 p-4 text-sm text-muted-foreground">
+                                              Este estudiante todavía no registra partidas visibles en `game-data` para esta institución.
+                                            </div>
+                                          )}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+                              ) : null}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ) : selectedGroupStudents.length > 0 ? (
+                    <div className="mt-4 rounded-2xl border border-dashed border-border/80 bg-muted/20 p-4 text-sm text-muted-foreground">
+                      No encontré estudiantes que coincidan con la búsqueda o los filtros activos.
+                    </div>
+                  ) : (
+                    <div className="mt-4 rounded-2xl border border-dashed border-border/80 bg-muted/20 p-4 text-sm text-muted-foreground">
+                      Este grupo todavía no tiene perfiles cargados. Cuando subas el Excel, van a aparecer acá.
+                    </div>
+                  )}
+              </div>
+
+            </>
+          )}
+        </CardContent>
+      </Card>
+
+      <StudentImportPanel
+        token={tokens?.accessToken}
+        institutionId={selectedInstitution?.id ?? null}
+        institutionName={selectedInstitution?.name ?? null}
+        user={currentUser}
+      />
     </div>
   );
 }

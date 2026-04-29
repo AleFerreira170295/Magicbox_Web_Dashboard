@@ -24,6 +24,15 @@ export const apiEndpoints = {
     byId: (id: string) => `/educational-center/${id}`,
     imageById: (id: string) => `/educational-center/${id}/image`,
   },
+  classGroups: {
+    list: "/class-group/",
+    byId: (id: string) => `/class-group/${id}`,
+    importStudents: (id: string) => `/class-group/${id}/students/import`,
+  },
+  students: {
+    list: "/student/",
+    byId: (id: string) => `/student/${id}`,
+  },
   features: {
     list: "/feature",
     byId: (id: string) => `/feature/${id}`,
