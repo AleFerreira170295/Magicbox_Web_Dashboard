@@ -293,6 +293,7 @@ describe("InstitutionsOverview", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /Luna Pérez/i }));
 
+    expect(screen.getByRole("dialog", { name: /Detalle de Luna Pérez/i })).toBeInTheDocument();
     expect(screen.getAllByText(/Documento \/ ID: luna_001/).length).toBeGreaterThan(0);
     expect(screen.getByText("Analítica temporal")).toBeInTheDocument();
     expect(screen.getByText("Turnos por fecha")).toBeInTheDocument();
@@ -441,17 +442,18 @@ describe("InstitutionsOverview", () => {
     expect(screen.queryByText("Luna Pérez")).not.toBeInTheDocument();
   });
 
-  it("abre y cierra el detalle inline del estudiante desde su fila", () => {
+  it("abre el detalle del estudiante en un popup y permite cerrarlo", () => {
     renderInstitutionsOverview();
 
-    expect(screen.queryByText("Analítica temporal")).not.toBeInTheDocument();
+    expect(screen.queryByRole("dialog", { name: /Detalle de Luna Pérez/i })).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /Luna Pérez/i }));
 
+    expect(screen.getByRole("dialog", { name: /Detalle de Luna Pérez/i })).toBeInTheDocument();
     expect(screen.getByText(/Luna Pérez: La lectura temporal usa solo las partidas y turnos del estudiante activo./i)).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: /Luna Pérez/i }));
+    fireEvent.click(screen.getByRole("button", { name: "Cerrar" }));
 
-    expect(screen.queryByText("Analítica temporal")).not.toBeInTheDocument();
+    expect(screen.queryByRole("dialog", { name: /Detalle de Luna Pérez/i })).not.toBeInTheDocument();
   });
 });

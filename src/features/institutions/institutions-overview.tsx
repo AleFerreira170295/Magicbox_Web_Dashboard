@@ -4,13 +4,14 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Building2, ChevronDown, ChevronUp, Globe, GraduationCap, Mail, MapPin, Phone, Search, ShieldCheck, Smartphone, Trash2, UserPlus, Users } from "lucide-react";
+import { Building2, Globe, GraduationCap, Mail, MapPin, Phone, Search, ShieldCheck, Smartphone, Trash2, UserPlus, Users } from "lucide-react";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { SectionHeader } from "@/components/section-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ImageUploadField } from "@/components/ui/image-upload-field";
+import { Modal } from "@/components/ui/modal";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -1486,264 +1487,52 @@ export function InstitutionsOverview() {
                           const isSelected = selectedStudent?.id === student.id;
 
                           return (
-                            <div key={student.id} className={cn("overflow-hidden", isSelected ? "bg-primary/4" : "") }>
-                              <div
-                                className={cn(
-                                  "grid w-full gap-3 px-4 py-4 text-left transition md:grid-cols-[minmax(0,1.8fr)_minmax(0,1fr)_120px_120px_110px] md:items-center",
-                                  isSelected ? "bg-primary/8" : "hover:bg-primary/5",
-                                )}
-                              >
-                                <div className="flex min-w-0 items-start gap-3">
-                                  <div className="flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-border/70 bg-primary/10 font-semibold text-primary">
-                                    {student.imageUrl ? (
-                                      <img src={student.imageUrl} alt={student.fullName} className="h-full w-full object-cover" />
-                                    ) : (
-                                      <span>{getPersonInitials(student.fullName)}</span>
-                                    )}
+                            <button
+                              key={student.id}
+                              type="button"
+                              onClick={() => {
+                                setSelectedStudentId(student.id);
+                                setAnalyticsScope("student");
+                              }}
+                              className={cn(
+                                "grid w-full gap-3 px-4 py-4 text-left transition md:grid-cols-[minmax(0,1.8fr)_minmax(0,1fr)_120px_120px_110px] md:items-center",
+                                isSelected ? "bg-primary/8 ring-1 ring-primary/35" : "hover:bg-primary/5",
+                              )}
+                            >
+                              <div className="flex min-w-0 items-start gap-3">
+                                <div className="flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-border/70 bg-primary/10 font-semibold text-primary">
+                                  {student.imageUrl ? (
+                                    <img src={student.imageUrl} alt={student.fullName} className="h-full w-full object-cover" />
+                                  ) : (
+                                    <span>{getPersonInitials(student.fullName)}</span>
+                                  )}
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex flex-wrap items-center gap-2">
+                                    <p className="truncate text-sm font-semibold text-foreground">{student.fullName}</p>
+                                    {isSelected ? <Badge variant="secondary">seleccionado</Badge> : null}
                                   </div>
-                                  <div className="min-w-0 flex-1">
-                                    <div className="flex flex-wrap items-center gap-2">
-                                      <button
-                                        type="button"
-                                        aria-expanded={isSelected}
-                                        aria-controls={`student-accordion-${student.id}`}
-                                        onClick={() => {
-                                          if (isSelected) {
-                                            setSelectedStudentId(null);
-                                            setAnalyticsScope("group");
-                                            return;
-                                          }
-
-                                          setSelectedStudentId(student.id);
-                                          setAnalyticsScope("student");
-                                        }}
-                                        className="inline-flex max-w-full items-center gap-2 rounded-md text-left text-sm font-semibold text-foreground transition hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
-                                      >
-                                        <span className="truncate">{student.fullName}</span>
-                                        {isSelected ? <ChevronUp className="size-4 shrink-0" /> : <ChevronDown className="size-4 shrink-0" />}
-                                      </button>
-                                      {isSelected ? <Badge variant="secondary">seleccionado</Badge> : null}
-                                    </div>
-                                    <p className="mt-1 text-xs text-muted-foreground">Última actividad: {formatDateTime(entry.lastParticipation)}</p>
-                                    <p className="mt-1 text-xs text-muted-foreground">{isSelected ? "Ocultar detalle" : "Ver detalle"}</p>
-                                  </div>
-                                </div>
-                                <div className="text-sm text-foreground">
-                                  <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground md:hidden">Documento / ID</p>
-                                  <p className="font-medium">{student.fileNumber || "-"}</p>
-                                </div>
-                                <div className="text-sm text-foreground">
-                                  <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground md:hidden">Partidas</p>
-                                  <p className="font-medium">{entry.gamesCount}</p>
-                                </div>
-                                <div className="text-sm text-foreground">
-                                  <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground md:hidden">Turnos</p>
-                                  <p className="font-medium">{entry.turnsCount}</p>
-                                </div>
-                                <div className="text-sm text-foreground">
-                                  <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground md:hidden">Acierto</p>
-                                  <Badge variant={entry.successRate >= 70 ? "success" : entry.successRate >= 40 ? "secondary" : "outline"}>{entry.successRate}%</Badge>
+                                  <p className="mt-1 text-xs text-muted-foreground">Última actividad: {formatDateTime(entry.lastParticipation)}</p>
+                                  <p className="mt-1 text-xs text-muted-foreground">Abrir detalle del estudiante</p>
                                 </div>
                               </div>
-
-                              {isSelected ? (
-                                <div id={`student-accordion-${student.id}`} className="border-t border-border/70 bg-background/40 px-4 py-4 md:pl-[5.2rem]">
-                                  <div className="grid gap-4">
-                                    <div className="rounded-2xl border border-border/70 bg-white/85 p-4">
-                                      <div className="flex flex-wrap items-start justify-between gap-3">
-                                        <div>
-                                          <p className="text-sm font-medium text-foreground">Analítica temporal</p>
-                                          <p className="mt-1 text-sm text-muted-foreground">
-                                            {analyticsTitle}: {analyticsDescription}
-                                          </p>
-                                        </div>
-                                        <div className="flex flex-wrap gap-2">
-                                          <Button type="button" size="sm" variant={analyticsScope === "group" ? "secondary" : "outline"} onClick={() => setAnalyticsScope("group")}>
-                                            Ver grupo
-                                          </Button>
-                                          <Button type="button" size="sm" variant={analyticsScope === "student" ? "secondary" : "outline"} onClick={() => setAnalyticsScope("student")}>
-                                            Ver estudiante
-                                          </Button>
-                                        </div>
-                                      </div>
-
-                                      <div className="mt-4 grid gap-4 xl:grid-cols-3">
-                                        <div className="rounded-2xl bg-background/70 p-4">
-                                          <p className="text-sm font-medium text-foreground">Turnos por fecha</p>
-                                          <p className="mt-1 text-sm text-muted-foreground">Cantidad de turnos visibles a lo largo del tiempo.</p>
-                                          <div className="mt-4 h-60">
-                                            {gamesQuery.error ? (
-                                              <div className="flex h-full items-center justify-center rounded-2xl border border-dashed border-destructive/40 bg-destructive/5 px-4 text-center text-sm text-destructive">
-                                                No pude cargar la serie temporal. {getErrorMessage(gamesQuery.error)}
-                                              </div>
-                                            ) : analyticsSeries.length > 0 ? (
-                                              <ResponsiveContainer width="100%" height="100%">
-                                                <BarChart data={analyticsSeries}>
-                                                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e7dcc9" />
-                                                  <XAxis dataKey="name" tickLine={false} axisLine={false} fontSize={12} />
-                                                  <YAxis tickLine={false} axisLine={false} fontSize={12} width={30} />
-                                                  <Tooltip />
-                                                  <Bar dataKey="turnos" fill="#47b9ef" radius={[8, 8, 0, 0]} />
-                                                </BarChart>
-                                              </ResponsiveContainer>
-                                            ) : (
-                                              <div className="flex h-full items-center justify-center rounded-2xl border border-dashed border-border text-sm text-muted-foreground">
-                                                Todavía no hay turnos visibles para graficar.
-                                              </div>
-                                            )}
-                                          </div>
-                                        </div>
-
-                                        <div className="rounded-2xl bg-background/70 p-4">
-                                          <p className="text-sm font-medium text-foreground">Partidas por fecha</p>
-                                          <p className="mt-1 text-sm text-muted-foreground">Permite ver la frecuencia de uso por día.</p>
-                                          <div className="mt-4 h-60">
-                                            {gamesQuery.error ? (
-                                              <div className="flex h-full items-center justify-center rounded-2xl border border-dashed border-destructive/40 bg-destructive/5 px-4 text-center text-sm text-destructive">
-                                                No pude cargar la serie temporal. {getErrorMessage(gamesQuery.error)}
-                                              </div>
-                                            ) : analyticsSeries.length > 0 ? (
-                                              <ResponsiveContainer width="100%" height="100%">
-                                                <BarChart data={analyticsSeries}>
-                                                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e7dcc9" />
-                                                  <XAxis dataKey="name" tickLine={false} axisLine={false} fontSize={12} />
-                                                  <YAxis tickLine={false} axisLine={false} fontSize={12} width={30} />
-                                                  <Tooltip />
-                                                  <Bar dataKey="partidas" fill="#1f2a37" radius={[8, 8, 0, 0]} />
-                                                </BarChart>
-                                              </ResponsiveContainer>
-                                            ) : (
-                                              <div className="flex h-full items-center justify-center rounded-2xl border border-dashed border-border text-sm text-muted-foreground">
-                                                Todavía no hay partidas visibles para graficar.
-                                              </div>
-                                            )}
-                                          </div>
-                                        </div>
-
-                                        <div className="rounded-2xl bg-background/70 p-4">
-                                          <p className="text-sm font-medium text-foreground">Porcentaje de acierto</p>
-                                          <p className="mt-1 text-sm text-muted-foreground">Evolución de aciertos según el período visible.</p>
-                                          <div className="mt-4 h-60">
-                                            {gamesQuery.error ? (
-                                              <div className="flex h-full items-center justify-center rounded-2xl border border-dashed border-destructive/40 bg-destructive/5 px-4 text-center text-sm text-destructive">
-                                                No pude cargar la serie temporal. {getErrorMessage(gamesQuery.error)}
-                                              </div>
-                                            ) : analyticsSeries.length > 0 ? (
-                                              <ResponsiveContainer width="100%" height="100%">
-                                                <BarChart data={analyticsSeries}>
-                                                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e7dcc9" />
-                                                  <XAxis dataKey="name" tickLine={false} axisLine={false} fontSize={12} />
-                                                  <YAxis domain={[0, 100]} tickLine={false} axisLine={false} fontSize={12} width={30} />
-                                                  <Tooltip />
-                                                  <Bar dataKey="acierto" fill="#6d5efc" radius={[8, 8, 0, 0]} />
-                                                </BarChart>
-                                              </ResponsiveContainer>
-                                            ) : (
-                                              <div className="flex h-full items-center justify-center rounded-2xl border border-dashed border-border text-sm text-muted-foreground">
-                                                Todavía no hay porcentaje de acierto para graficar.
-                                              </div>
-                                            )}
-                                          </div>
-                                        </div>
-                                      </div>
-                                    </div>
-
-                                    <div className="grid gap-4 lg:grid-cols-[0.95fr_1.05fr]">
-                                      <div className="rounded-2xl border border-border/70 bg-white/85 p-4">
-                                        <div className="flex items-start gap-3">
-                                          <div className="flex size-14 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-border/70 bg-primary/10 font-semibold text-primary">
-                                            {selectedStudent?.imageUrl ? (
-                                              <img src={selectedStudent.imageUrl} alt={selectedStudent.fullName} className="h-full w-full object-cover" />
-                                            ) : (
-                                              <span>{getPersonInitials(selectedStudent?.fullName || student.fullName)}</span>
-                                            )}
-                                          </div>
-                                          <div className="min-w-0 flex-1">
-                                            <p className="truncate text-base font-semibold text-foreground">{selectedStudent?.fullName || student.fullName}</p>
-                                            <div className="mt-2 flex flex-wrap gap-2">
-                                              <Badge variant="outline">Documento / ID: {selectedStudent?.fileNumber || student.fileNumber}</Badge>
-                                              <Badge variant="secondary">{selectedGroup?.name}</Badge>
-                                              {selectedStudent?.updatedAt ? <Badge variant="outline">act. {formatDateTime(selectedStudent.updatedAt)}</Badge> : null}
-                                            </div>
-                                          </div>
-                                        </div>
-
-                                        <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                                          <div className="rounded-2xl bg-background/70 p-3">
-                                            <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Partidas</p>
-                                            <p className="mt-2 text-2xl font-semibold text-foreground">{selectedStudentPerformance?.gamesCount ?? 0}</p>
-                                          </div>
-                                          <div className="rounded-2xl bg-background/70 p-3">
-                                            <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Turnos</p>
-                                            <p className="mt-2 text-2xl font-semibold text-foreground">{selectedStudentPerformance?.turnsCount ?? 0}</p>
-                                          </div>
-                                          <div className="rounded-2xl bg-background/70 p-3">
-                                            <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Acierto</p>
-                                            <p className="mt-2 text-2xl font-semibold text-foreground">{selectedStudentPerformance?.successRate ?? 0}%</p>
-                                          </div>
-                                          <div className="rounded-2xl bg-background/70 p-3">
-                                            <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Tiempo medio</p>
-                                            <p className="mt-2 text-2xl font-semibold text-foreground">{formatDurationSeconds(selectedStudentPerformance?.averageTurnSeconds ?? 0)}</p>
-                                          </div>
-                                        </div>
-
-                                        <div className="mt-4 grid gap-2 text-sm text-muted-foreground sm:grid-cols-2">
-                                          <p>Última participación: {formatDateTime(selectedStudentPerformance?.lastParticipation)}</p>
-                                          <p>Partidas con datos visibles: {selectedStudentGameRows.length}</p>
-                                        </div>
-                                      </div>
-
-                                      <div className="rounded-2xl border border-border/70 bg-white/85 p-4">
-                                        <p className="text-sm font-medium text-foreground">Partidas en las que participó</p>
-                                        <p className="mt-1 text-sm text-muted-foreground">Listado operativo para ver cuándo jugó, cuántos turnos tuvo y cómo rindió en cada partida.</p>
-                                        {selectedStudentGameRows.length > 0 ? (
-                                          <div className="relative mt-4">
-                                            <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
-                                            <Input
-                                              value={studentGamesSearchQuery}
-                                              onChange={(event) => setStudentGamesSearchQuery(event.target.value)}
-                                              placeholder="Buscar partida por nombre o fecha"
-                                              className="pl-9"
-                                            />
-                                          </div>
-                                        ) : null}
-                                        <div className="mt-4 grid gap-3">
-                                          {gamesQuery.error ? (
-                                            <div className="rounded-2xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
-                                              No pude recuperar las partidas visibles de este estudiante. {getErrorMessage(gamesQuery.error)}
-                                            </div>
-                                          ) : gamesQuery.isLoading ? (
-                                            Array.from({ length: 3 }).map((_, index) => <Skeleton key={index} className="h-20 rounded-2xl" />)
-                                          ) : filteredSelectedStudentGameRows.length > 0 ? (
-                                            filteredSelectedStudentGameRows.map((game) => (
-                                              <div key={game.id} className="rounded-2xl bg-background/70 p-4">
-                                                <div className="flex flex-wrap items-center justify-between gap-2">
-                                                  <p className="text-sm font-semibold text-foreground">{game.label}</p>
-                                                  <Badge variant="secondary">{game.successRate}% aciertos</Badge>
-                                                </div>
-                                                <div className="mt-2 flex flex-wrap gap-2">
-                                                  <Badge variant="outline">{game.turnCount} turnos</Badge>
-                                                  <Badge variant="outline">tiempo medio {formatDurationSeconds(game.avgTurnSeconds)}</Badge>
-                                                  {game.playedAt ? <Badge variant="outline">{formatDateTime(game.playedAt)}</Badge> : null}
-                                                </div>
-                                              </div>
-                                            ))
-                                          ) : selectedStudentGameRows.length > 0 ? (
-                                            <div className="rounded-2xl border border-dashed border-border/80 bg-muted/20 p-4 text-sm text-muted-foreground">
-                                              No encontré partidas que coincidan con la búsqueda activa para este estudiante.
-                                            </div>
-                                          ) : (
-                                            <div className="rounded-2xl border border-dashed border-border/80 bg-muted/20 p-4 text-sm text-muted-foreground">
-                                              Este estudiante todavía no registra partidas visibles en `game-data` para esta institución.
-                                            </div>
-                                          )}
-                                        </div>
-                                      </div>
-                                    </div>
-                                  </div>
-                                </div>
-                              ) : null}
-                            </div>
+                              <div className="text-sm text-foreground">
+                                <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground md:hidden">Documento / ID</p>
+                                <p className="font-medium">{student.fileNumber || "-"}</p>
+                              </div>
+                              <div className="text-sm text-foreground">
+                                <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground md:hidden">Partidas</p>
+                                <p className="font-medium">{entry.gamesCount}</p>
+                              </div>
+                              <div className="text-sm text-foreground">
+                                <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground md:hidden">Turnos</p>
+                                <p className="font-medium">{entry.turnsCount}</p>
+                              </div>
+                              <div className="text-sm text-foreground">
+                                <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground md:hidden">Acierto</p>
+                                <Badge variant={entry.successRate >= 70 ? "success" : entry.successRate >= 40 ? "secondary" : "outline"}>{entry.successRate}%</Badge>
+                              </div>
+                            </button>
                           );
                         })}
                       </div>
@@ -1763,6 +1552,214 @@ export function InstitutionsOverview() {
           )}
         </CardContent>
       </Card>
+
+      <Modal
+        open={Boolean(selectedStudent)}
+        onClose={() => {
+          setSelectedStudentId(null);
+          setAnalyticsScope("group");
+          setStudentGamesSearchQuery("");
+        }}
+        title={selectedStudent ? `Detalle de ${selectedStudent.fullName}` : "Detalle del estudiante"}
+        description={selectedStudent ? `Vista completa del estudiante dentro de ${selectedGroup?.name || "este grupo"}: analítica temporal, métricas y partidas visibles.` : undefined}
+        className="max-w-[1180px]"
+      >
+        {selectedStudent ? (
+          <div className="grid gap-4">
+            <div className="rounded-2xl border border-border/70 bg-white/85 p-4">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <p className="text-sm font-medium text-foreground">Analítica temporal</p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    {analyticsTitle}: {analyticsDescription}
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Button type="button" size="sm" variant={analyticsScope === "group" ? "secondary" : "outline"} onClick={() => setAnalyticsScope("group")}>
+                    Ver grupo
+                  </Button>
+                  <Button type="button" size="sm" variant={analyticsScope === "student" ? "secondary" : "outline"} onClick={() => setAnalyticsScope("student")}>
+                    Ver estudiante
+                  </Button>
+                </div>
+              </div>
+
+              <div className="mt-4 grid gap-4 xl:grid-cols-3">
+                <div className="rounded-2xl bg-background/70 p-4">
+                  <p className="text-sm font-medium text-foreground">Turnos por fecha</p>
+                  <p className="mt-1 text-sm text-muted-foreground">Cantidad de turnos visibles a lo largo del tiempo.</p>
+                  <div className="mt-4 h-60">
+                    {gamesQuery.error ? (
+                      <div className="flex h-full items-center justify-center rounded-2xl border border-dashed border-destructive/40 bg-destructive/5 px-4 text-center text-sm text-destructive">
+                        No pude cargar la serie temporal. {getErrorMessage(gamesQuery.error)}
+                      </div>
+                    ) : analyticsSeries.length > 0 ? (
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={analyticsSeries}>
+                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e7dcc9" />
+                          <XAxis dataKey="name" tickLine={false} axisLine={false} fontSize={12} />
+                          <YAxis tickLine={false} axisLine={false} fontSize={12} width={30} />
+                          <Tooltip />
+                          <Bar dataKey="turnos" fill="#47b9ef" radius={[8, 8, 0, 0]} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    ) : (
+                      <div className="flex h-full items-center justify-center rounded-2xl border border-dashed border-border text-sm text-muted-foreground">
+                        Todavía no hay turnos visibles para graficar.
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="rounded-2xl bg-background/70 p-4">
+                  <p className="text-sm font-medium text-foreground">Partidas por fecha</p>
+                  <p className="mt-1 text-sm text-muted-foreground">Permite ver la frecuencia de uso por día.</p>
+                  <div className="mt-4 h-60">
+                    {gamesQuery.error ? (
+                      <div className="flex h-full items-center justify-center rounded-2xl border border-dashed border-destructive/40 bg-destructive/5 px-4 text-center text-sm text-destructive">
+                        No pude cargar la serie temporal. {getErrorMessage(gamesQuery.error)}
+                      </div>
+                    ) : analyticsSeries.length > 0 ? (
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={analyticsSeries}>
+                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e7dcc9" />
+                          <XAxis dataKey="name" tickLine={false} axisLine={false} fontSize={12} />
+                          <YAxis tickLine={false} axisLine={false} fontSize={12} width={30} />
+                          <Tooltip />
+                          <Bar dataKey="partidas" fill="#1f2a37" radius={[8, 8, 0, 0]} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    ) : (
+                      <div className="flex h-full items-center justify-center rounded-2xl border border-dashed border-border text-sm text-muted-foreground">
+                        Todavía no hay partidas visibles para graficar.
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="rounded-2xl bg-background/70 p-4">
+                  <p className="text-sm font-medium text-foreground">Porcentaje de acierto</p>
+                  <p className="mt-1 text-sm text-muted-foreground">Evolución de aciertos según el período visible.</p>
+                  <div className="mt-4 h-60">
+                    {gamesQuery.error ? (
+                      <div className="flex h-full items-center justify-center rounded-2xl border border-dashed border-destructive/40 bg-destructive/5 px-4 text-center text-sm text-destructive">
+                        No pude cargar la serie temporal. {getErrorMessage(gamesQuery.error)}
+                      </div>
+                    ) : analyticsSeries.length > 0 ? (
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={analyticsSeries}>
+                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e7dcc9" />
+                          <XAxis dataKey="name" tickLine={false} axisLine={false} fontSize={12} />
+                          <YAxis domain={[0, 100]} tickLine={false} axisLine={false} fontSize={12} width={30} />
+                          <Tooltip />
+                          <Bar dataKey="acierto" fill="#6d5efc" radius={[8, 8, 0, 0]} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    ) : (
+                      <div className="flex h-full items-center justify-center rounded-2xl border border-dashed border-border text-sm text-muted-foreground">
+                        Todavía no hay porcentaje de acierto para graficar.
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid gap-4 lg:grid-cols-[0.95fr_1.05fr]">
+              <div className="rounded-2xl border border-border/70 bg-white/85 p-4">
+                <div className="flex items-start gap-3">
+                  <div className="flex size-14 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-border/70 bg-primary/10 font-semibold text-primary">
+                    {selectedStudent.imageUrl ? (
+                      <img src={selectedStudent.imageUrl} alt={selectedStudent.fullName} className="h-full w-full object-cover" />
+                    ) : (
+                      <span>{getPersonInitials(selectedStudent.fullName)}</span>
+                    )}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-base font-semibold text-foreground">{selectedStudent.fullName}</p>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      <Badge variant="outline">Documento / ID: {selectedStudent.fileNumber || "-"}</Badge>
+                      <Badge variant="secondary">{selectedGroup?.name}</Badge>
+                      {selectedStudent.updatedAt ? <Badge variant="outline">act. {formatDateTime(selectedStudent.updatedAt)}</Badge> : null}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                  <div className="rounded-2xl bg-background/70 p-3">
+                    <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Partidas</p>
+                    <p className="mt-2 text-2xl font-semibold text-foreground">{selectedStudentPerformance?.gamesCount ?? 0}</p>
+                  </div>
+                  <div className="rounded-2xl bg-background/70 p-3">
+                    <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Turnos</p>
+                    <p className="mt-2 text-2xl font-semibold text-foreground">{selectedStudentPerformance?.turnsCount ?? 0}</p>
+                  </div>
+                  <div className="rounded-2xl bg-background/70 p-3">
+                    <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Acierto</p>
+                    <p className="mt-2 text-2xl font-semibold text-foreground">{selectedStudentPerformance?.successRate ?? 0}%</p>
+                  </div>
+                  <div className="rounded-2xl bg-background/70 p-3">
+                    <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Tiempo medio</p>
+                    <p className="mt-2 text-2xl font-semibold text-foreground">{formatDurationSeconds(selectedStudentPerformance?.averageTurnSeconds ?? 0)}</p>
+                  </div>
+                </div>
+
+                <div className="mt-4 grid gap-2 text-sm text-muted-foreground sm:grid-cols-2">
+                  <p>Última participación: {formatDateTime(selectedStudentPerformance?.lastParticipation)}</p>
+                  <p>Partidas con datos visibles: {selectedStudentGameRows.length}</p>
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-border/70 bg-white/85 p-4">
+                <p className="text-sm font-medium text-foreground">Partidas en las que participó</p>
+                <p className="mt-1 text-sm text-muted-foreground">Listado operativo para ver cuándo jugó, cuántos turnos tuvo y cómo rindió en cada partida.</p>
+                {selectedStudentGameRows.length > 0 ? (
+                  <div className="relative mt-4">
+                    <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      value={studentGamesSearchQuery}
+                      onChange={(event) => setStudentGamesSearchQuery(event.target.value)}
+                      placeholder="Buscar partida por nombre o fecha"
+                      className="pl-9"
+                    />
+                  </div>
+                ) : null}
+                <div className="mt-4 grid gap-3">
+                  {gamesQuery.error ? (
+                    <div className="rounded-2xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
+                      No pude recuperar las partidas visibles de este estudiante. {getErrorMessage(gamesQuery.error)}
+                    </div>
+                  ) : gamesQuery.isLoading ? (
+                    Array.from({ length: 3 }).map((_, index) => <Skeleton key={index} className="h-20 rounded-2xl" />)
+                  ) : filteredSelectedStudentGameRows.length > 0 ? (
+                    filteredSelectedStudentGameRows.map((game) => (
+                      <div key={game.id} className="rounded-2xl bg-background/70 p-4">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <p className="text-sm font-semibold text-foreground">{game.label}</p>
+                          <Badge variant="secondary">{game.successRate}% aciertos</Badge>
+                        </div>
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          <Badge variant="outline">{game.turnCount} turnos</Badge>
+                          <Badge variant="outline">tiempo medio {formatDurationSeconds(game.avgTurnSeconds)}</Badge>
+                          {game.playedAt ? <Badge variant="outline">{formatDateTime(game.playedAt)}</Badge> : null}
+                        </div>
+                      </div>
+                    ))
+                  ) : selectedStudentGameRows.length > 0 ? (
+                    <div className="rounded-2xl border border-dashed border-border/80 bg-muted/20 p-4 text-sm text-muted-foreground">
+                      No encontré partidas que coincidan con la búsqueda activa para este estudiante.
+                    </div>
+                  ) : (
+                    <div className="rounded-2xl border border-dashed border-border/80 bg-muted/20 p-4 text-sm text-muted-foreground">
+                      Este estudiante todavía no registra partidas visibles en `game-data` para esta institución.
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : null}
+      </Modal>
 
       <StudentImportPanel
         token={tokens?.accessToken}
