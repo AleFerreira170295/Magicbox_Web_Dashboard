@@ -1,5 +1,7 @@
 "use client";
 
+/* eslint-disable @next/next/no-img-element */
+
 import { useMemo, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Building2, Globe, Mail, MapPin, Phone, Search, ShieldCheck, Smartphone, Trash2, UserPlus, Users } from "lucide-react";
@@ -7,8 +9,10 @@ import { SectionHeader } from "@/components/section-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { ImageUploadField } from "@/components/ui/image-upload-field";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Modal } from "@/components/ui/modal";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useAuth } from "@/features/auth/auth-context";
@@ -16,6 +20,7 @@ import { useDevices } from "@/features/devices/api";
 import {
   createInstitution,
   deleteInstitution,
+  uploadInstitutionImage,
   updateInstitution,
   useInstitutionById,
   useInstitutions,
@@ -59,13 +64,14 @@ function SummaryCard({
 }
 
 type FormMode = "create" | "edit";
-type InstitutionFocusFilter = "all" | "review" | "no_users" | "no_devices" | "active_operation";
+type InstitutionFocusFilter = "all" | "review" | "no_logo" | "no_users" | "no_devices" | "active_operation";
 type FeedbackState = { type: "success" | "error"; message: string } | null;
 
 type InstitutionFormState = {
   name: string;
   email: string;
   phoneNumber: string;
+  imageUrl: string;
   url: string;
   addressFirstLine: string;
   addressSecondLine: string;
@@ -90,6 +96,7 @@ function emptyFormState(): InstitutionFormState {
     name: "",
     email: "",
     phoneNumber: "",
+    imageUrl: "",
     url: "",
     addressFirstLine: "",
     addressSecondLine: "",
@@ -105,6 +112,7 @@ function formFromInstitution(institution: InstitutionRecord): InstitutionFormSta
     name: institution.name,
     email: institution.email,
     phoneNumber: institution.phoneNumber,
+    imageUrl: institution.imageUrl || "",
     url: institution.url || "",
     addressFirstLine: institution.address?.addressFirstLine || "",
     addressSecondLine: institution.address?.addressSecondLine || "",
@@ -128,6 +136,7 @@ function buildPayload(form: InstitutionFormState) {
     name: form.name.trim(),
     email: form.email.trim().toLowerCase(),
     phoneNumber: form.phoneNumber.trim(),
+    imageUrl: form.imageUrl.trim() || null,
     url: form.url.trim() || null,
     address: {
       addressFirstLine: form.addressFirstLine.trim(),
@@ -142,6 +151,42 @@ function buildPayload(form: InstitutionFormState) {
   return { payload };
 }
 
+function getInstitutionInitials(name: string) {
+  const parts = name
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2);
+
+  if (parts.length === 0) return "IN";
+  return parts.map((part) => part.slice(0, 1).toUpperCase()).join("");
+}
+
+function InstitutionAvatar({
+  name,
+  imageUrl,
+  className,
+}: {
+  name: string;
+  imageUrl?: string | null;
+  className?: string;
+}) {
+  return (
+    <div
+      className={cn(
+        "flex shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-border/70 bg-white font-semibold text-primary",
+        className,
+      )}
+    >
+      {imageUrl ? (
+        <img src={imageUrl} alt={name} className="h-full w-full object-cover" />
+      ) : (
+        <span>{getInstitutionInitials(name)}</span>
+      )}
+    </div>
+  );
+}
+
 export function InstitutionsOverview() {
   const { tokens, user: currentUser } = useAuth();
   const queryClient = useQueryClient();
@@ -152,6 +197,8 @@ export function InstitutionsOverview() {
   const [selectedInstitutionId, setSelectedInstitutionId] = useState<string | null>(null);
   const [form, setForm] = useState<InstitutionFormState>(emptyFormState);
   const [feedback, setFeedback] = useState<FeedbackState>(null);
+  const [isFormModalOpen, setIsFormModalOpen] = useState(false);
+  const [imageFile, setImageFile] = useState<File | null>(null);
 
   const institutionsQuery = useInstitutions(tokens?.accessToken);
   const institutionDetailQuery = useInstitutionById(tokens?.accessToken, selectedInstitutionId);
@@ -183,25 +230,48 @@ export function InstitutionsOverview() {
   const canSubmitForm = mode === "create" ? canCreateInstitutions : canUpdateInstitutions;
 
   const createInstitutionMutation = useMutation({
-    mutationFn: (payload: CreateInstitutionPayload) => createInstitution(tokens?.accessToken as string, payload),
+    mutationFn: async ({ payload, imageFile }: { payload: CreateInstitutionPayload; imageFile: File | null }) => {
+      const createdInstitution = await createInstitution(tokens?.accessToken as string, payload);
+      if (!imageFile) return createdInstitution;
+
+      const uploadResult = await uploadInstitutionImage(tokens?.accessToken as string, createdInstitution.id, imageFile);
+      return {
+        ...createdInstitution,
+        imageUrl: uploadResult.imageUrl,
+      };
+    },
     onSuccess: async (created) => {
       await queryClient.invalidateQueries({ queryKey: ["institutions"] });
+      await queryClient.invalidateQueries({ queryKey: ["institutions", "detail"] });
       setMode("edit");
       setSelectedInstitutionId(created.id);
       setForm(formFromInstitution(created));
+      setImageFile(null);
       setFeedback({ type: "success", message: `Institución ${created.name} creada.` });
+      setIsFormModalOpen(false);
     },
     onError: (error) => setFeedback({ type: "error", message: getErrorMessage(error) }),
   });
 
   const updateInstitutionMutation = useMutation({
-    mutationFn: ({ institutionId, payload }: { institutionId: string; payload: UpdateInstitutionPayload }) =>
-      updateInstitution(tokens?.accessToken as string, institutionId, payload),
+    mutationFn: async ({ institutionId, payload, imageFile }: { institutionId: string; payload: UpdateInstitutionPayload; imageFile?: File | null }) => {
+      const updatedInstitution = await updateInstitution(tokens?.accessToken as string, institutionId, payload);
+      if (!imageFile) return updatedInstitution;
+
+      const uploadResult = await uploadInstitutionImage(tokens?.accessToken as string, institutionId, imageFile);
+      return {
+        ...updatedInstitution,
+        imageUrl: uploadResult.imageUrl,
+      };
+    },
     onSuccess: async (updated) => {
       await queryClient.invalidateQueries({ queryKey: ["institutions"] });
+      await queryClient.invalidateQueries({ queryKey: ["institutions", "detail"] });
       setSelectedInstitutionId(updated.id);
       setForm(formFromInstitution(updated));
+      setImageFile(null);
       setFeedback({ type: "success", message: `Institución ${updated.name} actualizada.` });
+      setIsFormModalOpen(false);
     },
     onError: (error) => setFeedback({ type: "error", message: getErrorMessage(error) }),
   });
@@ -210,10 +280,13 @@ export function InstitutionsOverview() {
     mutationFn: (institutionId: string) => deleteInstitution(tokens?.accessToken as string, institutionId),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["institutions"] });
+      await queryClient.invalidateQueries({ queryKey: ["institutions", "detail"] });
       setMode("edit");
       setSelectedInstitutionId(null);
       setForm(emptyFormState());
+      setImageFile(null);
       setFeedback({ type: "success", message: "Institución eliminada." });
+      setIsFormModalOpen(false);
     },
     onError: (error) => setFeedback({ type: "error", message: getErrorMessage(error) }),
   });
@@ -279,6 +352,8 @@ export function InstitutionsOverview() {
         switch (focusFilter) {
           case "review":
             return item.needsReview;
+          case "no_logo":
+            return !item.imageUrl;
           case "no_users":
             return item.userCount === 0;
           case "no_devices":
@@ -315,6 +390,7 @@ export function InstitutionsOverview() {
       totalDevicesLinked: institutionRows.reduce((acc, item) => acc + item.deviceCount, 0),
       totalClassesLinked: institutionRows.reduce((acc, item) => acc + item.classGroupCount, 0),
       totalStudentsLinked: institutionRows.reduce((acc, item) => acc + item.studentCount, 0),
+      institutionsWithLogo: institutionRows.filter((item) => Boolean(item.imageUrl)).length,
       reviewInstitutions: institutionRows.filter((item) => item.needsReview).length,
       institutionsWithoutUsers: institutionRows.filter((item) => item.userCount === 0).length,
       institutionsWithoutDevices: institutionRows.filter((item) => item.deviceCount === 0).length,
@@ -325,6 +401,7 @@ export function InstitutionsOverview() {
   const focusSegments = [
     { key: "all" as const, label: "Todas", count: metrics.totalInstitutions },
     { key: "review" as const, label: "Con observaciones", count: metrics.reviewInstitutions },
+    { key: "no_logo" as const, label: "Sin logo", count: metrics.totalInstitutions - metrics.institutionsWithLogo },
     { key: "no_users" as const, label: "Sin usuarios", count: metrics.institutionsWithoutUsers },
     { key: "no_devices" as const, label: "Sin dispositivos", count: metrics.institutionsWithoutDevices },
     { key: "active_operation" as const, label: "Operación activa", count: metrics.institutionsWithActiveOperation },
@@ -341,7 +418,32 @@ export function InstitutionsOverview() {
     setMode("edit");
     setSelectedInstitutionId(institution.id);
     setForm(formFromInstitution(institution));
+    setImageFile(null);
     setFeedback(null);
+  }
+
+  function openCreateInstitutionForm() {
+    setMode("create");
+    setSelectedInstitutionId(null);
+    setForm(emptyFormState());
+    setImageFile(null);
+    setFeedback(null);
+    setIsFormModalOpen(true);
+  }
+
+  function openEditInstitutionForm() {
+    if (!selectedInstitution) return;
+    setMode("edit");
+    setSelectedInstitutionId(selectedInstitution.id);
+    setForm(formFromInstitution(selectedInstitution));
+    setImageFile(null);
+    setFeedback(null);
+    setIsFormModalOpen(true);
+  }
+
+  function closeInstitutionForm() {
+    setIsFormModalOpen(false);
+    setImageFile(null);
   }
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -363,7 +465,10 @@ export function InstitutionsOverview() {
     }
 
     if (mode === "create") {
-      await createInstitutionMutation.mutateAsync(result.payload as CreateInstitutionPayload);
+      await createInstitutionMutation.mutateAsync({
+        payload: result.payload as CreateInstitutionPayload,
+        imageFile,
+      });
       return;
     }
 
@@ -375,6 +480,7 @@ export function InstitutionsOverview() {
     await updateInstitutionMutation.mutateAsync({
       institutionId: selectedInstitutionId,
       payload: result.payload as UpdateInstitutionPayload,
+      imageFile,
     });
   }
 
@@ -387,6 +493,171 @@ export function InstitutionsOverview() {
     if (!globalThis.confirm(`¿Eliminar ${selectedInstitution.name}?`)) return;
     setFeedback(null);
     await deleteInstitutionMutation.mutateAsync(selectedInstitutionId);
+  }
+
+  function renderInstitutionEditorPanel() {
+    return (
+      <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
+        <CardHeader>
+          <CardTitle>{mode === "create" ? "Alta de institución" : isDirectorView ? "Detalle de seguimiento" : "Editar institución"}</CardTitle>
+          <CardDescription>
+            {mode === "create"
+              ? canCreateInstitutions
+                ? "Alta conectada al endpoint real de instituciones."
+                : "Tu perfil actual no expone alta de instituciones."
+              : isDirectorView
+                ? "Resumen de contacto, cobertura visible y señales básicas para seguimiento institucional."
+                : canUpdateInstitutions
+                  ? "Datos base del cliente, contacto y localización operativa."
+                  : "Vista de solo lectura para los datos base de la institución."}
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-5">
+          {feedback ? (
+            <div
+              className={cn(
+                "rounded-2xl border px-4 py-3 text-sm",
+                feedback.type === "success"
+                  ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                  : "border-destructive/20 bg-destructive/5 text-destructive",
+              )}
+            >
+              {feedback.message}
+            </div>
+          ) : null}
+
+          {mode === "edit" && !selectedInstitution ? (
+            <div className="rounded-2xl bg-background/70 p-4 text-sm text-muted-foreground">
+              {isDirectorView ? "Elegí una institución de la tabla para revisar su detalle de seguimiento." : "Elegí una institución de la tabla para editarla o crear una nueva."}
+            </div>
+          ) : (
+            <>
+              {mode === "edit" && selectedInstitution ? (
+                <div className="rounded-2xl bg-background/70 p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex min-w-0 items-center gap-3">
+                      <InstitutionAvatar name={selectedInstitution.name} imageUrl={selectedInstitution.imageUrl} className="size-14 text-sm" />
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold text-foreground">{selectedInstitution.name}</p>
+                        <p className="mt-1 truncate text-sm text-muted-foreground">{selectedInstitution.email}</p>
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <Badge variant={selectedInstitution.status === "active" ? "success" : "outline"}>
+                        {selectedInstitution.status === "active" ? "activa" : "eliminada"}
+                      </Badge>
+                      <Badge variant={selectedInstitution.imageUrl ? "secondary" : "outline"}>
+                        {selectedInstitution.imageUrl ? "logo cargado" : "sin logo"}
+                      </Badge>
+                      {selectedInstitution.needsReview ? <Badge variant="outline">revisar</Badge> : null}
+                    </div>
+                  </div>
+                  <div className="mt-3 grid gap-2 text-xs text-muted-foreground sm:grid-cols-2">
+                    <p>Usuarios vinculados: {selectedInstitution.userCount}</p>
+                    <p>Dispositivos vinculados: {selectedInstitution.deviceCount}</p>
+                    <p>Grupos vinculados: {selectedInstitution.classGroupCount}</p>
+                    <p>Estudiantes vinculados: {selectedInstitution.studentCount}</p>
+                    <p>Creada: {formatDateTime(selectedInstitution.createdAt)}</p>
+                    <p>Actualizada: {formatDateTime(selectedInstitution.updatedAt)}</p>
+                  </div>
+                </div>
+              ) : null}
+
+              <form className="space-y-5" onSubmit={handleSubmit}>
+                <ImageUploadField
+                  value={form.imageUrl}
+                  file={imageFile}
+                  onFileChange={setImageFile}
+                  onRemoveCurrent={() => {
+                    setImageFile(null);
+                    updateFormField("imageUrl", "");
+                  }}
+                  disabled={!canSubmitForm || isSaving}
+                  label="Logo o imagen institucional"
+                  description="Subí el logo o una imagen de referencia de la institución. Se guarda con upload real al confirmar el formulario."
+                />
+
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-2 md:col-span-2">
+                    <Label htmlFor="name">Nombre</Label>
+                    <Input id="name" disabled={!canSubmitForm} value={form.name} onChange={(event) => updateFormField("name", event.target.value)} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="email">Email</Label>
+                    <Input id="email" disabled={!canSubmitForm} type="email" value={form.email} onChange={(event) => updateFormField("email", event.target.value)} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="phoneNumber">Teléfono</Label>
+                    <Input id="phoneNumber" disabled={!canSubmitForm} value={form.phoneNumber} onChange={(event) => updateFormField("phoneNumber", event.target.value)} />
+                  </div>
+                  <div className="space-y-2 md:col-span-2">
+                    <Label htmlFor="url">URL</Label>
+                    <Input id="url" disabled={!canSubmitForm} value={form.url} onChange={(event) => updateFormField("url", event.target.value)} placeholder="https://..." />
+                  </div>
+                </div>
+
+                <div className="space-y-3 rounded-2xl bg-background/70 p-4">
+                  <p className="text-sm font-medium text-foreground">Dirección</p>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div className="space-y-2 md:col-span-2">
+                      <Label htmlFor="addressFirstLine">Calle</Label>
+                      <Input id="addressFirstLine" disabled={!canSubmitForm} value={form.addressFirstLine} onChange={(event) => updateFormField("addressFirstLine", event.target.value)} />
+                    </div>
+                    <div className="space-y-2 md:col-span-2">
+                      <Label htmlFor="addressSecondLine">Complemento</Label>
+                      <Input id="addressSecondLine" disabled={!canSubmitForm} value={form.addressSecondLine} onChange={(event) => updateFormField("addressSecondLine", event.target.value)} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="city">Ciudad</Label>
+                      <Input id="city" disabled={!canSubmitForm} value={form.city} onChange={(event) => updateFormField("city", event.target.value)} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="countryCode">País (código)</Label>
+                      <Input id="countryCode" disabled={!canSubmitForm} value={form.countryCode} onChange={(event) => updateFormField("countryCode", event.target.value)} placeholder="UY" maxLength={2} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="state">Departamento / estado</Label>
+                      <Input id="state" disabled={!canSubmitForm} value={form.state} onChange={(event) => updateFormField("state", event.target.value)} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="postalCode">Código postal</Label>
+                      <Input id="postalCode" disabled={!canSubmitForm} value={form.postalCode} onChange={(event) => updateFormField("postalCode", event.target.value)} />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap gap-3">
+                  <Button type="submit" disabled={isSaving || !tokens?.accessToken || !canSubmitForm}>
+                    {mode === "create" ? (canCreateInstitutions ? "Crear institución" : "Alta bloqueada") : canUpdateInstitutions ? "Guardar cambios" : "Edición bloqueada"}
+                  </Button>
+                  {mode === "create" ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => {
+                        setMode("edit");
+                        if (selectedInstitution) setForm(formFromInstitution(selectedInstitution));
+                        setFeedback(null);
+                        closeInstitutionForm();
+                      }}
+                    >
+                      Cancelar
+                    </Button>
+                  ) : canDeleteInstitutions ? (
+                    <Button type="button" variant="destructive" disabled={isSaving || !selectedInstitution} onClick={handleDelete}>
+                      <Trash2 className="size-4" />
+                      Eliminar
+                    </Button>
+                  ) : (
+                    <Badge variant="outline">Sin permiso para eliminar</Badge>
+                  )}
+                </div>
+              </form>
+            </>
+          )}
+        </CardContent>
+      </Card>
+    );
   }
 
   return (
@@ -415,12 +686,7 @@ export function InstitutionsOverview() {
             <Button
               type="button"
               disabled={!canCreateInstitutions}
-              onClick={() => {
-                setMode("create");
-                setSelectedInstitutionId(null);
-                setForm(emptyFormState());
-                setFeedback(null);
-              }}
+              onClick={openCreateInstitutionForm}
             >
               <UserPlus className="size-4" />
               {canCreateInstitutions ? "Nueva institución" : "Alta no disponible"}
@@ -455,7 +721,7 @@ export function InstitutionsOverview() {
         </CardContent>
       </Card>
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+      <div className="grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(220px,1fr))]">
         {institutionsQuery.isLoading ? (
           Array.from({ length: 4 }).map((_, index) => <Skeleton key={index} className="h-32 rounded-2xl" />)
         ) : (
@@ -496,12 +762,26 @@ export function InstitutionsOverview() {
               hint="Falta URL, teléfono o dirección básica para operar con comodidad."
               icon={ShieldCheck}
             />
+            <SummaryCard
+              label="Con logo cargado"
+              value={String(metrics.institutionsWithLogo)}
+              hint="Ayuda a cerrar identidad visual y reconocimiento rápido dentro del dashboard."
+              icon={Building2}
+            />
           </>
         )}
       </div>
 
       <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
-        <CardContent className="flex flex-wrap gap-2 p-5">
+        <CardContent className="p-5">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-semibold text-foreground">Enfocar listado</p>
+              <p className="text-sm text-muted-foreground">Priorizá instituciones con huecos de operación antes de editar datos base.</p>
+            </div>
+            <Badge variant="outline">{filtered.length} visibles</Badge>
+          </div>
+          <div className="flex flex-wrap gap-2">
           {focusSegments.map((segment) => (
             <Button
               key={segment.key}
@@ -527,10 +807,11 @@ export function InstitutionsOverview() {
           >
             Limpiar foco
           </Button>
+          </div>
         </CardContent>
       </Card>
 
-      <div className="grid gap-6 xl:grid-cols-[1.25fr_0.95fr]">
+      <div className="grid gap-6 2xl:grid-cols-[minmax(0,1.4fr)_420px]">
         <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
           <CardHeader>
             <CardTitle>{isDirectorView ? "Instituciones visibles para seguimiento" : "Mapa institucional"}</CardTitle>
@@ -570,11 +851,14 @@ export function InstitutionsOverview() {
                     filtered.map((item) => {
                       const active = mode === "edit" && selectedInstitutionId === item.id;
                       return (
-                        <TableRow key={item.id} className={cn("cursor-pointer", active && "bg-primary/5")} onClick={() => selectInstitution(item)}>
+                        <TableRow key={item.id} className={cn("cursor-pointer", active && "border-primary/30 bg-primary/8")} onClick={() => selectInstitution(item)}>
                           <TableCell>
-                            <div>
-                              <p className="font-medium text-foreground">{item.name}</p>
-                              <p className="text-xs text-muted-foreground">{item.email}</p>
+                            <div className="flex min-w-0 items-center gap-3">
+                              <InstitutionAvatar name={item.name} imageUrl={item.imageUrl} className="size-10 text-[11px]" />
+                              <div className="min-w-0">
+                                <p className="truncate font-medium text-foreground">{item.name}</p>
+                                <p className="truncate text-xs text-muted-foreground">{item.email}</p>
+                              </div>
                             </div>
                           </TableCell>
                           <TableCell>
@@ -590,6 +874,7 @@ export function InstitutionsOverview() {
                               <Badge variant={item.status === "active" ? "success" : "outline"}>
                                 {item.status === "active" ? "activa" : "eliminada"}
                               </Badge>
+                              <Badge variant={item.imageUrl ? "secondary" : "outline"}>{item.imageUrl ? "logo" : "sin logo"}</Badge>
                               {item.needsReview ? <Badge variant="outline">revisar</Badge> : null}
                             </div>
                           </TableCell>
@@ -607,144 +892,63 @@ export function InstitutionsOverview() {
         <div className="space-y-6">
           <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
             <CardHeader>
-              <CardTitle>{mode === "create" ? "Alta de institución" : isDirectorView ? "Detalle de seguimiento" : "Editar institución"}</CardTitle>
+              <CardTitle>Alta y edición</CardTitle>
               <CardDescription>
-                {mode === "create"
-                  ? canCreateInstitutions
-                    ? "Alta conectada al endpoint real de instituciones."
-                    : "Tu perfil actual no expone alta de instituciones."
-                  : isDirectorView
-                  ? "Resumen de contacto, cobertura visible y señales básicas para seguimiento institucional."
-                  : canUpdateInstitutions
-                    ? "Datos base del cliente, contacto y localización operativa."
-                    : "Vista de solo lectura para los datos base de la institución."}
+                Los formularios de instituciones ahora priorizan pop-up en anchos intermedios para que el mapa operativo no quede comprimido.
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-5">
-              {feedback ? (
-                <div
-                  className={cn(
-                    "rounded-2xl border px-4 py-3 text-sm",
-                    feedback.type === "success"
-                      ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                      : "border-destructive/20 bg-destructive/5 text-destructive",
-                  )}
-                >
-                  {feedback.message}
-                </div>
-              ) : null}
-
-              {mode === "edit" && !selectedInstitution ? (
-                <div className="rounded-2xl bg-background/70 p-4 text-sm text-muted-foreground">
-                  {isDirectorView ? "Elegí una institución de la tabla para revisar su detalle de seguimiento." : "Elegí una institución de la tabla para editarla o crear una nueva."}
+            <CardContent className="space-y-4">
+              {mode === "edit" && selectedInstitution ? (
+                <div className="rounded-2xl border border-border/70 bg-white/80 p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex min-w-0 items-center gap-3">
+                      <InstitutionAvatar name={selectedInstitution.name} imageUrl={selectedInstitution.imageUrl} className="size-12 text-xs" />
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold text-foreground">{selectedInstitution.name}</p>
+                        <p className="mt-1 truncate text-sm text-muted-foreground">{selectedInstitution.email}</p>
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <Badge variant={selectedInstitution.status === "active" ? "success" : "outline"}>
+                        {selectedInstitution.status === "active" ? "activa" : "eliminada"}
+                      </Badge>
+                      <Badge variant={selectedInstitution.imageUrl ? "secondary" : "outline"}>
+                        {selectedInstitution.imageUrl ? "logo cargado" : "sin logo"}
+                      </Badge>
+                      {selectedInstitution.needsReview ? <Badge variant="outline">revisar</Badge> : null}
+                    </div>
+                  </div>
                 </div>
               ) : (
-                <>
-                  {mode === "edit" && selectedInstitution ? (
-                    <div className="rounded-2xl bg-background/70 p-4">
-                      <div className="flex flex-wrap items-center justify-between gap-3">
-                        <div>
-                          <p className="text-sm font-semibold text-foreground">{selectedInstitution.name}</p>
-                          <p className="mt-1 text-sm text-muted-foreground">{selectedInstitution.email}</p>
-                        </div>
-                        <div className="flex flex-wrap gap-2">
-                          <Badge variant={selectedInstitution.status === "active" ? "success" : "outline"}>
-                            {selectedInstitution.status === "active" ? "activa" : "eliminada"}
-                          </Badge>
-                          {selectedInstitution.needsReview ? <Badge variant="outline">revisar</Badge> : null}
-                        </div>
-                      </div>
-                      <div className="mt-3 grid gap-2 text-xs text-muted-foreground sm:grid-cols-2">
-                        <p>Usuarios vinculados: {selectedInstitution.userCount}</p>
-                        <p>Dispositivos vinculados: {selectedInstitution.deviceCount}</p>
-                        <p>Grupos vinculados: {selectedInstitution.classGroupCount}</p>
-                        <p>Estudiantes vinculados: {selectedInstitution.studentCount}</p>
-                        <p>Creada: {formatDateTime(selectedInstitution.createdAt)}</p>
-                        <p>Actualizada: {formatDateTime(selectedInstitution.updatedAt)}</p>
-                      </div>
-                    </div>
-                  ) : null}
-
-                  <form className="space-y-5" onSubmit={handleSubmit}>
-                    <div className="grid gap-4 md:grid-cols-2">
-                      <div className="space-y-2 md:col-span-2">
-                        <Label htmlFor="name">Nombre</Label>
-                        <Input id="name" disabled={!canSubmitForm} value={form.name} onChange={(event) => updateFormField("name", event.target.value)} />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="email">Email</Label>
-                        <Input id="email" disabled={!canSubmitForm} type="email" value={form.email} onChange={(event) => updateFormField("email", event.target.value)} />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="phoneNumber">Teléfono</Label>
-                        <Input id="phoneNumber" disabled={!canSubmitForm} value={form.phoneNumber} onChange={(event) => updateFormField("phoneNumber", event.target.value)} />
-                      </div>
-                      <div className="space-y-2 md:col-span-2">
-                        <Label htmlFor="url">URL</Label>
-                        <Input id="url" disabled={!canSubmitForm} value={form.url} onChange={(event) => updateFormField("url", event.target.value)} placeholder="https://..." />
-                      </div>
-                    </div>
-
-                    <div className="space-y-3 rounded-2xl bg-background/70 p-4">
-                      <p className="text-sm font-medium text-foreground">Dirección</p>
-                      <div className="grid gap-4 md:grid-cols-2">
-                        <div className="space-y-2 md:col-span-2">
-                          <Label htmlFor="addressFirstLine">Calle</Label>
-                          <Input id="addressFirstLine" disabled={!canSubmitForm} value={form.addressFirstLine} onChange={(event) => updateFormField("addressFirstLine", event.target.value)} />
-                        </div>
-                        <div className="space-y-2 md:col-span-2">
-                          <Label htmlFor="addressSecondLine">Complemento</Label>
-                          <Input id="addressSecondLine" disabled={!canSubmitForm} value={form.addressSecondLine} onChange={(event) => updateFormField("addressSecondLine", event.target.value)} />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="city">Ciudad</Label>
-                          <Input id="city" disabled={!canSubmitForm} value={form.city} onChange={(event) => updateFormField("city", event.target.value)} />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="countryCode">País (código)</Label>
-                          <Input id="countryCode" disabled={!canSubmitForm} value={form.countryCode} onChange={(event) => updateFormField("countryCode", event.target.value)} placeholder="UY" maxLength={2} />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="state">Departamento / estado</Label>
-                          <Input id="state" disabled={!canSubmitForm} value={form.state} onChange={(event) => updateFormField("state", event.target.value)} />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="postalCode">Código postal</Label>
-                          <Input id="postalCode" disabled={!canSubmitForm} value={form.postalCode} onChange={(event) => updateFormField("postalCode", event.target.value)} />
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="flex flex-wrap gap-3">
-                      <Button type="submit" disabled={isSaving || !tokens?.accessToken || !canSubmitForm}>
-                        {mode === "create" ? (canCreateInstitutions ? "Crear institución" : "Alta bloqueada") : canUpdateInstitutions ? "Guardar cambios" : "Edición bloqueada"}
-                      </Button>
-                      {mode === "create" ? (
-                        <Button
-                          type="button"
-                          variant="outline"
-                          onClick={() => {
-                            setMode("edit");
-                            if (selectedInstitution) setForm(formFromInstitution(selectedInstitution));
-                            setFeedback(null);
-                          }}
-                        >
-                          Cancelar
-                        </Button>
-                      ) : canDeleteInstitutions ? (
-                        <Button type="button" variant="destructive" disabled={isSaving || !selectedInstitution} onClick={handleDelete}>
-                          <Trash2 className="size-4" />
-                          Eliminar
-                        </Button>
-                      ) : (
-                        <Badge variant="outline">Sin permiso para eliminar</Badge>
-                      )}
-                    </div>
-                  </form>
-                </>
+                <div className="rounded-2xl border border-border/70 bg-white/80 p-4 text-sm leading-6 text-muted-foreground">
+                  Seleccioná una institución para editarla o usá el alta rápida para abrir el formulario sin perder el contexto del listado.
+                </div>
               )}
+
+              <div className="flex flex-wrap gap-3">
+                <Button type="button" onClick={openCreateInstitutionForm} disabled={!canCreateInstitutions}>
+                  <UserPlus className="size-4" />
+                  {canCreateInstitutions ? "Nueva institución" : "Alta no disponible"}
+                </Button>
+                <Button type="button" variant="outline" onClick={openEditInstitutionForm} disabled={!selectedInstitution}>
+                  Editar seleccionada
+                </Button>
+              </div>
+
+              <div className={cn("hidden 2xl:block", isFormModalOpen && "2xl:hidden")}>{renderInstitutionEditorPanel()}</div>
             </CardContent>
           </Card>
+
+          <Modal
+            open={isFormModalOpen}
+            onClose={closeInstitutionForm}
+            title={mode === "create" ? "Alta de institución" : "Editar institución"}
+            description={mode === "create" ? "Completá el formulario sin salir del módulo." : "Ajustá contacto, cobertura y datos base dentro de un pop-up más cómodo para edición."}
+            className="max-w-[1120px]"
+            hideHeader
+          >
+            {renderInstitutionEditorPanel()}
+          </Modal>
 
           <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
             <CardHeader>
@@ -761,11 +965,20 @@ export function InstitutionsOverview() {
               ) : (
                 <>
                   <div className="rounded-2xl bg-background/70 p-4">
-                    <div className="flex items-center gap-2 text-sm font-medium text-foreground">
-                      <MapPin className="size-4 text-primary" />
-                      {selectedInstitution.address?.addressFirstLine || "Sin dirección cargada"}
+                    <div className="flex flex-wrap items-start gap-3">
+                      <InstitutionAvatar name={selectedInstitution.name} imageUrl={selectedInstitution.imageUrl} className="size-16 text-base" />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-semibold text-foreground">{selectedInstitution.name}</p>
+                        <div className="mt-2 flex items-center gap-2 text-sm font-medium text-foreground">
+                          <MapPin className="size-4 text-primary" />
+                          <span className="min-w-0 truncate">{selectedInstitution.address?.addressFirstLine || "Sin dirección cargada"}</span>
+                        </div>
+                      </div>
                     </div>
                     <div className="mt-3 flex flex-wrap gap-2">
+                      <Badge variant={selectedInstitution.imageUrl ? "secondary" : "outline"}>
+                        {selectedInstitution.imageUrl ? "logo institucional cargado" : "logo pendiente"}
+                      </Badge>
                       {selectedInstitution.url ? (
                         <Badge variant="outline">
                           <Globe className="mr-1 size-3" />
@@ -793,11 +1006,22 @@ export function InstitutionsOverview() {
                       {previewUsers.length > 0 ? (
                         previewUsers.map((user) => (
                           <div key={user.id} className="rounded-2xl bg-background/70 p-3">
-                            <div className="flex flex-wrap items-center justify-between gap-2">
-                              <p className="text-sm font-medium text-foreground">{user.fullName}</p>
+                            <div className="flex flex-wrap items-center justify-between gap-3">
+                              <div className="flex min-w-0 items-center gap-3">
+                                <div className="flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-border/70 bg-white text-xs font-semibold text-primary">
+                                  {user.imageUrl ? (
+                                    <img src={user.imageUrl} alt={user.fullName} className="h-full w-full object-cover" />
+                                  ) : (
+                                    user.fullName.slice(0, 1).toUpperCase()
+                                  )}
+                                </div>
+                                <div className="min-w-0">
+                                  <p className="truncate text-sm font-medium text-foreground">{user.fullName}</p>
+                                  <p className="mt-1 truncate text-xs text-muted-foreground">{user.email}</p>
+                                </div>
+                              </div>
                               <Badge variant="secondary">{user.userType}</Badge>
                             </div>
-                            <p className="mt-1 text-xs text-muted-foreground">{user.email}</p>
                             <div className="mt-2 flex flex-wrap gap-2">
                               {user.roleCodes.map((roleCode) => (
                                 <Badge key={roleCode} variant="outline">{roleCode}</Badge>
@@ -891,7 +1115,7 @@ export function InstitutionsOverview() {
             Señales rápidas para completar contacto, dirección o presencia web antes de seguir escalando operación.
           </CardDescription>
         </CardHeader>
-        <CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+        <CardContent className="grid gap-3 md:grid-cols-2 2xl:grid-cols-3">
           {institutionsQuery.isLoading ? (
             Array.from({ length: 3 }).map((_, index) => <Skeleton key={index} className="h-24 rounded-2xl" />)
           ) : institutionRows.filter((item) => item.needsReview).length === 0 ? (
@@ -915,6 +1139,7 @@ export function InstitutionsOverview() {
                     {!item.phoneNumber ? <Badge variant="outline">sin teléfono</Badge> : null}
                     {!item.url ? <Badge variant="outline">sin URL</Badge> : null}
                     {!item.address?.addressFirstLine ? <Badge variant="outline">sin dirección</Badge> : null}
+                    {!item.imageUrl ? <Badge variant="outline">sin logo</Badge> : null}
                     {item.userCount > 0 ? <Badge variant="secondary">{item.userCount} usuarios</Badge> : null}
                     {item.deviceCount > 0 ? <Badge variant="outline">{item.deviceCount} dispositivos</Badge> : null}
                   </div>

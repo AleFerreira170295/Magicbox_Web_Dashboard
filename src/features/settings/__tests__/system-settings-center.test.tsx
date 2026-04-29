@@ -7,6 +7,7 @@ const useAuthMock = vi.fn();
 const useBasicHealthMock = vi.fn();
 const useReadinessHealthMock = vi.fn();
 const useOtaReleaseMock = vi.fn();
+const useOtaReleasesMock = vi.fn();
 const useAccessFeaturesMock = vi.fn();
 const useAccessActionsMock = vi.fn();
 
@@ -15,7 +16,12 @@ vi.mock("@/features/health/api", () => ({
   useBasicHealth: (...args: unknown[]) => useBasicHealthMock(...args),
   useReadinessHealth: (...args: unknown[]) => useReadinessHealthMock(...args),
 }));
-vi.mock("@/features/settings/api", () => ({ useOtaRelease: (...args: unknown[]) => useOtaReleaseMock(...args) }));
+vi.mock("@/features/settings/api", () => ({
+  useOtaRelease: (...args: unknown[]) => useOtaReleaseMock(...args),
+  useOtaReleases: (...args: unknown[]) => useOtaReleasesMock(...args),
+  createOtaRelease: vi.fn(),
+  activateOtaRelease: vi.fn(),
+}));
 vi.mock("@/features/access-control/api", () => ({
   useAccessFeatures: (...args: unknown[]) => useAccessFeaturesMock(...args),
   useAccessActions: (...args: unknown[]) => useAccessActionsMock(...args),
@@ -37,6 +43,7 @@ describe("SystemSettingsCenter", () => {
     useBasicHealthMock.mockReturnValue(okQuery({ environment: "local", version: "1.0.0" }));
     useReadinessHealthMock.mockReturnValue(okQuery({ status: "healthy", checks: {} }));
     useOtaReleaseMock.mockReturnValue(okQuery({ configured: false, channel: null }));
+    useOtaReleasesMock.mockReturnValue(okQuery(okPaginated([])));
     useAccessFeaturesMock.mockReturnValue(okQuery(okPaginated([])));
     useAccessActionsMock.mockReturnValue(okQuery(okPaginated([])));
   });

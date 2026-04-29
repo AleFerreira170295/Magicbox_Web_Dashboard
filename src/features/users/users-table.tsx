@@ -1,5 +1,7 @@
 "use client";
 
+/* eslint-disable @next/next/no-img-element */
+
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { KeyRound, Phone, Search, ShieldCheck, Trash2, UserPlus, Users } from "lucide-react";
@@ -7,8 +9,10 @@ import { SectionHeader } from "@/components/section-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { ImageUploadField } from "@/components/ui/image-upload-field";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Modal } from "@/components/ui/modal";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
@@ -22,7 +26,7 @@ import {
 import type { PermissionRecord } from "@/features/access-control/types";
 import { useAuth } from "@/features/auth/auth-context";
 import { useInstitutions } from "@/features/institutions/api";
-import { createUser, deleteUser, updateUser, useUsers } from "@/features/users/api";
+import { createUser, deleteUser, updateUser, uploadUserImage, useUsers } from "@/features/users/api";
 import type { CreateUserPayload, UpdateUserPayload, UserMutationPayload, UserRecord } from "@/features/users/types";
 import { cn, formatDateTime, getErrorMessage } from "@/lib/utils";
 
@@ -82,7 +86,7 @@ const roleBundles = [
 ] as const;
 
 type FormMode = "create" | "edit";
-type UsersFocusFilter = "all" | "review" | "no_acl" | "teachers" | "admins";
+type UsersFocusFilter = "all" | "review" | "no_image" | "no_acl" | "teachers" | "admins";
 
 type FeedbackState = {
   type: "success" | "error";
@@ -217,6 +221,39 @@ function buildPayload(form: UserFormState, mode: FormMode) {
   return { payload: payload as UpdateUserPayload };
 }
 
+function getUserInitials(user: Pick<UserRecord, "firstName" | "lastName" | "fullName">) {
+  const first = user.firstName?.trim()?.slice(0, 1) || "";
+  const last = user.lastName?.trim()?.slice(0, 1) || "";
+  const combined = `${first}${last}`.toUpperCase();
+  if (combined) return combined;
+
+  return user.fullName
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part.slice(0, 1).toUpperCase())
+    .join("") || "US";
+}
+
+function UserAvatar({
+  user,
+  className,
+}: {
+  user: Pick<UserRecord, "firstName" | "lastName" | "fullName" | "imageUrl">;
+  className?: string;
+}) {
+  return (
+    <div className={cn("flex shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-border/70 bg-white font-semibold text-primary", className)}>
+      {user.imageUrl ? (
+        <img src={user.imageUrl} alt={user.fullName} className="h-full w-full object-cover" />
+      ) : (
+        <span>{getUserInitials(user)}</span>
+      )}
+    </div>
+  );
+}
+
 function inferRoles(user: UserRecord, permissionKeys: string[]) {
   const roles = new Set(user.roles);
   const keySet = new Set(permissionKeys);
@@ -316,6 +353,8 @@ export function UsersTable() {
   const [feedback, setFeedback] = useState<FeedbackState>(null);
   const [permissionBusy, setPermissionBusy] = useState(false);
   const [aclScope, setAclScope] = useState<string>(GLOBAL_SCOPE);
+  const [isFormModalOpen, setIsFormModalOpen] = useState(false);
+  const [imageFile, setImageFile] = useState<File | null>(null);
 
   const auditEventsQuery = useAccessAuditEvents(tokens?.accessToken, selectedUserId || undefined, 20);
 
@@ -466,6 +505,8 @@ export function UsersTable() {
         switch (focusFilter) {
           case "review":
             return item.needsReview;
+          case "no_image":
+            return !item.imageUrl;
           case "no_acl":
             return item.explicitPermissionKeys.length === 0;
           case "teachers":
@@ -484,6 +525,7 @@ export function UsersTable() {
   const metrics = useMemo(() => {
     const permissionedUsers = users.filter((item) => item.explicitPermissionKeys.length > 0).length;
     const adminLikeUsers = users.filter((item) => item.inferredRoles.includes("admin") || item.inferredRoles.includes("institution-admin")).length;
+    const usersWithImage = users.filter((item) => Boolean(item.imageUrl)).length;
     const reviewUsers = users.filter((item) => item.needsReview).length;
     const usersWithoutAcl = users.filter((item) => item.explicitPermissionKeys.length === 0).length;
     const teacherUsers = users.filter((item) => item.inferredRoles.includes("teacher")).length;
@@ -492,6 +534,7 @@ export function UsersTable() {
       totalUsers: usersQuery.data?.total || users.length,
       permissionedUsers,
       adminLikeUsers,
+      usersWithImage,
       reviewUsers,
       usersWithoutAcl,
       teacherUsers,
@@ -501,6 +544,7 @@ export function UsersTable() {
   const focusSegments = [
     { key: "all" as const, label: "Todos", count: metrics.totalUsers },
     { key: "review" as const, label: "Con observaciones", count: metrics.reviewUsers },
+    { key: "no_image" as const, label: "Sin imagen", count: metrics.totalUsers - metrics.usersWithImage },
     { key: "no_acl" as const, label: "Sin ACL explícita", count: metrics.usersWithoutAcl },
     { key: "teachers" as const, label: "Docentes", count: metrics.teacherUsers },
     { key: "admins" as const, label: "Admins", count: metrics.adminLikeUsers },
@@ -526,7 +570,16 @@ export function UsersTable() {
   }, [actions, features, selectedUser]);
 
   const createUserMutation = useMutation({
-    mutationFn: (payload: CreateUserPayload) => createUser(tokens?.accessToken as string, payload),
+    mutationFn: async ({ payload, imageFile }: { payload: CreateUserPayload; imageFile: File | null }) => {
+      const createdUser = await createUser(tokens?.accessToken as string, payload);
+      if (!imageFile) return createdUser;
+
+      const uploadResult = await uploadUserImage(tokens?.accessToken as string, createdUser.id, imageFile);
+      return {
+        ...createdUser,
+        imageUrl: uploadResult.imageUrl,
+      };
+    },
     onSuccess: async (createdUser) => {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["users"] }),
@@ -536,6 +589,8 @@ export function UsersTable() {
       setMode("edit");
       setSelectedUserId(createdUser.id);
       setForm(formFromUser(createdUser));
+      setImageFile(null);
+      setIsFormModalOpen(false);
     },
     onError: (error) => {
       setFeedback({ type: "error", message: getErrorMessage(error) });
@@ -543,8 +598,16 @@ export function UsersTable() {
   });
 
   const updateUserMutation = useMutation({
-    mutationFn: ({ userId, payload }: { userId: string; payload: UpdateUserPayload }) =>
-      updateUser(tokens?.accessToken as string, userId, payload),
+    mutationFn: async ({ userId, payload, imageFile }: { userId: string; payload: UpdateUserPayload; imageFile?: File | null }) => {
+      const updatedUser = await updateUser(tokens?.accessToken as string, userId, payload);
+      if (!imageFile) return updatedUser;
+
+      const uploadResult = await uploadUserImage(tokens?.accessToken as string, userId, imageFile);
+      return {
+        ...updatedUser,
+        imageUrl: uploadResult.imageUrl,
+      };
+    },
     onSuccess: async (updatedUser) => {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["users"] }),
@@ -553,6 +616,8 @@ export function UsersTable() {
       setFeedback({ type: "success", message: "Usuario actualizado correctamente." });
       setSelectedUserId(updatedUser.id);
       setForm(formFromUser(updatedUser));
+      setImageFile(null);
+      setIsFormModalOpen(false);
     },
     onError: (error) => {
       setFeedback({ type: "error", message: getErrorMessage(error) });
@@ -567,6 +632,8 @@ export function UsersTable() {
       setSelectedUserId(null);
       setMode("create");
       setForm(emptyFormState());
+      setImageFile(null);
+      setIsFormModalOpen(false);
     },
     onError: (error) => {
       setFeedback({ type: "error", message: getErrorMessage(error) });
@@ -640,6 +707,36 @@ export function UsersTable() {
     setAclScope(user.educationalCenterId || scopedInstitutionId || GLOBAL_SCOPE);
     setForm(formFromUser(user));
     setFeedback(null);
+    setImageFile(null);
+  }
+
+  function openCreateUserForm() {
+    setMode("create");
+    setSelectedUserId(null);
+    setAclScope(scopedInstitutionId || GLOBAL_SCOPE);
+    setForm({
+      ...emptyFormState(),
+      educationalCenterId: scopedInstitutionId || "",
+    });
+    setFeedback(null);
+    setImageFile(null);
+    setIsFormModalOpen(true);
+  }
+
+  function openEditUserForm() {
+    if (!selectedUser) return;
+    setMode("edit");
+    setSelectedUserId(selectedUser.id);
+    setAclScope(selectedUser.educationalCenterId || scopedInstitutionId || GLOBAL_SCOPE);
+    setForm(formFromUser(selectedUser));
+    setFeedback(null);
+    setImageFile(null);
+    setIsFormModalOpen(true);
+  }
+
+  function closeUserForm() {
+    setImageFile(null);
+    setIsFormModalOpen(false);
   }
 
   function hasBundle(user: UserRow, bundle: (typeof roleBundles)[number], scope: string = GLOBAL_SCOPE) {
@@ -776,7 +873,10 @@ export function UsersTable() {
     }
 
     if (mode === "create") {
-      await createUserMutation.mutateAsync(result.payload as CreateUserPayload);
+      await createUserMutation.mutateAsync({
+        payload: result.payload as CreateUserPayload,
+        imageFile,
+      });
       return;
     }
 
@@ -788,6 +888,7 @@ export function UsersTable() {
     await updateUserMutation.mutateAsync({
       userId: selectedUserId,
       payload: result.payload as UpdateUserPayload,
+      imageFile,
     });
   }
 
@@ -800,6 +901,222 @@ export function UsersTable() {
     if (!globalThis.confirm(`¿Eliminar a ${selectedUser.fullName}?`)) return;
     setFeedback(null);
     await deleteUserMutation.mutateAsync(selectedUser.id);
+  }
+
+  function renderUserEditorPanel() {
+    return (
+      <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
+        <CardHeader>
+          <CardTitle>{mode === "create" ? "Alta de usuario" : "Editar usuario"}</CardTitle>
+          <CardDescription>
+            {mode === "create"
+              ? canCreateUsers
+                ? "Alta inicial conectada al backend real."
+                : "Tu perfil actual puede consultar usuarios, pero no dar de alta nuevos registros."
+              : canUpdateUsers
+                ? "Datos base del usuario, vínculo institucional y tipo de acceso."
+                : "Vista de solo lectura para datos base del usuario y su contexto institucional."}
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-5">
+          {feedback ? (
+            <div
+              className={cn(
+                "rounded-2xl border px-4 py-3 text-sm",
+                feedback.type === "success"
+                  ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                  : "border-destructive/20 bg-destructive/5 text-destructive",
+              )}
+            >
+              {feedback.message}
+            </div>
+          ) : null}
+
+          {mode === "edit" && !selectedUser ? (
+            <div className="rounded-2xl bg-background/70 p-4 text-sm text-muted-foreground">
+              Elegí un usuario de la tabla para editarlo o crear uno nuevo.
+            </div>
+          ) : (
+            <>
+              {mode === "edit" && selectedUser ? (
+                <div className="rounded-2xl bg-background/70 p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex min-w-0 items-center gap-3">
+                      <UserAvatar user={selectedUser} className="size-12 text-xs" />
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold text-foreground">{selectedUser.fullName}</p>
+                        <p className="mt-1 truncate text-sm text-muted-foreground">{selectedUser.email}</p>
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <Badge variant={selectedUser.imageUrl ? "secondary" : "outline"}>
+                        {selectedUser.imageUrl ? "imagen cargada" : "sin imagen"}
+                      </Badge>
+                      {selectedUser.inferredRoles.map((role) => (
+                        <Badge key={role} variant={role === "admin" ? "warning" : "secondary"}>
+                          {role}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="mt-3 grid gap-2 text-xs text-muted-foreground sm:grid-cols-2">
+                    <p>Creado: {formatDateTime(selectedUser.createdAt)}</p>
+                    <p>Actualizado: {formatDateTime(selectedUser.updatedAt)}</p>
+                    <p>Institución: {resolveInstitutionLabel(selectedUser)}</p>
+                    <p>Permisos ACL: {selectedUser.explicitPermissionKeys.length}</p>
+                  </div>
+                </div>
+              ) : null}
+
+              <form className="space-y-5" onSubmit={handleSubmit}>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="firstName">Nombre</Label>
+                    <Input id="firstName" disabled={!canSubmitForm} value={form.firstName} onChange={(event) => updateFormField("firstName", event.target.value)} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="lastName">Apellido</Label>
+                    <Input id="lastName" disabled={!canSubmitForm} value={form.lastName} onChange={(event) => updateFormField("lastName", event.target.value)} />
+                  </div>
+                  <div className="space-y-2 md:col-span-2">
+                    <Label htmlFor="email">Email</Label>
+                    <Input id="email" disabled={!canSubmitForm} type="email" value={form.email} onChange={(event) => updateFormField("email", event.target.value)} />
+                  </div>
+                  {mode === "create" ? (
+                    <div className="space-y-2 md:col-span-2">
+                      <Label htmlFor="password">Contraseña inicial</Label>
+                      <Input id="password" disabled={!canSubmitForm} type="password" value={form.password} onChange={(event) => updateFormField("password", event.target.value)} />
+                    </div>
+                  ) : null}
+                  <div className="space-y-2">
+                    <Label htmlFor="phoneNumber">Teléfono</Label>
+                    <Input id="phoneNumber" disabled={!canSubmitForm} value={form.phoneNumber} onChange={(event) => updateFormField("phoneNumber", event.target.value)} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="userType">Tipo de usuario</Label>
+                    <SelectField disabled={!canSubmitForm} value={form.userType} onChange={(value) => updateFormField("userType", value as UserFormState["userType"])}>
+                      {userTypeOptions.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </SelectField>
+                  </div>
+                  <div className="space-y-2 md:col-span-2">
+                    <Label>Roles persistidos</Label>
+                    <div className="flex flex-wrap gap-2 rounded-2xl border border-border bg-background/70 p-3">
+                      {roleBundles.map((bundle) => {
+                        const active = form.roles.includes(bundle.role);
+                        return (
+                          <Button
+                            key={bundle.role}
+                            type="button"
+                            size="sm"
+                            variant={active ? "default" : "outline"}
+                            disabled={!canUpdateUsers}
+                            onClick={() => toggleFormRole(bundle.role)}
+                          >
+                            {bundle.label}
+                          </Button>
+                        );
+                      })}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Estos roles se guardan en backend. Los permisos finos se ajustan abajo desde ACL.
+                    </p>
+                  </div>
+                  <div className="space-y-2 md:col-span-2">
+                    <Label htmlFor="educationalCenterId">Institución</Label>
+                    <SelectField disabled={!canSubmitForm} value={form.educationalCenterId} onChange={(value) => updateFormField("educationalCenterId", value)}>
+                      {!scopedInstitutionId ? <option value="">Sin institución</option> : null}
+                      {institutions.map((institution) => (
+                        <option key={institution.id} value={institution.id}>
+                          {institution.name}
+                        </option>
+                      ))}
+                    </SelectField>
+                    <p className="text-xs text-muted-foreground">
+                      {scopedInstitutionName
+                        ? `En este modo, las altas y ediciones quedan ancladas a ${scopedInstitutionName}.`
+                        : "Podés dejar el usuario sin institución o asignarlo explícitamente."}
+                    </p>
+                  </div>
+                  <ImageUploadField
+                    value={form.imageUrl}
+                    file={imageFile}
+                    onFileChange={setImageFile}
+                    onRemoveCurrent={() => {
+                      updateFormField("imageUrl", "");
+                      setImageFile(null);
+                    }}
+                    disabled={!canSubmitForm}
+                    label="Imagen de perfil"
+                    description="Podés arrastrar una imagen o buscarla en la computadora. La guardamos al confirmar el alta o la edición del usuario."
+                  />
+                </div>
+
+                <div className="space-y-3 rounded-2xl bg-background/70 p-4">
+                  <p className="text-sm font-medium text-foreground">Dirección</p>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div className="space-y-2 md:col-span-2">
+                      <Label htmlFor="addressFirstLine">Calle</Label>
+                      <Input id="addressFirstLine" disabled={!canSubmitForm} value={form.addressFirstLine} onChange={(event) => updateFormField("addressFirstLine", event.target.value)} />
+                    </div>
+                    <div className="space-y-2 md:col-span-2">
+                      <Label htmlFor="addressSecondLine">Complemento</Label>
+                      <Input id="addressSecondLine" disabled={!canSubmitForm} value={form.addressSecondLine} onChange={(event) => updateFormField("addressSecondLine", event.target.value)} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="city">Ciudad</Label>
+                      <Input id="city" disabled={!canSubmitForm} value={form.city} onChange={(event) => updateFormField("city", event.target.value)} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="countryCode">País (código)</Label>
+                      <Input id="countryCode" disabled={!canSubmitForm} value={form.countryCode} onChange={(event) => updateFormField("countryCode", event.target.value)} placeholder="UY" maxLength={2} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="state">Departamento / estado</Label>
+                      <Input id="state" disabled={!canSubmitForm} value={form.state} onChange={(event) => updateFormField("state", event.target.value)} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="postalCode">Código postal</Label>
+                      <Input id="postalCode" disabled={!canSubmitForm} value={form.postalCode} onChange={(event) => updateFormField("postalCode", event.target.value)} />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap gap-3">
+                  <Button type="submit" disabled={isSaving || !tokens?.accessToken || !canSubmitForm}>
+                    {mode === "create" ? (canCreateUsers ? "Crear usuario" : "Alta bloqueada") : canUpdateUsers ? "Guardar cambios" : "Edición bloqueada"}
+                  </Button>
+                  {mode === "create" ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => {
+                        setMode("edit");
+                        if (selectedUser) setForm(formFromUser(selectedUser));
+                        setFeedback(null);
+                        closeUserForm();
+                      }}
+                    >
+                      Cancelar
+                    </Button>
+                  ) : canDeleteUsers ? (
+                    <Button type="button" variant="destructive" disabled={isSaving || !selectedUser} onClick={handleDelete}>
+                      <Trash2 className="size-4" />
+                      Eliminar
+                    </Button>
+                  ) : (
+                    <Badge variant="outline">Sin permiso para eliminar</Badge>
+                  )}
+                </div>
+              </form>
+            </>
+          )}
+        </CardContent>
+      </Card>
+    );
   }
 
   return (
@@ -826,16 +1143,7 @@ export function UsersTable() {
             <Button
               type="button"
               disabled={!canCreateUsers}
-              onClick={() => {
-                setMode("create");
-                setSelectedUserId(null);
-                setAclScope(scopedInstitutionId || GLOBAL_SCOPE);
-                setForm({
-                  ...emptyFormState(),
-                  educationalCenterId: scopedInstitutionId || "",
-                });
-                setFeedback(null);
-              }}
+              onClick={openCreateUserForm}
             >
               <UserPlus className="size-4" />
               {canCreateUsers ? "Nuevo usuario" : "Alta no disponible"}
@@ -873,7 +1181,7 @@ export function UsersTable() {
         </CardContent>
       </Card>
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(220px,1fr))]">
         {usersQuery.isLoading ? (
           Array.from({ length: 4 }).map((_, index) => <Skeleton key={index} className="h-32 rounded-2xl" />)
         ) : (
@@ -902,12 +1210,18 @@ export function UsersTable() {
               hint="Falta de institución, teléfono o dirección." 
               icon={Phone}
             />
+            <SummaryCard
+              label="Con imagen cargada"
+              value={String(metrics.usersWithImage)}
+              hint="Facilita reconocimiento rápido en lectura operativa y auditoría visual." 
+              icon={Users}
+            />
           </>
         )}
       </div>
 
       <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
-        <CardContent className="grid gap-4 p-5 md:grid-cols-2 xl:grid-cols-4">
+        <CardContent className="grid gap-4 p-5 md:grid-cols-2 2xl:grid-cols-4">
           <div className="space-y-2">
             <Label>Institución</Label>
             <SelectField value={institutionFilter} onChange={setInstitutionFilter}>
@@ -935,6 +1249,7 @@ export function UsersTable() {
             <SelectField value={focusFilter} onChange={(value) => setFocusFilter(value as UsersFocusFilter)}>
               <option value="all">Todos</option>
               <option value="review">Con observaciones</option>
+              <option value="no_image">Sin imagen</option>
               <option value="no_acl">Sin ACL explícita</option>
               <option value="teachers">Docentes</option>
               <option value="admins">Admins</option>
@@ -976,7 +1291,7 @@ export function UsersTable() {
         </CardContent>
       </Card>
 
-      <div className="grid gap-6 xl:grid-cols-[1.25fr_0.95fr]">
+      <div className="grid gap-6 2xl:grid-cols-[1.25fr_0.95fr]">
         <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
           <CardHeader>
             <CardTitle>Padrón de usuarios</CardTitle>
@@ -1016,9 +1331,12 @@ export function UsersTable() {
                       return (
                         <TableRow key={item.id} className={cn("cursor-pointer", active && "bg-primary/5")} onClick={() => selectUser(item)}>
                           <TableCell>
-                            <div>
-                              <p className="font-medium text-foreground">{item.fullName}</p>
-                              <p className="text-xs text-muted-foreground">{item.email}</p>
+                            <div className="flex min-w-0 items-center gap-3">
+                              <UserAvatar user={item} className="size-10 text-[11px]" />
+                              <div className="min-w-0">
+                                <p className="truncate font-medium text-foreground">{item.fullName}</p>
+                                <p className="truncate text-xs text-muted-foreground">{item.email}</p>
+                              </div>
                             </div>
                           </TableCell>
                           <TableCell>
@@ -1047,6 +1365,7 @@ export function UsersTable() {
                               <Badge variant={item.status === "active" ? "success" : "outline"}>
                                 {item.status === "active" ? "activo" : "eliminado"}
                               </Badge>
+                              <Badge variant={item.imageUrl ? "secondary" : "outline"}>{item.imageUrl ? "imagen" : "sin imagen"}</Badge>
                               {item.needsReview ? <Badge variant="outline">revisar</Badge> : null}
                             </div>
                           </TableCell>
@@ -1064,200 +1383,62 @@ export function UsersTable() {
         <div className="space-y-6">
           <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
             <CardHeader>
-              <CardTitle>{mode === "create" ? "Alta de usuario" : "Editar usuario"}</CardTitle>
+              <CardTitle>Edición y alta</CardTitle>
               <CardDescription>
-                {mode === "create"
-                  ? canCreateUsers
-                    ? "Alta inicial conectada al backend real."
-                    : "Tu perfil actual puede consultar usuarios, pero no dar de alta nuevos registros."
-                  : canUpdateUsers
-                    ? "Datos base del usuario, vínculo institucional y tipo de acceso."
-                    : "Vista de solo lectura para datos base del usuario y su contexto institucional."}
+                Los formularios de usuario ahora se abren como pop-up en ventanas medias/chicas para no comprimir la lectura operativa del módulo.
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-5">
-              {feedback ? (
-                <div
-                  className={cn(
-                    "rounded-2xl border px-4 py-3 text-sm",
-                    feedback.type === "success"
-                      ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                      : "border-destructive/20 bg-destructive/5 text-destructive",
-                  )}
-                >
-                  {feedback.message}
-                </div>
-              ) : null}
-
-              {mode === "edit" && !selectedUser ? (
-                <div className="rounded-2xl bg-background/70 p-4 text-sm text-muted-foreground">
-                  Elegí un usuario de la tabla para editarlo o crear uno nuevo.
+            <CardContent className="space-y-4">
+              {mode === "edit" && selectedUser ? (
+                <div className="rounded-2xl border border-border/70 bg-white/80 p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex min-w-0 items-center gap-3">
+                      <UserAvatar user={selectedUser} className="size-12 text-xs" />
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold text-foreground">{selectedUser.fullName}</p>
+                        <p className="mt-1 truncate text-sm text-muted-foreground">{selectedUser.email}</p>
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <Badge variant={selectedUser.imageUrl ? "secondary" : "outline"}>
+                        {selectedUser.imageUrl ? "imagen cargada" : "sin imagen"}
+                      </Badge>
+                      {selectedUser.inferredRoles.map((role) => (
+                        <Badge key={role} variant={role === "admin" ? "warning" : "secondary"}>{role}</Badge>
+                      ))}
+                    </div>
+                  </div>
                 </div>
               ) : (
-                <>
-                  {mode === "edit" && selectedUser ? (
-                    <div className="rounded-2xl bg-background/70 p-4">
-                      <div className="flex flex-wrap items-center justify-between gap-3">
-                        <div>
-                          <p className="text-sm font-semibold text-foreground">{selectedUser.fullName}</p>
-                          <p className="mt-1 text-sm text-muted-foreground">{selectedUser.email}</p>
-                        </div>
-                        <div className="flex flex-wrap gap-2">
-                          {selectedUser.inferredRoles.map((role) => (
-                            <Badge key={role} variant={role === "admin" ? "warning" : "secondary"}>
-                              {role}
-                            </Badge>
-                          ))}
-                        </div>
-                      </div>
-                      <div className="mt-3 grid gap-2 text-xs text-muted-foreground sm:grid-cols-2">
-                        <p>Creado: {formatDateTime(selectedUser.createdAt)}</p>
-                        <p>Actualizado: {formatDateTime(selectedUser.updatedAt)}</p>
-                        <p>Institución: {resolveInstitutionLabel(selectedUser)}</p>
-                        <p>Permisos ACL: {selectedUser.explicitPermissionKeys.length}</p>
-                      </div>
-                    </div>
-                  ) : null}
-
-                  <form className="space-y-5" onSubmit={handleSubmit}>
-                    <div className="grid gap-4 md:grid-cols-2">
-                      <div className="space-y-2">
-                        <Label htmlFor="firstName">Nombre</Label>
-                        <Input id="firstName" disabled={!canSubmitForm} value={form.firstName} onChange={(event) => updateFormField("firstName", event.target.value)} />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="lastName">Apellido</Label>
-                        <Input id="lastName" disabled={!canSubmitForm} value={form.lastName} onChange={(event) => updateFormField("lastName", event.target.value)} />
-                      </div>
-                      <div className="space-y-2 md:col-span-2">
-                        <Label htmlFor="email">Email</Label>
-                        <Input id="email" disabled={!canSubmitForm} type="email" value={form.email} onChange={(event) => updateFormField("email", event.target.value)} />
-                      </div>
-                      {mode === "create" ? (
-                        <div className="space-y-2 md:col-span-2">
-                          <Label htmlFor="password">Contraseña inicial</Label>
-                          <Input id="password" disabled={!canSubmitForm} type="password" value={form.password} onChange={(event) => updateFormField("password", event.target.value)} />
-                        </div>
-                      ) : null}
-                      <div className="space-y-2">
-                        <Label htmlFor="phoneNumber">Teléfono</Label>
-                        <Input id="phoneNumber" disabled={!canSubmitForm} value={form.phoneNumber} onChange={(event) => updateFormField("phoneNumber", event.target.value)} />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="userType">Tipo de usuario</Label>
-                        <SelectField disabled={!canSubmitForm} value={form.userType} onChange={(value) => updateFormField("userType", value as UserFormState["userType"])}>
-                          {userTypeOptions.map((option) => (
-                            <option key={option.value} value={option.value}>
-                              {option.label}
-                            </option>
-                          ))}
-                        </SelectField>
-                      </div>
-                      <div className="space-y-2 md:col-span-2">
-                        <Label>Roles persistidos</Label>
-                        <div className="flex flex-wrap gap-2 rounded-2xl border border-border bg-background/70 p-3">
-                          {roleBundles.map((bundle) => {
-                            const active = form.roles.includes(bundle.role);
-                            return (
-                              <Button
-                                key={bundle.role}
-                                type="button"
-                                size="sm"
-                                variant={active ? "default" : "outline"}
-                                disabled={!canUpdateUsers}
-                                onClick={() => toggleFormRole(bundle.role)}
-                              >
-                                {bundle.label}
-                              </Button>
-                            );
-                          })}
-                        </div>
-                        <p className="text-xs text-muted-foreground">
-                          Estos roles se guardan en backend. Los permisos finos se ajustan abajo desde ACL.
-                        </p>
-                      </div>
-                      <div className="space-y-2 md:col-span-2">
-                        <Label htmlFor="educationalCenterId">Institución</Label>
-                        <SelectField disabled={!canSubmitForm} value={form.educationalCenterId} onChange={(value) => updateFormField("educationalCenterId", value)}>
-                          {!scopedInstitutionId ? <option value="">Sin institución</option> : null}
-                          {institutions.map((institution) => (
-                            <option key={institution.id} value={institution.id}>
-                              {institution.name}
-                            </option>
-                          ))}
-                        </SelectField>
-                        <p className="text-xs text-muted-foreground">
-                          {scopedInstitutionName
-                            ? `En este modo, las altas y ediciones quedan ancladas a ${scopedInstitutionName}.`
-                            : "Podés dejar el usuario sin institución o asignarlo explícitamente."}
-                        </p>
-                      </div>
-                      <div className="space-y-2 md:col-span-2">
-                        <Label htmlFor="imageUrl">URL de imagen</Label>
-                        <Input id="imageUrl" disabled={!canSubmitForm} value={form.imageUrl} onChange={(event) => updateFormField("imageUrl", event.target.value)} placeholder="https://..." />
-                      </div>
-                    </div>
-
-                    <div className="space-y-3 rounded-2xl bg-background/70 p-4">
-                      <p className="text-sm font-medium text-foreground">Dirección</p>
-                      <div className="grid gap-4 md:grid-cols-2">
-                        <div className="space-y-2 md:col-span-2">
-                          <Label htmlFor="addressFirstLine">Calle</Label>
-                          <Input id="addressFirstLine" disabled={!canSubmitForm} value={form.addressFirstLine} onChange={(event) => updateFormField("addressFirstLine", event.target.value)} />
-                        </div>
-                        <div className="space-y-2 md:col-span-2">
-                          <Label htmlFor="addressSecondLine">Complemento</Label>
-                          <Input id="addressSecondLine" disabled={!canSubmitForm} value={form.addressSecondLine} onChange={(event) => updateFormField("addressSecondLine", event.target.value)} />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="city">Ciudad</Label>
-                          <Input id="city" disabled={!canSubmitForm} value={form.city} onChange={(event) => updateFormField("city", event.target.value)} />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="countryCode">País (código)</Label>
-                          <Input id="countryCode" disabled={!canSubmitForm} value={form.countryCode} onChange={(event) => updateFormField("countryCode", event.target.value)} placeholder="UY" maxLength={2} />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="state">Departamento / estado</Label>
-                          <Input id="state" disabled={!canSubmitForm} value={form.state} onChange={(event) => updateFormField("state", event.target.value)} />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="postalCode">Código postal</Label>
-                          <Input id="postalCode" disabled={!canSubmitForm} value={form.postalCode} onChange={(event) => updateFormField("postalCode", event.target.value)} />
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="flex flex-wrap gap-3">
-                      <Button type="submit" disabled={isSaving || !tokens?.accessToken || !canSubmitForm}>
-                        {mode === "create" ? (canCreateUsers ? "Crear usuario" : "Alta bloqueada") : canUpdateUsers ? "Guardar cambios" : "Edición bloqueada"}
-                      </Button>
-                      {mode === "create" ? (
-                        <Button
-                          type="button"
-                          variant="outline"
-                          onClick={() => {
-                            setMode("edit");
-                            if (selectedUser) setForm(formFromUser(selectedUser));
-                            setFeedback(null);
-                          }}
-                        >
-                          Cancelar
-                        </Button>
-                      ) : canDeleteUsers ? (
-                        <Button type="button" variant="destructive" disabled={isSaving || !selectedUser} onClick={handleDelete}>
-                          <Trash2 className="size-4" />
-                          Eliminar
-                        </Button>
-                      ) : (
-                        <Badge variant="outline">Sin permiso para eliminar</Badge>
-                      )}
-                    </div>
-                  </form>
-                </>
+                <div className="rounded-2xl border border-border/70 bg-white/80 p-4 text-sm leading-6 text-muted-foreground">
+                  Seleccioná un usuario de la tabla para editarlo o usá el alta rápida para crear uno nuevo sin perder contexto del padrón.
+                </div>
               )}
+
+              <div className="flex flex-wrap gap-3">
+                <Button type="button" onClick={openCreateUserForm} disabled={!canCreateUsers}>
+                  <UserPlus className="size-4" />
+                  {canCreateUsers ? "Nuevo usuario" : "Alta no disponible"}
+                </Button>
+                <Button type="button" variant="outline" onClick={openEditUserForm} disabled={!selectedUser}>
+                  Editar seleccionado
+                </Button>
+              </div>
+
+              <div className={cn("hidden 2xl:block", isFormModalOpen && "2xl:hidden")}>{renderUserEditorPanel()}</div>
             </CardContent>
           </Card>
+
+          <Modal
+            open={isFormModalOpen}
+            onClose={closeUserForm}
+            title={mode === "create" ? "Alta de usuario" : "Editar usuario"}
+            description={mode === "create" ? "Completá el formulario sin salir del módulo." : "Ajustá datos base, vínculo institucional y contexto de acceso."}
+            className="max-w-[1180px]"
+            hideHeader
+          >
+            {renderUserEditorPanel()}
+          </Modal>
 
           <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
             <CardHeader>
@@ -1433,7 +1614,7 @@ export function UsersTable() {
             Cruce rápido entre datos incompletos y configuración de acceso explícita.
           </CardDescription>
         </CardHeader>
-        <CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+        <CardContent className="grid gap-3 md:grid-cols-2 2xl:grid-cols-3">
           {usersQuery.isLoading ? (
             Array.from({ length: 6 }).map((_, index) => <Skeleton key={index} className="h-24 rounded-2xl" />)
           ) : users.filter((item) => item.needsReview).length === 0 ? (
@@ -1457,6 +1638,7 @@ export function UsersTable() {
                     {!item.educationalCenterId ? <Badge variant="outline">sin institución</Badge> : null}
                     {!item.phoneNumber ? <Badge variant="outline">sin teléfono</Badge> : null}
                     {!item.address ? <Badge variant="outline">sin dirección</Badge> : null}
+                    {!item.imageUrl ? <Badge variant="outline">sin imagen</Badge> : null}
                     {item.explicitPermissionKeys.length > 0 ? <Badge variant="secondary">ACL explícita</Badge> : null}
                   </div>
                 </button>

@@ -1,5 +1,7 @@
 "use client";
 
+/* eslint-disable @next/next/no-img-element */
+
 import { type ComponentType, useMemo, useState } from "react";
 import { BadgeCheck, CreditCard, Search, UserRound, Users, Waves } from "lucide-react";
 import { SectionHeader } from "@/components/section-header";
@@ -13,7 +15,7 @@ import { useAuth } from "@/features/auth/auth-context";
 import { useProfilesOverview } from "@/features/profiles/api";
 import { cn, formatDateTime, getErrorMessage } from "@/lib/utils";
 
-type ProfilesFocusFilter = "all" | "no_cards" | "no_sessions" | "no_owner" | "institution_linked";
+type ProfilesFocusFilter = "all" | "no_avatar" | "no_cards" | "no_sessions" | "no_owner" | "institution_linked";
 
 function SummaryCard({
   label,
@@ -41,6 +43,34 @@ function SummaryCard({
         </div>
       </CardContent>
     </Card>
+  );
+}
+
+function getProfileInitials(displayName: string) {
+  return displayName
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part.slice(0, 1).toUpperCase())
+    .join("") || "PR";
+}
+
+function ProfileAvatar({
+  profile,
+  className,
+}: {
+  profile: { displayName: string; avatarUrl?: string | null };
+  className?: string;
+}) {
+  return (
+    <div className={cn("flex shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-border/70 bg-white font-semibold text-primary", className)}>
+      {profile.avatarUrl ? (
+        <img src={profile.avatarUrl} alt={profile.displayName} className="h-full w-full object-cover" />
+      ) : (
+        <span>{getProfileInitials(profile.displayName)}</span>
+      )}
+    </div>
   );
 }
 
@@ -89,6 +119,8 @@ export function RelevantProfiles() {
       if (activityFilter === "inactive" && profile.isActive) return false;
       const matchesFocus = (() => {
         switch (focusFilter) {
+          case "no_avatar":
+            return !profile.avatarUrl;
           case "no_cards":
             return profile.activeBindingCount === 0;
           case "no_sessions":
@@ -124,6 +156,7 @@ export function RelevantProfiles() {
 
   const metrics = useMemo(() => {
     const activeProfiles = profiles.filter((profile) => profile.isActive).length;
+    const withAvatars = profiles.filter((profile) => Boolean(profile.avatarUrl)).length;
     const withBindings = profiles.filter((profile) => profile.activeBindingCount > 0).length;
     const withSessions = profiles.filter((profile) => profile.sessionCount > 0).length;
     const institutionLinked = profiles.filter((profile) => Boolean(profile.educationalCenterId)).length;
@@ -134,6 +167,7 @@ export function RelevantProfiles() {
     return {
       total: profiles.length,
       activeProfiles,
+      withAvatars,
       withBindings,
       withSessions,
       institutionLinked,
@@ -145,6 +179,7 @@ export function RelevantProfiles() {
 
   const focusSegments = [
     { key: "all" as const, label: "Todos", count: metrics.total },
+    { key: "no_avatar" as const, label: "Sin avatar", count: metrics.total - metrics.withAvatars },
     { key: "no_cards" as const, label: "Sin tarjeta", count: metrics.profilesWithoutCards },
     { key: "no_sessions" as const, label: "Sin sesiones", count: metrics.profilesWithoutSessions },
     { key: "no_owner" as const, label: "Sin owner", count: metrics.profilesWithoutOwner },
@@ -164,20 +199,20 @@ export function RelevantProfiles() {
             : "Vista operativa real de perfiles Home, con ownership, bindings y actividad de sesiones. Ya no usa `users` como proxy del módulo."
         }
         actions={
-          <div className="flex flex-col items-stretch gap-3 md:flex-row md:items-center">
-            <div className="relative min-w-72">
+          <div className="grid w-full gap-3 md:grid-cols-2 2xl:grid-cols-[minmax(0,1.35fr)_minmax(220px,0.8fr)_minmax(180px,0.6fr)]">
+            <div className="relative min-w-0">
               <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
                 placeholder="Filtrar por perfil, owner, institución, tarjeta o dispositivo"
-                className="pl-9"
+                className="w-full pl-9"
               />
             </div>
             <select
               value={institutionFilter || scopedInstitutionId || ""}
               onChange={(event) => setInstitutionFilter(event.target.value)}
-              className="h-10 min-w-48 rounded-md border border-input bg-background px-3 text-sm"
+              className="h-10 min-w-0 w-full rounded-md border border-input bg-background px-3 text-sm"
               disabled={Boolean(scopedInstitutionId)}
             >
               <option value="">Todas las instituciones</option>
@@ -190,7 +225,7 @@ export function RelevantProfiles() {
             <select
               value={activityFilter}
               onChange={(event) => setActivityFilter(event.target.value as "all" | "active" | "inactive")}
-              className="h-10 min-w-40 rounded-md border border-input bg-background px-3 text-sm"
+              className="h-10 min-w-0 w-full rounded-md border border-input bg-background px-3 text-sm"
             >
               <option value="all">Todos</option>
               <option value="active">Activos</option>
@@ -222,13 +257,14 @@ export function RelevantProfiles() {
         </CardContent>
       </Card>
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+      <div className="grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(220px,1fr))]">
         {profilesQuery.isLoading ? (
           Array.from({ length: 5 }).map((_, index) => <Skeleton key={index} className="h-32 rounded-2xl" />)
         ) : (
           <>
             <SummaryCard label="Perfiles" value={String(metrics.total)} hint="Perfiles Home visibles en el alcance actual." icon={Users} />
             <SummaryCard label="Activos" value={String(metrics.activeProfiles)} hint="Perfiles no archivados y operativamente vigentes." icon={BadgeCheck} />
+            <SummaryCard label="Con avatar" value={String(metrics.withAvatars)} hint="Mejora mucho la identificación visual en lectura rápida." icon={UserRound} />
             <SummaryCard label="Con tarjeta" value={String(metrics.withBindings)} hint="Perfiles con bindings activos a cards." icon={CreditCard} />
             <SummaryCard label="Con sesiones" value={String(metrics.withSessions)} hint="Perfiles que ya aparecen en historial de juego." icon={Waves} />
             <SummaryCard label="Institucionales" value={String(metrics.institutionLinked)} hint="Perfiles cuyos owners ya están ligados a una institución." icon={UserRound} />
@@ -245,6 +281,7 @@ export function RelevantProfiles() {
               size="sm"
               variant={focusFilter === segment.key ? "default" : "outline"}
               onClick={() => setFocusFilter(segment.key)}
+              className="w-full justify-between text-left sm:w-auto sm:justify-center"
             >
               {segment.label}
               <Badge variant={focusFilter === segment.key ? "secondary" : "outline"} className={focusFilter === segment.key ? "bg-white/90 text-foreground" : ""}>
@@ -260,13 +297,14 @@ export function RelevantProfiles() {
               setFocusFilter("all");
               setQuery("");
             }}
+            className="w-full sm:w-auto"
           >
             Limpiar foco
           </Button>
         </CardContent>
       </Card>
 
-      <div className="grid gap-6 xl:grid-cols-[1.2fr_1fr]">
+      <div className="grid gap-6 2xl:grid-cols-[1.2fr_1fr]">
         <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
           <CardHeader>
             <CardTitle>{isDirectorView ? "Perfiles visibles para seguimiento" : "Listado de perfiles"}</CardTitle>
@@ -312,15 +350,21 @@ export function RelevantProfiles() {
                         onClick={() => setSelectedProfileId(profile.id)}
                       >
                         <TableCell>
-                          <div>
-                            <p className="font-medium text-foreground">{profile.displayName}</p>
-                            <p className="text-xs text-muted-foreground">{profile.ageCategory || "sin categoría"}</p>
+                          <div className="flex min-w-0 items-center gap-3">
+                            <ProfileAvatar profile={profile} className="size-10 text-[11px]" />
+                            <div className="min-w-0">
+                              <p className="truncate font-medium text-foreground">{profile.displayName}</p>
+                              <p className="truncate text-xs text-muted-foreground">{profile.ageCategory || "sin categoría"}</p>
+                            </div>
                           </div>
                         </TableCell>
                         <TableCell>
                           <div>
                             <p className="text-sm text-foreground">{profile.userName || "sin owner"}</p>
                             <p className="text-xs text-muted-foreground">{profile.userEmail || "-"}</p>
+                            <div className="mt-1 flex flex-wrap gap-2">
+                              <Badge variant={profile.avatarUrl ? "secondary" : "outline"}>{profile.avatarUrl ? "avatar" : "sin avatar"}</Badge>
+                            </div>
                           </div>
                         </TableCell>
                         <TableCell>{profile.educationalCenterName || profile.educationalCenterId || "-"}</TableCell>
@@ -358,12 +402,16 @@ export function RelevantProfiles() {
               <>
                 <div className="rounded-2xl bg-background/70 p-4">
                   <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div>
-                      <p className="text-sm font-semibold text-foreground">{selectedProfile.displayName}</p>
-                      <p className="mt-1 text-xs text-muted-foreground">Owner {selectedProfile.userName || selectedProfile.userEmail || selectedProfile.userId}</p>
+                    <div className="flex min-w-0 items-center gap-3">
+                      <ProfileAvatar profile={selectedProfile} className="size-14 text-sm" />
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold text-foreground">{selectedProfile.displayName}</p>
+                        <p className="mt-1 truncate text-xs text-muted-foreground">Owner {selectedProfile.userName || selectedProfile.userEmail || selectedProfile.userId}</p>
+                      </div>
                     </div>
                     <div className="flex flex-wrap gap-2">
                       <Badge variant={selectedProfile.isActive ? "success" : "outline"}>{selectedProfile.isActive ? "activo" : "inactivo"}</Badge>
+                      <Badge variant={selectedProfile.avatarUrl ? "secondary" : "outline"}>{selectedProfile.avatarUrl ? "avatar cargado" : "sin avatar"}</Badge>
                       <Badge variant="outline">{selectedProfile.sessionCount} sesiones</Badge>
                     </div>
                   </div>

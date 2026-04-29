@@ -143,6 +143,7 @@ function normalizeInstitution(input: unknown): InstitutionRecord {
     name,
     email,
     phoneNumber: readString(record, "phone_number", "phoneNumber", "phone") || "",
+    imageUrl: readString(record, "image_url", "imageUrl") || null,
     address,
     url: readString(record, "url", "website") || null,
     code: readString(record, "code", "slug") || null,
@@ -207,6 +208,7 @@ export async function createInstitution(token: string, payload: CreateInstitutio
       email: payload.email,
       phone_number: payload.phoneNumber,
       address: serializeAddress(payload.address),
+      image_url: payload.imageUrl || null,
       url: payload.url || null,
     },
   });
@@ -231,11 +233,42 @@ export async function updateInstitution(token: string, institutionId: string, pa
       email: payload.email,
       phone_number: payload.phoneNumber,
       address: serializeAddress(payload.address),
+      image_url: payload.imageUrl || null,
       url: payload.url || null,
     },
   });
 
   return normalizeInstitution(response);
+}
+
+export type UploadInstitutionImageResponse = {
+  educationalCenterId: string;
+  imageUrl: string;
+  imagePath: string;
+  filename: string;
+  folder: string;
+};
+
+export async function uploadInstitutionImage(token: string, institutionId: string, file: File, filename?: string) {
+  const formData = new FormData();
+  formData.append("file", file);
+  if (filename) formData.append("filename", filename);
+
+  const response = await apiRequest<unknown>(apiEndpoints.institutions.imageById(institutionId), {
+    method: "POST",
+    token,
+    body: formData,
+  });
+
+  const record = asRecord(response);
+
+  return {
+    educationalCenterId: readString(record, "educational_center_id", "educationalCenterId") || institutionId,
+    imageUrl: readString(record, "image_url", "imageUrl"),
+    imagePath: readString(record, "image_path", "imagePath"),
+    filename: readString(record, "filename"),
+    folder: readString(record, "folder"),
+  } satisfies UploadInstitutionImageResponse;
 }
 
 export async function deleteInstitution(token: string, institutionId: string) {

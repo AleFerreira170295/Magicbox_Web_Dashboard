@@ -25,8 +25,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="es" className={`${manrope.variable} ${geistMono.variable} h-full antialiased`}>
-      <body className="min-h-full bg-background text-foreground">
-        <Providers>{children}</Providers>
+      <body className="min-h-full w-full bg-background text-foreground">
+        <div id="app-root" className="min-h-full w-full bg-background">
+          <Providers>{children}</Providers>
+        </div>
       </body>
     </html>
   );

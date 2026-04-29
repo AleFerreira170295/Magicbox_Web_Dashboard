@@ -131,7 +131,7 @@ export function TerritorialOverviewCenter() {
         </Card>
       ) : null}
 
-      <div className="grid gap-4 md:grid-cols-3 xl:grid-cols-4">
+      <div className="grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(220px,1fr))]">
         <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
           <CardContent className="p-5">
             <p className="text-sm text-muted-foreground">Territorios destacados</p>
@@ -162,7 +162,7 @@ export function TerritorialOverviewCenter() {
         </Card>
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
+      <div className="grid gap-6 2xl:grid-cols-[1.1fr_0.9fr]">
         <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
           <CardHeader>
             <CardTitle>Jerarquía territorial</CardTitle>

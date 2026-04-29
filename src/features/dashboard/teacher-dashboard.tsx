@@ -205,7 +205,7 @@ export function TeacherDashboard() {
         description="La base visual puede seguir mejorando después, pero esta pantalla ya prioriza lo que una cuenta docente necesita ver para operar: partidas, dispositivos, sincronizaciones y señales concretas de revisión."
       />
 
-      <div className="grid gap-6 xl:grid-cols-[1.4fr_0.9fr]">
+      <div className="grid gap-6 2xl:grid-cols-[1.4fr_0.9fr]">
         <Card className="overflow-hidden border-none bg-[linear-gradient(135deg,#1f2a37_0%,#31465e_52%,#3f5a74_100%)] text-white shadow-[0_20px_60px_rgba(31,42,55,0.22)]">
           <CardContent className="p-8 sm:p-10">
             <div className="flex flex-wrap gap-2">
@@ -281,7 +281,7 @@ export function TeacherDashboard() {
         </Card>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(220px,1fr))]">
         {isLoading ? (
           Array.from({ length: 4 }).map((_, index) => <Skeleton key={index} className="h-36 rounded-2xl" />)
         ) : (
@@ -338,7 +338,7 @@ export function TeacherDashboard() {
         </CardContent>
       </Card>
 
-      <div className="grid gap-6 xl:grid-cols-2">
+      <div className="grid gap-6 2xl:grid-cols-2">
         <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
           <CardHeader>
             <CardTitle>Partidas por mazo</CardTitle>

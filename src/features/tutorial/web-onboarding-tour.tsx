@@ -22,6 +22,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import type { AppRole, AuthUser } from "@/features/auth/types";
+import { canAccessPermissionsModule } from "@/features/auth/permission-contract";
 
 export type TutorialStep = {
   id: string;
@@ -66,7 +67,44 @@ function getPrimaryRole(user: AuthUser | null): AppRole | null {
   if (user.roles.includes("researcher")) return "researcher";
   if (user.roles.includes("family")) return "family";
   if (user.roles.includes("teacher")) return "teacher";
-  return user.roles[0] || null;
+  return (user.roles[0] as AppRole | undefined) || null;
+}
+
+function canVisitTutorialRoute(user: AuthUser | null, href?: string) {
+  if (!href || !user) return true;
+
+  const hasRole = (role: AppRole) => user.roles.includes(role);
+
+  switch (href) {
+    case "/dashboard":
+      return true;
+    case "/territorial-alerts":
+    case "/territorial-overview":
+      return hasRole("government-viewer");
+    case "/syncs":
+    case "/games":
+      return (["teacher", "director", "researcher", "family", "admin", "institution-admin"] as AppRole[]).some(hasRole);
+    case "/users":
+      return (["admin", "institution-admin", "family"] as AppRole[]).some(hasRole);
+    case "/permissions":
+      return canAccessPermissionsModule(user);
+    case "/institutions":
+      return (["admin", "institution-admin", "director"] as AppRole[]).some(hasRole);
+    case "/health":
+    case "/settings":
+      return hasRole("admin");
+    case "/profiles":
+      return (["admin", "institution-admin", "director"] as AppRole[]).some(hasRole);
+    case "/devices":
+      return (["teacher", "director", "admin", "institution-admin", "family"] as AppRole[]).some(hasRole);
+    default:
+      return true;
+  }
+}
+
+function finalizeTutorialSteps(user: AuthUser | null, steps: TutorialStep[]) {
+  const filtered = steps.filter((step) => canVisitTutorialRoute(user, step.href));
+  return filtered.length > 0 ? filtered : steps;
 }
 
 export function getWebTutorialSteps(user: AuthUser | null): TutorialStep[] {
@@ -75,7 +113,7 @@ export function getWebTutorialSteps(user: AuthUser | null): TutorialStep[] {
 
   switch (role) {
     case "admin":
-      return [
+      return finalizeTutorialSteps(user, [
         buildStep(
           "welcome",
           `Bienvenido, ${name}`,
@@ -122,9 +160,9 @@ export function getWebTutorialSteps(user: AuthUser | null): TutorialStep[] {
           ],
           { href: "/health", ctaLabel: "Revisar salud", badge: "Técnico" },
         ),
-      ];
+      ]);
     case "government-viewer":
-      return [
+      return finalizeTutorialSteps(user, [
         buildStep(
           "welcome",
           `Bienvenido, ${name}`,
@@ -158,10 +196,10 @@ export function getWebTutorialSteps(user: AuthUser | null): TutorialStep[] {
           ],
           { href: "/territorial-overview", ctaLabel: "Ver territorios", badge: "Drilldown" },
         ),
-      ];
+      ]);
     case "institution-admin":
     case "director":
-      return [
+      return finalizeTutorialSteps(user, [
         buildStep(
           "welcome",
           `Bienvenido, ${name}`,
@@ -212,9 +250,9 @@ export function getWebTutorialSteps(user: AuthUser | null): TutorialStep[] {
             : ["Perfiles conecta la lectura de personas con el uso real visible en la institución."],
           { href: "/profiles", ctaLabel: "Ver perfiles", badge: "Seguimiento" },
         ),
-      ];
+      ]);
     case "researcher":
-      return [
+      return finalizeTutorialSteps(user, [
         buildStep(
           "welcome",
           `Bienvenido, ${name}`,
@@ -248,9 +286,9 @@ export function getWebTutorialSteps(user: AuthUser | null): TutorialStep[] {
           ],
           { href: "/syncs", ctaLabel: "Ver syncs", badge: "Trazabilidad" },
         ),
-      ];
+      ]);
     case "family":
-      return [
+      return finalizeTutorialSteps(user, [
         buildStep(
           "welcome",
           `Bienvenido, ${name}`,
@@ -284,10 +322,10 @@ export function getWebTutorialSteps(user: AuthUser | null): TutorialStep[] {
           ],
           { href: "/users", ctaLabel: "Ver usuarios", badge: "Contexto" },
         ),
-      ];
+      ]);
     case "teacher":
     default:
-      return [
+      return finalizeTutorialSteps(user, [
         buildStep(
           "welcome",
           `Bienvenido, ${name}`,
@@ -332,7 +370,7 @@ export function getWebTutorialSteps(user: AuthUser | null): TutorialStep[] {
           ],
           { href: "/syncs", ctaLabel: "Ver syncs", badge: "Seguimiento" },
         ),
-      ];
+      ]);
   }
 }
 
@@ -355,39 +393,39 @@ export function WebOnboardingTour({
   const isLast = currentStepIndex === steps.length - 1;
 
   return (
-    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/68 p-4 backdrop-blur-sm">
-      <div className="absolute inset-0" onClick={onSkip} aria-hidden="true" />
-      <div className="relative z-[81] w-full max-w-3xl overflow-hidden rounded-[32px] border border-white/12 bg-background shadow-[0_32px_80px_rgba(15,23,42,0.42)]">
-        <div className="bg-[linear-gradient(135deg,#1f2a37_0%,#31465e_55%,#3f5a74_100%)] px-6 py-6 text-white sm:px-8 sm:py-7">
+    <div className="fixed inset-0 z-[80] flex items-start justify-center overflow-y-auto bg-slate-950/42 p-2 backdrop-blur-[6px] sm:p-4 lg:items-center lg:p-6 2xl:p-8">
+      <div className="pointer-events-auto my-auto flex w-full max-w-[1360px] flex-col overflow-hidden rounded-[32px] border border-slate-200/80 bg-background shadow-[0_36px_96px_rgba(15,23,42,0.24)] max-h-[calc(100dvh-1rem)] sm:max-h-[calc(100dvh-2rem)] lg:max-h-[calc(100dvh-2.5rem)] 2xl:max-w-[1500px]">
+        <div className="shrink-0 bg-[linear-gradient(135deg,#1f2a37_0%,#31465e_55%,#3f5a74_100%)] px-5 py-4 text-white sm:px-7 sm:py-5 lg:px-8">
           <div className="flex items-start justify-between gap-4">
             <div>
               <div className="flex flex-wrap items-center gap-2">
                 <Badge className="bg-white/14 text-white hover:bg-white/14">Tutorial inicial</Badge>
                 {currentStep.badge ? <Badge className="bg-white/14 text-white hover:bg-white/14">{currentStep.badge}</Badge> : null}
+                <Badge className="bg-white/10 text-white/90 hover:bg-white/10">Adaptado a tu acceso</Badge>
               </div>
-              <h2 className="mt-4 text-2xl font-semibold tracking-tight sm:text-3xl">{currentStep.title}</h2>
-              <p className="mt-3 max-w-2xl text-sm leading-7 text-white/78 sm:text-base">{currentStep.description}</p>
+              <h2 className="mt-3 text-[1.95rem] font-semibold leading-none tracking-tight sm:text-[2.35rem] lg:text-[2.8rem] 2xl:text-[3rem]">{currentStep.title}</h2>
+              <p className="mt-2 max-w-5xl text-sm leading-6 text-white/78 sm:text-[15px] sm:leading-7 lg:text-[1rem]">{currentStep.description}</p>
             </div>
             <button
               type="button"
               onClick={onSkip}
-              className="inline-flex rounded-full border border-white/15 bg-white/10 p-2 text-white transition hover:bg-white/16"
+              className="inline-flex rounded-full border border-white/15 bg-white/10 p-3 text-white transition hover:bg-white/16"
               aria-label="Cerrar tutorial"
             >
-              <X className="size-4" />
+              <X className="size-5" />
             </button>
           </div>
 
-          <div className="mt-6 flex items-center gap-3">
-            <div className="flex size-14 items-center justify-center rounded-3xl bg-white/12">
-              <Icon className="size-7" />
+          <div className="mt-5 flex items-center gap-4">
+            <div className="flex size-14 items-center justify-center rounded-[22px] bg-white/12 sm:size-16">
+              <Icon className="size-6 sm:size-7" />
             </div>
             <div className="min-w-0 flex-1">
               <div className="flex items-center justify-between gap-3 text-xs uppercase tracking-[0.22em] text-white/60">
                 <span>Paso {currentStepIndex + 1}</span>
                 <span>{steps.length} pasos</span>
               </div>
-              <div className="mt-2 h-2 overflow-hidden rounded-full bg-white/12">
+              <div className="mt-2 h-2.5 overflow-hidden rounded-full bg-white/12">
                 <div
                   className="h-full rounded-full bg-white transition-all duration-300"
                   style={{ width: `${((currentStepIndex + 1) / steps.length) * 100}%` }}
@@ -397,28 +435,29 @@ export function WebOnboardingTour({
           </div>
         </div>
 
-        <div className="grid gap-6 px-6 py-6 sm:px-8 sm:py-8 lg:grid-cols-[1fr_260px]">
-          <div>
-            <p className="text-sm font-medium text-foreground">Qué te muestra esta parte</p>
-            <ul className="mt-4 space-y-3">
+        <div className="grid min-h-0 flex-1 content-start gap-5 overflow-y-auto px-5 py-5 sm:px-7 sm:py-6 lg:px-8 xl:grid-cols-[minmax(0,1.65fr)_320px] xl:gap-6">
+          <div className="min-w-0">
+            <p className="text-base font-semibold text-foreground">Qué te muestra esta parte</p>
+            <ul className="mt-4 space-y-2.5">
               {currentStep.bullets.map((bullet) => (
-                <li key={bullet} className="flex gap-3 rounded-2xl bg-white/80 p-4 text-sm leading-6 text-muted-foreground shadow-[0_12px_28px_rgba(31,42,55,0.06)]">
-                  <span className="mt-1 size-2 rounded-full bg-primary" />
+                <li key={bullet} className="flex gap-3 rounded-[22px] bg-white/88 p-4 text-[15px] leading-6 text-muted-foreground shadow-[0_12px_28px_rgba(31,42,55,0.06)]">
+                  <span className="mt-2 size-2.5 rounded-full bg-primary" />
                   <span>{bullet}</span>
                 </li>
               ))}
             </ul>
           </div>
 
-          <div className="rounded-[28px] border border-border/70 bg-secondary/45 p-5">
-            <p className="text-sm font-medium text-foreground">Cómo moverte</p>
-            <div className="mt-4 space-y-3 text-sm leading-6 text-muted-foreground">
+          <div className="rounded-[28px] border border-border/70 bg-secondary/45 p-5 xl:sticky xl:top-0 xl:self-start">
+            <p className="text-base font-semibold text-foreground">Cómo moverte</p>
+            <div className="mt-3 space-y-3 text-[15px] leading-6 text-muted-foreground">
               <p>La navegación principal vive en la barra lateral y ya está recortada a los permisos efectivos de esta sesión.</p>
               <p>Si cerrás este tutorial, después podés volver a abrirlo desde el panel lateral con el botón <span className="font-medium text-foreground">“Ver tutorial”</span>.</p>
+              <p>Este recorrido cambia según tu rol y solo te muestra superficies que realmente están visibles para tu cuenta.</p>
             </div>
 
             {currentStep.href ? (
-              <Link href={currentStep.href} className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-full bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground shadow-[0_16px_30px_rgba(71,185,239,0.26)] transition hover:-translate-y-0.5 hover:bg-primary/90">
+              <Link href={currentStep.href} className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-full bg-primary px-4 py-3.5 text-sm font-semibold text-primary-foreground shadow-[0_16px_30px_rgba(71,185,239,0.26)] transition hover:-translate-y-0.5 hover:bg-primary/90">
                 {currentStep.ctaLabel || "Abrir módulo"}
                 <ArrowRight className="size-4" />
               </Link>
@@ -426,28 +465,33 @@ export function WebOnboardingTour({
           </div>
         </div>
 
-        <div className="flex flex-col gap-3 border-t border-border/60 px-6 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-8">
-          <div className="flex items-center gap-2">
-            {steps.map((step, index) => (
-              <button
-                key={step.id}
-                type="button"
-                onClick={() => setCurrentStepIndex(index)}
-                className={`h-2.5 rounded-full transition-all ${index === currentStepIndex ? "w-8 bg-primary" : "w-2.5 bg-border hover:bg-primary/40"}`}
-                aria-label={`Ir al paso ${index + 1}`}
-              />
-            ))}
+        <div className="shrink-0 border-t border-border/60 bg-white/92 px-5 py-4 shadow-[0_-18px_32px_rgba(31,42,55,0.08)] backdrop-blur supports-[backdrop-filter]:bg-white/82 sm:px-7 lg:px-8">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-2">
+              {steps.map((step, index) => (
+                <button
+                  key={step.id}
+                  type="button"
+                  onClick={() => setCurrentStepIndex(index)}
+                  className={`h-2.5 rounded-full transition-all ${index === currentStepIndex ? "w-10 bg-primary" : "w-2.5 bg-border hover:bg-primary/40"}`}
+                  aria-label={`Ir al paso ${index + 1}`}
+                />
+              ))}
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Paso <span className="font-medium text-foreground">{currentStepIndex + 1}</span> de <span className="font-medium text-foreground">{steps.length}</span>
+            </p>
           </div>
 
-          <div className="flex flex-wrap justify-end gap-3">
-            <Button type="button" variant="ghost" onClick={onSkip}>Omitir</Button>
+          <div className="mt-3 flex flex-col-reverse gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end sm:gap-3">
+            <Button type="button" variant="ghost" onClick={onSkip} className="w-full sm:w-auto">Omitir</Button>
             {currentStepIndex > 0 ? (
-              <Button type="button" variant="outline" onClick={() => setCurrentStepIndex((index) => index - 1)}>Atrás</Button>
+              <Button type="button" variant="outline" onClick={() => setCurrentStepIndex((index) => index - 1)} className="w-full sm:w-auto">Atrás</Button>
             ) : null}
             {isLast ? (
-              <Button type="button" onClick={onComplete}>Empezar a usar MagicBox</Button>
+              <Button type="button" onClick={onComplete} className="w-full sm:w-auto">Empezar a usar MagicBox</Button>
             ) : (
-              <Button type="button" onClick={() => setCurrentStepIndex((index) => Math.min(index + 1, steps.length - 1))}>
+              <Button type="button" onClick={() => setCurrentStepIndex((index) => Math.min(index + 1, steps.length - 1))} className="w-full sm:w-auto">
                 Siguiente
                 <ArrowRight className="size-4" />
               </Button>

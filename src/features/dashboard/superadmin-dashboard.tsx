@@ -113,13 +113,16 @@ function ModuleCard({
             <div className="rounded-2xl bg-primary/12 p-3 text-primary">
               <Icon className="size-5" />
             </div>
-            <Badge variant="success">Disponible</Badge>
+            <Badge variant="outline">Módulo</Badge>
           </div>
           <div className="mt-5">
             <h3 className="text-lg font-semibold text-foreground">{title}</h3>
             <p className="mt-2 text-sm leading-6 text-muted-foreground">{description}</p>
           </div>
-          <div className="mt-auto pt-5 text-sm font-medium text-primary">Abrir módulo</div>
+          <div className="mt-auto flex items-center gap-2 pt-5 text-sm font-medium text-primary">
+            Entrar
+            <ArrowRight className="size-4" />
+          </div>
         </CardContent>
       </Card>
     </Link>
@@ -625,10 +628,10 @@ export function SuperadminDashboard() {
       <SectionHeader
         eyebrow={scopeLabel}
         title="Centro de control MagicBox"
-        description="Home operativo real del dashboard. Resume usuarios, instituciones, devices, syncs, games, profiles y salud técnica sin depender de pantallas placeholder."
+        description="Home operativa para leer estado, riesgos y próximos focos sin perderte entre módulos."
       />
 
-      <div className="grid gap-6 xl:grid-cols-[1.35fr_0.95fr]">
+      <div className="grid gap-6 2xl:grid-cols-[1.35fr_0.95fr]">
         <Card className="overflow-hidden border-none bg-[linear-gradient(135deg,#1f2a37_0%,#2c4156_55%,#39546f_100%)] text-white shadow-[0_20px_60px_rgba(31,42,55,0.22)]">
           <CardContent className="p-8 sm:p-10">
             <div className="flex flex-wrap gap-2">
@@ -639,7 +642,7 @@ export function SuperadminDashboard() {
 
             {usesSystemSummary ? (
               <>
-                <div className="mt-6 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                <div className="mt-6 grid gap-3 md:grid-cols-2 2xl:grid-cols-3">
                   <label className="rounded-2xl bg-white/10 p-4 text-sm text-white/85 backdrop-blur-sm">
                     <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.2em] text-white/65">Ventana temporal</span>
                     <select
@@ -782,10 +785,10 @@ export function SuperadminDashboard() {
 
             <div className="mt-6 max-w-3xl">
               <h2 className="text-3xl font-semibold tracking-tight sm:text-4xl">
-                La home ya puede resumir el estado del sistema completo en lugar de repetir promesas de módulos futuros.
+                Entrá, mirá lo crítico primero y saltá directo al módulo correcto.
               </h2>
               <p className="mt-4 text-base leading-7 text-white/78">
-                Desde acá ya se puede leer alcance operativo, focos de revisión y puertas de entrada a los módulos que aterrizamos en esta iteración.
+                Esta portada prioriza estado operativo, filtros activos y puertas de entrada reales para revisar datos, hardware, personas y salud técnica.
               </p>
             </div>
 
@@ -826,40 +829,55 @@ export function SuperadminDashboard() {
           <CardHeader>
             <CardTitle>Qué mirar primero</CardTitle>
             <CardDescription>
-              Señales blandas para ubicar rápido el próximo foco de revisión.
+              Tres atajos para arrancar por riesgo y no por intuición.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
-            <div className="rounded-2xl bg-white/80 p-4">
-              <p className="text-sm font-medium text-foreground">Instituciones con review pendiente</p>
-              <p className="mt-1 text-sm leading-6 text-muted-foreground">{metrics.institutionsNeedingReview} instituciones marcan `needs_review` en el resumen operativo.</p>
-            </div>
-            <div className="rounded-2xl bg-white/80 p-4">
-              <p className="text-sm font-medium text-foreground">Dispositivos sin estado</p>
-              <p className="mt-1 text-sm leading-6 text-muted-foreground">{metrics.devicesWithoutStatus} dispositivos visibles siguen sin `status` explícito, y {metrics.totalDevices - metrics.devicesWithOwner} no tienen owner asociado.</p>
-            </div>
-            <div className="rounded-2xl bg-white/80 p-4">
-              <p className="text-sm font-medium text-foreground">Cobertura de raw y bindings</p>
-              <p className="mt-1 text-sm leading-6 text-muted-foreground">{formatPercent(metrics.syncsWithRaw, metrics.totalSyncs)} de syncs tienen raw visible y {formatPercent(metrics.profilesWithBindings, metrics.totalProfiles)} de profiles tienen binding activo.</p>
-            </div>
+            <Link href="/institutions" className="block rounded-2xl border border-border/70 bg-white/80 p-4 transition hover:border-primary/20 hover:bg-white">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-sm font-medium text-foreground">Instituciones con review pendiente</p>
+                  <p className="mt-1 text-sm leading-6 text-muted-foreground">{metrics.institutionsNeedingReview} instituciones marcan `needs_review` en el resumen operativo.</p>
+                </div>
+                <Badge variant={metrics.institutionsNeedingReview > 0 ? "warning" : "success"}>{metrics.institutionsNeedingReview > 0 ? "Revisar" : "OK"}</Badge>
+              </div>
+            </Link>
+            <Link href="/devices" className="block rounded-2xl border border-border/70 bg-white/80 p-4 transition hover:border-primary/20 hover:bg-white">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-sm font-medium text-foreground">Dispositivos sin estado u owner</p>
+                  <p className="mt-1 text-sm leading-6 text-muted-foreground">{metrics.devicesWithoutStatus} sin estado explícito y {metrics.totalDevices - metrics.devicesWithOwner} sin owner asociado.</p>
+                </div>
+                <Badge variant={metrics.devicesWithoutStatus > 0 ? "warning" : "success"}>{metrics.devicesWithoutStatus > 0 ? "Atención" : "OK"}</Badge>
+              </div>
+            </Link>
+            <Link href="/syncs" className="block rounded-2xl border border-border/70 bg-white/80 p-4 transition hover:border-primary/20 hover:bg-white">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-sm font-medium text-foreground">Cobertura de sync y perfiles</p>
+                  <p className="mt-1 text-sm leading-6 text-muted-foreground">{formatPercent(metrics.syncsWithRaw, metrics.totalSyncs)} de syncs tienen raw visible y {formatPercent(metrics.profilesWithBindings, metrics.totalProfiles)} de perfiles tienen binding activo.</p>
+                </div>
+                <Badge variant="outline">Seguir</Badge>
+              </div>
+            </Link>
           </CardContent>
         </Card>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-6">
+      <div className="grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(220px,1fr))]">
         {showInitialLoading ? (
           Array.from({ length: 6 }).map((_, index) => <Skeleton key={index} className="h-36 rounded-2xl" />)
         ) : (
           <>
             <SummaryCard label="Usuarios" value={String(metrics.totalUsers)} hint="Padrón operativo visible." icon={Users} isLoading={(usesSystemSummary ? summaryQuery.isLoading : usersQuery.isLoading) && users.length === 0} />
             <SummaryCard label="Instituciones" value={String(metrics.totalInstitutions)} hint="Clientes y alcance actual." icon={Building2} isLoading={(usesSystemSummary ? summaryQuery.isLoading : institutionsQuery.isLoading) && institutions.length === 0} />
-            <SummaryCard label="Devices" value={String(metrics.totalDevices)} hint={`${metrics.homeDevices} Home y ${metrics.institutionDevices} institucionales.`} icon={Smartphone} isLoading={(usesSystemSummary ? summaryQuery.isLoading : devicesQuery.isLoading) && devices.length === 0} />
-            <SummaryCard label="Syncs" value={String(metrics.totalSyncs)} hint={`${formatPercent(metrics.syncsWithRaw, metrics.totalSyncs)} con raw visible.`} icon={Layers3} tone="accent" isLoading={(usesSystemSummary ? summaryQuery.isLoading : syncsQuery.isLoading) && syncs.length === 0} />
-            <SummaryCard label="Games" value={String(metrics.totalGames)} hint={`${formatAverage(metrics.totalPlayers, metrics.totalGames)} jugadores por partida.`} icon={Database} tone="accent" isLoading={(usesSystemSummary ? summaryQuery.isLoading : gamesQuery.isLoading) && games.length === 0} />
+            <SummaryCard label="Dispositivos" value={String(metrics.totalDevices)} hint={`${metrics.homeDevices} Home y ${metrics.institutionDevices} institucionales.`} icon={Smartphone} isLoading={(usesSystemSummary ? summaryQuery.isLoading : devicesQuery.isLoading) && devices.length === 0} />
+            <SummaryCard label="Sincronizaciones" value={String(metrics.totalSyncs)} hint={`${formatPercent(metrics.syncsWithRaw, metrics.totalSyncs)} con raw visible.`} icon={Layers3} tone="accent" isLoading={(usesSystemSummary ? summaryQuery.isLoading : syncsQuery.isLoading) && syncs.length === 0} />
+            <SummaryCard label="Partidas" value={String(metrics.totalGames)} hint={`${formatAverage(metrics.totalPlayers, metrics.totalGames)} jugadores por partida.`} icon={Database} tone="accent" isLoading={(usesSystemSummary ? summaryQuery.isLoading : gamesQuery.isLoading) && games.length === 0} />
             {canSeeHealthModule ? (
-              <SummaryCard label="Health" value={metrics.readiness} hint={`Backend ${metrics.version}.`} icon={HeartPulse} tone={metrics.degradedChecks === 0 ? "accent" : "warning"} isLoading={canSeeHealthModule && healthQuery.isLoading && !healthQuery.data} />
+              <SummaryCard label="Salud" value={metrics.readiness} hint={`Backend ${metrics.version}.`} icon={HeartPulse} tone={metrics.degradedChecks === 0 ? "accent" : "warning"} isLoading={canSeeHealthModule && healthQuery.isLoading && !healthQuery.data} />
             ) : (
-              <SummaryCard label="Profiles" value={String(metrics.totalProfiles)} hint={`${metrics.activeProfiles} activos y ${metrics.profilesWithSessions} con sesiones.`} icon={UserSquare2} tone="accent" isLoading={(usesSystemSummary ? summaryQuery.isLoading : profilesQuery.isLoading) && profiles.length === 0} />
+              <SummaryCard label="Perfiles" value={String(metrics.totalProfiles)} hint={`${metrics.activeProfiles} activos y ${metrics.profilesWithSessions} con sesiones.`} icon={UserSquare2} tone="accent" isLoading={(usesSystemSummary ? summaryQuery.isLoading : profilesQuery.isLoading) && profiles.length === 0} />
             )}
           </>
         )}
@@ -922,7 +940,7 @@ export function SuperadminDashboard() {
               Contraste del período actual contra el bloque inmediatamente anterior ({comparisonWindowLabel}).
             </CardDescription>
           </CardHeader>
-          <CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <CardContent className="grid gap-3 md:grid-cols-2 2xl:grid-cols-4">
             {comparisonMetrics.map((metric) => {
               const delta = metric.delta_percent ?? 0;
               const deltaTone = delta > 0 ? "success" : delta < 0 ? "warning" : "secondary";
@@ -952,7 +970,7 @@ export function SuperadminDashboard() {
               Alertas rápidas construidas sobre la comparación entre períodos y el estado del recorte actual.
             </CardDescription>
           </CardHeader>
-          <CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+          <CardContent className="grid gap-3 md:grid-cols-2 2xl:grid-cols-3">
             {summaryAlerts.map((alert) => (
               <div key={`${alert.severity}-${alert.title}`} className="rounded-2xl bg-white/80 p-4 text-sm text-muted-foreground">
                 <div className="flex items-start justify-between gap-3">
@@ -1010,7 +1028,7 @@ export function SuperadminDashboard() {
               </div>
             </div>
           </CardHeader>
-          <CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+          <CardContent className="grid gap-3 md:grid-cols-2 2xl:grid-cols-3">
             {territorialPresets.length > 0 ? (
               territorialPresets.map((preset) => (
                 <div key={preset.id} className="rounded-2xl bg-white/80 p-4 text-sm text-muted-foreground">
@@ -1122,7 +1140,7 @@ export function SuperadminDashboard() {
             <CardTitle>Alertas por territorio</CardTitle>
             <CardDescription>Focos subterritoriales que pueden quedar ocultos cuando el agregado país todavía se ve sano.</CardDescription>
           </CardHeader>
-          <CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+          <CardContent className="grid gap-3 md:grid-cols-2 2xl:grid-cols-3">
             {filteredTerritoryAlerts.length > 0 ? (
               filteredTerritoryAlerts.map((alert) => (
                 <div key={`${alert.scope}-${alert.label}`} className="rounded-2xl bg-white/80 p-4 text-sm text-muted-foreground">
@@ -1149,7 +1167,7 @@ export function SuperadminDashboard() {
             <CardTitle>Índice territorial compuesto</CardTitle>
             <CardDescription>Score ejecutivo para ordenar prioridades por territorio combinando actividad, cobertura y señales de riesgo.</CardDescription>
           </CardHeader>
-          <CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+          <CardContent className="grid gap-3 md:grid-cols-2 2xl:grid-cols-3">
             {filteredTerritoryScores.length > 0 ? (
               filteredTerritoryScores.map((territory) => (
                 <div key={territory.label} className="rounded-2xl bg-white/80 p-4 text-sm text-muted-foreground">
@@ -1174,7 +1192,7 @@ export function SuperadminDashboard() {
       ) : null}
 
       {isGovernmentViewer ? (
-        <div className="grid gap-5 xl:grid-cols-3">
+        <div className="grid gap-5 2xl:grid-cols-3">
           <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)] xl:col-span-2">
             <CardHeader>
               <CardTitle>Territorios con mayor actividad</CardTitle>
@@ -1222,7 +1240,7 @@ export function SuperadminDashboard() {
         </div>
       ) : null}
 
-      <div className="grid gap-5 xl:grid-cols-3">
+      <div className="grid gap-5 2xl:grid-cols-3">
         <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
           <CardHeader>
             <CardTitle>Uso y actividad</CardTitle>
@@ -1281,7 +1299,7 @@ export function SuperadminDashboard() {
             <CardTitle>Instituciones destacadas en el territorio</CardTitle>
             <CardDescription>Comparativa compacta para detectar dónde hay mayor actividad o cobertura.</CardDescription>
           </CardHeader>
-          <CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+          <CardContent className="grid gap-3 md:grid-cols-2 2xl:grid-cols-3">
             {topInstitutions.length > 0 ? (
               topInstitutions.map((institution) => (
                 <div key={institution.id} className="rounded-2xl bg-white/80 p-4 text-sm text-muted-foreground">
@@ -1305,7 +1323,7 @@ export function SuperadminDashboard() {
         </Card>
       ) : null}
 
-      <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+      <div className="grid gap-5 md:grid-cols-2 2xl:grid-cols-3">
         {moduleCards.map((module) => (
           <ModuleCard key={module.href} title={module.title} description={module.description} icon={module.icon} href={module.href} />
         ))}
@@ -1334,11 +1352,11 @@ export function SuperadminDashboard() {
             </div>
             <div className="rounded-2xl bg-white/80 p-4">
               <p className="text-sm font-medium text-foreground">2. Cobertura de tests UI</p>
-              <p className="mt-1 text-sm leading-6 text-muted-foreground">Agregar pruebas mínimas a módulos nuevos fuera de Users.</p>
+              <p className="mt-1 text-sm leading-6 text-muted-foreground">Agregar pruebas mínimas a los módulos más usados, no solo a Users.</p>
             </div>
             <div className="rounded-2xl bg-white/80 p-4">
               <p className="text-sm font-medium text-foreground">3. QA consolidado</p>
-              <p className="mt-1 text-sm leading-6 text-muted-foreground">Usar esta home como punto de entrada y validar el flujo completo en local.</p>
+              <p className="mt-1 text-sm leading-6 text-muted-foreground">Usar esta home como punto de entrada y validar el flujo local completo con foco en desktop.</p>
             </div>
           </div>
         </CardContent>

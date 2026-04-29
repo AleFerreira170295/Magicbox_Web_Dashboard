@@ -98,6 +98,35 @@ function buildFormState(device: DeviceRecord | null, scopedInstitutionId?: strin
   };
 }
 
+function getDeviceInitials(name: string) {
+  return name
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part.slice(0, 1).toUpperCase())
+    .join("") || "DV";
+}
+
+function DeviceAvatar({
+  device,
+  className,
+}: {
+  device: Pick<DeviceRecord, "name" | "assignmentScope">;
+  className?: string;
+}) {
+  const Icon = device.assignmentScope === "home" ? Home : Smartphone;
+
+  return (
+    <div className={cn("flex shrink-0 items-center justify-center rounded-2xl border border-border/70 bg-white text-primary", className)}>
+      <div className="flex flex-col items-center justify-center leading-none">
+        <Icon className="size-4" />
+        <span className="mt-1 text-[10px] font-semibold tracking-[0.12em] text-primary/80">{getDeviceInitials(device.name)}</span>
+      </div>
+    </div>
+  );
+}
+
 function DeviceEditorPanel({
   selectedDevice,
   scopedInstitutionId,
@@ -107,7 +136,7 @@ function DeviceEditorPanel({
   canUpdateDevices,
   onUpdated,
 }: {
-  selectedDevice: DeviceRecord;
+  selectedDevice: DeviceRecord & { relatedSyncCount: number };
   scopedInstitutionId?: string | null;
   institutions: Array<{ id: string; name: string }>;
   users: Array<{ id: string; fullName: string; email: string; educationalCenterId?: string | null }>;
@@ -182,13 +211,19 @@ function DeviceEditorPanel({
     <>
       <div className="rounded-2xl bg-background/70 p-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <p className="text-sm font-semibold text-foreground">{selectedDevice.name}</p>
-            <p className="mt-1 font-mono text-xs text-muted-foreground">{selectedDevice.deviceId}</p>
+          <div className="flex min-w-0 items-center gap-3">
+            <DeviceAvatar device={selectedDevice} className="size-14" />
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold text-foreground">{selectedDevice.name}</p>
+              <p className="mt-1 truncate font-mono text-xs text-muted-foreground">{selectedDevice.deviceId}</p>
+            </div>
           </div>
           <div className="flex flex-wrap gap-2">
             {scopeBadge(selectedDevice)}
             <Badge variant={selectedDevice.status ? "secondary" : "outline"}>{statusLabel(selectedDevice.status)}</Badge>
+            <Badge variant={selectedDevice.relatedSyncCount > 0 ? "secondary" : "outline"}>
+              {selectedDevice.relatedSyncCount > 0 ? "con sync visible" : "sin sync visible"}
+            </Badge>
           </div>
         </div>
         <div className="mt-3 grid gap-2 text-xs text-muted-foreground sm:grid-cols-2">
@@ -614,7 +649,15 @@ export function DevicesTable() {
       </Card>
 
       <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
-        <CardContent className="flex flex-wrap gap-2 p-5">
+        <CardContent className="p-5">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-semibold text-foreground">Acceso visible</p>
+              <p className="text-sm text-muted-foreground">Filtrá por relación de acceso para entender por qué aparece cada dispositivo.</p>
+            </div>
+            <Badge variant="outline">{filtered.length} visibles</Badge>
+          </div>
+          <div className="flex flex-wrap gap-2">
           {accessSegments.map((segment) => (
             <button
               key={segment.key}
@@ -633,10 +676,11 @@ export function DevicesTable() {
               </Badge>
             </button>
           ))}
+          </div>
         </CardContent>
       </Card>
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-6">
+      <div className="grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(220px,1fr))]">
         {devicesQuery.isLoading ? (
           Array.from({ length: 6 }).map((_, index) => <Skeleton key={index} className="h-32 rounded-2xl" />)
         ) : (
@@ -647,6 +691,7 @@ export function DevicesTable() {
                 <SummaryCard label="Institución" value={String(metrics.institutionDevices)} hint="Asignados al centro que dirigís." icon={University} />
                 <SummaryCard label="Online" value={String(metrics.onlineDevices)} hint="Lectura rápida del parque activo." icon={Wifi} />
                 <SummaryCard label="Con actividad" value={String(metrics.devicesWithActivity)} hint="Tuvieron syncs o partidas visibles." icon={ShieldCheck} />
+                <SummaryCard label="Sin sync visible" value={String(metrics.devicesWithoutSync)} hint="Conviene chequear conectividad o uso reciente." icon={Wifi} />
                 <SummaryCard label="Sin responsable" value={String(metrics.devicesWithoutOwner)} hint="Ownership pendiente o incompleto." icon={UserRound} />
                 <SummaryCard label="Conviene revisar" value={String(metrics.reviewDevices)} hint="Tienen alguna señal blanda para seguimiento." icon={Home} />
               </>
@@ -656,6 +701,7 @@ export function DevicesTable() {
                 <SummaryCard label="Home" value={String(metrics.homeDevices)} hint="Sin centro educativo asociado, por diseño." icon={Home} />
                 <SummaryCard label="Institución" value={String(metrics.institutionDevices)} hint="Asignados a una institución concreta." icon={University} />
                 <SummaryCard label="Online" value={String(metrics.onlineDevices)} hint="Lectura rápida del parque activo." icon={Wifi} />
+                <SummaryCard label="Sin sync visible" value={String(metrics.devicesWithoutSync)} hint="Sirve para detectar equipos apagados o poco usados." icon={Wifi} />
                 <SummaryCard label="Con responsable" value={String(metrics.devicesWithOwner)} hint="Ownership ya resuelto desde backend." icon={UserRound} />
                 <SummaryCard label="Con metadata" value={String(metrics.devicesWithMetadata)} hint="Ayuda a soporte y QA manual." icon={ShieldCheck} />
               </>
@@ -665,7 +711,17 @@ export function DevicesTable() {
       </div>
 
       <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
-        <CardContent className="flex flex-wrap gap-2 p-5">
+        <CardContent className="p-5">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-semibold text-foreground">Enfocar revisión</p>
+              <p className="text-sm text-muted-foreground">Recortá el parque por señales blandas antes de abrir el detalle.</p>
+            </div>
+            <Button type="button" size="sm" variant="ghost" onClick={() => setFocusFilter("all")}>
+              Limpiar foco
+            </Button>
+          </div>
+          <div className="flex flex-wrap gap-2">
           {focusSegments.map((segment) => (
             <button
               key={segment.key}
@@ -684,10 +740,11 @@ export function DevicesTable() {
               </Badge>
             </button>
           ))}
+          </div>
         </CardContent>
       </Card>
 
-      <div className="grid gap-6 xl:grid-cols-[1.15fr_1.05fr]">
+      <div className="grid gap-6 2xl:grid-cols-[minmax(0,1.35fr)_420px]">
         <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
           <CardHeader>
             <CardTitle>Parque de dispositivos</CardTitle>
@@ -730,10 +787,18 @@ export function DevicesTable() {
                     filtered.map((device) => (
                       <TableRow
                         key={device.id}
-                        className={cn("cursor-pointer", selectedDeviceId === device.id && "bg-primary/5")}
+                        className={cn("cursor-pointer", selectedDeviceId === device.id && "border-primary/30 bg-primary/8")}
                         onClick={() => setSelectedDeviceId(device.id)}
                       >
-                        <TableCell className="font-medium">{device.name}</TableCell>
+                        <TableCell>
+                          <div className="flex min-w-0 items-center gap-3">
+                            <DeviceAvatar device={device} className="size-10" />
+                            <div className="min-w-0">
+                              <p className="truncate font-medium text-foreground">{device.name}</p>
+                              <p className="truncate text-xs text-muted-foreground">{device.assignmentScope === "home" ? "Home" : device.educationalCenterName || "Institución"}</p>
+                            </div>
+                          </div>
+                        </TableCell>
                         <TableCell className="font-mono text-xs">{device.deviceId}</TableCell>
                         <TableCell>{scopeBadge(device)}</TableCell>
                         <TableCell>{locationLabel(device)}</TableCell>
@@ -780,19 +845,31 @@ export function DevicesTable() {
             ) : (
               <>
                 <div className="rounded-2xl bg-background/70 p-4">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Badge variant={selectedDevice.hasUnresolvedAssociation ? "warning" : "outline"}>{selectedDevice.accessRelation}</Badge>
-                    {selectedDevice.hasOperationalActivity ? <Badge variant="secondary">actividad visible</Badge> : <Badge variant="outline">sin actividad visible</Badge>}
-                    {isTeacherView ? (
-                      <Badge variant={selectedDevice.isReadyForClassroom ? "secondary" : "warning"}>
-                        {selectedDevice.isReadyForClassroom ? "listo para aula" : "conviene revisar"}
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="flex min-w-0 items-center gap-3">
+                      <DeviceAvatar device={selectedDevice} className="size-14" />
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold text-foreground">{selectedDevice.name}</p>
+                        <p className="mt-1 truncate font-mono text-xs text-muted-foreground">{selectedDevice.deviceId}</p>
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge variant={selectedDevice.hasUnresolvedAssociation ? "warning" : "outline"}>{selectedDevice.accessRelation}</Badge>
+                      {selectedDevice.hasOperationalActivity ? <Badge variant="secondary">actividad visible</Badge> : <Badge variant="outline">sin actividad visible</Badge>}
+                      <Badge variant={selectedDevice.relatedSyncCount > 0 ? "secondary" : "outline"}>
+                        {selectedDevice.relatedSyncCount > 0 ? "con sync visible" : "sin sync visible"}
                       </Badge>
-                    ) : null}
-                    {isDirectorView ? (
-                      <Badge variant={selectedDevice.reviewReasons.length === 0 ? "secondary" : "warning"}>
-                        {selectedDevice.reviewReasons.length === 0 ? "estable para coordinar" : "requiere seguimiento"}
-                      </Badge>
-                    ) : null}
+                      {isTeacherView ? (
+                        <Badge variant={selectedDevice.isReadyForClassroom ? "secondary" : "warning"}>
+                          {selectedDevice.isReadyForClassroom ? "listo para aula" : "conviene revisar"}
+                        </Badge>
+                      ) : null}
+                      {isDirectorView ? (
+                        <Badge variant={selectedDevice.reviewReasons.length === 0 ? "secondary" : "warning"}>
+                          {selectedDevice.reviewReasons.length === 0 ? "estable para coordinar" : "requiere seguimiento"}
+                        </Badge>
+                      ) : null}
+                    </div>
                   </div>
                   <div className="mt-3 grid gap-2 text-xs text-muted-foreground sm:grid-cols-2">
                     <p>Syncs visibles: {selectedDevice.relatedSyncCount}</p>

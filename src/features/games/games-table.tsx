@@ -43,6 +43,23 @@ function SummaryCard({
   );
 }
 
+function getDeckInitials(deckName?: string | null) {
+  return (deckName || "Partida")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part.slice(0, 1).toUpperCase())
+    .join("") || "GM";
+}
+
+function getPlayerMixLabel(manualCount: number, registeredCount: number) {
+  if (manualCount > 0 && registeredCount > 0) return "mixta";
+  if (manualCount > 0) return "manual";
+  if (registeredCount > 0) return "registrada";
+  return "sin jugadores";
+}
+
 export function GamesTable() {
   const { tokens, user: currentUser } = useAuth();
   const [query, setQuery] = useState("");
@@ -99,6 +116,9 @@ export function GamesTable() {
       const ownerLabel = device?.ownerUserName || device?.ownerUserEmail || "sin responsable";
       const playerCount = game.players.length || game.totalPlayers || 0;
 
+      const manualCount = game.players.filter((player) => player.playerSource === "manual").length;
+      const registeredCount = game.players.filter((player) => player.playerSource !== "manual").length;
+
       return {
         ...game,
         institution,
@@ -109,6 +129,9 @@ export function GamesTable() {
         isInstitutionVisible,
         hasUnresolvedAssociation: !device || !game.educationalCenterId || accessRelation === "sin asociación resuelta",
         playerCount,
+        manualCount,
+        registeredCount,
+        playerMixLabel: getPlayerMixLabel(manualCount, registeredCount),
       };
     });
   }, [currentUser, deviceById, games, institutionById]);
@@ -223,14 +246,14 @@ export function GamesTable() {
             : "Vista operativa sobre `game-data` con contexto de institución, dispositivo, jugadores y desempeño, para seguir el tramo sync → partida sin caer en inspección cruda solamente."
         }
         actions={
-          <div className="flex flex-col items-stretch gap-3 md:flex-row md:items-center">
-            <div className="relative min-w-72">
+          <div className="grid w-full gap-3 md:grid-cols-2 2xl:grid-cols-[minmax(0,1.45fr)_minmax(220px,0.8fr)_minmax(210px,0.7fr)_minmax(220px,0.8fr)]">
+            <div className="relative min-w-0 md:col-span-2 2xl:col-span-1">
               <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
                 placeholder="Filtrar por mazo, gameId, institución, dispositivo o jugador"
-                className="pl-9"
+                className="w-full pl-9"
               />
             </div>
             {isFamilyView ? null : (
@@ -238,7 +261,7 @@ export function GamesTable() {
                 <select
                   value={institutionFilter || scopedInstitutionId || ""}
                   onChange={(event) => setInstitutionFilter(event.target.value)}
-                  className="h-10 min-w-48 rounded-md border border-input bg-background px-3 text-sm"
+                  className="h-10 min-w-0 w-full rounded-md border border-input bg-background px-3 text-sm"
                   disabled={Boolean(scopedInstitutionId)}
                 >
                   <option value="">Todas las instituciones</option>
@@ -251,7 +274,7 @@ export function GamesTable() {
                 <select
                   value={playerModeFilter}
                   onChange={(event) => setPlayerModeFilter(event.target.value as "all" | "manual" | "mixed" | "registered")}
-                  className="h-10 min-w-44 rounded-md border border-input bg-background px-3 text-sm"
+                  className="h-10 min-w-0 w-full rounded-md border border-input bg-background px-3 text-sm"
                 >
                   <option value="all">Todos los modos</option>
                   <option value="registered">Solo registrados</option>
@@ -261,7 +284,7 @@ export function GamesTable() {
                 <select
                   value={accessFilter}
                   onChange={(event) => setAccessFilter(event.target.value as "all" | "owned" | "institution" | "shared" | "unresolved")}
-                  className="h-10 min-w-48 rounded-md border border-input bg-background px-3 text-sm"
+                  className="h-10 min-w-0 w-full rounded-md border border-input bg-background px-3 text-sm"
                 >
                   <option value="all">Todos los accesos</option>
                   <option value="owned">Mis dispositivos</option>
@@ -324,14 +347,22 @@ export function GamesTable() {
 
       {isFamilyView ? null : (
         <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
-          <CardContent className="flex flex-wrap gap-2 p-5">
+          <CardContent className="p-5">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold text-foreground">Acceso visible</p>
+                <p className="text-sm text-muted-foreground">Recortá la muestra por tipo de acceso antes de abrir una partida.</p>
+              </div>
+              <Badge variant="outline">{filtered.length} visibles</Badge>
+            </div>
+            <div className="flex flex-wrap gap-2">
             {accessSegments.map((segment) => (
               <button
                 key={segment.key}
                 type="button"
                 onClick={() => setAccessFilter(segment.key)}
                 className={cn(
-                  "inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-medium transition",
+                  "inline-flex w-full items-center justify-between gap-2 rounded-full border px-4 py-2 text-left text-sm font-medium transition sm:w-auto sm:justify-center",
                   accessFilter === segment.key
                     ? "border-primary bg-primary text-primary-foreground"
                     : "border-border bg-background text-foreground hover:bg-accent",
@@ -343,11 +374,12 @@ export function GamesTable() {
                 </Badge>
               </button>
             ))}
+            </div>
           </CardContent>
         </Card>
       )}
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+      <div className="grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(220px,1fr))]">
         {gamesQuery.isLoading ? (
           Array.from({ length: 5 }).map((_, index) => <Skeleton key={index} className="h-32 rounded-2xl" />)
         ) : (
@@ -356,12 +388,12 @@ export function GamesTable() {
             <SummaryCard label={isResearcherView ? "Participantes" : "Jugadores"} value={String(metrics.totalPlayers)} hint={isResearcherView ? "Volumen proyectado de participantes en la evidencia visible." : "Suma proyectada de participantes en la muestra."} icon={Users} />
             <SummaryCard label="Turnos" value={String(metrics.totalTurns)} hint={isFamilyView ? "Interacciones visibles dentro de las partidas." : isResearcherView ? "Eventos observables persistidos para análisis." : "Volumen operativo de interacción ya persistido."} icon={TimerReset} />
             <SummaryCard label={isFamilyView ? "Mazos" : isResearcherView ? "Muestra mixta" : "Mixtas"} value={String(isFamilyView ? new Set(games.map((game) => game.deckName).filter(Boolean)).size : metrics.mixedGames)} hint={isFamilyView ? "Variedad de contenidos que aparecen en la cuenta." : isResearcherView ? "Sesiones con combinación de manuales y registrados." : "Partidas con mezcla de jugadores manuales y registrados."} icon={BookOpen} />
-            <SummaryCard label={isFamilyView ? "Éxito visible" : isResearcherView ? "Éxito visible" : "Éxito"} value={`${metrics.successRate}%`} hint={isFamilyView ? "Lectura agregada del desempeño visible." : isResearcherView ? "Tasa agregada de turnos exitosos dentro de la vista." : "Tasa agregada de turnos exitosos en la vista."} icon={Trophy} />
+            <SummaryCard label={isFamilyView ? "Éxito visible" : isResearcherView ? "Sin asociación" : "Sin asociación"} value={isFamilyView ? `${metrics.successRate}%` : String(metrics.unresolvedAssociations)} hint={isFamilyView ? "Lectura agregada del desempeño visible." : isResearcherView ? "Partidas cuya relación con dispositivo o institución pide revisión." : "Partidas cuya relación con dispositivo o institución pide revisión."} icon={isFamilyView ? Trophy : Gamepad2} />
           </>
         )}
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-[1.2fr_1fr]">
+      <div className="grid gap-6 2xl:grid-cols-[minmax(0,1.35fr)_420px]">
         <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
           <CardHeader>
             <CardTitle>{isFamilyView ? "Actividad visible" : isResearcherView ? "Muestra visible de partidas" : isTeacherView ? "Partidas visibles para aula" : isDirectorView ? "Partidas visibles para seguimiento" : "Listado operativo de partidas"}</CardTitle>
@@ -413,11 +445,28 @@ export function GamesTable() {
                       return (
                         <TableRow
                           key={game.id}
-                          className={cn("cursor-pointer", selectedGameId === game.id && "bg-primary/5")}
+                          className={cn("cursor-pointer", selectedGameId === game.id && "border-primary/30 bg-primary/8")}
                           onClick={() => setSelectedGameId(game.id)}
                         >
-                          <TableCell className="font-medium">{game.gameId || "-"}</TableCell>
-                          <TableCell>{game.deckName || "-"}</TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-3">
+                              <div className="flex size-10 shrink-0 items-center justify-center rounded-2xl border border-border/70 bg-white text-[11px] font-semibold text-primary">
+                                {getDeckInitials(game.deckName)}
+                              </div>
+                              <div>
+                                <p className="font-medium text-foreground">{game.gameId || "-"}</p>
+                                <p className="text-xs text-muted-foreground">{game.playerMixLabel}</p>
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="space-y-1">
+                              <p className="text-sm text-foreground">{game.deckName || "-"}</p>
+                              <div className="flex flex-wrap gap-2">
+                                <Badge variant={game.hasUnresolvedAssociation ? "warning" : "outline"}>{game.hasUnresolvedAssociation ? "revisar asociación" : "asociación visible"}</Badge>
+                              </div>
+                            </div>
+                          </TableCell>
                           {isFamilyView ? null : <TableCell>{game.institution?.name || game.educationalCenterId || "-"}</TableCell>}
                           {isFamilyView ? null : <TableCell>{game.device?.name || game.device?.deviceId || game.bleDeviceId || "-"}</TableCell>}
                           {isFamilyView ? null : (
@@ -431,6 +480,7 @@ export function GamesTable() {
                           <TableCell>
                             <div className="flex flex-wrap items-center gap-2">
                               <Badge variant="secondary">{game.players.length || game.totalPlayers || 0}</Badge>
+                              <Badge variant={game.playerMixLabel === "mixta" ? "secondary" : "outline"}>{game.playerMixLabel}</Badge>
                               {registeredCount > 0 ? <Badge variant="outline">registrados {registeredCount}</Badge> : null}
                               {manualCount > 0 ? <Badge variant="success">manuales {manualCount}</Badge> : null}
                             </div>
@@ -473,12 +523,18 @@ export function GamesTable() {
               <>
                 <div className="rounded-2xl bg-background/70 p-4">
                   <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div>
-                      <p className="text-sm font-semibold text-foreground">{selectedGame.deckName || `Game ${selectedGame.gameId || "-"}`}</p>
-                      <p className="mt-1 text-xs text-muted-foreground">Game ID {selectedGame.gameId || "-"}</p>
+                    <div className="flex min-w-0 items-center gap-3">
+                      <div className="flex size-14 shrink-0 items-center justify-center rounded-2xl border border-border/70 bg-white text-sm font-semibold text-primary">
+                        {getDeckInitials(selectedGame.deckName)}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold text-foreground">{selectedGame.deckName || `Game ${selectedGame.gameId || "-"}`}</p>
+                        <p className="mt-1 truncate text-xs text-muted-foreground">Game ID {selectedGame.gameId || "-"}</p>
+                      </div>
                     </div>
                     <div className="flex flex-wrap gap-2">
                       <Badge variant="secondary">{selectedInstitution?.name || "sin institución"}</Badge>
+                      <Badge variant={selectedGame.hasUnresolvedAssociation ? "warning" : "outline"}>{selectedGame.hasUnresolvedAssociation ? "revisar asociación" : "asociación visible"}</Badge>
                       <Badge variant="outline">{selectedTurnSuccessRate}% éxito</Badge>
                     </div>
                   </div>
@@ -489,6 +545,7 @@ export function GamesTable() {
                     {isFamilyView ? null : <p>Relación de acceso: {selectedGame.accessRelation}</p>}
                     <p>Jugadores: {selectedGame.players.length || selectedGame.totalPlayers || 0}</p>
                     <p>Turnos: {selectedGame.turns.length}</p>
+                    <p>Mix: {selectedGame.playerMixLabel}</p>
                     <p>Registrados: {selectedRegisteredCount}</p>
                     <p>Manuales: {selectedManualCount}</p>
                   </div>

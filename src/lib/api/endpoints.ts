@@ -22,6 +22,7 @@ export const apiEndpoints = {
   institutions: {
     list: "/educational-center",
     byId: (id: string) => `/educational-center/${id}`,
+    imageById: (id: string) => `/educational-center/${id}/image`,
   },
   features: {
     list: "/feature",
@@ -48,6 +49,8 @@ export const apiEndpoints = {
   settings: {
     otaRelease: "/system/ota/release",
     otaReleaseLegacy: "/home/ota/release",
+    otaReleases: "/system/ota/releases",
+    otaReleaseActivate: (id: string) => `/system/ota/releases/${id}/activate`,
   },
   dashboard: {
     systemSummary: "/system/dashboard/summary",

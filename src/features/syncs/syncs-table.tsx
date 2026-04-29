@@ -45,6 +45,16 @@ function SummaryCard({
   );
 }
 
+function getSyncInitials(source?: string | null, deckName?: string | null) {
+  return (deckName || source || "Sync")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part.slice(0, 1).toUpperCase())
+    .join("") || "SY";
+}
+
 export function SyncsTable() {
   const { tokens, user: currentUser } = useAuth();
   const [query, setQuery] = useState("");
@@ -135,6 +145,8 @@ export function SyncsTable() {
         isOwnedByCurrentUser,
         isInstitutionVisible,
         hasUnresolvedAssociation: !device || accessRelation === "sin asociación resuelta",
+        participantCount: sync.participants.length || sync.totalPlayers || 0,
+        evidenceState: hasRaw ? "con evidencia" : "sin evidencia",
       };
     });
   }, [canReadOperationalSyncs, currentUser, deviceById, gameById, syncs, userById]);
@@ -225,14 +237,14 @@ export function SyncsTable() {
             : "Sin permiso BLE operativo, `/sync-sessions` vuelve a comportarse como historial personal del usuario autenticado."
         }
         actions={
-          <div className="flex flex-col items-stretch gap-3 md:flex-row md:items-center">
-            <div className="relative min-w-72">
+          <div className="grid w-full gap-3 md:grid-cols-2 2xl:grid-cols-[minmax(0,1.45fr)_minmax(220px,0.8fr)_minmax(220px,0.8fr)]">
+            <div className="relative min-w-0 md:col-span-2 2xl:col-span-1">
               <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
                 placeholder="Filtrar por syncId, origen, mazo, dispositivo o usuario"
-                className="pl-9"
+                className="w-full pl-9"
               />
             </div>
             {isFamilyView ? null : (
@@ -240,7 +252,7 @@ export function SyncsTable() {
                 <select
                   value={rawFilter}
                   onChange={(event) => setRawFilter(event.target.value as "all" | "with-raw" | "without-raw")}
-                  className="h-10 min-w-48 rounded-md border border-input bg-background px-3 text-sm"
+                  className="h-10 min-w-0 w-full rounded-md border border-input bg-background px-3 text-sm"
                 >
                   <option value="all">Todas</option>
                   <option value="with-raw">Solo con raw</option>
@@ -249,7 +261,7 @@ export function SyncsTable() {
                 <select
                   value={accessFilter}
                   onChange={(event) => setAccessFilter(event.target.value as "all" | "owned" | "institution" | "shared" | "unresolved")}
-                  className="h-10 min-w-48 rounded-md border border-input bg-background px-3 text-sm"
+                  className="h-10 min-w-0 w-full rounded-md border border-input bg-background px-3 text-sm"
                 >
                   <option value="all">Todos los accesos</option>
                   <option value="owned">Mis dispositivos</option>
@@ -332,14 +344,22 @@ export function SyncsTable() {
 
       {isFamilyView ? null : (
         <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
-          <CardContent className="flex flex-wrap gap-2 p-5">
+          <CardContent className="p-5">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold text-foreground">Acceso visible</p>
+                <p className="text-sm text-muted-foreground">Priorizá el recorte por alcance antes de leer trazabilidad fina.</p>
+              </div>
+              <Badge variant="outline">{filtered.length} visibles</Badge>
+            </div>
+            <div className="flex flex-wrap gap-2">
             {accessSegments.map((segment) => (
               <button
                 key={segment.key}
                 type="button"
                 onClick={() => setAccessFilter(segment.key)}
                 className={cn(
-                  "inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-medium transition",
+                  "inline-flex w-full items-center justify-between gap-2 rounded-full border px-4 py-2 text-left text-sm font-medium transition sm:w-auto sm:justify-center",
                   accessFilter === segment.key
                     ? "border-primary bg-primary text-primary-foreground"
                     : "border-border bg-background text-foreground hover:bg-accent",
@@ -351,11 +371,12 @@ export function SyncsTable() {
                 </Badge>
               </button>
             ))}
+            </div>
           </CardContent>
         </Card>
       )}
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+      <div className="grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(220px,1fr))]">
         {syncsQuery.isLoading ? (
           Array.from({ length: 5 }).map((_, index) => <Skeleton key={index} className="h-32 rounded-2xl" />)
         ) : (
@@ -364,12 +385,12 @@ export function SyncsTable() {
             <SummaryCard label="Con evidencia" value={String(metrics.withRaw)} hint={isFamilyView ? "Syncs donde quedó alguna evidencia cruda disponible." : isResearcherView ? "Cobertura observable de captura cruda." : "Ayuda a validar trazabilidad e ingestión."} icon={HardDriveDownload} />
             <SummaryCard label="Con participantes" value={String(metrics.withParticipants)} hint={isFamilyView ? "Syncs con participantes proyectados visibles." : isResearcherView ? "Syncs con proyección de participantes usable para análisis." : "Sesiones con proyección de jugadores usable."} icon={Users} />
             <SummaryCard label="Con dispositivo" value={String(metrics.withDeviceLink)} hint={isFamilyView ? "Sincronizaciones enlazadas a un dispositivo visible." : isResearcherView ? "Sesiones enlazadas a un dispositivo visible." : "Sesiones enlazadas a BLE o device_id."} icon={Waves} />
-            <SummaryCard label={isFamilyView ? "Con versión" : "Con firmware"} value={String(metrics.withFirmware)} hint={isFamilyView ? "Syncs donde quedó registrada alguna versión visible." : isResearcherView ? "Sirve para detectar sesgos o variaciones por versión." : "Útil para detectar variaciones de ingesta por versión."} icon={Cpu} />
+            <SummaryCard label={isFamilyView ? "Con versión" : "Sin asociación"} value={String(isFamilyView ? metrics.withFirmware : metrics.unresolvedAssociations)} hint={isFamilyView ? "Syncs donde quedó registrada alguna versión visible." : isResearcherView ? "Sesiones cuya relación con dispositivo/usuario todavía pide revisión." : "Sesiones cuya relación con dispositivo/usuario todavía pide revisión."} icon={isFamilyView ? Cpu : Activity} />
           </>
         )}
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-[1.2fr_1fr]">
+      <div className="grid gap-6 2xl:grid-cols-[minmax(0,1.35fr)_420px]">
         <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
           <CardHeader>
             <CardTitle>{isFamilyView ? "Actividad de sincronización" : isResearcherView ? "Muestra visible de sincronizaciones" : isTeacherView ? "Sincronizaciones visibles para aula" : isDirectorView ? "Sincronizaciones visibles para seguimiento" : "Sesiones sincronizadas"}</CardTitle>
@@ -418,12 +439,25 @@ export function SyncsTable() {
                       return (
                         <TableRow
                           key={sync.id}
-                          className={cn("cursor-pointer", selectedSyncId === sync.id && "bg-primary/5")}
+                          className={cn("cursor-pointer", selectedSyncId === sync.id && "border-primary/30 bg-primary/8")}
                           onClick={() => setSelectedSyncId(sync.id)}
                         >
-                          <TableCell className="max-w-56 truncate font-mono text-xs">{sync.syncId || sync.id}</TableCell>
                           <TableCell>
-                            <Badge variant="secondary">{sync.source || sync.sourceType || "desconocido"}</Badge>
+                            <div className="flex items-center gap-3">
+                              <div className="flex size-10 shrink-0 items-center justify-center rounded-2xl border border-border/70 bg-white text-[11px] font-semibold text-primary">
+                                {getSyncInitials(sync.source || sync.sourceType, sync.deckName)}
+                              </div>
+                              <div className="min-w-0">
+                                <p className="max-w-40 truncate font-mono text-xs text-foreground">{sync.syncId || sync.id}</p>
+                                <p className="text-xs text-muted-foreground">{sync.evidenceState}</p>
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="space-y-1">
+                              <Badge variant="secondary">{sync.source || sync.sourceType || "desconocido"}</Badge>
+                              {sync.matchedGame ? <Badge variant="outline">partida visible</Badge> : null}
+                            </div>
                           </TableCell>
                           <TableCell>{sync.device?.name || sync.deviceId || sync.bleDeviceId || "-"}</TableCell>
                           {isFamilyView ? null : <TableCell>{sync.user?.fullName || sync.user?.email || sync.userId || "-"}</TableCell>}
@@ -435,7 +469,12 @@ export function SyncsTable() {
                               </div>
                             </TableCell>
                           )}
-                          <TableCell>{sync.participants.length || sync.totalPlayers || 0}</TableCell>
+                          <TableCell>
+                            <div className="flex flex-wrap gap-2">
+                              <Badge variant="secondary">{sync.participantCount}</Badge>
+                              <Badge variant={sync.hasRaw ? "success" : "outline"}>{sync.hasRaw ? "con evidencia" : "sin evidencia"}</Badge>
+                            </div>
+                          </TableCell>
                           <TableCell>
                             <Badge variant={sync.hasRaw ? "success" : "outline"}>{sync.hasRaw ? "disponible" : "pendiente"}</Badge>
                           </TableCell>
@@ -474,12 +513,18 @@ export function SyncsTable() {
               <>
                 <div className="rounded-2xl bg-background/70 p-4">
                   <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div>
-                      <p className="text-sm font-semibold text-foreground">{selectedSync.deckName || selectedSync.syncId || selectedSync.id}</p>
-                      <p className="mt-1 font-mono text-xs text-muted-foreground">{selectedSync.syncId || selectedSync.id}</p>
+                    <div className="flex min-w-0 items-center gap-3">
+                      <div className="flex size-14 shrink-0 items-center justify-center rounded-2xl border border-border/70 bg-white text-sm font-semibold text-primary">
+                        {getSyncInitials(selectedSync.source || selectedSync.sourceType, selectedSync.deckName)}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold text-foreground">{selectedSync.deckName || selectedSync.syncId || selectedSync.id}</p>
+                        <p className="mt-1 truncate font-mono text-xs text-muted-foreground">{selectedSync.syncId || selectedSync.id}</p>
+                      </div>
                     </div>
                     <div className="flex flex-wrap gap-2">
                       <Badge variant="secondary">{selectedSync.source || selectedSync.sourceType || "desconocido"}</Badge>
+                      <Badge variant={selectedSync.hasUnresolvedAssociation ? "warning" : "outline"}>{selectedSync.hasUnresolvedAssociation ? "revisar asociación" : "asociación visible"}</Badge>
                       <Badge variant={selectedRawKeys.length > 0 || (selectedSync.rawRecordCount || 0) > 0 ? "success" : "outline"}>
                         raw {(selectedSync.rawRecordCount || selectedSync.rawRecordIds.length || 0) > 0 ? "disponible" : "pendiente"}
                       </Badge>
@@ -493,6 +538,7 @@ export function SyncsTable() {
                     <p>Firmware: {selectedSync.firmwareVersion || "sin firmware"}</p>
                     <p>App: {selectedSync.appVersion || "sin versión"}</p>
                     <p>Participantes: {selectedSync.participants.length || selectedSync.totalPlayers || 0}</p>
+                    <p>Evidencia: {selectedSync.hasRaw ? "con evidencia" : "sin evidencia"}</p>
                     <p>Sincronizado: {formatDateTime(selectedSync.syncedAt || selectedSync.receivedAt || selectedSync.startedAt)}</p>
                   </div>
                 </div>

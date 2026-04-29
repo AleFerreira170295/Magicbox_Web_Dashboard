@@ -162,7 +162,7 @@ export function InstitutionDashboard() {
         }
       />
 
-      <div className="grid gap-6 xl:grid-cols-[1.3fr_0.9fr]">
+      <div className="grid gap-6 2xl:grid-cols-[1.3fr_0.9fr]">
         <Card className="overflow-hidden border-none bg-[linear-gradient(135deg,#1f2a37_0%,#31465e_52%,#3f5a74_100%)] text-white shadow-[0_20px_60px_rgba(31,42,55,0.22)]">
           <CardContent className="p-8 sm:p-10">
             <div className="flex flex-wrap gap-2">
@@ -226,7 +226,7 @@ export function InstitutionDashboard() {
         </Card>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(220px,1fr))]">
         <MetricCard label="Usuarios visibles" value={String(metrics.totalUsers)} hint="Padrón operativo bajo este perfil." icon={Users} isLoading={isLoading} />
         <MetricCard label="Dispositivos" value={String(metrics.totalDevices)} hint="Hardware visible y asignable en el scope actual." icon={Smartphone} isLoading={isLoading} />
         <MetricCard label="Partidas" value={String(metrics.totalGames)} hint="Uso real de juego dentro del alcance actual." icon={Database} isLoading={isLoading} />
@@ -249,7 +249,7 @@ export function InstitutionDashboard() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+          <div className="grid gap-5 md:grid-cols-2 2xl:grid-cols-3">
             {moduleCards.map((module) => (
               <ModuleCard key={module.href} title={module.title} description={module.description} href={module.href} icon={module.icon} />
             ))}

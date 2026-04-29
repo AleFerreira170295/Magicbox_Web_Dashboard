@@ -145,7 +145,7 @@ export function TerritorialAlertsCenter() {
         }
       />
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(220px,1fr))]">
         {focusPresets.map((preset) => {
           const Icon = preset.key === "critical"
             ? Siren
@@ -176,7 +176,7 @@ export function TerritorialAlertsCenter() {
         })}
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
+      <div className="grid gap-6 2xl:grid-cols-[1.2fr_0.8fr]">
         <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
           <CardHeader>
             <CardTitle>Focos priorizados</CardTitle>

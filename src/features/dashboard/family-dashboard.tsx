@@ -75,7 +75,7 @@ export function FamilyDashboard() {
         description="Esta vista evita módulos técnicos y se concentra en una lectura clara de tus dispositivos, partidas y usuarios visibles."
       />
 
-      <div className="grid gap-6 xl:grid-cols-[1.35fr_0.95fr]">
+      <div className="grid gap-6 2xl:grid-cols-[1.35fr_0.95fr]">
         <Card className="overflow-hidden border-none bg-[linear-gradient(135deg,#3d4f68_0%,#4f6887_52%,#6d86a5_100%)] text-white shadow-[0_20px_60px_rgba(31,42,55,0.22)]">
           <CardContent className="p-8 sm:p-10">
             <div className="flex flex-wrap gap-2">
@@ -169,7 +169,7 @@ export function FamilyDashboard() {
         </Card>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(220px,1fr))]">
         {isLoading ? (
           Array.from({ length: 4 }).map((_, index) => <Skeleton key={index} className="h-36 rounded-2xl" />)
         ) : (

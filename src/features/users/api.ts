@@ -10,6 +10,14 @@ import type {
   UserRecord,
 } from "@/features/users/types";
 
+type UploadUserImageResponse = {
+  user_id: string;
+  image_url: string;
+  image_path: string;
+  filename: string;
+  folder: string;
+};
+
 function asRecord(value: unknown): JsonObject {
   if (value && typeof value === "object" && !Array.isArray(value)) return value as JsonObject;
   return {};
@@ -159,6 +167,28 @@ export async function updateUser(token: string, userId: string, payload: UpdateU
   });
 
   return normalizeUser(response);
+}
+
+export async function uploadUserImage(token: string, userId: string, file: File, filename?: string) {
+  const formData = new FormData();
+  formData.append("file", file);
+  if (filename?.trim()) {
+    formData.append("filename", filename.trim());
+  }
+
+  const response = await apiRequest<UploadUserImageResponse>(`${apiEndpoints.users.byId(userId)}/image`, {
+    method: "POST",
+    token,
+    body: formData,
+  });
+
+  return {
+    userId: response.user_id,
+    imageUrl: response.image_url,
+    imagePath: response.image_path,
+    filename: response.filename,
+    folder: response.folder,
+  };
 }
 
 export async function deleteUser(token: string, userId: string) {

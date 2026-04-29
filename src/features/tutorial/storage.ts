@@ -1,4 +1,4 @@
-const TUTORIAL_VERSION = "v1";
+const TUTORIAL_VERSION = "v2";
 
 function getTutorialKey(userId: string) {
   return `magicbox.web.tutorial.${TUTORIAL_VERSION}.${userId}`;

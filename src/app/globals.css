@@ -1,18 +1,18 @@
 @import "tailwindcss";
 
 :root {
-  --background: #f7fbff;
-  --foreground: #20242f;
+  --background: #f5f9fd;
+  --foreground: #16202c;
   --card: #ffffff;
-  --card-foreground: #20242f;
-  --muted: #eef7ff;
-  --muted-foreground: #667085;
-  --border: #d7eaf7;
-  --input: #d7eaf7;
+  --card-foreground: #16202c;
+  --muted: #edf5fb;
+  --muted-foreground: #566577;
+  --border: #cfddea;
+  --input: #cfddea;
   --primary: #47b9ef;
   --primary-foreground: #ffffff;
-  --secondary: #edf8ff;
-  --secondary-foreground: #1b5b78;
+  --secondary: #e8f3fb;
+  --secondary-foreground: #17455d;
   --accent: #e7f9f1;
   --accent-foreground: #207257;
   --destructive: #dc5b5b;
@@ -56,17 +56,27 @@
 }
 
 html, body {
+  width: 100%;
   min-height: 100%;
+}
+
+html {
+  background: #f5f9fd;
 }
 
 body {
   background:
-    radial-gradient(circle at top, rgba(71, 185, 239, 0.16), transparent 28%),
-    radial-gradient(circle at bottom right, rgba(128, 214, 250, 0.12), transparent 24%),
-    linear-gradient(180deg, #ffffff 0%, var(--background) 45%, #f3faff 100%);
+    radial-gradient(circle at top, rgba(71, 185, 239, 0.14), transparent 30%),
+    radial-gradient(circle at bottom right, rgba(128, 214, 250, 0.1), transparent 24%),
+    linear-gradient(180deg, #ffffff 0%, var(--background) 44%, #f0f7fc 100%);
   color: var(--foreground);
   font-family: var(--font-manrope), Arial, Helvetica, sans-serif;
   letter-spacing: -0.02em;
+}
+
+#app-root {
+  min-height: 100%;
+  width: 100%;
 }
 
 ::selection {
@@ -80,11 +90,11 @@ a {
 }
 
 .soft-panel {
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(244, 250, 255, 0.92));
-  border: 1px solid rgba(215, 234, 247, 0.9);
-  box-shadow: 0 24px 60px rgba(66, 128, 164, 0.08);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(244, 249, 253, 0.96));
+  border: 1px solid rgba(207, 221, 234, 0.92);
+  box-shadow: 0 18px 42px rgba(33, 59, 87, 0.07);
 }
 
 .container-shell {
-  @apply mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8;
+  @apply w-full px-4 sm:px-6 lg:px-8 xl:px-10 2xl:px-12;
 }

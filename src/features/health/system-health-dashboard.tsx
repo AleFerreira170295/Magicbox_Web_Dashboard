@@ -122,8 +122,8 @@ export function SystemHealthDashboard() {
     <div className="space-y-6">
       <SectionHeader
         eyebrow="Salud global"
-        title="Health"
-        description="Combina el health técnico real del backend (`/health`, `/health/ready`, `/health/live`) con señales operativas globales de dispositivos, syncs, games y profiles."
+        title="Salud del sistema"
+        description="Combina el health técnico real del backend con señales operativas globales para detectar rápido qué conviene revisar primero."
       />
 
       <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
@@ -141,7 +141,7 @@ export function SystemHealthDashboard() {
         </CardContent>
       </Card>
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+      <div className="grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(220px,1fr))]">
         {isLoading ? (
           Array.from({ length: 5 }).map((_, index) => <Skeleton key={index} className="h-32 rounded-2xl" />)
         ) : (
@@ -163,7 +163,7 @@ export function SystemHealthDashboard() {
         </Card>
       ) : null}
 
-      <div className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
+      <div className="grid gap-6 2xl:grid-cols-[minmax(0,1.2fr)_420px]">
         <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
           <CardHeader>
             <CardTitle>Checks técnicos</CardTitle>
@@ -192,27 +192,27 @@ export function SystemHealthDashboard() {
           <CardHeader>
             <div className="flex items-center gap-2">
               <AlertTriangle className="size-5 text-primary" />
-              <CardTitle>Lectura rápida</CardTitle>
+            <CardTitle>Qué mirar primero</CardTitle>
             </div>
             <CardDescription>
-              Resumen operativo del sistema para ubicar rápido dónde mirar primero.
+              Resumen corto para arrancar por riesgo y no por intuición.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
-            <div className="rounded-2xl bg-white/80 p-4 text-sm leading-6 text-muted-foreground">
+            <div className="rounded-2xl border border-border/70 bg-white/80 p-4 text-sm leading-6 text-muted-foreground">
               Hay <strong>{metrics.devicesWithoutStatus}</strong> dispositivos sin estado, <strong>{metrics.unknownSourceSyncs}</strong> syncs sin origen claro y <strong>{metrics.profilesWithoutBindings}</strong> profiles sin bindings activos.
             </div>
-            <div className="rounded-2xl bg-white/80 p-4 text-sm leading-6 text-muted-foreground">
+            <div className="rounded-2xl border border-border/70 bg-white/80 p-4 text-sm leading-6 text-muted-foreground">
               La tasa agregada de éxito en turnos visibles es <strong>{metrics.successRate}%</strong> sobre <strong>{metrics.totalTurns}</strong> turnos persistidos.
             </div>
-            <div className="rounded-2xl bg-white/80 p-4 text-sm leading-6 text-muted-foreground">
+            <div className="rounded-2xl border border-border/70 bg-white/80 p-4 text-sm leading-6 text-muted-foreground">
               Última respuesta básica del backend: <strong>{formatDateTime(basicHealthQuery.data?.timestamp)}</strong>.
             </div>
           </CardContent>
         </Card>
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-2">
+      <div className="grid gap-6 2xl:grid-cols-2">
         <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
           <CardHeader>
             <CardTitle>Dispositivos recientes</CardTitle>

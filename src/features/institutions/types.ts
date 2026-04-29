@@ -53,6 +53,7 @@ export interface InstitutionRecord {
   name: string;
   email: string;
   phoneNumber: string;
+  imageUrl?: string | null;
   address?: InstitutionAddress | null;
   url?: string | null;
   code?: string | null;
@@ -74,6 +75,7 @@ export interface InstitutionMutationPayload {
   email: string;
   phoneNumber: string;
   address: InstitutionAddress;
+  imageUrl?: string | null;
   url?: string | null;
 }
 

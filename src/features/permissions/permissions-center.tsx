@@ -230,34 +230,42 @@ export function PermissionsCenter() {
   const hasContractGap = hasInstitutionAdminPermissionsContractGap(user);
 
   return (
-    <div className="space-y-6">
+    <div className="min-w-0 space-y-6">
       <SectionHeader
         eyebrow={isInstitutionAdminView ? "Institution admin" : "Superadmin"}
-        title="Permisos"
+        title="Permisos y gobernanza"
         description={
           isInstitutionAdminView
-            ? "Vista acotada por alcance institucional. Lee el catálogo ACL disponible para tu sesión y muestra overrides dentro del alcance que el backend te expone."
-            : "Esta pantalla ya usa el catálogo real de actions, features y permisos explícitos para leer la gobernanza efectiva del sistema."
+            ? "Vista acotada por alcance institucional para revisar ACL disponible, overrides visibles y desvíos que conviene atender primero."
+            : "Mesa de trabajo para leer el contrato ACL real, detectar overrides y revisar rápido dónde hay inconsistencias operativas."
         }
       />
 
       <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
-        <CardContent className="flex flex-wrap items-center gap-3 p-5 text-sm text-muted-foreground">
-          <Badge variant={isInstitutionAdminView ? "secondary" : "warning"}>
-            {isInstitutionAdminView ? "lectura institucional" : "gobernanza global"}
-          </Badge>
-          <Badge variant={canReadAcl ? "secondary" : "outline"}>{canReadAcl ? "ACL legible" : "ACL bloqueada"}</Badge>
-          <Badge variant={canReadFeatureCatalog ? "secondary" : "outline"}>
-            {canReadFeatureCatalog ? "features legibles" : "features bloqueadas"}
-          </Badge>
-          {hasContractGap ? <Badge variant="warning">contrato incompleto</Badge> : null}
-          <span>
-            {hasContractGap
-              ? "La sesión llegó sin ACL/feature read, aunque este perfil debería poder revisar Permissions. Esto ya se trata como desalineación de contrato, no como ausencia intencional del módulo."
-              : isInstitutionAdminView
-              ? "Esta sesión cumple el contrato esperado para revisar ACL institucional y overrides dentro del alcance visible."
-              : "La pantalla ya está consolidada como lectura operativa del contrato ACL compartido entre dashboard y backend."}
-          </span>
+        <CardContent className="grid gap-4 p-5 lg:grid-cols-[minmax(0,1fr)_280px] lg:items-start">
+          <div className="min-w-0 space-y-3">
+            <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+              <Badge variant={isInstitutionAdminView ? "secondary" : "warning"}>
+                {isInstitutionAdminView ? "lectura institucional" : "gobernanza global"}
+              </Badge>
+              <Badge variant={canReadAcl ? "secondary" : "outline"}>{canReadAcl ? "ACL legible" : "ACL bloqueada"}</Badge>
+              <Badge variant={canReadFeatureCatalog ? "secondary" : "outline"}>
+                {canReadFeatureCatalog ? "features legibles" : "features bloqueadas"}
+              </Badge>
+              {hasContractGap ? <Badge variant="warning">contrato incompleto</Badge> : null}
+            </div>
+            <p className="max-w-4xl break-words text-sm leading-6 text-muted-foreground">
+              {hasContractGap
+                ? "La sesión llegó sin ACL/feature read, aunque este perfil debería poder revisar Permissions. Esto ya se trata como desalineación de contrato, no como ausencia intencional del módulo."
+                : isInstitutionAdminView
+                ? "Esta sesión cumple el contrato esperado para revisar ACL institucional y overrides dentro del alcance visible."
+                : "La pantalla ya está consolidada como lectura operativa del contrato ACL compartido entre dashboard y backend."}
+            </p>
+          </div>
+          <div className="min-w-0 rounded-2xl border border-border/70 bg-white/80 px-4 py-3 text-sm text-muted-foreground">
+            <p className="font-medium text-foreground">Qué mirar primero</p>
+            <p className="mt-2 leading-6">Arrancá por overrides explícitos, referencias incompletas y perfiles sin rol antes de bajar al catálogo completo.</p>
+          </div>
         </CardContent>
       </Card>
 
@@ -277,7 +285,7 @@ export function PermissionsCenter() {
         </Card>
       ) : null}
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(220px,1fr))]">
         {loading ? (
           Array.from({ length: 4 }).map((_, index) => <Skeleton key={index} className="h-32 rounded-2xl" />)
         ) : (
@@ -319,8 +327,8 @@ export function PermissionsCenter() {
         </Card>
       ) : null}
 
-      <div className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
-        <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
+      <div className="grid gap-6 2xl:grid-cols-[minmax(0,1.2fr)_380px]">
+        <Card className="min-w-0 border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
           <CardHeader>
             <CardTitle>Catálogo ACL operativo</CardTitle>
             <CardDescription>
@@ -328,7 +336,7 @@ export function PermissionsCenter() {
             </CardDescription>
           </CardHeader>
           <CardContent className="grid gap-3">
-            <div className="rounded-2xl bg-white/80 p-4">
+            <div className="rounded-2xl border border-border/70 bg-white/80 p-4">
               <div className="flex items-center gap-2 text-sm font-medium text-foreground">
                 <ShieldCheck className="size-4 text-primary" />
                 Actions disponibles
@@ -340,7 +348,7 @@ export function PermissionsCenter() {
               </div>
             </div>
 
-            <div className="rounded-2xl bg-white/80 p-4">
+            <div className="rounded-2xl border border-border/70 bg-white/80 p-4">
               <div className="flex items-center gap-2 text-sm font-medium text-foreground">
                 <Layers3 className="size-4 text-primary" />
                 Features disponibles
@@ -352,7 +360,7 @@ export function PermissionsCenter() {
               </div>
             </div>
 
-            <div className="rounded-2xl bg-background/70 p-4 text-sm leading-6 text-muted-foreground">
+            <div className="rounded-2xl border border-border/70 bg-background/70 p-4 text-sm leading-6 text-muted-foreground">
               {permissions.length === 0
                 ? "Todavía no hay permisos explícitos activos. El sistema está apoyándose sobre roles base y alcance implícito."
                 : `Hoy vemos ${model.globalPermissions} overrides globales y ${model.scopedPermissions} overrides con scope institucional.`}
@@ -360,22 +368,22 @@ export function PermissionsCenter() {
           </CardContent>
         </Card>
 
-        <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
+        <Card className="min-w-0 border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
           <CardHeader>
             <CardTitle>Sesión actual y señales de revisión</CardTitle>
             <CardDescription>
               Lectura rápida del actor autenticado y de los desvíos que conviene revisar primero.
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="rounded-2xl bg-white/80 p-4">
+          <CardContent className="space-y-5">
+            <div className="rounded-2xl border border-border/70 bg-white/80 p-4">
               <p className="text-sm font-medium text-foreground">{user?.fullName || "Sin nombre"}</p>
               <p className="mt-1 text-sm text-muted-foreground">{user?.email || "Sin email"}</p>
             </div>
 
             <div>
               <p className="text-sm font-medium text-foreground">Roles efectivos</p>
-              <div className="mt-2 flex flex-wrap gap-2">
+              <div className="mt-2 flex flex-wrap gap-2.5 rounded-2xl border border-border/70 bg-white/72 p-3">
                 {user?.roles.length ? user.roles.map((role) => (
                   <Badge key={role} variant={role === "admin" ? "warning" : "secondary"}>{role}</Badge>
                 )) : <Badge variant="outline">sin roles</Badge>}
@@ -384,21 +392,21 @@ export function PermissionsCenter() {
 
             <div>
               <p className="text-sm font-medium text-foreground">Permisos explícitos visibles</p>
-              <div className="mt-2 flex flex-wrap gap-2">
+              <div className="mt-2 flex max-h-32 flex-wrap gap-2 overflow-y-auto rounded-2xl border border-border/70 bg-white/72 p-3">
                 {currentPermissions.length ? currentPermissions.map((permission) => (
                   <Badge key={permission} variant="outline">{permission}</Badge>
                 )) : <Badge variant="outline">sin permisos explícitos</Badge>}
               </div>
             </div>
 
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div className="rounded-2xl bg-white/80 p-4">
+            <div className="grid gap-3 sm:grid-cols-2 2xl:grid-cols-1">
+              <div className="rounded-2xl border border-border/70 bg-white/80 p-4">
                 <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">Perfiles sin rol</p>
                 <p className="mt-2 text-2xl font-semibold text-foreground">
                   {loading || !canReadUsers ? "-" : String(users.filter((item) => item.roles.length === 0).length)}
                 </p>
               </div>
-              <div className="rounded-2xl bg-white/80 p-4">
+              <div className="rounded-2xl border border-border/70 bg-white/80 p-4">
                 <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">Referencias rotas</p>
                 <p className="mt-2 text-2xl font-semibold text-foreground">{loading ? "-" : String(model.missingReferences)}</p>
               </div>
@@ -414,8 +422,8 @@ export function PermissionsCenter() {
             Primero filtros, después lectura acotada. Así la pantalla empieza a servir como mesa de trabajo real sobre ACL.
           </CardDescription>
         </CardHeader>
-        <CardContent className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-          <div className="space-y-2 xl:col-span-2">
+        <CardContent className="grid gap-4 md:grid-cols-2 xl:grid-cols-[minmax(0,1.4fr)_repeat(3,minmax(0,1fr))]">
+          <div className="space-y-2 md:col-span-2 xl:col-span-1">
             <Label htmlFor="permissions-query">Buscar</Label>
             <div className="relative">
               <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
@@ -474,7 +482,15 @@ export function PermissionsCenter() {
       </Card>
 
       <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
-        <CardContent className="flex flex-wrap gap-2 p-5">
+        <CardContent className="p-5">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-semibold text-foreground">Recortes rápidos</p>
+              <p className="text-sm text-muted-foreground">Usá estas vistas para entrar directo a señales críticas sin tocar todos los filtros.</p>
+            </div>
+            <Badge variant="outline">{model.permissionRows.length} visibles</Badge>
+          </div>
+          <div className="flex flex-wrap gap-2">
           <Button
             type="button"
             size="sm"
@@ -555,10 +571,11 @@ export function PermissionsCenter() {
             Overrides explícitos
             <Badge variant="outline">{model.reviewWithOverrides}</Badge>
           </Button>
+          </div>
         </CardContent>
       </Card>
 
-      <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
+      <Card className="min-w-0 border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
         <CardHeader>
           <CardTitle>Catálogo de actions</CardTitle>
           <CardDescription>
@@ -603,7 +620,7 @@ export function PermissionsCenter() {
         </CardContent>
       </Card>
 
-      <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
+      <Card className="min-w-0 border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
         <CardHeader>
           <CardTitle>Overrides explícitos vigentes</CardTitle>
           <CardDescription>
@@ -665,7 +682,7 @@ export function PermissionsCenter() {
         </CardContent>
       </Card>
 
-      <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
+      <Card className="min-w-0 border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
         <CardHeader>
           <CardTitle>Perfiles que conviene revisar</CardTitle>
           <CardDescription>
