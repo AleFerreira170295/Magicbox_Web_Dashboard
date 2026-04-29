@@ -324,6 +324,7 @@ export function ProfileDetailPage({
                 </CardDescription>
               </CardHeader>
               <CardContent className="grid gap-3">
+                <div className="max-h-[420px] space-y-3 overflow-y-auto pr-1" data-testid="profile-detail-navigation-list">
                 <div className="rounded-2xl bg-background/70 p-4">
                   <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Institución activa</p>
                   <p className="mt-2 text-base font-semibold text-foreground">{selectedEntity.educationalCenterName || selectedEntity.educationalCenterId || "Sin institución visible"}</p>
@@ -339,7 +340,7 @@ export function ProfileDetailPage({
                       institutionId: entity.educationalCenterId,
                       classGroupId: entity.classGroupId,
                     })}
-                    className="rounded-2xl border border-border/70 bg-white/85 px-4 py-3 transition hover:border-primary/30 hover:bg-primary/5"
+                    className="block rounded-2xl border border-border/70 bg-white/85 px-4 py-3 transition hover:border-primary/30 hover:bg-primary/5"
                   >
                     <div className="flex items-center justify-between gap-3">
                       <div>
@@ -354,6 +355,7 @@ export function ProfileDetailPage({
                     No hay otros registros visibles dentro de esta institución por ahora.
                   </div>
                 )}
+                </div>
               </CardContent>
             </Card>
           </div>

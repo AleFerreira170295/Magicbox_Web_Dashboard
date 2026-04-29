@@ -121,6 +121,8 @@ describe("ProfileDetailPage", () => {
       okQuery({
         data: [
           { id: "student-1", classGroupId: "group-1", firstName: "Luna", lastName: "Pérez", fullName: "Luna Pérez", fileNumber: "luna_001", imageUrl: null, createdAt: null, updatedAt: null, deletedAt: null },
+          { id: "student-2", classGroupId: "group-1", firstName: "Mateo", lastName: "Ruiz", fullName: "Mateo Ruiz", fileNumber: "mateo_002", imageUrl: null, createdAt: null, updatedAt: null, deletedAt: null },
+          { id: "student-3", classGroupId: "group-1", firstName: "Julia", lastName: "Sosa", fullName: "Julia Sosa", fileNumber: "julia_003", imageUrl: null, createdAt: null, updatedAt: null, deletedAt: null },
         ],
         page: 1,
         limit: 1,
@@ -166,6 +168,7 @@ describe("ProfileDetailPage", () => {
     expect(screen.getAllByText(/Owner: Ana Owner/i).length).toBeGreaterThan(0);
     expect(screen.getByText(/Tarjetas vinculadas/i)).toBeInTheDocument();
     expect(screen.getByText("card-1")).toBeInTheDocument();
+    expect(screen.getByTestId("profile-detail-navigation-list")).toHaveClass("max-h-[420px]", "overflow-y-auto");
     expect(screen.getByRole("link", { name: /Volver a Profiles/i })).toHaveAttribute("href", "/profiles?institutionId=ec-1");
   });
 
