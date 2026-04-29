@@ -120,6 +120,8 @@ export function RelevantProfiles() {
   const [institutionFilter, setInstitutionFilter] = useState<string>("");
   const [activityFilter, setActivityFilter] = useState<"all" | "active" | "inactive">("all");
   const [focusFilter, setFocusFilter] = useState<ProfilesFocusFilter>("all");
+  const [pageSize, setPageSize] = useState<10 | 20 | 50>(10);
+  const [currentPage, setCurrentPage] = useState(1);
 
   const profilesQuery = useProfilesOverview(tokens?.accessToken);
   const institutionsQuery = useInstitutions(tokens?.accessToken);
@@ -326,6 +328,23 @@ export function RelevantProfiles() {
     });
   }, [activityFilter, effectiveInstitutionFilter, entities, focusFilter, query]);
 
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [query, institutionFilter, activityFilter, focusFilter, pageSize]);
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
+
+  const paginatedFiltered = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filtered.slice(start, start + pageSize);
+  }, [currentPage, filtered, pageSize]);
+
   const metrics = useMemo(() => {
     const activeProfiles = entities.filter((profile) => profile.isActive).length;
     const withAvatars = entities.filter((profile) => Boolean(profile.avatarUrl)).length;
@@ -362,6 +381,8 @@ export function RelevantProfiles() {
     { key: "institution_linked" as const, label: "Institucionales", count: metrics.institutionLinked },
   ];
 
+  const paginationStart = filtered.length === 0 ? 0 : (currentPage - 1) * pageSize + 1;
+  const paginationEnd = filtered.length === 0 ? 0 : Math.min(currentPage * pageSize, filtered.length);
   const hasAnyError = profilesQuery.error || institutionsQuery.error || classGroupsQuery.error || studentsQuery.error || gamesQuery.error;
   const isLoading = profilesQuery.isLoading || institutionsQuery.isLoading || classGroupsQuery.isLoading || studentsQuery.isLoading || gamesQuery.isLoading;
 
@@ -485,12 +506,34 @@ export function RelevantProfiles() {
 
       <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
           <CardHeader>
-            <CardTitle>{isDirectorView ? "Perfiles y estudiantes visibles para seguimiento" : "Listado de perfiles y estudiantes"}</CardTitle>
-            <CardDescription>
-              {isDirectorView
-                ? "Seleccioná un registro para revisar owner, contexto institucional y señales visibles de actividad."
-                : "Seleccioná un registro para revisar ownership, contexto institucional y actividad reciente."}
-            </CardDescription>
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+              <div>
+                <CardTitle>{isDirectorView ? "Perfiles y estudiantes visibles para seguimiento" : "Listado de perfiles y estudiantes"}</CardTitle>
+                <CardDescription>
+                  {isDirectorView
+                    ? "Seleccioná un registro para revisar owner, contexto institucional y señales visibles de actividad."
+                    : "Seleccioná un registro para revisar ownership, contexto institucional y actividad reciente."}
+                </CardDescription>
+              </div>
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
+                <label className="flex items-center gap-2 text-sm text-muted-foreground">
+                  Filas visibles
+                  <select
+                    value={String(pageSize)}
+                    onChange={(event) => setPageSize(Number(event.target.value) as 10 | 20 | 50)}
+                    className="h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground"
+                    aria-label="Filas visibles por página"
+                  >
+                    <option value="10">10</option>
+                    <option value="20">20</option>
+                    <option value="50">50</option>
+                  </select>
+                </label>
+                <div className="text-sm text-muted-foreground" data-testid="profiles-pagination-summary">
+                  Mostrando {paginationStart}-{paginationEnd} de {filtered.length}
+                </div>
+              </div>
+            </div>
           </CardHeader>
           <CardContent className="overflow-x-auto p-0">
             {isLoading ? (
@@ -521,7 +564,7 @@ export function RelevantProfiles() {
                       </TableCell>
                     </TableRow>
                   ) : (
-                    filtered.map((profile) => {
+                    paginatedFiltered.map((profile) => {
                       const detailHref = buildProfileDetailHref({
                         kind: profile.kind,
                         entityId: profile.entityId,
@@ -594,9 +637,34 @@ export function RelevantProfiles() {
               : "Cada registro abre ahora una vista propia, igual que en Institutions, para que el detalle completo siempre quede visible."}
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-3">
           <div className="rounded-2xl bg-background/70 p-4 text-sm text-muted-foreground">
             Podés entrar desde cualquier fila del listado o desde el nombre del perfil/estudiante para abrir su pantalla interna con contexto, identidad, actividad y asignación visibles.
+          </div>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-sm text-muted-foreground">
+              Página {currentPage} de {totalPages}
+            </p>
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
+                disabled={currentPage === 1 || filtered.length === 0}
+              >
+                Anterior
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
+                disabled={currentPage === totalPages || filtered.length === 0}
+              >
+                Siguiente
+              </Button>
+            </div>
           </div>
         </CardContent>
       </Card>

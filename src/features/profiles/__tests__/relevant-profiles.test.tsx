@@ -280,6 +280,76 @@ describe("RelevantProfiles", () => {
     );
   });
 
+  it("lets the user paginate the listing and choose 10, 20 or 50 visible rows", () => {
+    useProfilesOverviewMock.mockReturnValue(
+      okQuery(
+        Array.from({ length: 12 }, (_, index) => ({
+          id: `profile-${index + 1}`,
+          displayName: `Perfil ${index + 1}`,
+          avatarUrl: null,
+          age: 7,
+          ageCategory: "6-8",
+          isActive: true,
+          userId: `user-${index + 1}`,
+          userName: `Owner ${index + 1}`,
+          userEmail: `owner${index + 1}@example.com`,
+          educationalCenterId: "ec-1",
+          educationalCenterName: "Colegio Norte",
+          bindingCount: 1,
+          activeBindingCount: 1,
+          cardUids: [`card-${index + 1}`],
+          boundDevices: [],
+          sessionCount: index + 1,
+          lastSessionAt: null,
+          createdAt: null,
+          updatedAt: null,
+          deletedAt: null,
+          raw: {},
+        })),
+      ),
+    );
+
+    useStudentsMock.mockReturnValue(
+      okQuery({
+        data: [],
+        page: 1,
+        limit: 0,
+        total: 0,
+        total_pages: 1,
+      }),
+    );
+
+    useGamesMock.mockReturnValue(
+      okQuery({
+        data: [],
+        page: 1,
+        limit: 0,
+        total: 0,
+        total_pages: 1,
+      }),
+    );
+
+    renderProfiles();
+
+    expect(screen.getByTestId("profiles-pagination-summary")).toHaveTextContent("Mostrando 1-10 de 12");
+    expect(screen.getByText("Perfil 10")).toBeInTheDocument();
+    expect(screen.queryByText("Perfil 11")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Siguiente" }));
+
+    expect(screen.getByTestId("profiles-pagination-summary")).toHaveTextContent("Mostrando 11-12 de 12");
+    expect(screen.getByText("Perfil 11")).toBeInTheDocument();
+
+    fireEvent.change(screen.getByRole("combobox", { name: /Filas visibles por página/i }), { target: { value: "20" } });
+
+    expect(screen.getByTestId("profiles-pagination-summary")).toHaveTextContent("Mostrando 1-12 de 12");
+    expect(screen.getByText("Perfil 12")).toBeInTheDocument();
+
+    fireEvent.change(screen.getByRole("combobox", { name: /Filas visibles por página/i }), { target: { value: "50" } });
+
+    expect(screen.getByRole("combobox", { name: /Filas visibles por página/i })).toHaveValue("50");
+  });
+
   it("filters the unified list through the operational focus segments", () => {
     useProfilesOverviewMock.mockReturnValue(
       okQuery([
