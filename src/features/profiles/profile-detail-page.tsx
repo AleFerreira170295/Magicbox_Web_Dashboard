@@ -79,7 +79,6 @@ export function ProfileDetailPage({
   const classGroupsQuery = useClassGroups(tokens?.accessToken, institutionId ?? null);
   const studentsQuery = useStudents(tokens?.accessToken, {
     institutionId: institutionId ?? null,
-    classGroupId: classGroupId ?? null,
     page: 1,
     limit: 100,
     sortBy: "updated_at",
@@ -199,12 +198,27 @@ export function ProfileDetailPage({
     return entities.find((entity) => entity.kind === kind && entity.entityId === entityId) ?? null;
   }, [entities, entityId, kind]);
 
-  const siblingEntities = useMemo(() => {
-    if (!selectedEntity) return [];
-    return entities
-      .filter((entity) => entity.id !== selectedEntity.id && entity.educationalCenterId === selectedEntity.educationalCenterId)
-      .slice(0, 8);
+  const sameGroupEntities = useMemo(() => {
+    if (!selectedEntity || selectedEntity.kind !== "student" || !selectedEntity.classGroupId) return [];
+    return entities.filter(
+      (entity) =>
+        entity.id !== selectedEntity.id &&
+        entity.kind === "student" &&
+        entity.classGroupId === selectedEntity.classGroupId,
+    );
   }, [entities, selectedEntity]);
+
+  const sameGroupEntityIds = useMemo(() => new Set(sameGroupEntities.map((entity) => entity.id)), [sameGroupEntities]);
+
+  const institutionEntities = useMemo(() => {
+    if (!selectedEntity) return [];
+    return entities.filter(
+      (entity) =>
+        entity.id !== selectedEntity.id &&
+        entity.educationalCenterId === selectedEntity.educationalCenterId &&
+        !sameGroupEntityIds.has(entity.id),
+    );
+  }, [entities, sameGroupEntityIds, selectedEntity]);
 
   const backHref = buildProfilesOverviewHref({ institutionId });
   const isLoading = profilesQuery.isLoading || institutionsQuery.isLoading || classGroupsQuery.isLoading || studentsQuery.isLoading || gamesQuery.isLoading;
@@ -320,7 +334,7 @@ export function ProfileDetailPage({
                   Contexto y navegación
                 </CardTitle>
                 <CardDescription>
-                  Podés saltar a otros registros visibles de la misma institución sin volver al listado principal.
+                  Podés saltar a otros registros visibles del mismo grupo o de la misma institución sin volver al listado principal.
                 </CardDescription>
               </CardHeader>
               <CardContent className="grid gap-3">
@@ -331,30 +345,73 @@ export function ProfileDetailPage({
                   <p className="mt-1 text-sm text-muted-foreground">{selectedEntity.kind === "student" ? selectedEntity.classGroupName || "Sin grupo visible" : "Perfil Home visible dentro del alcance actual."}</p>
                 </div>
 
-                {siblingEntities.length > 0 ? siblingEntities.map((entity) => (
-                  <Link
-                    key={entity.id}
-                    href={buildProfileDetailHref({
-                      kind: entity.kind,
-                      entityId: entity.entityId,
-                      institutionId: entity.educationalCenterId,
-                      classGroupId: entity.classGroupId,
-                    })}
-                    className="block rounded-2xl border border-border/70 bg-white/85 px-4 py-3 transition hover:border-primary/30 hover:bg-primary/5"
-                  >
-                    <div className="flex items-center justify-between gap-3">
-                      <div>
-                        <p className="text-sm font-semibold text-foreground">{entity.displayName}</p>
-                        <p className="mt-1 text-xs text-muted-foreground">{entity.kind === "student" ? `Estudiante · ${entity.classGroupName || "sin grupo"}` : entity.userName || entity.userEmail || "Perfil Home"}</p>
-                      </div>
-                      <Badge variant="outline">{entity.sessionCount} sesiones</Badge>
+                {sameGroupEntities.length > 0 ? (
+                  <div className="space-y-3">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Mismo grupo</p>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        Estudiantes que comparten el grupo visible con este perfil.
+                      </p>
                     </div>
-                  </Link>
-                )) : (
+                    {sameGroupEntities.map((entity) => (
+                      <Link
+                        key={entity.id}
+                        href={buildProfileDetailHref({
+                          kind: entity.kind,
+                          entityId: entity.entityId,
+                          institutionId: entity.educationalCenterId,
+                          classGroupId: entity.classGroupId,
+                        })}
+                        className="block rounded-2xl border border-border/70 bg-white/85 px-4 py-3 transition hover:border-primary/30 hover:bg-primary/5"
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <div>
+                            <p className="text-sm font-semibold text-foreground">{entity.displayName}</p>
+                            <p className="mt-1 text-xs text-muted-foreground">{entity.kind === "student" ? `Estudiante · ${entity.classGroupName || "sin grupo"}` : entity.userName || entity.userEmail || "Perfil Home"}</p>
+                          </div>
+                          <Badge variant="outline">{entity.sessionCount} sesiones</Badge>
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
+                ) : null}
+
+                {institutionEntities.length > 0 ? (
+                  <div className="space-y-3">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Misma institución</p>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        Otros perfiles y estudiantes visibles asociados a esta institución.
+                      </p>
+                    </div>
+                    {institutionEntities.map((entity) => (
+                      <Link
+                        key={entity.id}
+                        href={buildProfileDetailHref({
+                          kind: entity.kind,
+                          entityId: entity.entityId,
+                          institutionId: entity.educationalCenterId,
+                          classGroupId: entity.classGroupId,
+                        })}
+                        className="block rounded-2xl border border-border/70 bg-white/85 px-4 py-3 transition hover:border-primary/30 hover:bg-primary/5"
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <div>
+                            <p className="text-sm font-semibold text-foreground">{entity.displayName}</p>
+                            <p className="mt-1 text-xs text-muted-foreground">{entity.kind === "student" ? `Estudiante · ${entity.classGroupName || "sin grupo"}` : entity.userName || entity.userEmail || "Perfil Home"}</p>
+                          </div>
+                          <Badge variant="outline">{entity.sessionCount} sesiones</Badge>
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
+                ) : null}
+
+                {sameGroupEntities.length === 0 && institutionEntities.length === 0 ? (
                   <div className="rounded-2xl border border-dashed border-border/80 bg-muted/20 p-4 text-sm text-muted-foreground">
                     No hay otros registros visibles dentro de esta institución por ahora.
                   </div>
-                )}
+                ) : null}
                 </div>
               </CardContent>
             </Card>

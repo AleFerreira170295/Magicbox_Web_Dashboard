@@ -515,7 +515,7 @@ export function RelevantProfiles() {
                     : "Seleccioná un registro para revisar ownership, contexto institucional y actividad reciente."}
                 </CardDescription>
               </div>
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
+              <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
                 <label className="flex items-center gap-2 text-sm text-muted-foreground">
                   Filas visibles
                   <select
@@ -531,6 +531,26 @@ export function RelevantProfiles() {
                 </label>
                 <div className="text-sm text-muted-foreground" data-testid="profiles-pagination-summary">
                   Mostrando {paginationStart}-{paginationEnd} de {filtered.length}
+                </div>
+                <div className="flex gap-2" data-testid="profiles-pagination-controls">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
+                    disabled={currentPage === 1 || filtered.length === 0}
+                  >
+                    Anterior
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
+                    disabled={currentPage === totalPages || filtered.length === 0}
+                  >
+                    Siguiente
+                  </Button>
                 </div>
               </div>
             </div>
@@ -641,31 +661,9 @@ export function RelevantProfiles() {
           <div className="rounded-2xl bg-background/70 p-4 text-sm text-muted-foreground">
             Podés entrar desde cualquier fila del listado o desde el nombre del perfil/estudiante para abrir su pantalla interna con contexto, identidad, actividad y asignación visibles.
           </div>
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-sm text-muted-foreground">
-              Página {currentPage} de {totalPages}
-            </p>
-            <div className="flex gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
-                disabled={currentPage === 1 || filtered.length === 0}
-              >
-                Anterior
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
-                disabled={currentPage === totalPages || filtered.length === 0}
-              >
-                Siguiente
-              </Button>
-            </div>
-          </div>
+          <p className="text-sm text-muted-foreground">
+            Página {currentPage} de {totalPages}
+          </p>
         </CardContent>
       </Card>
     </div>

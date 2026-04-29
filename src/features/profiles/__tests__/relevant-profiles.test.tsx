@@ -220,6 +220,7 @@ describe("RelevantProfiles", () => {
     );
     expect(screen.getByText("Estudiantes")).toBeInTheDocument();
     expect(screen.getAllByText(/Click en la fila o en el nombre para abrir el detalle/i).length).toBeGreaterThan(0);
+    expect(screen.getByTestId("profiles-pagination-controls")).toBeInTheDocument();
   });
 
   it("adapts profiles copy to a director-oriented institutional reading", () => {
@@ -336,6 +337,8 @@ describe("RelevantProfiles", () => {
     expect(screen.queryByText("Perfil 11")).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Siguiente" }));
+
+    expect(screen.getByTestId("profiles-pagination-controls")).toBeInTheDocument();
 
     expect(screen.getByTestId("profiles-pagination-summary")).toHaveTextContent("Mostrando 11-12 de 12");
     expect(screen.getByText("Perfil 11")).toBeInTheDocument();
