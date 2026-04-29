@@ -1,0 +1,18 @@
+name: mbox-dashboard
+
+services:
+  web:
+    container_name: mbox-dashboard
+    build:
+      context: .
+      dockerfile: Dockerfile.prod
+      args:
+        NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL?required}
+        NEXT_PUBLIC_DEFAULT_ROLE: ${NEXT_PUBLIC_DEFAULT_ROLE?required}
+    ports:
+      - "3001:3001"
+    environment:
+      NODE_ENV: production
+      NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL?required}
+      NEXT_PUBLIC_DEFAULT_ROLE: ${NEXT_PUBLIC_DEFAULT_ROLE?required}
+    restart: unless-stopped

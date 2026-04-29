@@ -23,7 +23,7 @@ export function ForgotPasswordForm() {
     try {
       const email = values.email.trim();
       await forgotPassword(email);
-      router.push(`/auth/verify-otp?email=${encodeURIComponent(email)}`);
+      router.push(`/verify-otp?email=${encodeURIComponent(email)}`);
     } catch (submitError) {
       setError(getErrorMessage(submitError));
     }
@@ -52,10 +52,10 @@ export function ForgotPasswordForm() {
       </form>
 
       <div className="flex items-center justify-between gap-3 text-sm">
-        <Link href="/auth/login" className="font-medium text-primary hover:underline">
+        <Link href="/login" className="font-medium text-primary hover:underline">
           Volver al login
         </Link>
-        <Link href="/auth/register" className="font-medium text-primary hover:underline">
+        <Link href="/register" className="font-medium text-primary hover:underline">
           Crear usuario
         </Link>
       </div>

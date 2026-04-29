@@ -24,7 +24,7 @@ export function VerifyOtpForm() {
 
   useEffect(() => {
     if (!email) {
-      router.replace("/auth/forgot-password");
+      router.replace("/forgot-password");
     }
   }, [email, router]);
 
@@ -48,7 +48,7 @@ export function VerifyOtpForm() {
     setError(null);
     try {
       await verifyOtpCode(email, digits.join(""));
-      router.push(`/auth/reset-password?email=${encodeURIComponent(email)}`);
+      router.push(`/reset-password?email=${encodeURIComponent(email)}`);
     } catch (submitError) {
       setDigits(Array.from({ length: OTP_LENGTH }, () => ""));
       inputRefs.current[0]?.focus();
@@ -117,10 +117,10 @@ export function VerifyOtpForm() {
       </div>
 
       <div className="flex items-center justify-between gap-3 text-sm">
-        <Link href="/auth/login" className="font-medium text-primary hover:underline">
+        <Link href="/login" className="font-medium text-primary hover:underline">
           Volver al login
         </Link>
-        <Link href="/auth/forgot-password" className="font-medium text-primary hover:underline">
+        <Link href="/forgot-password" className="font-medium text-primary hover:underline">
           Cambiar email
         </Link>
       </div>

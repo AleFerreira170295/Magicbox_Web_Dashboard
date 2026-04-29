@@ -198,10 +198,10 @@ export function RegisterForm() {
       </form>
 
       <div className="flex items-center justify-between gap-3 text-sm">
-        <Link href="/auth/login" className="font-medium text-primary hover:underline">
+        <Link href="/login" className="font-medium text-primary hover:underline">
           Ya tengo cuenta
         </Link>
-        <button type="button" className="font-medium text-primary hover:underline" onClick={() => router.push("/auth/login")}>
+        <button type="button" className="font-medium text-primary hover:underline" onClick={() => router.push("/login")}>
           Ir al login
         </button>
       </div>

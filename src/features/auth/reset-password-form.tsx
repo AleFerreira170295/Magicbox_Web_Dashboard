@@ -22,7 +22,7 @@ export function ResetPasswordForm() {
 
   useEffect(() => {
     if (!email) {
-      router.replace("/auth/forgot-password");
+      router.replace("/forgot-password");
     }
   }, [email, router]);
 
@@ -35,7 +35,7 @@ export function ResetPasswordForm() {
         newPassword: values.newPassword,
         confirmPassword: values.confirmPassword,
       });
-      router.replace("/auth/login");
+      router.replace("/login");
     } catch (submitError) {
       setError(getErrorMessage(submitError));
     }
@@ -87,10 +87,10 @@ export function ResetPasswordForm() {
       </form>
 
       <div className="flex items-center justify-between gap-3 text-sm">
-        <Link href="/auth/login" className="font-medium text-primary hover:underline">
+        <Link href="/login" className="font-medium text-primary hover:underline">
           Volver al login
         </Link>
-        <Link href="/auth/forgot-password" className="font-medium text-primary hover:underline">
+        <Link href="/forgot-password" className="font-medium text-primary hover:underline">
           Reenviar código
         </Link>
       </div>

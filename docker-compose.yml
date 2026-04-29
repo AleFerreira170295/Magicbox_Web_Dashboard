@@ -1,12 +1,15 @@
+name: mbox-dashboard
+
 services:
   web:
+    container_name: mbox-dashboard-web
     build:
       context: .
     ports:
       - "3001:3001"
     environment:
-      NEXT_PUBLIC_API_BASE_URL: http://host.docker.internal:3000/api/v1.0
-      NEXT_PUBLIC_DEFAULT_ROLE: teacher
+      NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:3000/api/v1.0}
+      NEXT_PUBLIC_DEFAULT_ROLE: ${NEXT_PUBLIC_DEFAULT_ROLE:-teacher}
     volumes:
       - .:/app
       - /app/node_modules

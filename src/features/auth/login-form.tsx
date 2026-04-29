@@ -92,10 +92,10 @@ export function LoginForm() {
       ) : null}
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <Link href="/auth/forgot-password" className="text-sm font-medium text-primary hover:underline">
+        <Link href="/forgot-password" className="text-sm font-medium text-primary hover:underline">
           ¿Olvidaste tu contraseña?
         </Link>
-        <Link href="/auth/register" className="text-sm font-medium text-primary hover:underline">
+        <Link href="/register" className="text-sm font-medium text-primary hover:underline">
           Crear usuario
         </Link>
       </div>
