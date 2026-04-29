@@ -8,6 +8,7 @@ import InstitutionsPage from "@/app/(app)/institutions/page";
 import InstitutionStudentPage from "@/app/(app)/institutions/student/page";
 import PermissionsPage from "@/app/(app)/permissions/page";
 import ProfilesPage from "@/app/(app)/profiles/page";
+import ProfilesDetailPage from "@/app/(app)/profiles/detail/page";
 import SettingsPage from "@/app/(app)/settings/page";
 import SyncsPage from "@/app/(app)/syncs/page";
 import TerritorialAlertsPage from "@/app/(app)/territorial-alerts/page";
@@ -45,7 +46,7 @@ vi.mock("@/features/institutions/institution-student-profile-page", () => ({
 }));
 
 vi.mock("next/navigation", () => ({
-  useSearchParams: () => new URLSearchParams("institutionId=ec-1&groupId=group-1&studentId=student-1"),
+  useSearchParams: () => new URLSearchParams("institutionId=ec-1&groupId=group-1&studentId=student-1&kind=student&entityId=student-1&classGroupId=group-1"),
 }));
 
 vi.mock("@/features/permissions/permissions-center", () => ({
@@ -54,6 +55,10 @@ vi.mock("@/features/permissions/permissions-center", () => ({
 
 vi.mock("@/features/profiles/relevant-profiles", () => ({
   RelevantProfiles: () => <div>relevant-profiles</div>,
+}));
+
+vi.mock("@/features/profiles/profile-detail-page", () => ({
+  ProfileDetailPage: () => <div>profile-detail-page</div>,
 }));
 
 vi.mock("@/features/settings/system-settings-center", () => ({
@@ -85,6 +90,7 @@ const allModules = [
   "institution-student-profile-page",
   "permissions-center",
   "relevant-profiles",
+  "profile-detail-page",
   "system-settings-center",
   "syncs-table",
   "territorial-alerts-center",
@@ -103,6 +109,7 @@ function renderProtectedPages() {
       <InstitutionStudentPage />
       <PermissionsPage />
       <ProfilesPage />
+      <ProfilesDetailPage />
       <SettingsPage />
       <SyncsPage />
       <TerritorialAlertsPage />
@@ -137,6 +144,7 @@ describe("operational route guards", () => {
         "institution-student-profile-page",
         "permissions-center",
         "relevant-profiles",
+        "profile-detail-page",
         "system-settings-center",
         "syncs-table",
         "users-table",
@@ -152,6 +160,7 @@ describe("operational route guards", () => {
         "institution-student-profile-page",
         "permissions-center",
         "relevant-profiles",
+        "profile-detail-page",
         "syncs-table",
         "users-table",
       ],
@@ -165,6 +174,7 @@ describe("operational route guards", () => {
         "institutions-overview",
         "institution-student-profile-page",
         "relevant-profiles",
+        "profile-detail-page",
         "syncs-table",
       ],
     },

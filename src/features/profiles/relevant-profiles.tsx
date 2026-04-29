@@ -2,7 +2,9 @@
 
 /* eslint-disable @next/next/no-img-element */
 
-import { type ComponentType, useMemo, useState } from "react";
+import Link from "next/link";
+import { useSearchParams } from "next/navigation";
+import { type ComponentType, useEffect, useMemo, useState } from "react";
 import { BadgeCheck, CreditCard, GraduationCap, Search, UserRound, Users, Waves } from "lucide-react";
 import { SectionHeader } from "@/components/section-header";
 import { Badge } from "@/components/ui/badge";
@@ -16,6 +18,7 @@ import { useClassGroups } from "@/features/class-groups/api";
 import { useGames } from "@/features/games/api";
 import { useInstitutions } from "@/features/institutions/api";
 import { useProfilesOverview } from "@/features/profiles/api";
+import { buildProfileDetailHref } from "@/features/profiles/profile-route";
 import { useStudents } from "@/features/students/api";
 import { cn, formatDateTime, getErrorMessage } from "@/lib/utils";
 
@@ -111,11 +114,11 @@ function ProfileAvatar({
 
 export function RelevantProfiles() {
   const { tokens, user: currentUser } = useAuth();
+  const searchParams = useSearchParams();
   const [query, setQuery] = useState("");
   const [institutionFilter, setInstitutionFilter] = useState<string>("");
   const [activityFilter, setActivityFilter] = useState<"all" | "active" | "inactive">("all");
   const [focusFilter, setFocusFilter] = useState<ProfilesFocusFilter>("all");
-  const [selectedProfileId, setSelectedProfileId] = useState<string | null>(null);
 
   const profilesQuery = useProfilesOverview(tokens?.accessToken);
   const institutionsQuery = useInstitutions(tokens?.accessToken);
@@ -272,6 +275,13 @@ export function RelevantProfiles() {
 
   const entities = useMemo(() => [...homeProfileEntities, ...studentEntities], [homeProfileEntities, studentEntities]);
 
+  useEffect(() => {
+    const institutionIdFromUrl = searchParams.get("institutionId");
+    if (institutionIdFromUrl) {
+      setInstitutionFilter(institutionIdFromUrl);
+    }
+  }, [searchParams]);
+
   const filtered = useMemo(() => {
     const normalized = query.trim().toLowerCase();
 
@@ -314,11 +324,6 @@ export function RelevantProfiles() {
         .some((value) => String(value).toLowerCase().includes(normalized));
     });
   }, [activityFilter, effectiveInstitutionFilter, entities, focusFilter, query]);
-
-  const selectedProfile = useMemo(
-    () => filtered.find((profile) => profile.id === selectedProfileId) || entities.find((profile) => profile.id === selectedProfileId) || null,
-    [entities, filtered, selectedProfileId],
-  );
 
   const metrics = useMemo(() => {
     const activeProfiles = entities.filter((profile) => profile.isActive).length;
@@ -477,8 +482,7 @@ export function RelevantProfiles() {
         </CardContent>
       </Card>
 
-      <div className="grid gap-6 2xl:grid-cols-[1.25fr_1fr]">
-        <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
+      <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
           <CardHeader>
             <CardTitle>{isDirectorView ? "Perfiles y estudiantes visibles para seguimiento" : "Listado de perfiles y estudiantes"}</CardTitle>
             <CardDescription>
@@ -517,17 +521,24 @@ export function RelevantProfiles() {
                     </TableRow>
                   ) : (
                     filtered.map((profile) => (
-                      <TableRow
-                        key={profile.id}
-                        className={cn("cursor-pointer", selectedProfileId === profile.id && "bg-primary/5")}
-                        onClick={() => setSelectedProfileId(profile.id)}
-                      >
+                      <TableRow key={profile.id}>
                         <TableCell>
                           <div className="flex min-w-0 items-center gap-3">
                             <ProfileAvatar profile={profile} className="size-10 text-[11px]" />
                             <div className="min-w-0">
-                              <p className="truncate font-medium text-foreground">{profile.displayName}</p>
+                              <Link
+                                href={buildProfileDetailHref({
+                                  kind: profile.kind,
+                                  entityId: profile.entityId,
+                                  institutionId: profile.educationalCenterId,
+                                  classGroupId: profile.classGroupId,
+                                })}
+                                className="truncate font-medium text-foreground transition hover:text-primary"
+                              >
+                                {profile.displayName}
+                              </Link>
                               <p className="truncate text-xs text-muted-foreground">{profile.kind === "student" ? `Documento / ID: ${profile.fileNumber || "-"}` : profile.ageCategory || "sin categoría"}</p>
+                              <p className="truncate text-xs text-muted-foreground">Abrir página interna del registro</p>
                             </div>
                           </div>
                         </TableCell>
@@ -564,101 +575,21 @@ export function RelevantProfiles() {
           </CardContent>
         </Card>
 
-        <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
-          <CardHeader>
-            <CardTitle>{isDirectorView ? "Detalle de seguimiento" : "Detalle del registro"}</CardTitle>
-            <CardDescription>
-              {isDirectorView
-                ? "Resumen rápido del perfil o estudiante y sus señales visibles dentro del alcance institucional."
-                : "Resumen rápido del perfil o estudiante y sus señales operativas visibles."}
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-5">
-            {!selectedProfile ? (
-              <div className="rounded-2xl bg-background/70 p-4 text-sm text-muted-foreground">
-                {isDirectorView ? "Elegí un perfil o estudiante para revisar su detalle de seguimiento." : "Elegí un perfil o estudiante para revisar su detalle operativo."}
-              </div>
-            ) : (
-              <>
-                <div className="rounded-2xl bg-background/70 p-4">
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div className="flex min-w-0 items-center gap-3">
-                      <ProfileAvatar profile={selectedProfile} className="size-14 text-sm" />
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-semibold text-foreground">{selectedProfile.displayName}</p>
-                        <p className="mt-1 truncate text-xs text-muted-foreground">
-                          {selectedProfile.kind === "student"
-                            ? `Estudiante · ${selectedProfile.classGroupName || "sin grupo visible"}`
-                            : `Owner ${selectedProfile.userName || selectedProfile.userEmail || selectedProfile.userId || "sin owner"}`}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      <Badge variant={selectedProfile.kind === "student" ? "secondary" : "outline"}>{selectedProfile.kind === "student" ? "estudiante" : "perfil Home"}</Badge>
-                      <Badge variant={selectedProfile.isActive ? "success" : "outline"}>{selectedProfile.isActive ? "activo" : "inactivo"}</Badge>
-                      <Badge variant={selectedProfile.avatarUrl ? "secondary" : "outline"}>{selectedProfile.avatarUrl ? "avatar cargado" : "sin avatar"}</Badge>
-                      <Badge variant="outline">{selectedProfile.sessionCount} sesiones</Badge>
-                    </div>
-                  </div>
-                  <div className="mt-3 grid gap-2 text-xs text-muted-foreground sm:grid-cols-2">
-                    <p>Institución: {selectedProfile.educationalCenterName || selectedProfile.educationalCenterId || "-"}</p>
-                    <p>Tipo: {selectedProfile.kind === "student" ? "Estudiante institucional" : "Perfil Home"}</p>
-                    <p>{selectedProfile.kind === "student" ? `Grupo: ${selectedProfile.classGroupName || "-"}` : `Categoría: ${selectedProfile.ageCategory || "sin categoría"}`}</p>
-                    <p>{selectedProfile.kind === "student" ? `Documento / ID: ${selectedProfile.fileNumber || "-"}` : `Edad: ${selectedProfile.age ?? "sin edad"}`}</p>
-                    <p>Última sesión: {formatDateTime(selectedProfile.lastSessionAt)}</p>
-                    <p>Actualización: {formatDateTime(selectedProfile.updatedAt)}</p>
-                  </div>
-                </div>
-
-                <div>
-                  <p className="text-sm font-medium text-foreground">Identidad y asignación</p>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {selectedProfile.kind === "student" ? (
-                      <>
-                        <Badge variant="outline">Documento / ID: {selectedProfile.fileNumber || "-"}</Badge>
-                        <Badge variant="outline">Grupo: {selectedProfile.classGroupName || "sin grupo"}</Badge>
-                        <Badge variant="outline">Permisos: visible solo dentro del scope permitido</Badge>
-                      </>
-                    ) : (
-                      <>
-                        <Badge variant="outline">Owner: {selectedProfile.userName || selectedProfile.userEmail || "sin owner"}</Badge>
-                        <Badge variant="outline">{selectedProfile.cardUids.length} cards registradas</Badge>
-                        <Badge variant="outline">{selectedProfile.boundDevices.length} dispositivos vinculados</Badge>
-                      </>
-                    )}
-                  </div>
-                </div>
-
-                <div>
-                  <p className="text-sm font-medium text-foreground">Tarjetas vinculadas</p>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {selectedProfile.cardUids.length === 0 ? (
-                      <Badge variant="outline">{selectedProfile.kind === "student" ? "sin cards en este registro" : "sin cards activas"}</Badge>
-                    ) : (
-                      selectedProfile.cardUids.map((cardUid) => (
-                        <Badge key={cardUid} variant="outline">{cardUid}</Badge>
-                      ))
-                    )}
-                  </div>
-                </div>
-
-                <div>
-                  <p className="text-sm font-medium text-foreground">Dispositivos vinculados</p>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {selectedProfile.boundDevices.length === 0 ? (
-                      <Badge variant="outline">sin dispositivo asociado</Badge>
-                    ) : (
-                      selectedProfile.boundDevices.map((device) => (
-                        <Badge key={device.id} variant="secondary">{device.name || device.deviceId || device.id}</Badge>
-                      ))
-                    )}
-                  </div>
-                </div>
-              </>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+      <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
+        <CardHeader>
+          <CardTitle>{isDirectorView ? "Detalle visible en página dedicada" : "Detalle en página dedicada"}</CardTitle>
+          <CardDescription>
+            {isDirectorView
+              ? "Cada registro abre ahora una vista propia, igual que en Institutions, para evitar que el detalle quede oculto en un panel lateral."
+              : "Cada registro abre ahora una vista propia, igual que en Institutions, para que el detalle completo siempre quede visible."}
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="rounded-2xl bg-background/70 p-4 text-sm text-muted-foreground">
+            Entrá desde el nombre del perfil o estudiante para abrir su pantalla interna con contexto, identidad, actividad y asignación visibles.
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }

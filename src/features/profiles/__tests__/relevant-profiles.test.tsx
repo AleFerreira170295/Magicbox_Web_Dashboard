@@ -34,6 +34,10 @@ vi.mock("@/features/games/api", () => ({
   useGames: (...args: unknown[]) => useGamesMock(...args),
 }));
 
+vi.mock("next/navigation", () => ({
+  useSearchParams: () => new URLSearchParams(),
+}));
+
 function okQuery<T>(data: T) {
   return {
     data,
@@ -207,7 +211,10 @@ describe("RelevantProfiles", () => {
     expect(screen.getByText(/Institución activa: Colegio Norte/)).toBeInTheDocument();
     expect(screen.getByText(/ahora suma estudiantes además de perfiles Home/i)).toBeInTheDocument();
     expect(screen.getAllByRole("combobox")[0]).toBeDisabled();
-    expect(screen.getByText("Luna Pérez")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Luna Pérez" })).toHaveAttribute(
+      "href",
+      "/profiles/detail?kind=student&entityId=student-1&institutionId=ec-1&classGroupId=group-1",
+    );
     expect(screen.getByText("Estudiantes")).toBeInTheDocument();
   });
 
@@ -232,11 +239,11 @@ describe("RelevantProfiles", () => {
     expect(screen.getByText("Director")).toBeInTheDocument();
     expect(screen.getByText(/mezclando perfiles Home y estudiantes visibles/i)).toBeInTheDocument();
 
-    fireEvent.click(screen.getByText("Luna Pérez"));
-
-    expect(screen.getByText(/Perfiles y estudiantes visibles para seguimiento/i)).toBeInTheDocument();
-    expect(screen.getByText(/Detalle de seguimiento/i)).toBeInTheDocument();
-    expect(screen.getByText(/Estudiante institucional/i)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Luna Pérez" })).toHaveAttribute(
+      "href",
+      "/profiles/detail?kind=student&entityId=student-1&institutionId=ec-1&classGroupId=group-1",
+    );
+    expect(screen.getByText(/Detalle visible en página dedicada/i)).toBeInTheDocument();
   });
 
   it("keeps the institution-scoped explanation even when no profiles or students are returned", () => {
@@ -279,7 +286,7 @@ describe("RelevantProfiles", () => {
           cardUids: ["card-1"],
           boundDevices: [],
           sessionCount: 3,
-          lastSessionAt: null,
+          lastSessionAt: "2026-04-28T10:00:00Z",
           createdAt: null,
           updatedAt: null,
           deletedAt: null,
@@ -326,6 +333,6 @@ describe("RelevantProfiles", () => {
     fireEvent.click(screen.getByRole("button", { name: /Sin sesiones/i }));
 
     expect(screen.queryAllByText("Luna Pérez").length).toBeGreaterThan(0);
-    expect(screen.queryAllByText("Tomi")).toHaveLength(0);
+    expect(screen.queryByRole("link", { name: "Tomi" })).not.toBeInTheDocument();
   });
 });
