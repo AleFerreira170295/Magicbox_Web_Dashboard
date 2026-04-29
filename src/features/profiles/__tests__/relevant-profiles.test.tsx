@@ -9,6 +9,7 @@ const useInstitutionsMock = vi.fn();
 const useClassGroupsMock = vi.fn();
 const useStudentsMock = vi.fn();
 const useGamesMock = vi.fn();
+const pushMock = vi.fn();
 
 vi.mock("@/features/auth/auth-context", () => ({
   useAuth: () => useAuthMock(),
@@ -36,6 +37,7 @@ vi.mock("@/features/games/api", () => ({
 
 vi.mock("next/navigation", () => ({
   useSearchParams: () => new URLSearchParams(),
+  useRouter: () => ({ push: pushMock }),
 }));
 
 function okQuery<T>(data: T) {
@@ -64,6 +66,7 @@ function renderProfiles() {
 describe("RelevantProfiles", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    pushMock.mockReset();
 
     useAuthMock.mockReturnValue({
       tokens: { accessToken: "token", refreshToken: "refresh" },
@@ -216,6 +219,7 @@ describe("RelevantProfiles", () => {
       "/profiles/detail?kind=student&entityId=student-1&institutionId=ec-1&classGroupId=group-1",
     );
     expect(screen.getByText("Estudiantes")).toBeInTheDocument();
+    expect(screen.getAllByText(/Click en la fila o en el nombre para abrir el detalle/i).length).toBeGreaterThan(0);
   });
 
   it("adapts profiles copy to a director-oriented institutional reading", () => {
@@ -264,6 +268,16 @@ describe("RelevantProfiles", () => {
     expect(screen.getByText(/ahora suma estudiantes además de perfiles Home/i)).toBeInTheDocument();
     expect(screen.getByText(/No hay perfiles ni estudiantes visibles dentro de la institución actual/i)).toBeInTheDocument();
     expect(screen.getAllByRole("combobox")[0]).toBeDisabled();
+  });
+
+  it("navigates to the detail page when the row is clicked", () => {
+    renderProfiles();
+
+    fireEvent.click(screen.getByText("Luna Pérez").closest("tr") as HTMLElement);
+
+    expect(pushMock).toHaveBeenCalledWith(
+      "/profiles/detail?kind=student&entityId=student-1&institutionId=ec-1&classGroupId=group-1",
+    );
   });
 
   it("filters the unified list through the operational focus segments", () => {

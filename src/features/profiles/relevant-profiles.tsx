@@ -3,7 +3,7 @@
 /* eslint-disable @next/next/no-img-element */
 
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { type ComponentType, useEffect, useMemo, useState } from "react";
 import { BadgeCheck, CreditCard, GraduationCap, Search, UserRound, Users, Waves } from "lucide-react";
 import { SectionHeader } from "@/components/section-header";
@@ -114,6 +114,7 @@ function ProfileAvatar({
 
 export function RelevantProfiles() {
   const { tokens, user: currentUser } = useAuth();
+  const router = useRouter();
   const searchParams = useSearchParams();
   const [query, setQuery] = useState("");
   const [institutionFilter, setInstitutionFilter] = useState<string>("");
@@ -520,25 +521,33 @@ export function RelevantProfiles() {
                       </TableCell>
                     </TableRow>
                   ) : (
-                    filtered.map((profile) => (
-                      <TableRow key={profile.id}>
+                    filtered.map((profile) => {
+                      const detailHref = buildProfileDetailHref({
+                        kind: profile.kind,
+                        entityId: profile.entityId,
+                        institutionId: profile.educationalCenterId,
+                        classGroupId: profile.classGroupId,
+                      });
+
+                      return (
+                      <TableRow
+                        key={profile.id}
+                        className="cursor-pointer transition hover:bg-muted/40"
+                        onClick={() => router.push(detailHref)}
+                      >
                         <TableCell>
                           <div className="flex min-w-0 items-center gap-3">
                             <ProfileAvatar profile={profile} className="size-10 text-[11px]" />
                             <div className="min-w-0">
                               <Link
-                                href={buildProfileDetailHref({
-                                  kind: profile.kind,
-                                  entityId: profile.entityId,
-                                  institutionId: profile.educationalCenterId,
-                                  classGroupId: profile.classGroupId,
-                                })}
+                                href={detailHref}
                                 className="truncate font-medium text-foreground transition hover:text-primary"
+                                onClick={(event) => event.stopPropagation()}
                               >
                                 {profile.displayName}
                               </Link>
                               <p className="truncate text-xs text-muted-foreground">{profile.kind === "student" ? `Documento / ID: ${profile.fileNumber || "-"}` : profile.ageCategory || "sin categoría"}</p>
-                              <p className="truncate text-xs text-muted-foreground">Abrir página interna del registro</p>
+                              <p className="truncate text-xs text-muted-foreground">Click en la fila o en el nombre para abrir el detalle</p>
                             </div>
                           </div>
                         </TableCell>
@@ -567,7 +576,8 @@ export function RelevantProfiles() {
                         <TableCell>{profile.sessionCount}</TableCell>
                         <TableCell>{formatDateTime(profile.lastSessionAt)}</TableCell>
                       </TableRow>
-                    ))
+                      );
+                    })
                   )}
                 </TableBody>
               </Table>
@@ -586,7 +596,7 @@ export function RelevantProfiles() {
         </CardHeader>
         <CardContent>
           <div className="rounded-2xl bg-background/70 p-4 text-sm text-muted-foreground">
-            Entrá desde el nombre del perfil o estudiante para abrir su pantalla interna con contexto, identidad, actividad y asignación visibles.
+            Podés entrar desde cualquier fila del listado o desde el nombre del perfil/estudiante para abrir su pantalla interna con contexto, identidad, actividad y asignación visibles.
           </div>
         </CardContent>
       </Card>
