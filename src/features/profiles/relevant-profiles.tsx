@@ -3,7 +3,7 @@
 /* eslint-disable @next/next/no-img-element */
 
 import { type ComponentType, useMemo, useState } from "react";
-import { BadgeCheck, CreditCard, Search, UserRound, Users, Waves } from "lucide-react";
+import { BadgeCheck, CreditCard, GraduationCap, Search, UserRound, Users, Waves } from "lucide-react";
 import { SectionHeader } from "@/components/section-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -12,10 +12,43 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useAuth } from "@/features/auth/auth-context";
+import { useClassGroups } from "@/features/class-groups/api";
+import { useGames } from "@/features/games/api";
+import { useInstitutions } from "@/features/institutions/api";
 import { useProfilesOverview } from "@/features/profiles/api";
+import { useStudents } from "@/features/students/api";
 import { cn, formatDateTime, getErrorMessage } from "@/lib/utils";
 
 type ProfilesFocusFilter = "all" | "no_avatar" | "no_cards" | "no_sessions" | "no_owner" | "institution_linked";
+type RelevantEntityKind = "home-profile" | "student";
+
+type RelevantEntity = {
+  id: string;
+  entityId: string;
+  kind: RelevantEntityKind;
+  displayName: string;
+  avatarUrl?: string | null;
+  age?: number | null;
+  ageCategory?: string | null;
+  isActive: boolean;
+  userId?: string | null;
+  userName?: string | null;
+  userEmail?: string | null;
+  educationalCenterId?: string | null;
+  educationalCenterName?: string | null;
+  bindingCount: number;
+  activeBindingCount: number;
+  cardUids: string[];
+  boundDevices: { id: string; deviceId?: string | null; name?: string | null }[];
+  sessionCount: number;
+  lastSessionAt?: string | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+  deletedAt?: string | null;
+  fileNumber?: string | null;
+  classGroupId?: string | null;
+  classGroupName?: string | null;
+};
 
 function SummaryCard({
   label,
@@ -47,13 +80,15 @@ function SummaryCard({
 }
 
 function getProfileInitials(displayName: string) {
-  return displayName
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part.slice(0, 1).toUpperCase())
-    .join("") || "PR";
+  return (
+    displayName
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((part) => part.slice(0, 1).toUpperCase())
+      .join("") || "PR"
+  );
 }
 
 function ProfileAvatar({
@@ -83,89 +118,222 @@ export function RelevantProfiles() {
   const [selectedProfileId, setSelectedProfileId] = useState<string | null>(null);
 
   const profilesQuery = useProfilesOverview(tokens?.accessToken);
+  const institutionsQuery = useInstitutions(tokens?.accessToken);
   const profiles = useMemo(() => profilesQuery.data || [], [profilesQuery.data]);
+  const institutionsData = useMemo(() => institutionsQuery.data?.data ?? [], [institutionsQuery.data?.data]);
   const isDirectorView = currentUser?.roles.includes("director") || false;
-  const isScopedActor = Boolean(
-    currentUser?.roles.includes("institution-admin") || currentUser?.roles.includes("director"),
-  );
+  const isScopedActor = Boolean(currentUser?.roles.includes("institution-admin") || currentUser?.roles.includes("director"));
 
-  const institutions = useMemo(() => {
+  const institutionOptions = useMemo(() => {
     const map = new Map<string, string>();
+
+    for (const institution of institutionsData) {
+      if (institution.id && institution.name) {
+        map.set(institution.id, institution.name);
+      }
+    }
+
     for (const profile of profiles) {
       if (profile.educationalCenterId && profile.educationalCenterName) {
         map.set(profile.educationalCenterId, profile.educationalCenterName);
       }
     }
-    return Array.from(map.entries()).map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name));
-  }, [profiles]);
+
+    return Array.from(map.entries())
+      .map(([id, name]) => ({ id, name }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [institutionsData, profiles]);
 
   const scopedInstitutionId = isScopedActor
     ? currentUser?.educationalCenterId || null
-    : institutions.length === 1
-      ? institutions[0]?.id || null
+    : institutionOptions.length === 1
+      ? institutionOptions[0]?.id || null
       : null;
+  const effectiveInstitutionFilter = institutionFilter || scopedInstitutionId || null;
   const scopedInstitutionName = scopedInstitutionId
-    ? institutions.find((institution) => institution.id === scopedInstitutionId)?.name || null
+    ? institutionOptions.find((institution) => institution.id === scopedInstitutionId)?.name || null
     : null;
   const isInstitutionScopedView = Boolean(scopedInstitutionId && isScopedActor);
 
+  const classGroupsQuery = useClassGroups(tokens?.accessToken, effectiveInstitutionFilter);
+  const studentsQuery = useStudents(tokens?.accessToken, {
+    institutionId: effectiveInstitutionFilter,
+    page: 1,
+    limit: 100,
+    sortBy: "updated_at",
+    order: "desc",
+  });
+  const gamesQuery = useGames(tokens?.accessToken, {
+    institutionId: effectiveInstitutionFilter,
+    page: 1,
+    limit: 100,
+    sortBy: "created_at",
+    order: "desc",
+  });
+
+  const classGroups = useMemo(() => classGroupsQuery.data?.data ?? [], [classGroupsQuery.data?.data]);
+  const students = useMemo(() => studentsQuery.data?.data ?? [], [studentsQuery.data?.data]);
+  const games = useMemo(() => gamesQuery.data?.data ?? [], [gamesQuery.data?.data]);
+
+  const institutionNameById = useMemo(() => new Map(institutionOptions.map((institution) => [institution.id, institution.name])), [institutionOptions]);
+  const classGroupById = useMemo(() => new Map(classGroups.map((group) => [group.id, group])), [classGroups]);
+
+  const studentMetrics = useMemo(() => {
+    const metrics = new Map<string, { sessionCount: number; lastSessionAt: string | null }>();
+
+    for (const game of games) {
+      const studentIds = new Set<string>();
+      for (const player of game.players) {
+        if (player.studentId) studentIds.add(player.studentId);
+      }
+      for (const turn of game.turns) {
+        if (turn.studentId) studentIds.add(turn.studentId);
+      }
+
+      const gameTimestamp = game.startDate || game.updatedAt || game.createdAt || null;
+      for (const studentId of studentIds) {
+        const current = metrics.get(studentId) ?? { sessionCount: 0, lastSessionAt: null };
+        current.sessionCount += 1;
+        if (gameTimestamp && (!current.lastSessionAt || new Date(gameTimestamp).getTime() > new Date(current.lastSessionAt).getTime())) {
+          current.lastSessionAt = gameTimestamp;
+        }
+        metrics.set(studentId, current);
+      }
+    }
+
+    return metrics;
+  }, [games]);
+
+  const studentEntities = useMemo<RelevantEntity[]>(() => {
+    return students.map((student) => {
+      const classGroup = classGroupById.get(student.classGroupId);
+      const educationalCenterId = classGroup?.educationalCenterId || effectiveInstitutionFilter || null;
+      const metrics = studentMetrics.get(student.id);
+
+      return {
+        id: `student:${student.id}`,
+        entityId: student.id,
+        kind: "student",
+        displayName: student.fullName,
+        avatarUrl: student.imageUrl,
+        age: null,
+        ageCategory: "Estudiante",
+        isActive: !student.deletedAt,
+        userId: null,
+        userName: null,
+        userEmail: null,
+        educationalCenterId,
+        educationalCenterName: educationalCenterId ? institutionNameById.get(educationalCenterId) || null : null,
+        bindingCount: 0,
+        activeBindingCount: 0,
+        cardUids: [],
+        boundDevices: [],
+        sessionCount: metrics?.sessionCount ?? 0,
+        lastSessionAt: metrics?.lastSessionAt ?? null,
+        createdAt: student.createdAt,
+        updatedAt: student.updatedAt,
+        deletedAt: student.deletedAt,
+        fileNumber: student.fileNumber,
+        classGroupId: student.classGroupId,
+        classGroupName: classGroup?.name || null,
+      };
+    });
+  }, [classGroupById, effectiveInstitutionFilter, institutionNameById, studentMetrics, students]);
+
+  const homeProfileEntities = useMemo<RelevantEntity[]>(() => {
+    return profiles.map((profile) => ({
+      id: `profile:${profile.id}`,
+      entityId: profile.id,
+      kind: "home-profile",
+      displayName: profile.displayName,
+      avatarUrl: profile.avatarUrl,
+      age: profile.age,
+      ageCategory: profile.ageCategory,
+      isActive: profile.isActive,
+      userId: profile.userId,
+      userName: profile.userName,
+      userEmail: profile.userEmail,
+      educationalCenterId: profile.educationalCenterId,
+      educationalCenterName: profile.educationalCenterName,
+      bindingCount: profile.bindingCount,
+      activeBindingCount: profile.activeBindingCount,
+      cardUids: profile.cardUids,
+      boundDevices: profile.boundDevices,
+      sessionCount: profile.sessionCount,
+      lastSessionAt: profile.lastSessionAt,
+      createdAt: profile.createdAt,
+      updatedAt: profile.updatedAt,
+      deletedAt: profile.deletedAt,
+      fileNumber: null,
+      classGroupId: null,
+      classGroupName: null,
+    }));
+  }, [profiles]);
+
+  const entities = useMemo(() => [...homeProfileEntities, ...studentEntities], [homeProfileEntities, studentEntities]);
+
   const filtered = useMemo(() => {
     const normalized = query.trim().toLowerCase();
-    const effectiveInstitutionFilter = institutionFilter || scopedInstitutionId || "";
 
-    return profiles.filter((profile) => {
-      if (effectiveInstitutionFilter && profile.educationalCenterId !== effectiveInstitutionFilter) return false;
-      if (activityFilter === "active" && !profile.isActive) return false;
-      if (activityFilter === "inactive" && profile.isActive) return false;
+    return entities.filter((entity) => {
+      if (effectiveInstitutionFilter && entity.educationalCenterId !== effectiveInstitutionFilter) return false;
+      if (activityFilter === "active" && !entity.isActive) return false;
+      if (activityFilter === "inactive" && entity.isActive) return false;
+
       const matchesFocus = (() => {
         switch (focusFilter) {
           case "no_avatar":
-            return !profile.avatarUrl;
+            return !entity.avatarUrl;
           case "no_cards":
-            return profile.activeBindingCount === 0;
+            return entity.kind === "home-profile" && entity.activeBindingCount === 0;
           case "no_sessions":
-            return profile.sessionCount === 0;
+            return entity.sessionCount === 0;
           case "no_owner":
-            return !(profile.userId || profile.userName || profile.userEmail);
+            return entity.kind === "home-profile" ? !(entity.userId || entity.userName || entity.userEmail) : false;
           case "institution_linked":
-            return Boolean(profile.educationalCenterId);
+            return Boolean(entity.educationalCenterId);
           default:
             return true;
         }
       })();
+
       if (!matchesFocus) return false;
       if (!normalized) return true;
 
       return [
-        profile.displayName,
-        profile.userName,
-        profile.userEmail,
-        profile.educationalCenterName,
-        ...profile.cardUids,
-        ...profile.boundDevices.map((device) => device.name || device.deviceId || device.id),
+        entity.displayName,
+        entity.userName,
+        entity.userEmail,
+        entity.educationalCenterName,
+        entity.fileNumber,
+        entity.classGroupName,
+        ...entity.cardUids,
+        ...entity.boundDevices.map((device) => device.name || device.deviceId || device.id),
       ]
         .filter(Boolean)
         .some((value) => String(value).toLowerCase().includes(normalized));
     });
-  }, [activityFilter, focusFilter, institutionFilter, profiles, query, scopedInstitutionId]);
+  }, [activityFilter, effectiveInstitutionFilter, entities, focusFilter, query]);
 
   const selectedProfile = useMemo(
-    () => filtered.find((profile) => profile.id === selectedProfileId) || profiles.find((profile) => profile.id === selectedProfileId) || null,
-    [filtered, profiles, selectedProfileId],
+    () => filtered.find((profile) => profile.id === selectedProfileId) || entities.find((profile) => profile.id === selectedProfileId) || null,
+    [entities, filtered, selectedProfileId],
   );
 
   const metrics = useMemo(() => {
-    const activeProfiles = profiles.filter((profile) => profile.isActive).length;
-    const withAvatars = profiles.filter((profile) => Boolean(profile.avatarUrl)).length;
-    const withBindings = profiles.filter((profile) => profile.activeBindingCount > 0).length;
-    const withSessions = profiles.filter((profile) => profile.sessionCount > 0).length;
-    const institutionLinked = profiles.filter((profile) => Boolean(profile.educationalCenterId)).length;
-    const profilesWithoutCards = profiles.filter((profile) => profile.activeBindingCount === 0).length;
-    const profilesWithoutSessions = profiles.filter((profile) => profile.sessionCount === 0).length;
-    const profilesWithoutOwner = profiles.filter((profile) => !(profile.userId || profile.userName || profile.userEmail)).length;
+    const activeProfiles = entities.filter((profile) => profile.isActive).length;
+    const withAvatars = entities.filter((profile) => Boolean(profile.avatarUrl)).length;
+    const withBindings = homeProfileEntities.filter((profile) => profile.activeBindingCount > 0).length;
+    const withSessions = entities.filter((profile) => profile.sessionCount > 0).length;
+    const institutionLinked = entities.filter((profile) => Boolean(profile.educationalCenterId)).length;
+    const profilesWithoutCards = homeProfileEntities.filter((profile) => profile.activeBindingCount === 0).length;
+    const profilesWithoutSessions = entities.filter((profile) => profile.sessionCount === 0).length;
+    const profilesWithoutOwner = homeProfileEntities.filter((profile) => !(profile.userId || profile.userName || profile.userEmail)).length;
+    const studentsCount = studentEntities.length;
+    const homeProfilesCount = homeProfileEntities.length;
 
     return {
-      total: profiles.length,
+      total: entities.length,
       activeProfiles,
       withAvatars,
       withBindings,
@@ -174,29 +342,34 @@ export function RelevantProfiles() {
       profilesWithoutCards,
       profilesWithoutSessions,
       profilesWithoutOwner,
+      studentsCount,
+      homeProfilesCount,
     };
-  }, [profiles]);
+  }, [entities, homeProfileEntities, studentEntities]);
 
   const focusSegments = [
     { key: "all" as const, label: "Todos", count: metrics.total },
     { key: "no_avatar" as const, label: "Sin avatar", count: metrics.total - metrics.withAvatars },
-    { key: "no_cards" as const, label: "Sin tarjeta", count: metrics.profilesWithoutCards },
+    { key: "no_cards" as const, label: "Home sin tarjeta", count: metrics.profilesWithoutCards },
     { key: "no_sessions" as const, label: "Sin sesiones", count: metrics.profilesWithoutSessions },
     { key: "no_owner" as const, label: "Sin owner", count: metrics.profilesWithoutOwner },
     { key: "institution_linked" as const, label: "Institucionales", count: metrics.institutionLinked },
   ];
 
+  const hasAnyError = profilesQuery.error || institutionsQuery.error || classGroupsQuery.error || studentsQuery.error || gamesQuery.error;
+  const isLoading = profilesQuery.isLoading || institutionsQuery.isLoading || classGroupsQuery.isLoading || studentsQuery.isLoading || gamesQuery.isLoading;
+
   return (
     <div className="space-y-6">
       <SectionHeader
-        eyebrow={isInstitutionScopedView ? (isDirectorView ? "Director" : "Institution admin") : "Perfiles Home"}
+        eyebrow={isInstitutionScopedView ? (isDirectorView ? "Director" : "Institution admin") : "Perfiles y estudiantes"}
         title="Profiles"
         description={
           isInstitutionScopedView
             ? isDirectorView
-              ? `Vista institucional de perfiles Home para ${scopedInstitutionName}, pensada para seguimiento general de owners, tarjetas y actividad visible.`
-              : `Vista operativa real de perfiles Home para ${scopedInstitutionName}, ya alineada con el alcance institucional visible.`
-            : "Vista operativa real de perfiles Home, con ownership, bindings y actividad de sesiones. Ya no usa `users` como proxy del módulo."
+              ? `Vista institucional para ${scopedInstitutionName}, mezclando perfiles Home y estudiantes visibles dentro del mismo alcance operativo.`
+              : `Vista operativa real para ${scopedInstitutionName}, unificando perfiles Home y estudiantes sin salir del marco institucional visible.`
+            : "Vista operativa unificada de perfiles Home y estudiantes, respetando el alcance real de permisos del usuario actual."
         }
         actions={
           <div className="grid w-full gap-3 md:grid-cols-2 2xl:grid-cols-[minmax(0,1.35fr)_minmax(220px,0.8fr)_minmax(180px,0.6fr)]">
@@ -205,7 +378,7 @@ export function RelevantProfiles() {
               <Input
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
-                placeholder="Filtrar por perfil, owner, institución, tarjeta o dispositivo"
+                placeholder="Filtrar por perfil, estudiante, owner, institución, documento, tarjeta o grupo"
                 className="w-full pl-9"
               />
             </div>
@@ -216,7 +389,7 @@ export function RelevantProfiles() {
               disabled={Boolean(scopedInstitutionId)}
             >
               <option value="">Todas las instituciones</option>
-              {institutions.map((institution) => (
+              {institutionOptions.map((institution) => (
                 <option key={institution.id} value={institution.id}>
                   {institution.name}
                 </option>
@@ -243,14 +416,14 @@ export function RelevantProfiles() {
               <Badge variant={isInstitutionScopedView ? "secondary" : "outline"}>
                 {isInstitutionScopedView ? (isDirectorView ? "director" : "institution-admin") : "multi-institución / global"}
               </Badge>
-              <Badge variant="outline">profiles reales</Badge>
+              <Badge variant="outline">profiles + estudiantes</Badge>
             </div>
             <p className="mt-2 text-sm text-muted-foreground">
               {isInstitutionScopedView
                 ? isDirectorView
-                  ? "La lectura directoral deja en primer plano owners, tarjetas activas y actividad visible para seguimiento institucional, sin convertir perfiles en una pantalla técnica de administración." 
-                  : "La tabla queda anclada a la institución visible por ACL, así que el filtro institucional pasa a ser informativo y no abre otras sedes."
-                : "La vista refleja perfiles reales con ownership, cards y bindings visibles según el alcance actual."}
+                  ? "La lectura directoral mantiene el foco institucional y ahora también incorpora estudiantes visibles del alcance permitido."
+                  : "La tabla queda anclada a la institución visible por ACL y ahora suma estudiantes además de perfiles Home."
+                : "La vista refleja perfiles Home y estudiantes visibles según permisos, sin inventar accesos por fuera del scope real del usuario."}
             </p>
           </div>
           {scopedInstitutionName ? <Badge variant="outline">Institución activa: {scopedInstitutionName}</Badge> : null}
@@ -258,16 +431,16 @@ export function RelevantProfiles() {
       </Card>
 
       <div className="grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(220px,1fr))]">
-        {profilesQuery.isLoading ? (
-          Array.from({ length: 5 }).map((_, index) => <Skeleton key={index} className="h-32 rounded-2xl" />)
+        {isLoading ? (
+          Array.from({ length: 6 }).map((_, index) => <Skeleton key={index} className="h-32 rounded-2xl" />)
         ) : (
           <>
-            <SummaryCard label="Perfiles" value={String(metrics.total)} hint="Perfiles Home visibles en el alcance actual." icon={Users} />
-            <SummaryCard label="Activos" value={String(metrics.activeProfiles)} hint="Perfiles no archivados y operativamente vigentes." icon={BadgeCheck} />
-            <SummaryCard label="Con avatar" value={String(metrics.withAvatars)} hint="Mejora mucho la identificación visual en lectura rápida." icon={UserRound} />
-            <SummaryCard label="Con tarjeta" value={String(metrics.withBindings)} hint="Perfiles con bindings activos a cards." icon={CreditCard} />
-            <SummaryCard label="Con sesiones" value={String(metrics.withSessions)} hint="Perfiles que ya aparecen en historial de juego." icon={Waves} />
-            <SummaryCard label="Institucionales" value={String(metrics.institutionLinked)} hint="Perfiles cuyos owners ya están ligados a una institución." icon={UserRound} />
+            <SummaryCard label="Visibles" value={String(metrics.total)} hint="Suma de perfiles Home y estudiantes dentro del alcance actual." icon={Users} />
+            <SummaryCard label="Perfiles Home" value={String(metrics.homeProfilesCount)} hint="Perfiles clásicos del módulo Home." icon={UserRound} />
+            <SummaryCard label="Estudiantes" value={String(metrics.studentsCount)} hint="Estudiantes institucionales visibles en este alcance." icon={GraduationCap} />
+            <SummaryCard label="Activos" value={String(metrics.activeProfiles)} hint="Registros operativamente vigentes o no borrados." icon={BadgeCheck} />
+            <SummaryCard label="Con tarjeta" value={String(metrics.withBindings)} hint="Solo aplica a perfiles Home con bindings activos." icon={CreditCard} />
+            <SummaryCard label="Con sesiones" value={String(metrics.withSessions)} hint="Perfiles o estudiantes que ya muestran actividad visible." icon={Waves} />
           </>
         )}
       </div>
@@ -304,29 +477,29 @@ export function RelevantProfiles() {
         </CardContent>
       </Card>
 
-      <div className="grid gap-6 2xl:grid-cols-[1.2fr_1fr]">
+      <div className="grid gap-6 2xl:grid-cols-[1.25fr_1fr]">
         <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
           <CardHeader>
-            <CardTitle>{isDirectorView ? "Perfiles visibles para seguimiento" : "Listado de perfiles"}</CardTitle>
+            <CardTitle>{isDirectorView ? "Perfiles y estudiantes visibles para seguimiento" : "Listado de perfiles y estudiantes"}</CardTitle>
             <CardDescription>
               {isDirectorView
-                ? "Seleccioná un perfil para revisar owner, tarjetas activas y señales de actividad visibles desde una lectura institucional."
-                : "Seleccioná un perfil para revisar ownership, tarjetas, dispositivos vinculados y actividad reciente."}
+                ? "Seleccioná un registro para revisar owner, contexto institucional y señales visibles de actividad."
+                : "Seleccioná un registro para revisar ownership, contexto institucional y actividad reciente."}
             </CardDescription>
           </CardHeader>
           <CardContent className="overflow-x-auto p-0">
-            {profilesQuery.isLoading ? (
+            {isLoading ? (
               <div className="p-6">
                 <Skeleton className="h-72 w-full rounded-none" />
               </div>
-            ) : profilesQuery.error ? (
-              <div className="p-6 text-sm text-destructive">{getErrorMessage(profilesQuery.error)}</div>
+            ) : hasAnyError ? (
+              <div className="p-6 text-sm text-destructive">{getErrorMessage(hasAnyError)}</div>
             ) : (
               <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead>Perfil</TableHead>
-                    <TableHead>Owner</TableHead>
+                    <TableHead>Tipo / contexto</TableHead>
                     <TableHead>Institución</TableHead>
                     <TableHead>Tarjetas</TableHead>
                     <TableHead>Sesiones</TableHead>
@@ -338,8 +511,8 @@ export function RelevantProfiles() {
                     <TableRow>
                       <TableCell colSpan={6} className="py-10 text-center text-sm text-muted-foreground">
                         {isInstitutionScopedView
-                          ? "No hay perfiles Home ligados a la institución visible. Los perfiles personales sin vínculo institucional quedan fuera de esta vista operativa."
-                          : "No hay perfiles para mostrar."}
+                          ? "No hay perfiles ni estudiantes visibles dentro de la institución actual."
+                          : "No hay perfiles ni estudiantes para mostrar."}
                       </TableCell>
                     </TableRow>
                   ) : (
@@ -354,17 +527,24 @@ export function RelevantProfiles() {
                             <ProfileAvatar profile={profile} className="size-10 text-[11px]" />
                             <div className="min-w-0">
                               <p className="truncate font-medium text-foreground">{profile.displayName}</p>
-                              <p className="truncate text-xs text-muted-foreground">{profile.ageCategory || "sin categoría"}</p>
+                              <p className="truncate text-xs text-muted-foreground">{profile.kind === "student" ? `Documento / ID: ${profile.fileNumber || "-"}` : profile.ageCategory || "sin categoría"}</p>
                             </div>
                           </div>
                         </TableCell>
                         <TableCell>
                           <div>
-                            <p className="text-sm text-foreground">{profile.userName || "sin owner"}</p>
-                            <p className="text-xs text-muted-foreground">{profile.userEmail || "-"}</p>
-                            <div className="mt-1 flex flex-wrap gap-2">
+                            <div className="flex flex-wrap gap-2">
+                              <Badge variant={profile.kind === "student" ? "secondary" : "outline"}>{profile.kind === "student" ? "estudiante" : "perfil Home"}</Badge>
                               <Badge variant={profile.avatarUrl ? "secondary" : "outline"}>{profile.avatarUrl ? "avatar" : "sin avatar"}</Badge>
                             </div>
+                            <p className="mt-2 text-sm text-foreground">
+                              {profile.kind === "student"
+                                ? profile.classGroupName || "sin grupo visible"
+                                : profile.userName || "sin owner"}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {profile.kind === "student" ? "Grupo del estudiante" : profile.userEmail || "-"}
+                            </p>
                           </div>
                         </TableCell>
                         <TableCell>{profile.educationalCenterName || profile.educationalCenterId || "-"}</TableCell>
@@ -386,17 +566,17 @@ export function RelevantProfiles() {
 
         <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
           <CardHeader>
-            <CardTitle>{isDirectorView ? "Detalle de seguimiento" : "Detalle de perfil"}</CardTitle>
+            <CardTitle>{isDirectorView ? "Detalle de seguimiento" : "Detalle del registro"}</CardTitle>
             <CardDescription>
               {isDirectorView
-                ? "Resumen rápido del perfil, su owner y señales visibles de uso para seguimiento institucional."
-                : "Resumen rápido del perfil, su owner y señales de uso relevantes para operación."}
+                ? "Resumen rápido del perfil o estudiante y sus señales visibles dentro del alcance institucional."
+                : "Resumen rápido del perfil o estudiante y sus señales operativas visibles."}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-5">
             {!selectedProfile ? (
               <div className="rounded-2xl bg-background/70 p-4 text-sm text-muted-foreground">
-                {isDirectorView ? "Elegí un perfil para revisar su detalle de seguimiento." : "Elegí un perfil para revisar su detalle operativo."}
+                {isDirectorView ? "Elegí un perfil o estudiante para revisar su detalle de seguimiento." : "Elegí un perfil o estudiante para revisar su detalle operativo."}
               </div>
             ) : (
               <>
@@ -406,10 +586,15 @@ export function RelevantProfiles() {
                       <ProfileAvatar profile={selectedProfile} className="size-14 text-sm" />
                       <div className="min-w-0">
                         <p className="truncate text-sm font-semibold text-foreground">{selectedProfile.displayName}</p>
-                        <p className="mt-1 truncate text-xs text-muted-foreground">Owner {selectedProfile.userName || selectedProfile.userEmail || selectedProfile.userId}</p>
+                        <p className="mt-1 truncate text-xs text-muted-foreground">
+                          {selectedProfile.kind === "student"
+                            ? `Estudiante · ${selectedProfile.classGroupName || "sin grupo visible"}`
+                            : `Owner ${selectedProfile.userName || selectedProfile.userEmail || selectedProfile.userId || "sin owner"}`}
+                        </p>
                       </div>
                     </div>
                     <div className="flex flex-wrap gap-2">
+                      <Badge variant={selectedProfile.kind === "student" ? "secondary" : "outline"}>{selectedProfile.kind === "student" ? "estudiante" : "perfil Home"}</Badge>
                       <Badge variant={selectedProfile.isActive ? "success" : "outline"}>{selectedProfile.isActive ? "activo" : "inactivo"}</Badge>
                       <Badge variant={selectedProfile.avatarUrl ? "secondary" : "outline"}>{selectedProfile.avatarUrl ? "avatar cargado" : "sin avatar"}</Badge>
                       <Badge variant="outline">{selectedProfile.sessionCount} sesiones</Badge>
@@ -417,9 +602,30 @@ export function RelevantProfiles() {
                   </div>
                   <div className="mt-3 grid gap-2 text-xs text-muted-foreground sm:grid-cols-2">
                     <p>Institución: {selectedProfile.educationalCenterName || selectedProfile.educationalCenterId || "-"}</p>
-                    <p>Categoría: {selectedProfile.ageCategory || "sin categoría"}</p>
-                    <p>Edad: {selectedProfile.age ?? "sin edad"}</p>
+                    <p>Tipo: {selectedProfile.kind === "student" ? "Estudiante institucional" : "Perfil Home"}</p>
+                    <p>{selectedProfile.kind === "student" ? `Grupo: ${selectedProfile.classGroupName || "-"}` : `Categoría: ${selectedProfile.ageCategory || "sin categoría"}`}</p>
+                    <p>{selectedProfile.kind === "student" ? `Documento / ID: ${selectedProfile.fileNumber || "-"}` : `Edad: ${selectedProfile.age ?? "sin edad"}`}</p>
                     <p>Última sesión: {formatDateTime(selectedProfile.lastSessionAt)}</p>
+                    <p>Actualización: {formatDateTime(selectedProfile.updatedAt)}</p>
+                  </div>
+                </div>
+
+                <div>
+                  <p className="text-sm font-medium text-foreground">Identidad y asignación</p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {selectedProfile.kind === "student" ? (
+                      <>
+                        <Badge variant="outline">Documento / ID: {selectedProfile.fileNumber || "-"}</Badge>
+                        <Badge variant="outline">Grupo: {selectedProfile.classGroupName || "sin grupo"}</Badge>
+                        <Badge variant="outline">Permisos: visible solo dentro del scope permitido</Badge>
+                      </>
+                    ) : (
+                      <>
+                        <Badge variant="outline">Owner: {selectedProfile.userName || selectedProfile.userEmail || "sin owner"}</Badge>
+                        <Badge variant="outline">{selectedProfile.cardUids.length} cards registradas</Badge>
+                        <Badge variant="outline">{selectedProfile.boundDevices.length} dispositivos vinculados</Badge>
+                      </>
+                    )}
                   </div>
                 </div>
 
@@ -427,7 +633,7 @@ export function RelevantProfiles() {
                   <p className="text-sm font-medium text-foreground">Tarjetas vinculadas</p>
                   <div className="mt-3 flex flex-wrap gap-2">
                     {selectedProfile.cardUids.length === 0 ? (
-                      <Badge variant="outline">sin cards activas</Badge>
+                      <Badge variant="outline">{selectedProfile.kind === "student" ? "sin cards en este registro" : "sin cards activas"}</Badge>
                     ) : (
                       selectedProfile.cardUids.map((cardUid) => (
                         <Badge key={cardUid} variant="outline">{cardUid}</Badge>

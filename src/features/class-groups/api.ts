@@ -91,11 +91,11 @@ function normalizeImportResponse(response: unknown): ClassGroupStudentImportResu
   };
 }
 
-export async function listClassGroups(token: string, institutionId: string) {
+export async function listClassGroups(token: string, institutionId?: string | null) {
   const response = await apiRequest<unknown>(apiEndpoints.classGroups.list, {
     token,
     searchParams: {
-      institution_id: institutionId,
+      institution_id: institutionId || undefined,
       all: true,
       sort_by: "name",
       order: "asc",
@@ -135,8 +135,8 @@ export async function importClassGroupStudents(token: string, classGroupId: stri
 
 export function useClassGroups(token?: string, institutionId?: string | null) {
   return useQuery({
-    queryKey: ["class-groups", token, institutionId],
-    queryFn: () => listClassGroups(token as string, institutionId as string),
-    enabled: Boolean(token && institutionId),
+    queryKey: ["class-groups", token, institutionId ?? null],
+    queryFn: () => listClassGroups(token as string, institutionId ?? null),
+    enabled: Boolean(token),
   });
 }

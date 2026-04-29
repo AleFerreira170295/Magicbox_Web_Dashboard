@@ -66,7 +66,7 @@ function normalizeResponse(response: unknown): PaginatedResponse<StudentRecord> 
   };
 }
 
-export async function listStudents(token: string, params: ListStudentsParams) {
+export async function listStudents(token: string, params: ListStudentsParams = {}) {
   const safeLimit = Math.min(Math.max(params.limit ?? 100, 1), 100);
 
   const response = await apiRequest<unknown>(apiEndpoints.students.list, {
@@ -89,7 +89,7 @@ export function useStudents(token?: string, params?: ListStudentsParams) {
 
   return useQuery({
     queryKey: ["students", token, params?.institutionId ?? null, params?.classGroupId ?? null, params?.page ?? 1, safeLimit, params?.sortBy ?? "updated_at", params?.order ?? "desc"],
-    queryFn: () => listStudents(token as string, params as ListStudentsParams),
-    enabled: Boolean(token && (params?.classGroupId || params?.institutionId)),
+    queryFn: () => listStudents(token as string, params ?? {}),
+    enabled: Boolean(token),
   });
 }
