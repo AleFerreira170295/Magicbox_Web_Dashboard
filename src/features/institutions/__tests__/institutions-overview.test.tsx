@@ -48,6 +48,10 @@ vi.mock("@/features/class-groups/student-import-panel", () => ({
   StudentImportPanel: () => <div data-testid="student-import-panel" />,
 }));
 
+vi.mock("next/navigation", () => ({
+  useSearchParams: () => new URLSearchParams(),
+}));
+
 function okQuery<T>(data: T) {
   return {
     data,
@@ -291,16 +295,10 @@ describe("InstitutionsOverview", () => {
     expect(screen.getAllByText("Luna Pérez").length).toBeGreaterThan(0);
     expect(screen.queryByText("Analítica temporal")).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: /Luna Pérez/i }));
-
-    expect(screen.getByRole("dialog", { name: /Detalle de Luna Pérez/i })).toBeInTheDocument();
-    expect(screen.getAllByText(/Documento \/ ID: luna_001/).length).toBeGreaterThan(0);
-    expect(screen.getByText("Analítica temporal")).toBeInTheDocument();
-    expect(screen.getByText("Turnos por fecha")).toBeInTheDocument();
-    expect(screen.getByText("Partidas por fecha")).toBeInTheDocument();
-    expect(screen.getByText("Porcentaje de acierto")).toBeInTheDocument();
-    expect(screen.getAllByText(/50% aciertos/).length).toBeGreaterThan(0);
-    expect(screen.getByText(/Memoria #101/)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Luna Pérez/i })).toHaveAttribute(
+      "href",
+      "/institutions/student?institutionId=ec-1&groupId=group-1&studentId=student-1",
+    );
 
     fireEvent.click(screen.getAllByText("Colegio Norte")[0]);
 
@@ -442,18 +440,13 @@ describe("InstitutionsOverview", () => {
     expect(screen.queryByText("Luna Pérez")).not.toBeInTheDocument();
   });
 
-  it("abre el detalle del estudiante en un popup y permite cerrarlo", () => {
+  it("abre una navegación profunda al detalle del estudiante", () => {
     renderInstitutionsOverview();
 
-    expect(screen.queryByRole("dialog", { name: /Detalle de Luna Pérez/i })).not.toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("button", { name: /Luna Pérez/i }));
-
-    expect(screen.getByRole("dialog", { name: /Detalle de Luna Pérez/i })).toBeInTheDocument();
-    expect(screen.getByText(/Luna Pérez: La lectura temporal usa solo las partidas y turnos del estudiante activo./i)).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("button", { name: "Cerrar" }));
-
-    expect(screen.queryByRole("dialog", { name: /Detalle de Luna Pérez/i })).not.toBeInTheDocument();
+    expect(screen.getAllByText(/Abrir página interna del estudiante/i).length).toBeGreaterThan(0);
+    expect(screen.getByRole("link", { name: /Luna Pérez/i })).toHaveAttribute(
+      "href",
+      "/institutions/student?institutionId=ec-1&groupId=group-1&studentId=student-1",
+    );
   });
 });

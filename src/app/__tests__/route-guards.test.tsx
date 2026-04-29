@@ -5,6 +5,7 @@ import DevicesPage from "@/app/(app)/devices/page";
 import GamesPage from "@/app/(app)/games/page";
 import HealthPage from "@/app/(app)/health/page";
 import InstitutionsPage from "@/app/(app)/institutions/page";
+import InstitutionStudentPage from "@/app/(app)/institutions/student/page";
 import PermissionsPage from "@/app/(app)/permissions/page";
 import ProfilesPage from "@/app/(app)/profiles/page";
 import SettingsPage from "@/app/(app)/settings/page";
@@ -37,6 +38,14 @@ vi.mock("@/features/health/system-health-dashboard", () => ({
 
 vi.mock("@/features/institutions/institutions-overview", () => ({
   InstitutionsOverview: () => <div>institutions-overview</div>,
+}));
+
+vi.mock("@/features/institutions/institution-student-profile-page", () => ({
+  InstitutionStudentProfilePage: () => <div>institution-student-profile-page</div>,
+}));
+
+vi.mock("next/navigation", () => ({
+  useSearchParams: () => new URLSearchParams("institutionId=ec-1&groupId=group-1&studentId=student-1"),
 }));
 
 vi.mock("@/features/permissions/permissions-center", () => ({
@@ -73,6 +82,7 @@ const allModules = [
   "games-table",
   "system-health-dashboard",
   "institutions-overview",
+  "institution-student-profile-page",
   "permissions-center",
   "relevant-profiles",
   "system-settings-center",
@@ -90,6 +100,7 @@ function renderProtectedPages() {
       <GamesPage />
       <HealthPage />
       <InstitutionsPage />
+      <InstitutionStudentPage />
       <PermissionsPage />
       <ProfilesPage />
       <SettingsPage />
@@ -123,6 +134,7 @@ describe("operational route guards", () => {
         "games-table",
         "system-health-dashboard",
         "institutions-overview",
+        "institution-student-profile-page",
         "permissions-center",
         "relevant-profiles",
         "system-settings-center",
@@ -137,6 +149,7 @@ describe("operational route guards", () => {
         "devices-table",
         "games-table",
         "institutions-overview",
+        "institution-student-profile-page",
         "permissions-center",
         "relevant-profiles",
         "syncs-table",
@@ -150,6 +163,7 @@ describe("operational route guards", () => {
         "devices-table",
         "games-table",
         "institutions-overview",
+        "institution-student-profile-page",
         "relevant-profiles",
         "syncs-table",
       ],
