@@ -877,31 +877,11 @@ export function InstitutionsOverview() {
         }
       />
 
-      <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
-        <CardContent className="flex flex-wrap items-center justify-between gap-4 p-5">
-          <div>
-            <div className="flex flex-wrap items-center gap-2">
-              <p className="text-sm font-medium text-foreground">Alcance operativo</p>
-              <Badge variant={isInstitutionScopedView ? "secondary" : "outline"}>
-                {isInstitutionScopedView ? (isDirectorView ? "director" : "institution-admin") : "multi-institución / global"}
-              </Badge>
-            </div>
-            <p className="mt-2 text-sm text-muted-foreground">
-              {isInstitutionScopedView && scopedInstitutionName
-                ? isDirectorView
-                  ? `Estás siguiendo ${scopedInstitutionName}. La vista deja en primer plano contacto, cobertura y señales básicas de operación sin empujarte a una lectura administrativa más profunda.`
-                  : `Estás operando sobre ${scopedInstitutionName}. La vista ya refleja el perímetro real expuesto por el backend.`
-                : "Cada institución se muestra como unidad operativa con usuarios, dispositivos y datos de contacto conectados al backend real."}
-            </p>
-            <div className="mt-3 flex flex-wrap gap-2">
-              <Badge variant={canCreateInstitutions ? "secondary" : "outline"}>{canCreateInstitutions ? "alta habilitada" : "sin alta"}</Badge>
-              <Badge variant={canUpdateInstitutions ? "secondary" : "outline"}>{canUpdateInstitutions ? "edición habilitada" : "solo lectura"}</Badge>
-              <Badge variant={canDeleteInstitutions ? "secondary" : "outline"}>{canDeleteInstitutions ? "baja habilitada" : "sin baja"}</Badge>
-            </div>
-          </div>
-          {scopedInstitutionName ? <Badge variant="outline">Alcance visible: {scopedInstitutionName}</Badge> : null}
-        </CardContent>
-      </Card>
+      {scopedInstitutionName ? (
+        <div className="flex flex-wrap gap-2">
+          <Badge variant="outline">Institución activa: {scopedInstitutionName}</Badge>
+        </div>
+      ) : null}
 
       <div className="grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(220px,1fr))]">
         {institutionsQuery.isLoading ? (

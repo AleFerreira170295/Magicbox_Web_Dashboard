@@ -642,31 +642,12 @@ export function DevicesTable() {
         }
       />
 
-      <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
-        <CardContent className="flex flex-wrap items-center justify-between gap-4 p-5">
-          <div>
-            <div className="flex flex-wrap items-center gap-2">
-              <p className="text-sm font-medium text-foreground">Alcance operativo</p>
-              <Badge variant={isTeacherView || isDirectorView || isInstitutionScopedView ? "secondary" : "outline"}>
-                {isTeacherView ? "teacher" : isDirectorView ? "director" : isInstitutionScopedView ? "institution-admin" : "multi-institución / global"}
-              </Badge>
-              <Badge variant="secondary">Home explícito</Badge>
-              <Badge variant={canUpdateDevices ? "secondary" : "outline"}>{canUpdateDevices ? "edición habilitada" : "solo lectura"}</Badge>
-              {linkedOwnerUserId ? <Badge variant="outline">Usuario filtrado: {linkedOwnerUserName || linkedOwnerUserId}</Badge> : null}
-            </div>
-            <p className="mt-2 text-sm text-muted-foreground">
-              {isTeacherView
-                ? "La vista docente prioriza por qué cada dispositivo te importa hoy: ownership, actividad visible, última sync y señales rápidas para decidir si está listo para aula o conviene revisarlo."
-                : isDirectorView
-                ? "La vista directoral prioriza coordinación institucional: qué está operativo, qué requiere seguimiento y dónde falta ownership o trazabilidad antes de escalar a soporte."
-                : canUpdateDevices
-                ? "Además de distinguir Home vs institución, ahora esta pantalla puede persistir nombre, owner, firmware, estado y cambio de alcance cuando el backend lo permite."
-                : "La sesión actual puede revisar el parque visible por ACL, pero no editar dispositivos sin permiso explícito de actualización."}
-            </p>
-          </div>
+      {(scopedInstitutionName || linkedOwnerUserId) ? (
+        <div className="flex flex-wrap gap-2">
           {scopedInstitutionName ? <Badge variant="outline">Institución activa: {scopedInstitutionName}</Badge> : null}
-        </CardContent>
-      </Card>
+          {linkedOwnerUserId ? <Badge variant="outline">Usuario filtrado: {linkedOwnerUserName || linkedOwnerUserId}</Badge> : null}
+        </div>
+      ) : null}
 
       <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
         <CardContent className="p-5">

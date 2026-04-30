@@ -48,7 +48,7 @@ describe("SystemSettingsCenter", () => {
     useAccessActionsMock.mockReturnValue(okQuery(okPaginated([])));
   });
 
-  it("makes the global runtime scope explicit", () => {
+  it("renders the global settings summary without the old scope card", () => {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
 
     render(
@@ -58,7 +58,7 @@ describe("SystemSettingsCenter", () => {
     );
 
     expect(screen.getByText("Configuración global")).toBeInTheDocument();
-    expect(screen.getByText("admin global")).toBeInTheDocument();
-    expect(screen.getByText(/No funciona como una vista institucional scopeada/i)).toBeInTheDocument();
+    expect(screen.getByText("Configuración del sistema")).toBeInTheDocument();
+    expect(screen.queryByText(/Alcance operativo/i)).not.toBeInTheDocument();
   });
 });

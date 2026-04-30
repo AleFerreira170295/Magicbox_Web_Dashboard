@@ -1166,34 +1166,11 @@ export function UsersTable() {
         }
       />
 
-      <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
-        <CardContent className="flex flex-wrap items-center justify-between gap-4 p-5">
-          <div>
-            <div className="flex flex-wrap items-center gap-2">
-              <p className="text-sm font-medium text-foreground">Alcance operativo</p>
-              <Badge variant={isInstitutionAdminView ? "secondary" : "outline"}>
-                {isInstitutionAdminView ? "institution-admin" : "multi-institución / global"}
-              </Badge>
-            </div>
-            <p className="mt-2 text-sm text-muted-foreground">
-              {isInstitutionAdminView && scopedInstitutionName
-                ? `Estás operando sobre ${scopedInstitutionName}. El filtro, el alta y el scope ACL se anclan a esa institución para evitar desbordes.`
-                : "Cuando el backend devuelve un único alcance institucional, el módulo se adapta para trabajar dentro de ese perímetro."}
-            </p>
-            <div className="mt-3 flex flex-wrap gap-2">
-              <Badge variant={canCreateUsers ? "secondary" : "outline"}>{canCreateUsers ? "alta habilitada" : "sin alta"}</Badge>
-              <Badge variant={canUpdateUsers ? "secondary" : "outline"}>{canUpdateUsers ? "edición habilitada" : "solo lectura"}</Badge>
-              <Badge variant={canManageAcl ? "secondary" : "outline"}>{canManageAcl ? "ACL editable" : "ACL bloqueada"}</Badge>
-            </div>
-            {!hasResolvedCapabilities ? (
-              <p className="mt-2 text-xs text-muted-foreground">
-                El perfil autenticado todavía no expone permisos detallados en `/auth/me`. La UI mantiene los controles visibles para no bloquear el flujo.
-              </p>
-            ) : null}
-          </div>
-          {scopedInstitutionName ? <Badge variant="outline">Institución activa: {scopedInstitutionName}</Badge> : null}
-        </CardContent>
-      </Card>
+      {scopedInstitutionName ? (
+        <div className="flex flex-wrap gap-2">
+          <Badge variant="outline">Institución activa: {scopedInstitutionName}</Badge>
+        </div>
+      ) : null}
 
       <div className="grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(220px,1fr))]">
         {usersQuery.isLoading ? (

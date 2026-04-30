@@ -251,21 +251,6 @@ export function SystemSettingsCenter() {
         description="Centro operativo global con runtime efectivo, catálogo ACL y publicación OTA completa para firmware BIN sin romper el contrato que ya consume la app móvil."
       />
 
-      <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
-        <CardContent className="flex flex-wrap items-center justify-between gap-4 p-5">
-          <div>
-            <div className="flex flex-wrap items-center gap-2">
-              <p className="text-sm font-medium text-foreground">Alcance operativo</p>
-              <Badge variant="secondary">admin global</Badge>
-              <Badge variant="outline">runtime efectivo</Badge>
-            </div>
-            <p className="mt-2 text-sm text-muted-foreground">
-              Esta pantalla resume configuración global y catálogos efectivos del backend. No funciona como una vista institucional scopeada, aunque la sesión actual sea {user?.email || "global"}.
-            </p>
-          </div>
-        </CardContent>
-      </Card>
-
       <div className="grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(220px,1fr))]">
         {isLoading ? (
           Array.from({ length: 5 }).map((_, index) => <Skeleton key={index} className="h-32 rounded-2xl" />)

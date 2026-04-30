@@ -45,7 +45,7 @@ describe("SystemHealthDashboard", () => {
     useProfilesOverviewMock.mockReturnValue(okQuery([]));
   });
 
-  it("makes the global-only admin scope explicit", () => {
+  it("renders the health summary without the old scope card", () => {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
 
     render(
@@ -55,7 +55,7 @@ describe("SystemHealthDashboard", () => {
     );
 
     expect(screen.getByText("Salud global")).toBeInTheDocument();
-    expect(screen.getByText("admin global")).toBeInTheDocument();
-    expect(screen.getByText(/No representa una vista scopeada por institución/i)).toBeInTheDocument();
+    expect(screen.getByText("Salud del sistema")).toBeInTheDocument();
+    expect(screen.queryByText(/Alcance operativo/i)).not.toBeInTheDocument();
   });
 });

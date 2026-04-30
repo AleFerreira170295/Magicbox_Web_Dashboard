@@ -182,7 +182,7 @@ describe("UsersTable", () => {
 
     renderUsersTable();
 
-    expect(screen.getByText("institution-admin")).toBeInTheDocument();
+    expect(screen.getByText("Usuarios")).toBeInTheDocument();
     expect(screen.getByText(/Institución activa: Colegio Norte/)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Alta no disponible" })).not.toBeInTheDocument();
 
@@ -211,8 +211,8 @@ describe("UsersTable", () => {
     renderUsersTable();
 
     expect(screen.getAllByRole("button", { name: "Alta no disponible" })[0]).toBeDisabled();
-    expect(screen.getByText("solo lectura")).toBeInTheDocument();
-    expect(screen.getByText("ACL bloqueada")).toBeInTheDocument();
+    expect(screen.queryByText("solo lectura")).not.toBeInTheDocument();
+    expect(screen.queryByText("ACL bloqueada")).not.toBeInTheDocument();
 
     fireEvent.click(screen.getAllByText("Juan Pérez")[0]);
 

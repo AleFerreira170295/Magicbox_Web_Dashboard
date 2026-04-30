@@ -317,34 +317,12 @@ export function GamesTable() {
         }
       />
 
-      <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
-        <CardContent className="flex flex-wrap items-center justify-between gap-4 p-5">
-          <div>
-            <div className="flex flex-wrap items-center gap-2">
-              <p className="text-sm font-medium text-foreground">Alcance operativo</p>
-              <Badge variant={isFamilyView || isResearcherView || isTeacherView || isDirectorView || isInstitutionScopedView ? "secondary" : "outline"}>
-                {isFamilyView ? "family" : isResearcherView ? "researcher" : isTeacherView ? "teacher" : isDirectorView ? "director" : isInstitutionScopedView ? "institution-admin" : "multi-institución / global"}
-              </Badge>
-              <Badge variant="outline">game-data real</Badge>
-              {linkedOwnerUserId ? <Badge variant="outline">Usuario filtrado: {linkedOwnerUserName || linkedOwnerUserId}</Badge> : null}
-            </div>
-            <p className="mt-2 text-sm text-muted-foreground">
-              {isFamilyView
-                ? "La pantalla simplifica el lenguaje y deja la actividad visible en primer plano. Los cruces técnicos quedan en segundo plano para no sobrecargar la lectura."
-                : isResearcherView
-                ? "La vista conserva el alcance visible real y deja explícita la relación entre partida, dispositivo y composición de jugadores para poder leer evidencia sin irse directo al raw."
-                : isTeacherView
-                ? "La vista docente deja explícito por qué la partida entra en tu scope, qué dispositivo la sostiene y cómo se compone la sesión para conectar rápido juego y aula."
-                : isDirectorView
-                ? "La vista directoral deja en primer plano volumen, mezcla de participantes y contexto institucional para seguimiento general, sin pedirte leer turnos como si fuera una consola técnica."
-                : isInstitutionScopedView
-                ? "La tabla queda anclada a la institución visible por ACL, así que el filtro institucional pasa a ser informativo y no abre otras sedes."
-                : "La vista refleja las partidas visibles según el alcance actual de game-data y permite cruzarlas con institución y dispositivo."}
-            </p>
-          </div>
+      {(scopedInstitutionName || linkedOwnerUserId) ? (
+        <div className="flex flex-wrap gap-2">
           {scopedInstitutionName ? <Badge variant="outline">Institución activa: {scopedInstitutionName}</Badge> : null}
-        </CardContent>
-      </Card>
+          {linkedOwnerUserId ? <Badge variant="outline">Usuario filtrado: {linkedOwnerUserName || linkedOwnerUserId}</Badge> : null}
+        </div>
+      ) : null}
 
       {isResearcherView ? (
         <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">

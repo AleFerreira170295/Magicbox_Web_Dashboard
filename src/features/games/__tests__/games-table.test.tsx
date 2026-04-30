@@ -178,9 +178,8 @@ describe("GamesTable", () => {
   it("anchors the games view to a single institution when the session is institution-scoped", () => {
     renderGamesTable();
 
-    expect(screen.getByText("Institution admin")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Partidas" })).toBeInTheDocument();
     expect(screen.getByText(/Institución activa: Colegio Norte/)).toBeInTheDocument();
-    expect(screen.getByText(/La tabla queda anclada a la institución visible por ACL/i)).toBeInTheDocument();
     expect(screen.getAllByRole("combobox")[0]).toBeDisabled();
   });
 

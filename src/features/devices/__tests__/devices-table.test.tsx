@@ -168,14 +168,13 @@ describe("DevicesTable", () => {
   it("shows institution-admin read-only mode when update permission is missing", () => {
     renderDevicesTable();
 
-    expect(screen.getByText("institution-admin")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Dispositivos" })).toBeInTheDocument();
     expect(screen.getByText(/Institución activa: Colegio Norte/)).toBeInTheDocument();
-    expect(screen.getByText("solo lectura")).toBeInTheDocument();
 
     fireEvent.click(screen.getByText("MagicBox Aula 1"));
 
     expect(screen.getByRole("button", { name: "Edición bloqueada" })).toBeDisabled();
-    expect(screen.getByText(/La sesión actual puede revisar el parque visible por ACL/i)).toBeInTheDocument();
+    expect(screen.getByText(/Detalle y edición/i)).toBeInTheDocument();
   });
 
   it("filters devices through the operational focus segments", () => {
@@ -473,7 +472,6 @@ describe("DevicesTable", () => {
     renderDevicesTable();
 
     expect(screen.getByText("Director")).toBeInTheDocument();
-    expect(screen.getByText(/La vista directoral prioriza coordinación institucional/i)).toBeInTheDocument();
     expect(screen.getAllByText(/Sin responsable/i).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/Conviene revisar/i).length).toBeGreaterThan(0);
 
