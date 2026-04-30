@@ -29,11 +29,23 @@ interface ApiRequestOptions {
   signal?: AbortSignal;
 }
 
+function resolveApiBaseUrl() {
+  const configuredBase = appConfig.apiBaseUrl.trim();
+
+  if (/^https?:\/\//i.test(configuredBase)) {
+    return configuredBase.endsWith("/") ? configuredBase : `${configuredBase}/`;
+  }
+
+  const relativeBase = configuredBase.startsWith("/") ? configuredBase : `/${configuredBase}`;
+  const origin = typeof window !== "undefined"
+    ? window.location.origin
+    : "http://localhost:3000";
+
+  return `${origin}${relativeBase.endsWith("/") ? relativeBase : `${relativeBase}/`}`;
+}
+
 function buildUrl(path: string, searchParams?: QueryParams) {
-  const base = appConfig.apiBaseUrl.endsWith("/")
-    ? appConfig.apiBaseUrl
-    : `${appConfig.apiBaseUrl}/`;
-  const url = new URL(path.replace(/^\//, ""), base);
+  const url = new URL(path.replace(/^\//, ""), resolveApiBaseUrl());
 
   if (searchParams) {
     Object.entries(searchParams).forEach(([key, value]) => {
