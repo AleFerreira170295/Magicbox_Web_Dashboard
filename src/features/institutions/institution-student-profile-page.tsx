@@ -192,10 +192,11 @@ export function InstitutionStudentProfilePage({
   }, [selectedStudentGameRows, studentGamesSearchQuery]);
 
   const backHref = buildInstitutionsOverviewHref({ institutionId, groupId });
-  const siblingStudents = useMemo(
-    () => studentPerformanceRows.filter((entry) => entry.student.id !== selectedStudent?.id),
-    [selectedStudent?.id, studentPerformanceRows],
-  );
+  const navigationStudents = useMemo(() => {
+    const currentEntry = studentPerformanceRows.find((entry) => entry.student.id === selectedStudent?.id) ?? null;
+    const otherEntries = studentPerformanceRows.filter((entry) => entry.student.id !== selectedStudent?.id);
+    return currentEntry ? [currentEntry, ...otherEntries] : otherEntries;
+  }, [selectedStudent?.id, studentPerformanceRows]);
   const selectedStudentStatus = (selectedStudentPerformance?.gamesCount ?? 0) > 0 ? "Con actividad" : "Sin partidas visibles";
   const selectedStudentStatusVariant = (selectedStudentPerformance?.gamesCount ?? 0) > 0 ? "success" : "outline";
   const selectedStudentLastParticipationLabel = selectedStudentPerformance?.lastParticipation
@@ -313,11 +314,10 @@ export function InstitutionStudentProfilePage({
                   Mantenés el foco en este grupo, pero podés saltar a otro alumno sin volver a la pantalla principal.
                 </CardDescription>
               </CardHeader>
-              <CardContent className="grid gap-3">
-                <div
-                  data-testid="institution-student-navigation-list"
-                  className="grid gap-3 max-h-[420px] overflow-y-auto pr-1"
-                >
+              <CardContent
+                data-testid="institution-student-navigation-list"
+                className="grid max-h-[520px] gap-3 overflow-y-auto pr-1"
+              >
                 <div className="rounded-2xl bg-background/70 p-4">
                   <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Grupo activo</p>
                   <p className="mt-2 text-base font-semibold text-foreground">{selectedGroup?.name || "Grupo sin nombre"}</p>
@@ -326,31 +326,55 @@ export function InstitutionStudentProfilePage({
                   </p>
                 </div>
 
-                {siblingStudents.length > 0 ? siblingStudents.map((entry) => (
-                  <Link
-                    key={entry.student.id}
-                    href={buildInstitutionStudentDetailHref({
-                      institutionId: institutionId as string,
-                      groupId: groupId as string,
-                      studentId: entry.student.id,
-                    })}
-                    className="rounded-2xl border border-border/70 bg-white/85 px-4 py-3 transition hover:border-primary/30 hover:bg-primary/5"
-                  >
-                    <div className="flex items-center justify-between gap-3">
-                      <div>
-                        <p className="text-sm font-semibold text-foreground">{entry.student.fullName}</p>
-                        <p className="mt-1 text-xs text-muted-foreground">Documento / ID: {entry.student.fileNumber || "-"}</p>
-                        <p className="mt-1 text-xs text-muted-foreground">Ver perfil completo del estudiante</p>
+                {navigationStudents.length > 0 ? navigationStudents.map((entry) => {
+                  const isCurrentStudent = entry.student.id === selectedStudent?.id;
+
+                  if (isCurrentStudent) {
+                    return (
+                      <div
+                        key={entry.student.id}
+                        className="rounded-2xl border border-primary/25 bg-primary/5 px-4 py-3"
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <div>
+                            <div className="flex flex-wrap items-center gap-2">
+                              <p className="text-sm font-semibold text-foreground">{entry.student.fullName}</p>
+                              <Badge variant="secondary">actual</Badge>
+                            </div>
+                            <p className="mt-1 text-xs text-muted-foreground">Documento / ID: {entry.student.fileNumber || "-"}</p>
+                            <p className="mt-1 text-xs text-muted-foreground">Perfil abierto en esta pantalla</p>
+                          </div>
+                          <Badge variant="outline">{entry.gamesCount} partidas</Badge>
+                        </div>
                       </div>
-                      <Badge variant="outline">{entry.gamesCount} partidas</Badge>
-                    </div>
-                  </Link>
-                )) : (
+                    );
+                  }
+
+                  return (
+                    <Link
+                      key={entry.student.id}
+                      href={buildInstitutionStudentDetailHref({
+                        institutionId: institutionId as string,
+                        groupId: groupId as string,
+                        studentId: entry.student.id,
+                      })}
+                      className="rounded-2xl border border-border/70 bg-white/85 px-4 py-3 transition hover:border-primary/30 hover:bg-primary/5"
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-semibold text-foreground">{entry.student.fullName}</p>
+                          <p className="mt-1 text-xs text-muted-foreground">Documento / ID: {entry.student.fileNumber || "-"}</p>
+                          <p className="mt-1 text-xs text-muted-foreground">Ver perfil completo del estudiante</p>
+                        </div>
+                        <Badge variant="outline">{entry.gamesCount} partidas</Badge>
+                      </div>
+                    </Link>
+                  );
+                }) : (
                   <div className="rounded-2xl border border-dashed border-border/80 bg-muted/20 p-4 text-sm text-muted-foreground">
-                    No hay otros estudiantes visibles en este grupo por ahora.
+                    No hay estudiantes visibles en este grupo por ahora.
                   </div>
                 )}
-                </div>
               </CardContent>
             </Card>
           </div>

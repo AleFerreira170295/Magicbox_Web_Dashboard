@@ -264,7 +264,7 @@ describe("InstitutionStudentProfilePage", () => {
     renderStudentProfilePage();
 
     expect(screen.getByRole("heading", { name: "Luna Pérez", level: 1 })).toBeInTheDocument();
-    expect(screen.getByText(/Documento \/ ID: luna_001/)).toBeInTheDocument();
+    expect(screen.getAllByText(/Documento \/ ID: luna_001/).length).toBeGreaterThan(0);
     expect(screen.getByText("Analítica temporal")).toBeInTheDocument();
     expect(screen.getByText("Contexto y navegación")).toBeInTheDocument();
     expect(screen.getByText("Con actividad")).toBeInTheDocument();
@@ -275,6 +275,7 @@ describe("InstitutionStudentProfilePage", () => {
       "href",
       "/institutions?institutionId=ec-1&groupId=group-1",
     );
+    expect(screen.getByText(/Perfil abierto en esta pantalla/i)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /Mateo Ruiz/i })).toHaveAttribute(
       "href",
       "/institutions/student?institutionId=ec-1&groupId=group-1&studentId=student-2",
@@ -283,7 +284,7 @@ describe("InstitutionStudentProfilePage", () => {
       "href",
       "/institutions/student?institutionId=ec-1&groupId=group-1&studentId=student-10",
     );
-    expect(screen.getByTestId("institution-student-navigation-list")).toHaveClass("max-h-[420px]", "overflow-y-auto");
+    expect(screen.getByTestId("institution-student-navigation-list")).toHaveClass("max-h-[520px]", "overflow-y-auto");
     expect(screen.getByText(/Mostrando 1 partidas visibles para este estudiante./i)).toBeInTheDocument();
   });
 
