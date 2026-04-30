@@ -37,7 +37,7 @@ import type {
   UpdateInstitutionPayload,
 } from "@/features/institutions/types";
 import { buildInstitutionStudentDetailHref } from "@/features/institutions/student-route";
-import { useStudents } from "@/features/students/api";
+import { useAllStudents } from "@/features/students/api";
 import { useUsers } from "@/features/users/api";
 import { cn, formatDateTime, formatDurationSeconds, getErrorMessage } from "@/lib/utils";
 
@@ -72,7 +72,7 @@ function SummaryCard({
 
 type FormMode = "create" | "edit";
 type InstitutionFocusFilter = "all" | "review" | "no_logo" | "no_users" | "no_devices" | "active_operation";
-type StudentVisibilityFilter = "all" | "with_games" | "without_games";
+type StudentVisibilityFilter = "with_games" | "without_games";
 type StudentSortOption = "activity" | "name" | "performance";
 type FeedbackState = { type: "success" | "error"; message: string } | null;
 
@@ -229,8 +229,8 @@ export function InstitutionsOverview() {
   const [selectedInstitutionId, setSelectedInstitutionId] = useState<string | null>(null);
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
   const [studentSearchQuery, setStudentSearchQuery] = useState("");
-  const [studentVisibilityFilter, setStudentVisibilityFilter] = useState<StudentVisibilityFilter>("all");
-  const [studentSort, setStudentSort] = useState<StudentSortOption>("activity");
+  const [studentVisibilityFilter, setStudentVisibilityFilter] = useState<StudentVisibilityFilter | null>(null);
+  const [studentSort, setStudentSort] = useState<StudentSortOption | null>(null);
   const [form, setForm] = useState<InstitutionFormState>(emptyFormState);
   const [feedback, setFeedback] = useState<FeedbackState>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
@@ -244,7 +244,7 @@ export function InstitutionsOverview() {
   const devices = useMemo(() => devicesQuery.data?.data ?? [], [devicesQuery.data?.data]);
 
   const scopedInstitutionId = institutions.length === 1 ? institutions[0]?.id || null : null;
-  const activeInstitutionId = selectedInstitutionId ?? scopedInstitutionId;
+  const activeInstitutionId = selectedInstitutionId;
   const gamesQuery = useGames(tokens?.accessToken, {
     institutionId: activeInstitutionId,
     page: 1,
@@ -379,8 +379,8 @@ export function InstitutionsOverview() {
   }, [devicesByInstitutionId, institutions, usersByInstitutionId]);
 
   const selectedInstitution = useMemo(
-    () => institutionRows.find((item) => item.id === activeInstitutionId) || null,
-    [activeInstitutionId, institutionRows],
+    () => institutionRows.find((item) => item.id === selectedInstitutionId) || null,
+    [selectedInstitutionId, institutionRows],
   );
   const selectedInstitutionDetail = institutionDetailQuery.data || null;
   const previewUsers = selectedInstitutionDetail?.operationalPreview?.users || [];
@@ -421,9 +421,8 @@ export function InstitutionsOverview() {
       return;
     }
 
-    const hasCurrentSelection = selectedGroupId && institutionClassGroups.some((group) => group.id === selectedGroupId);
-    if (!hasCurrentSelection) {
-      setSelectedGroupId(institutionClassGroups[0].id);
+    if (selectedGroupId && !institutionClassGroups.some((group) => group.id === selectedGroupId)) {
+      setSelectedGroupId(null);
     }
   }, [groupIdFromUrl, institutionClassGroups, selectedGroupId]);
 
@@ -432,11 +431,9 @@ export function InstitutionsOverview() {
     [institutionClassGroups, selectedGroupId],
   );
 
-  const studentsQuery = useStudents(tokens?.accessToken, {
+  const studentsQuery = useAllStudents(tokens?.accessToken, {
     institutionId: activeInstitutionId,
     classGroupId: selectedGroup?.id ?? null,
-    page: 1,
-    limit: 100,
     sortBy: "updated_at",
     order: "desc",
   });
@@ -444,8 +441,8 @@ export function InstitutionsOverview() {
 
   useEffect(() => {
     setStudentSearchQuery("");
-    setStudentVisibilityFilter("all");
-    setStudentSort("activity");
+    setStudentVisibilityFilter(null);
+    setStudentSort(null);
   }, [selectedGroup?.id]);
 
   const studentPerformanceRows = useMemo(() => {
@@ -494,6 +491,10 @@ export function InstitutionsOverview() {
       }
     });
 
+    if (!studentSort) {
+      return filteredRows;
+    }
+
     return [...filteredRows].sort((a, b) => {
       switch (studentSort) {
         case "name":
@@ -501,8 +502,9 @@ export function InstitutionsOverview() {
         case "performance":
           return b.successRate - a.successRate || b.gamesCount - a.gamesCount || a.student.fullName.localeCompare(b.student.fullName, "es");
         case "activity":
-        default:
           return b.gamesCount - a.gamesCount || b.turnsCount - a.turnsCount || a.student.fullName.localeCompare(b.student.fullName, "es");
+        default:
+          return 0;
       }
     });
   }, [studentPerformanceRows, studentSearchQuery, studentSort, studentVisibilityFilter]);
@@ -580,10 +582,30 @@ export function InstitutionsOverview() {
 
   function selectInstitution(institution: InstitutionRow) {
     setMode("edit");
-    setSelectedInstitutionId(institution.id);
+    setSelectedInstitutionId((current) => current === institution.id ? null : institution.id);
     setForm(formFromInstitution(institution));
     setImageFile(null);
     setFeedback(null);
+  }
+
+  function clearInstitutionSelection() {
+    setSelectedInstitutionId(null);
+    setSelectedGroupId(null);
+    setStudentSearchQuery("");
+    setStudentVisibilityFilter(null);
+    setStudentSort(null);
+    setFeedback(null);
+  }
+
+  function toggleGroupSelection(groupId: string) {
+    setSelectedGroupId((current) => current === groupId ? null : groupId);
+  }
+
+  function clearGroupSelection() {
+    setSelectedGroupId(null);
+    setStudentSearchQuery("");
+    setStudentVisibilityFilter(null);
+    setStudentSort(null);
   }
 
   function openCreateInstitutionForm() {
@@ -873,7 +895,7 @@ export function InstitutionsOverview() {
               <Badge variant={canDeleteInstitutions ? "secondary" : "outline"}>{canDeleteInstitutions ? "baja habilitada" : "sin baja"}</Badge>
             </div>
           </div>
-          {scopedInstitutionName ? <Badge variant="outline">Institución activa: {scopedInstitutionName}</Badge> : null}
+          {scopedInstitutionName ? <Badge variant="outline">Alcance visible: {scopedInstitutionName}</Badge> : null}
         </CardContent>
       </Card>
 
@@ -987,6 +1009,9 @@ export function InstitutionsOverview() {
                   </Button>
                   <Button type="button" variant="outline" onClick={openEditInstitutionForm} disabled={!selectedInstitution || mode === "create"}>
                     Editar seleccionada
+                  </Button>
+                  <Button type="button" variant="ghost" onClick={clearInstitutionSelection} disabled={!selectedInstitution}>
+                    Deseleccionar institución
                   </Button>
                 </div>
                 <ListPaginationControls
@@ -1293,10 +1318,15 @@ export function InstitutionsOverview() {
                   <div>
                     <p className="text-sm font-medium text-foreground">Grupos visibles</p>
                     <p className="mt-1 text-sm text-muted-foreground">
-                      Elegí un grupo para ver quiénes quedaron cargados dentro.
+                      Podés seleccionar un grupo o dejar todo sin selección hasta decidir a qué detalle querés entrar.
                     </p>
                   </div>
-                  <Badge variant="secondary">{selectedInstitution.classGroupCount} grupos</Badge>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge variant="secondary">{selectedInstitution.classGroupCount} grupos</Badge>
+                    <Button type="button" size="sm" variant="ghost" onClick={clearGroupSelection} disabled={!selectedGroup}>
+                      Deseleccionar grupo
+                    </Button>
+                  </div>
                 </div>
 
                 <div className="mt-4 grid gap-3">
@@ -1312,7 +1342,7 @@ export function InstitutionsOverview() {
                         <button
                           key={group.id}
                           type="button"
-                          onClick={() => setSelectedGroupId(group.id)}
+                          onClick={() => toggleGroupSelection(group.id)}
                           className={cn(
                             "rounded-2xl border p-4 text-left transition",
                             isSelected
@@ -1345,8 +1375,8 @@ export function InstitutionsOverview() {
                       <p className="text-sm font-medium text-foreground">Perfiles dentro del grupo</p>
                       <p className="mt-1 text-sm text-muted-foreground">
                         {selectedGroup
-                          ? `Grupo activo: ${selectedGroup.name}. Elegí un estudiante para ver su detalle, partidas y rendimiento.`
-                          : "Elegí un grupo a la izquierda para ver los perfiles cargados."}
+                          ? `Grupo seleccionado: ${selectedGroup.name}. Elegí un estudiante para ver su detalle, partidas y rendimiento.`
+                          : "Podés dejar el grupo sin selección o elegir uno para ver los perfiles cargados."}
                       </p>
                     </div>
                     {selectedGroup ? <Badge variant="secondary">{filteredStudentPerformanceRows.length} visibles</Badge> : null}
@@ -1365,22 +1395,19 @@ export function InstitutionsOverview() {
                       </div>
 
                       <div className="flex flex-wrap gap-2">
-                        <Button type="button" size="sm" variant={studentVisibilityFilter === "all" ? "secondary" : "outline"} onClick={() => setStudentVisibilityFilter("all")}>
-                          Todos
-                        </Button>
-                        <Button type="button" size="sm" variant={studentVisibilityFilter === "with_games" ? "secondary" : "outline"} onClick={() => setStudentVisibilityFilter("with_games")}>
+                        <Button type="button" size="sm" variant={studentVisibilityFilter === "with_games" ? "secondary" : "outline"} onClick={() => setStudentVisibilityFilter((current) => current === "with_games" ? null : "with_games")}>
                           Con partidas
                         </Button>
-                        <Button type="button" size="sm" variant={studentVisibilityFilter === "without_games" ? "secondary" : "outline"} onClick={() => setStudentVisibilityFilter("without_games")}>
+                        <Button type="button" size="sm" variant={studentVisibilityFilter === "without_games" ? "secondary" : "outline"} onClick={() => setStudentVisibilityFilter((current) => current === "without_games" ? null : "without_games")}>
                           Sin partidas
                         </Button>
-                        <Button type="button" size="sm" variant={studentSort === "activity" ? "secondary" : "outline"} onClick={() => setStudentSort("activity")}>
+                        <Button type="button" size="sm" variant={studentSort === "activity" ? "secondary" : "outline"} onClick={() => setStudentSort((current) => current === "activity" ? null : "activity")}>
                           Más actividad
                         </Button>
-                        <Button type="button" size="sm" variant={studentSort === "name" ? "secondary" : "outline"} onClick={() => setStudentSort("name")}>
+                        <Button type="button" size="sm" variant={studentSort === "name" ? "secondary" : "outline"} onClick={() => setStudentSort((current) => current === "name" ? null : "name")}>
                           A-Z
                         </Button>
-                        <Button type="button" size="sm" variant={studentSort === "performance" ? "secondary" : "outline"} onClick={() => setStudentSort("performance")}>
+                        <Button type="button" size="sm" variant={studentSort === "performance" ? "secondary" : "outline"} onClick={() => setStudentSort((current) => current === "performance" ? null : "performance")}>
                           Mejor rendimiento
                         </Button>
                       </div>
@@ -1389,7 +1416,7 @@ export function InstitutionsOverview() {
 
                   {!selectedGroup ? (
                     <div className="mt-4 rounded-2xl border border-dashed border-border/80 bg-muted/20 p-4 text-sm text-muted-foreground">
-                      Todavía no hay un grupo seleccionado.
+                      No hay un grupo seleccionado por ahora. Elegilo cuando quieras, o dejá esta vista vacía hasta pasar al detalle que necesites.
                     </div>
                   ) : studentsQuery.error ? (
                     <div className="mt-4 rounded-2xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">

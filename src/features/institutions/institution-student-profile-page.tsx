@@ -16,7 +16,7 @@ import { useAuth } from "@/features/auth/auth-context";
 import { useClassGroups } from "@/features/class-groups/api";
 import { useGames } from "@/features/games/api";
 import { useInstitutions } from "@/features/institutions/api";
-import { useStudents } from "@/features/students/api";
+import { useAllStudents } from "@/features/students/api";
 import { buildInstitutionStudentDetailHref, buildInstitutionsOverviewHref } from "@/features/institutions/student-route";
 import { cn, formatDateTime, formatDurationSeconds, getErrorMessage } from "@/lib/utils";
 
@@ -59,11 +59,9 @@ export function InstitutionStudentProfilePage({
 
   const institutionsQuery = useInstitutions(tokens?.accessToken);
   const classGroupsQuery = useClassGroups(tokens?.accessToken, institutionId ?? null);
-  const studentsQuery = useStudents(tokens?.accessToken, {
+  const studentsQuery = useAllStudents(tokens?.accessToken, {
     institutionId: institutionId ?? null,
     classGroupId: groupId ?? null,
-    page: 1,
-    limit: 100,
     sortBy: "updated_at",
     order: "desc",
   });
@@ -311,12 +309,12 @@ export function InstitutionStudentProfilePage({
                   Contexto y navegación
                 </CardTitle>
                 <CardDescription>
-                  Mantenés el foco en este grupo, pero podés saltar a otro alumno sin volver a la pantalla principal.
+                  Ves todos los perfiles visibles del grupo en un único bloque con scroll, y podés saltar entre ellos sin volver a la pantalla principal.
                 </CardDescription>
               </CardHeader>
               <CardContent
                 data-testid="institution-student-navigation-list"
-                className="grid max-h-[520px] gap-3 overflow-y-auto pr-1"
+                className="grid max-h-[min(70vh,640px)] gap-3 overflow-y-auto overscroll-contain pr-1"
               >
                 <div className="rounded-2xl bg-background/70 p-4">
                   <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Grupo activo</p>

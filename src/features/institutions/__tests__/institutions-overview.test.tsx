@@ -9,7 +9,7 @@ const useInstitutionByIdMock = vi.fn();
 const useUsersMock = vi.fn();
 const useDevicesMock = vi.fn();
 const useClassGroupsMock = vi.fn();
-const useStudentsMock = vi.fn();
+const useAllStudentsMock = vi.fn();
 const useGamesMock = vi.fn();
 
 vi.mock("@/features/auth/auth-context", () => ({
@@ -37,7 +37,7 @@ vi.mock("@/features/class-groups/api", () => ({
 }));
 
 vi.mock("@/features/students/api", () => ({
-  useStudents: (...args: unknown[]) => useStudentsMock(...args),
+  useAllStudents: (...args: unknown[]) => useAllStudentsMock(...args),
 }));
 
 vi.mock("@/features/games/api", () => ({
@@ -217,7 +217,7 @@ describe("InstitutionsOverview", () => {
       }),
     );
 
-    useStudentsMock.mockReturnValue(
+    useAllStudentsMock.mockReturnValue(
       okQuery({
         data: [
           {
@@ -282,28 +282,34 @@ describe("InstitutionsOverview", () => {
     cleanup();
   });
 
-  it("shows institution-admin scoped read-only mode for institutions", () => {
+  it("shows institution-admin scoped read-only mode for institutions without forcing active selections", () => {
     renderInstitutionsOverview();
 
     expect(screen.getByText("Institution admin")).toBeInTheDocument();
-    expect(screen.getByText(/Institución activa: Colegio Norte/)).toBeInTheDocument();
+    expect(screen.getAllByText(/Colegio Norte/).length).toBeGreaterThan(0);
     expect(screen.getAllByRole("button", { name: "Alta no disponible" })[0]).toBeDisabled();
     expect(screen.getByText("solo lectura")).toBeInTheDocument();
     expect(screen.getByTestId("student-import-panel")).toBeInTheDocument();
     expect(screen.getByText("Grupos y perfiles de jugadores")).toBeInTheDocument();
-    expect(screen.getAllByText("Quinto A").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("Luna Pérez").length).toBeGreaterThan(0);
+    expect(screen.getByText(/Seleccioná una institución para ver sus grupos/i)).toBeInTheDocument();
+    expect(screen.queryByText("Luna Pérez")).not.toBeInTheDocument();
     expect(screen.queryByText("Analítica temporal")).not.toBeInTheDocument();
-
-    expect(screen.getByRole("link", { name: /Luna Pérez/i })).toHaveAttribute(
-      "href",
-      "/institutions/student?institutionId=ec-1&groupId=group-1&studentId=student-1",
-    );
 
     fireEvent.click(screen.getAllByText("Colegio Norte")[0]);
 
     expect(screen.getByRole("button", { name: "Edición bloqueada" })).toBeDisabled();
     expect(screen.getByText("Sin permiso para eliminar")).toBeInTheDocument();
+    expect(screen.getAllByText("Quinto A").length).toBeGreaterThan(0);
+
+    fireEvent.click(screen.getAllByText("Quinto A")[0]);
+
+    expect(screen.getAllByText("Luna Pérez").length).toBeGreaterThan(0);
+    expect(screen.getByRole("link", { name: /Luna Pérez/i })).toHaveAttribute(
+      "href",
+      "/institutions/student?institutionId=ec-1&groupId=group-1&studentId=student-1",
+    );
+    expect(screen.getByRole("button", { name: "Deseleccionar institución" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Deseleccionar grupo" })).toBeEnabled();
   });
 
   it("adapts institutions copy to a director-oriented follow-up view", () => {
@@ -420,6 +426,9 @@ describe("InstitutionsOverview", () => {
   it("permite buscar y filtrar estudiantes dentro del grupo seleccionado", () => {
     renderInstitutionsOverview();
 
+    fireEvent.click(screen.getAllByText("Colegio Norte")[0]);
+    fireEvent.click(screen.getAllByText("Quinto A")[0]);
+
     expect(screen.getAllByText("Luna Pérez").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Mateo Ruiz").length).toBeGreaterThan(0);
 
@@ -438,10 +447,16 @@ describe("InstitutionsOverview", () => {
 
     expect(screen.getAllByText("Mateo Ruiz").length).toBeGreaterThan(0);
     expect(screen.queryByText("Luna Pérez")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Sin partidas" }));
+    expect(screen.getAllByText("Luna Pérez").length).toBeGreaterThan(0);
   });
 
   it("abre una navegación profunda al detalle del estudiante", () => {
     renderInstitutionsOverview();
+
+    fireEvent.click(screen.getAllByText("Colegio Norte")[0]);
+    fireEvent.click(screen.getAllByText("Quinto A")[0]);
 
     expect(screen.getAllByText(/Abrir página interna del estudiante/i).length).toBeGreaterThan(0);
     expect(screen.getByRole("link", { name: /Luna Pérez/i })).toHaveAttribute(

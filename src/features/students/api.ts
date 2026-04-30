@@ -84,12 +84,45 @@ export async function listStudents(token: string, params: ListStudentsParams = {
   return normalizeResponse(response);
 }
 
+export async function listAllStudents(token: string, params: Omit<ListStudentsParams, "page" | "limit"> = {}) {
+  const limit = 100;
+  const firstPage = await listStudents(token, { ...params, page: 1, limit });
+
+  if ((firstPage.total_pages || 1) <= 1) {
+    return firstPage;
+  }
+
+  const remainingPages = await Promise.all(
+    Array.from({ length: Math.max(0, (firstPage.total_pages || 1) - 1) }, (_, index) =>
+      listStudents(token, { ...params, page: index + 2, limit }),
+    ),
+  );
+
+  const data = [firstPage, ...remainingPages].flatMap((page) => page.data);
+
+  return {
+    data,
+    page: 1,
+    limit,
+    total: firstPage.total || data.length,
+    total_pages: firstPage.total_pages || 1,
+  };
+}
+
 export function useStudents(token?: string, params?: ListStudentsParams) {
   const safeLimit = Math.min(Math.max(params?.limit ?? 100, 1), 100);
 
   return useQuery({
     queryKey: ["students", token, params?.institutionId ?? null, params?.classGroupId ?? null, params?.page ?? 1, safeLimit, params?.sortBy ?? "updated_at", params?.order ?? "desc"],
     queryFn: () => listStudents(token as string, params ?? {}),
+    enabled: Boolean(token),
+  });
+}
+
+export function useAllStudents(token?: string, params?: Omit<ListStudentsParams, "page" | "limit">) {
+  return useQuery({
+    queryKey: ["students", "all", token, params?.institutionId ?? null, params?.classGroupId ?? null, params?.sortBy ?? "updated_at", params?.order ?? "desc"],
+    queryFn: () => listAllStudents(token as string, params ?? {}),
     enabled: Boolean(token),
   });
 }

@@ -6,7 +6,7 @@ import { InstitutionStudentProfilePage } from "@/features/institutions/instituti
 const useAuthMock = vi.fn();
 const useInstitutionsMock = vi.fn();
 const useClassGroupsMock = vi.fn();
-const useStudentsMock = vi.fn();
+const useAllStudentsMock = vi.fn();
 const useGamesMock = vi.fn();
 
 vi.mock("@/features/auth/auth-context", () => ({
@@ -22,7 +22,7 @@ vi.mock("@/features/class-groups/api", () => ({
 }));
 
 vi.mock("@/features/students/api", () => ({
-  useStudents: (...args: unknown[]) => useStudentsMock(...args),
+  useAllStudents: (...args: unknown[]) => useAllStudentsMock(...args),
 }));
 
 vi.mock("@/features/games/api", () => ({
@@ -115,7 +115,7 @@ describe("InstitutionStudentProfilePage", () => {
       }),
     );
 
-    useStudentsMock.mockReturnValue(
+    useAllStudentsMock.mockReturnValue(
       okQuery({
         data: [
           {
@@ -284,7 +284,7 @@ describe("InstitutionStudentProfilePage", () => {
       "href",
       "/institutions/student?institutionId=ec-1&groupId=group-1&studentId=student-10",
     );
-    expect(screen.getByTestId("institution-student-navigation-list")).toHaveClass("max-h-[520px]", "overflow-y-auto");
+    expect(screen.getByTestId("institution-student-navigation-list")).toHaveClass("max-h-[min(70vh,640px)]", "overflow-y-auto", "overscroll-contain");
     expect(screen.getByText(/Mostrando 1 partidas visibles para este estudiante./i)).toBeInTheDocument();
   });
 
