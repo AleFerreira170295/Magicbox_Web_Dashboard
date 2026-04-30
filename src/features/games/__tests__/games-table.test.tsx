@@ -7,6 +7,14 @@ const useAuthMock = vi.fn();
 const useGamesMock = vi.fn();
 const useDevicesMock = vi.fn();
 const useInstitutionsMock = vi.fn();
+const routerPushMock = vi.fn();
+let currentSearch = "";
+
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: routerPushMock }),
+  usePathname: () => "/games",
+  useSearchParams: () => new URLSearchParams(currentSearch),
+}));
 
 vi.mock("@/features/auth/auth-context", () => ({
   useAuth: () => useAuthMock(),
@@ -50,6 +58,7 @@ function renderGamesTable() {
 describe("GamesTable", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    currentSearch = "";
 
     useAuthMock.mockReturnValue({
       tokens: { accessToken: "token", refreshToken: "refresh" },
@@ -185,6 +194,102 @@ describe("GamesTable", () => {
     expect(screen.getByText("Jugadores y asociaciones")).toBeInTheDocument();
     expect(screen.queryAllByText("Luna").length).toBeGreaterThan(0);
     expect(screen.queryAllByText(/medium/i).length).toBeGreaterThan(0);
+  });
+
+  it("can open the games view already filtered by user from the roster link", () => {
+    currentSearch = "ownerUserId=user-1&ownerUserName=Ines%20Admin";
+
+    useGamesMock.mockReturnValue(
+      okQuery({
+        data: [
+          {
+            id: "game-1",
+            educationalCenterId: "ec-1",
+            bleDeviceId: "device-1",
+            gameId: 101,
+            deckName: "Animales",
+            totalPlayers: 2,
+            startDate: null,
+            createdAt: null,
+            updatedAt: null,
+            players: [],
+            turns: [],
+            raw: {},
+          },
+          {
+            id: "game-2",
+            educationalCenterId: "ec-1",
+            bleDeviceId: "device-2",
+            gameId: 202,
+            deckName: "Frutas",
+            totalPlayers: 2,
+            startDate: null,
+            createdAt: null,
+            updatedAt: null,
+            players: [],
+            turns: [],
+            raw: {},
+          },
+        ],
+        page: 1,
+        limit: 2,
+        total: 2,
+        total_pages: 1,
+      }),
+    );
+
+    useDevicesMock.mockReturnValue(
+      okQuery({
+        data: [
+          {
+            id: "device-1",
+            deviceId: "mb-1",
+            name: "MagicBox Aula 1",
+            educationalCenterId: "ec-1",
+            educationalCenterName: "Colegio Norte",
+            assignmentScope: "institution",
+            ownerUserId: "user-1",
+            ownerUserName: "Ines Admin",
+            ownerUserEmail: "admin@example.com",
+            firmwareVersion: null,
+            status: "online",
+            deviceMetadata: {},
+            createdAt: null,
+            updatedAt: null,
+            deletedAt: null,
+            raw: {},
+          },
+          {
+            id: "device-2",
+            deviceId: "mb-2",
+            name: "MagicBox Aula 2",
+            educationalCenterId: "ec-1",
+            educationalCenterName: "Colegio Norte",
+            assignmentScope: "institution",
+            ownerUserId: "user-2",
+            ownerUserName: "Otro Owner",
+            ownerUserEmail: "otro@example.com",
+            firmwareVersion: null,
+            status: "online",
+            deviceMetadata: {},
+            createdAt: null,
+            updatedAt: null,
+            deletedAt: null,
+            raw: {},
+          },
+        ],
+        page: 1,
+        limit: 2,
+        total: 2,
+        total_pages: 1,
+      }),
+    );
+
+    renderGamesTable();
+
+    expect(screen.getByText(/Usuario filtrado: Ines Admin/i)).toBeInTheDocument();
+    expect(screen.queryAllByText("101").length).toBeGreaterThan(0);
+    expect(screen.queryAllByText("202")).toHaveLength(0);
   });
 
   it("adapts copy for researcher sessions without changing the evidence detail", () => {

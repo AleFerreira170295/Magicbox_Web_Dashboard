@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Home, Search, ShieldCheck, Smartphone, University, UserRound, Wifi } from "lucide-react";
 import { SectionHeader } from "@/components/section-header";
@@ -342,12 +343,17 @@ type DeviceFocusFilter = "all" | "review" | "no_owner" | "no_status" | "no_metad
 
 export function DevicesTable() {
   const { tokens, user: currentUser } = useAuth();
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [query, setQuery] = useState("");
   const [institutionFilter, setInstitutionFilter] = useState("all");
   const [scopeFilter, setScopeFilter] = useState<"all" | "home" | "institution">("all");
   const [focusFilter, setFocusFilter] = useState<DeviceFocusFilter>("all");
   const [accessFilter, setAccessFilter] = useState<"all" | "owned" | "institution" | "shared" | "unresolved">("all");
   const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null);
+  const linkedOwnerUserId = searchParams.get("ownerUserId")?.trim() || "";
+  const linkedOwnerUserName = searchParams.get("ownerUserName")?.trim() || "";
 
   const devicesQuery = useDevices(tokens?.accessToken);
   const institutionsQuery = useInstitutions(tokens?.accessToken);
@@ -443,6 +449,7 @@ export function DevicesTable() {
     const effectiveInstitutionFilter = institutionFilter === "all" && scopedInstitutionId ? scopedInstitutionId : institutionFilter;
 
     return deviceRows.filter((device) => {
+      if (linkedOwnerUserId && device.ownerUserId !== linkedOwnerUserId) return false;
       if (scopeFilter !== "all" && device.assignmentScope !== scopeFilter) return false;
       if (
         effectiveInstitutionFilter !== "all" &&
@@ -490,7 +497,7 @@ export function DevicesTable() {
         .filter(Boolean)
         .some((value) => String(value).toLowerCase().includes(normalized));
     });
-  }, [accessFilter, deviceRows, focusFilter, institutionFilter, query, scopeFilter, scopedInstitutionId]);
+  }, [accessFilter, deviceRows, focusFilter, institutionFilter, linkedOwnerUserId, query, scopeFilter, scopedInstitutionId]);
 
   const selectedDevice = useMemo(
     () => filtered.find((device) => device.id === selectedDeviceId) || deviceRows.find((device) => device.id === selectedDeviceId) || null,
@@ -622,6 +629,15 @@ export function DevicesTable() {
             >
               Limpiar filtros
             </button>
+            {linkedOwnerUserId ? (
+              <button
+                type="button"
+                onClick={() => router.push(pathname)}
+                className="inline-flex h-10 items-center justify-center rounded-md border border-primary/20 bg-primary/5 px-4 text-sm font-medium text-primary transition hover:bg-primary/10"
+              >
+                Quitar filtro de usuario
+              </button>
+            ) : null}
           </div>
         }
       />
@@ -636,6 +652,7 @@ export function DevicesTable() {
               </Badge>
               <Badge variant="secondary">Home explícito</Badge>
               <Badge variant={canUpdateDevices ? "secondary" : "outline"}>{canUpdateDevices ? "edición habilitada" : "solo lectura"}</Badge>
+              {linkedOwnerUserId ? <Badge variant="outline">Usuario filtrado: {linkedOwnerUserName || linkedOwnerUserId}</Badge> : null}
             </div>
             <p className="mt-2 text-sm text-muted-foreground">
               {isTeacherView

@@ -1,6 +1,7 @@
 "use client";
 
 import { type ComponentType, useMemo, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { BookOpen, Gamepad2, Search, TimerReset, Trophy, Users } from "lucide-react";
 import { SectionHeader } from "@/components/section-header";
 import { Badge } from "@/components/ui/badge";
@@ -63,11 +64,16 @@ function getPlayerMixLabel(manualCount: number, registeredCount: number) {
 
 export function GamesTable() {
   const { tokens, user: currentUser } = useAuth();
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [query, setQuery] = useState("");
   const [institutionFilter, setInstitutionFilter] = useState<string>("");
   const [playerModeFilter, setPlayerModeFilter] = useState<"all" | "manual" | "mixed" | "registered">("all");
   const [accessFilter, setAccessFilter] = useState<"all" | "owned" | "institution" | "shared" | "unresolved">("all");
   const [selectedGameId, setSelectedGameId] = useState<string | null>(null);
+  const linkedOwnerUserId = searchParams.get("ownerUserId")?.trim() || "";
+  const linkedOwnerUserName = searchParams.get("ownerUserName")?.trim() || "";
 
   const gamesQuery = useGames(tokens?.accessToken);
   const devicesQuery = useDevices(tokens?.accessToken);
@@ -143,6 +149,7 @@ export function GamesTable() {
     const effectiveInstitutionFilter = institutionFilter || scopedInstitutionId || "";
 
     return gameRows.filter((game) => {
+      if (linkedOwnerUserId && game.device?.ownerUserId !== linkedOwnerUserId) return false;
       if (effectiveInstitutionFilter && game.educationalCenterId !== effectiveInstitutionFilter) return false;
 
       const manualCount = game.players.filter((player) => player.playerSource === "manual").length;
@@ -173,7 +180,7 @@ export function GamesTable() {
         .filter(Boolean)
         .some((value) => String(value).toLowerCase().includes(normalized));
     });
-  }, [accessFilter, gameRows, institutionFilter, playerModeFilter, query, scopedInstitutionId]);
+  }, [accessFilter, gameRows, institutionFilter, linkedOwnerUserId, playerModeFilter, query, scopedInstitutionId]);
 
   const pagination = useListPagination(filtered);
 
@@ -295,6 +302,15 @@ export function GamesTable() {
                   <option value="shared">Compartidas</option>
                   <option value="unresolved">Sin asociación resuelta</option>
                 </select>
+                {linkedOwnerUserId ? (
+                  <button
+                    type="button"
+                    onClick={() => router.push(pathname)}
+                    className="inline-flex h-10 min-w-0 items-center justify-center rounded-md border border-primary/20 bg-primary/5 px-3 text-sm font-medium text-primary transition hover:bg-primary/10"
+                  >
+                    Quitar filtro de usuario
+                  </button>
+                ) : null}
               </>
             )}
           </div>
@@ -310,6 +326,7 @@ export function GamesTable() {
                 {isFamilyView ? "family" : isResearcherView ? "researcher" : isTeacherView ? "teacher" : isDirectorView ? "director" : isInstitutionScopedView ? "institution-admin" : "multi-institución / global"}
               </Badge>
               <Badge variant="outline">game-data real</Badge>
+              {linkedOwnerUserId ? <Badge variant="outline">Usuario filtrado: {linkedOwnerUserName || linkedOwnerUserId}</Badge> : null}
             </div>
             <p className="mt-2 text-sm text-muted-foreground">
               {isFamilyView

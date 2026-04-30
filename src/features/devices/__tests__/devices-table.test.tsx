@@ -9,6 +9,14 @@ const useInstitutionsMock = vi.fn();
 const useUsersMock = vi.fn();
 const useGamesMock = vi.fn();
 const useSyncSessionsMock = vi.fn();
+const routerPushMock = vi.fn();
+let currentSearch = "";
+
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: routerPushMock }),
+  usePathname: () => "/devices",
+  useSearchParams: () => new URLSearchParams(currentSearch),
+}));
 
 vi.mock("@/features/auth/auth-context", () => ({
   useAuth: () => useAuthMock(),
@@ -61,6 +69,7 @@ function renderDevicesTable() {
 describe("DevicesTable", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    currentSearch = "";
 
     useAuthMock.mockReturnValue({
       tokens: { accessToken: "token", refreshToken: "refresh" },
@@ -223,6 +232,63 @@ describe("DevicesTable", () => {
 
     expect(screen.queryAllByText("MagicBox Aula 2").length).toBeGreaterThan(0);
     expect(screen.queryAllByText("MagicBox Aula 1")).toHaveLength(0);
+  });
+
+  it("can open the devices view already filtered by user from the roster link", () => {
+    currentSearch = "ownerUserId=user-1&ownerUserName=Ana%20Admin";
+
+    useDevicesMock.mockReturnValue(
+      okQuery({
+        data: [
+          {
+            id: "device-1",
+            deviceId: "mb-1",
+            name: "MagicBox Aula 1",
+            educationalCenterId: "ec-1",
+            educationalCenterName: "Colegio Norte",
+            assignmentScope: "institution",
+            ownerUserId: "user-1",
+            ownerUserName: "Ana Admin",
+            ownerUserEmail: "ana@example.com",
+            firmwareVersion: "v2.2",
+            status: "active",
+            deviceMetadata: {},
+            createdAt: null,
+            updatedAt: null,
+            deletedAt: null,
+            raw: {},
+          },
+          {
+            id: "device-2",
+            deviceId: "mb-2",
+            name: "MagicBox Aula 2",
+            educationalCenterId: "ec-1",
+            educationalCenterName: "Colegio Norte",
+            assignmentScope: "institution",
+            ownerUserId: "user-2",
+            ownerUserName: "Otro Owner",
+            ownerUserEmail: "otro@example.com",
+            firmwareVersion: "v2.2",
+            status: "active",
+            deviceMetadata: {},
+            createdAt: null,
+            updatedAt: null,
+            deletedAt: null,
+            raw: {},
+          },
+        ],
+        page: 1,
+        limit: 2,
+        total: 2,
+        total_pages: 1,
+      }),
+    );
+
+    renderDevicesTable();
+
+    expect(screen.getByText(/Usuario filtrado: Ana Admin/i)).toBeInTheDocument();
+    expect(screen.queryAllByText("MagicBox Aula 1").length).toBeGreaterThan(0);
+    expect(screen.queryAllByText("MagicBox Aula 2")).toHaveLength(0);
   });
 
   it("clarifies teacher access and visible activity per device", () => {

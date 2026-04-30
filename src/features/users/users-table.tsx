@@ -2,12 +2,13 @@
 
 /* eslint-disable @next/next/no-img-element */
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { KeyRound, Phone, Search, ShieldCheck, Trash2, UserPlus, Users } from "lucide-react";
 import { SectionHeader } from "@/components/section-header";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ImageUploadField } from "@/components/ui/image-upload-field";
 import { Input } from "@/components/ui/input";
@@ -235,6 +236,14 @@ function getUserInitials(user: Pick<UserRecord, "firstName" | "lastName" | "full
     .slice(0, 2)
     .map((part) => part.slice(0, 1).toUpperCase())
     .join("") || "US";
+}
+
+function buildUserRelationHref(pathname: string, user: Pick<UserRecord, "id" | "fullName">) {
+  const params = new URLSearchParams({
+    ownerUserId: user.id,
+    ownerUserName: user.fullName,
+  });
+  return `${pathname}?${params.toString()}`;
 }
 
 function UserAvatar({
@@ -1444,6 +1453,29 @@ export function UsersTable() {
                   Editar seleccionado
                 </Button>
               </div>
+
+              {selectedUser ? (
+                <div className="rounded-2xl border border-border/70 bg-background/70 p-4">
+                  <p className="text-sm font-medium text-foreground">Cruces rápidos</p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Abrí el parque y las partidas ya filtradas por {selectedUser.fullName} para seguir ownership y actividad sin rearmar la búsqueda.
+                  </p>
+                  <div className="mt-3 flex flex-wrap gap-3">
+                    <Link
+                      href={buildUserRelationHref("/devices", selectedUser)}
+                      className={buttonVariants({ variant: "outline", size: "sm" })}
+                    >
+                      Ver dispositivos del usuario
+                    </Link>
+                    <Link
+                      href={buildUserRelationHref("/games", selectedUser)}
+                      className={buttonVariants({ variant: "outline", size: "sm" })}
+                    >
+                      Ver partidas subidas
+                    </Link>
+                  </div>
+                </div>
+              ) : null}
 
               <div className={cn("hidden 2xl:block", isFormModalOpen && "2xl:hidden")}>{renderUserEditorPanel()}</div>
             </CardContent>

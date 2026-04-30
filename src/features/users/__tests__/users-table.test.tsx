@@ -221,6 +221,33 @@ describe("UsersTable", () => {
     expect(screen.getByRole("button", { name: "Edición bloqueada" })).toBeDisabled();
   });
 
+  it("adds quick links from the selected user to devices and uploaded games", () => {
+    useAuthMock.mockReturnValue({
+      tokens: { accessToken: "token", refreshToken: "refresh" },
+      user: {
+        id: "current-user",
+        email: "director@example.com",
+        firstName: "Ana",
+        lastName: "Director",
+        fullName: "Ana Director",
+        educationalCenterId: "ec-1",
+        roles: ["institution-admin"],
+        permissions: ["user:read", "user:create", "user:update", "access_control:read", "access_control:update"],
+        raw: {},
+      },
+    });
+
+    renderUsersTable();
+
+    fireEvent.click(screen.getAllByText("Juan Pérez")[0]);
+
+    const devicesLink = screen.getByRole("link", { name: /Ver dispositivos del usuario/i });
+    const gamesLink = screen.getByRole("link", { name: /Ver partidas subidas/i });
+
+    expect(devicesLink).toHaveAttribute("href", "/devices?ownerUserId=user-1&ownerUserName=Juan+P%C3%A9rez");
+    expect(gamesLink).toHaveAttribute("href", "/games?ownerUserId=user-1&ownerUserName=Juan+P%C3%A9rez");
+  });
+
   it("filters the roster with quick operational focus segments", () => {
     useAuthMock.mockReturnValue({
       tokens: { accessToken: "token", refreshToken: "refresh" },
