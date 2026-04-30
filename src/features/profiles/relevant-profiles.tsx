@@ -4,7 +4,7 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { type ComponentType, useEffect, useMemo, useState } from "react";
+import { type ComponentType, useMemo, useState } from "react";
 import { BadgeCheck, CreditCard, GraduationCap, Search, UserRound, Users, Waves } from "lucide-react";
 import { SectionHeader } from "@/components/section-header";
 import { Badge } from "@/components/ui/badge";
@@ -117,8 +117,9 @@ export function RelevantProfiles() {
   const { tokens, user: currentUser } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
+  const institutionIdFromUrl = searchParams.get("institutionId") || "";
   const [query, setQuery] = useState("");
-  const [institutionFilter, setInstitutionFilter] = useState<string>("");
+  const [institutionFilter, setInstitutionFilter] = useState<string | null>(null);
   const [activityFilter, setActivityFilter] = useState<"all" | "active" | "inactive">("all");
   const [focusFilter, setFocusFilter] = useState<ProfilesFocusFilter>("all");
 
@@ -154,7 +155,8 @@ export function RelevantProfiles() {
     : institutionOptions.length === 1
       ? institutionOptions[0]?.id || null
       : null;
-  const effectiveInstitutionFilter = institutionFilter || scopedInstitutionId || null;
+  const selectedInstitutionFilter = institutionFilter ?? institutionIdFromUrl;
+  const effectiveInstitutionFilter = selectedInstitutionFilter || scopedInstitutionId || null;
   const scopedInstitutionName = scopedInstitutionId
     ? institutionOptions.find((institution) => institution.id === scopedInstitutionId)?.name || null
     : null;
@@ -277,13 +279,6 @@ export function RelevantProfiles() {
 
   const entities = useMemo(() => [...homeProfileEntities, ...studentEntities], [homeProfileEntities, studentEntities]);
 
-  useEffect(() => {
-    const institutionIdFromUrl = searchParams.get("institutionId");
-    if (institutionIdFromUrl) {
-      setInstitutionFilter(institutionIdFromUrl);
-    }
-  }, [searchParams]);
-
   const filtered = useMemo(() => {
     const normalized = query.trim().toLowerCase();
 
@@ -377,9 +372,9 @@ export function RelevantProfiles() {
         description={
           isInstitutionScopedView
             ? isDirectorView
-              ? `Vista institucional para ${scopedInstitutionName}, mezclando perfiles Home y estudiantes visibles dentro del mismo alcance operativo.`
-              : `Vista operativa real para ${scopedInstitutionName}, unificando perfiles Home y estudiantes sin salir del marco institucional visible.`
-            : "Vista operativa unificada de perfiles Home y estudiantes, respetando el alcance real de permisos del usuario actual."
+              ? `Vista institucional para ${scopedInstitutionName}, integrando perfiles Home y estudiantes en una sola lectura.`
+              : `Vista institucional para ${scopedInstitutionName}, unificando perfiles Home y estudiantes en el mismo contexto.`
+            : "Vista unificada de perfiles Home y estudiantes, respetando los permisos del usuario actual."
         }
         actions={
           <div className="grid w-full gap-3 md:grid-cols-2 2xl:grid-cols-[minmax(0,1.35fr)_minmax(220px,0.8fr)_minmax(180px,0.6fr)]">
@@ -393,7 +388,7 @@ export function RelevantProfiles() {
               />
             </div>
             <select
-              value={institutionFilter || scopedInstitutionId || ""}
+              value={selectedInstitutionFilter || scopedInstitutionId || ""}
               onChange={(event) => setInstitutionFilter(event.target.value)}
               className="h-10 min-w-0 w-full rounded-md border border-input bg-background px-3 text-sm"
               disabled={Boolean(scopedInstitutionId)}
@@ -422,7 +417,7 @@ export function RelevantProfiles() {
         <CardContent className="flex flex-wrap items-center justify-between gap-4 p-5">
           <div>
             <div className="flex flex-wrap items-center gap-2">
-              <p className="text-sm font-medium text-foreground">Alcance operativo</p>
+              <p className="text-sm font-medium text-foreground">Contexto de vista</p>
               <Badge variant={isInstitutionScopedView ? "secondary" : "outline"}>
                 {isInstitutionScopedView ? (isDirectorView ? "director" : "institution-admin") : "multi-institución / global"}
               </Badge>
@@ -431,9 +426,9 @@ export function RelevantProfiles() {
             <p className="mt-2 text-sm text-muted-foreground">
               {isInstitutionScopedView
                 ? isDirectorView
-                  ? "La lectura directoral mantiene el foco institucional y ahora también incorpora estudiantes visibles del alcance permitido."
-                  : "La tabla queda anclada a la institución visible por ACL y ahora suma estudiantes además de perfiles Home."
-                : "La vista refleja perfiles Home y estudiantes visibles según permisos, sin inventar accesos por fuera del scope real del usuario."}
+                  ? "La lectura directoral mantiene el foco institucional e incorpora estudiantes de la misma institución."
+                  : "La tabla queda anclada a la institución asignada y suma estudiantes además de perfiles Home."
+                : "La vista reúne perfiles Home y estudiantes según los permisos del usuario."}
             </p>
           </div>
           {scopedInstitutionName ? <Badge variant="outline">Institución activa: {scopedInstitutionName}</Badge> : null}
@@ -445,12 +440,12 @@ export function RelevantProfiles() {
           Array.from({ length: 6 }).map((_, index) => <Skeleton key={index} className="h-32 rounded-2xl" />)
         ) : (
           <>
-            <SummaryCard label="Visibles" value={String(metrics.total)} hint="Suma de perfiles Home y estudiantes dentro del alcance actual." icon={Users} />
+            <SummaryCard label="Total" value={String(metrics.total)} hint="Suma de perfiles Home y estudiantes en la vista actual." icon={Users} />
             <SummaryCard label="Perfiles Home" value={String(metrics.homeProfilesCount)} hint="Perfiles clásicos del módulo Home." icon={UserRound} />
-            <SummaryCard label="Estudiantes" value={String(metrics.studentsCount)} hint="Estudiantes institucionales visibles en este alcance." icon={GraduationCap} />
-            <SummaryCard label="Activos" value={String(metrics.activeProfiles)} hint="Registros operativamente vigentes o no borrados." icon={BadgeCheck} />
+            <SummaryCard label="Estudiantes" value={String(metrics.studentsCount)} hint="Estudiantes institucionales incluidos en esta vista." icon={GraduationCap} />
+            <SummaryCard label="Activos" value={String(metrics.activeProfiles)} hint="Registros vigentes o no borrados." icon={BadgeCheck} />
             <SummaryCard label="Con tarjeta" value={String(metrics.withBindings)} hint="Solo aplica a perfiles Home con bindings activos." icon={CreditCard} />
-            <SummaryCard label="Con sesiones" value={String(metrics.withSessions)} hint="Perfiles o estudiantes que ya muestran actividad visible." icon={Waves} />
+            <SummaryCard label="Con sesiones" value={String(metrics.withSessions)} hint="Perfiles o estudiantes que ya muestran actividad registrada." icon={Waves} />
           </>
         )}
       </div>
@@ -491,10 +486,10 @@ export function RelevantProfiles() {
           <CardHeader>
             <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
               <div>
-                <CardTitle>{isDirectorView ? "Perfiles y estudiantes visibles para seguimiento" : "Listado de perfiles y estudiantes"}</CardTitle>
+                <CardTitle>{isDirectorView ? "Perfiles y estudiantes para seguimiento" : "Listado de perfiles y estudiantes"}</CardTitle>
                 <CardDescription>
                   {isDirectorView
-                    ? "Seleccioná un registro para revisar owner, contexto institucional y señales visibles de actividad."
+                    ? "Seleccioná un registro para revisar owner, contexto institucional y señales de actividad."
                     : "Seleccioná un registro para revisar ownership, contexto institucional y actividad reciente."}
                 </CardDescription>
               </div>
@@ -537,7 +532,7 @@ export function RelevantProfiles() {
                     <TableRow>
                       <TableCell colSpan={6} className="py-10 text-center text-sm text-muted-foreground">
                         {isInstitutionScopedView
-                          ? "No hay perfiles ni estudiantes visibles dentro de la institución actual."
+                          ? "No hay perfiles ni estudiantes dentro de la institución actual."
                           : "No hay perfiles ni estudiantes para mostrar."}
                       </TableCell>
                     </TableRow>
@@ -580,7 +575,7 @@ export function RelevantProfiles() {
                             </div>
                             <p className="mt-2 text-sm text-foreground">
                               {profile.kind === "student"
-                                ? profile.classGroupName || "sin grupo visible"
+                                ? profile.classGroupName || "sin grupo asignado"
                                 : profile.userName || "sin owner"}
                             </p>
                             <p className="text-xs text-muted-foreground">
@@ -608,16 +603,16 @@ export function RelevantProfiles() {
 
       <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
         <CardHeader>
-          <CardTitle>{isDirectorView ? "Detalle visible en página dedicada" : "Detalle en página dedicada"}</CardTitle>
+          <CardTitle>{isDirectorView ? "Detalle en página dedicada" : "Detalle en página dedicada"}</CardTitle>
           <CardDescription>
             {isDirectorView
               ? "Cada registro abre ahora una vista propia, igual que en Institutions, para evitar que el detalle quede oculto en un panel lateral."
-              : "Cada registro abre ahora una vista propia, igual que en Institutions, para que el detalle completo siempre quede visible."}
+              : "Cada registro abre ahora una vista propia, igual que en Institutions, para que el detalle completo esté siempre disponible."}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="rounded-2xl bg-background/70 p-4 text-sm text-muted-foreground">
-            Podés entrar desde cualquier fila del listado o desde el nombre del perfil/estudiante para abrir su pantalla interna con contexto, identidad, actividad y asignación visibles.
+            Podés entrar desde cualquier fila del listado o desde el nombre del perfil/estudiante para abrir su pantalla interna con contexto, identidad, actividad y asignación.
           </div>
           <p className="text-sm text-muted-foreground">
             Página {pagination.currentPage} de {pagination.totalPages}

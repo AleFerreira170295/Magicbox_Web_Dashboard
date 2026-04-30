@@ -1,30 +1,40 @@
 "use client";
 
 import Link from "next/link";
-import { type ComponentType, useMemo, useState, useSyncExternalStore } from "react";
+import { useMemo, useState, useSyncExternalStore } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
-  ArrowRight,
   Building2,
   Check,
   Copy,
   Database,
   HeartPulse,
-  KeyRound,
   Layers3,
-  ShieldCheck,
   Smartphone,
   UserSquare2,
-  UserPlus,
   Users,
 } from "lucide-react";
-import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis } from "recharts";
 import { SectionHeader } from "@/components/section-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useSystemDashboardSummary } from "@/features/dashboard/api";
+import {
+  DashboardBarChartCard,
+  DashboardDetailPanel,
+  type DashboardDetailRow,
+  DashboardMetricCard,
+  DashboardMultiLineChartCard,
+} from "@/features/dashboard/dashboard-analytics-shared";
+import {
+  buildInstitutionCoverageSeries,
+  buildKeyCountSeries,
+  buildProfileCoverageBreakdown,
+  buildTopInstitutionLoadSeries,
+  buildUserRoleSeries,
+  buildUserTypeSeries,
+} from "@/features/dashboard/dashboard-analytics-utils";
 import { useAuth } from "@/features/auth/auth-context";
 import { useDevices } from "@/features/devices/api";
 import { useGames } from "@/features/games/api";
@@ -46,87 +56,8 @@ function formatAverage(total: number, count: number, digits = 1) {
   return (total / count).toFixed(digits);
 }
 
-function SummaryCard({
-  label,
-  value,
-  hint,
-  icon: Icon,
-  tone = "primary",
-  isLoading = false,
-}: {
-  label: string;
-  value: string;
-  hint: string;
-  icon: ComponentType<{ className?: string }>;
-  tone?: "primary" | "accent" | "warning";
-  isLoading?: boolean;
-}) {
-  const toneClass = {
-    primary: "bg-primary/12 text-primary",
-    accent: "bg-accent text-accent-foreground",
-    warning: "bg-amber-100 text-amber-700",
-  }[tone];
-
-  return (
-    <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
-      <CardContent className="p-5">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <p className="text-sm text-muted-foreground">{label}</p>
-            {isLoading ? (
-              <>
-                <Skeleton className="mt-3 h-8 w-20 rounded-xl" />
-                <Skeleton className="mt-3 h-4 w-40 rounded-xl" />
-              </>
-            ) : (
-              <>
-                <p className="mt-2 text-3xl font-semibold tracking-tight text-foreground">{value}</p>
-                <p className="mt-2 text-sm leading-6 text-muted-foreground">{hint}</p>
-              </>
-            )}
-          </div>
-          <div className={`rounded-2xl p-3 ${toneClass}`}>
-            <Icon className="size-5" />
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
-function ModuleCard({
-  title,
-  description,
-  icon: Icon,
-  href,
-}: {
-  title: string;
-  description: string;
-  icon: ComponentType<{ className?: string }>;
-  href: string;
-}) {
-  return (
-    <Link href={href}>
-      <Card className="h-full border-border/80 bg-card/95 transition-transform duration-150 hover:-translate-y-0.5 hover:shadow-[0_18px_44px_rgba(31,42,55,0.08)]">
-        <CardContent className="flex h-full flex-col p-5">
-          <div className="flex items-start justify-between gap-4">
-            <div className="rounded-2xl bg-primary/12 p-3 text-primary">
-              <Icon className="size-5" />
-            </div>
-            <Badge variant="outline">Módulo</Badge>
-          </div>
-          <div className="mt-5">
-            <h3 className="text-lg font-semibold text-foreground">{title}</h3>
-            <p className="mt-2 text-sm leading-6 text-muted-foreground">{description}</p>
-          </div>
-          <div className="mt-auto flex items-center gap-2 pt-5 text-sm font-medium text-primary">
-            Entrar
-            <ArrowRight className="size-4" />
-          </div>
-        </CardContent>
-      </Card>
-    </Link>
-  );
+function normalizeLabel(value?: string | null) {
+  return (value || "sin dato").replace(/[|]/g, " / ").replace(/[-_]/g, " ").trim().toLowerCase();
 }
 
 type TerritorialPreset = {
@@ -185,23 +116,14 @@ export function SuperadminDashboard() {
     }
   }, [territorialPresetsSnapshot]);
   const [shareLinkState, setShareLinkState] = useState<"idle" | "copied" | "error">("idle");
+  const [selectedDetail, setSelectedDetail] = useState<{ kind: string; label: string } | null>(null);
   const { tokens, user } = useAuth();
   const isAdmin = user?.roles.includes("admin") || false;
   const isGovernmentViewer = user?.roles.includes("government-viewer") || false;
   const isInstitutionAdmin = user?.roles.includes("institution-admin") || false;
   const isDirector = user?.roles.includes("director") || false;
   const usesSystemSummary = isAdmin || isGovernmentViewer;
-  const canSeeUsersModule = isAdmin || isInstitutionAdmin;
-  const canSeePermissionsModule = Boolean(
-    isAdmin ||
-      (isInstitutionAdmin &&
-        (user?.permissions.includes("access_control:read") ||
-          user?.permissions.includes("access-control:read") ||
-          user?.permissions.includes("feature:read") ||
-          user?.permissions.includes("feature:read:any"))),
-  );
   const canSeeHealthModule = isAdmin;
-  const canSeeSettingsModule = isAdmin;
   const selectedRange = searchParams.get("range") || "30d";
   const selectedInstitutionId = searchParams.get("institution_id");
   const selectedCountryCode = searchParams.get("country_code");
@@ -549,7 +471,7 @@ export function SuperadminDashboard() {
         totalPlayers: summaryQuery.data.stats.total_players,
         gamesWithTurns: summaryQuery.data.stats.games_with_turns,
         degradedChecks: Object.values(readinessChecks).filter((check) => check?.status !== "healthy").length,
-        environment: canSeeHealthModule ? healthQuery.data?.environment || "-" : "scopeado",
+        environment: canSeeHealthModule ? healthQuery.data?.environment || "-" : "sin detalle",
         version: canSeeHealthModule ? healthQuery.data?.version || "-" : "no disponible",
         readiness: canSeeHealthModule ? readinessQuery.data?.status || "unknown" : "no disponible",
       };
@@ -595,7 +517,7 @@ export function SuperadminDashboard() {
       totalPlayers,
       gamesWithTurns: gamesWithTurns.length,
       degradedChecks: Object.values(readinessChecks).filter((check) => check?.status !== "healthy").length,
-      environment: canSeeHealthModule ? healthQuery.data?.environment || "-" : "scopeado",
+      environment: canSeeHealthModule ? healthQuery.data?.environment || "-" : "sin detalle",
       version: canSeeHealthModule ? healthQuery.data?.version || "-" : "no disponible",
       readiness: canSeeHealthModule ? readinessQuery.data?.status || "unknown" : "no disponible",
     };
@@ -606,38 +528,175 @@ export function SuperadminDashboard() {
     : isGovernmentViewer
       ? "Gobierno"
       : isInstitutionAdmin
-        ? "Institution admin"
+        ? "Admin institucional"
         : isDirector
           ? "Dirección"
-          : "Operación";
+        : "Operación";
 
-  const moduleCards = [
-    { title: "Usuarios", description: "Alta, edición, roles, ACL y revisión operativa del padrón.", icon: UserPlus, href: "/users", visible: canSeeUsersModule },
-    { title: "Permisos", description: "Catálogo ACL, acciones y reglas activas de acceso.", icon: KeyRound, href: "/permissions", visible: canSeePermissionsModule },
-    { title: "Instituciones", description: "Resumen operativo, previews y estado institucional.", icon: Building2, href: "/institutions", visible: isAdmin || isInstitutionAdmin || isDirector },
-    { title: "Dispositivos", description: "Parque real con estado, owner y alcance Home/institución.", icon: Smartphone, href: "/devices", visible: true },
-    { title: "Syncs", description: "Sesiones sincronizadas con detalle y raw reciente.", icon: ShieldCheck, href: "/syncs", visible: true },
-    { title: "Games", description: "Partidas, jugadores, turnos y lectura operativa del juego.", icon: Database, href: "/games", visible: true },
-    { title: "Profiles", description: "Perfiles Home reales con owner, bindings y sesiones.", icon: UserSquare2, href: "/profiles", visible: true },
-    { title: "Health", description: "Health técnico real y señales operativas del sistema.", icon: HeartPulse, href: "/health", visible: canSeeHealthModule },
-    { title: "Settings", description: "Runtime efectivo, OTA y catálogos ACL actuales.", icon: ShieldCheck, href: "/settings", visible: canSeeSettingsModule },
-  ].filter((module) => module.visible);
+  const executiveInstitutionLoad = usesSystemSummary ? buildTopInstitutionLoadSeries(topInstitutions) : buildInstitutionCoverageSeries(institutions);
+  const executiveRoleSeries = usesSystemSummary ? buildKeyCountSeries(roleMix, "Sin rol") : buildUserRoleSeries(users);
+  const executiveUserTypeSeries = usesSystemSummary ? buildKeyCountSeries(userTypeMix, "Sin tipo") : buildUserTypeSeries(users);
+  const executiveProfileCoverage = buildProfileCoverageBreakdown({
+    totalProfiles: metrics.totalProfiles,
+    activeProfiles: metrics.activeProfiles,
+    profilesWithBindings: metrics.profilesWithBindings,
+    profilesWithSessions: metrics.profilesWithSessions,
+  });
+
+  const detailPanel = (() => {
+    if (!selectedDetail) return null;
+
+    const metricRowsByType: Record<string, DashboardDetailRow[]> = {
+      users: usesSystemSummary
+        ? [
+            { label: "Total", value: String(metrics.totalUsers), hint: `${roleMix.length} segmentos de rol · ${userTypeMix.length} segmentos de tipo` },
+            ...roleMix.slice(0, 6).map((item) => ({ label: `Rol · ${item.key}`, value: String(item.count), hint: "Mix agregado del recorte actual" })),
+            ...userTypeMix.slice(0, 6).map((item) => ({ label: `Tipo · ${item.key}`, value: String(item.count), hint: "Composición por tipo de usuario" })),
+          ]
+        : users.map((entry) => ({
+            label: entry.fullName || entry.email || `Usuario ${entry.id}`,
+            value: entry.roles.join(", ") || "Sin rol",
+            hint: entry.email || entry.userType || "Sin detalle",
+            badge: entry.lastLoginAt ? `Login ${entry.lastLoginAt}` : undefined,
+          })),
+      institutions: usesSystemSummary
+        ? topInstitutions.map((institution) => ({
+            label: institution.name,
+            value: `${institution.users} usuarios`,
+            hint: `${institution.games} partidas · ${institution.turns} turnos`,
+            badge: [institution.state, institution.city].filter(Boolean).join(" / ") || undefined,
+          }))
+        : institutions.map((institution) => ({
+            label: institution.name,
+            value: String(institution.operationalSummary?.studentCount ?? 0),
+            hint: `${institution.operationalSummary?.userCount ?? 0} usuarios · ${institution.operationalSummary?.classGroupCount ?? 0} grupos`,
+            badge: institution.status || institution.city || undefined,
+          })),
+      devices: usesSystemSummary
+        ? [
+            { label: "Dispositivos Home", value: String(metrics.homeDevices), hint: "Parque doméstico" },
+            { label: "Dispositivos institucionales", value: String(metrics.institutionDevices), hint: "Parque institucional" },
+            { label: "Con owner", value: String(metrics.devicesWithOwner), hint: "Dispositivos asociados a persona" },
+            { label: "Con firmware", value: String(metrics.devicesWithFirmware), hint: "Dispositivos con versión registrada" },
+            { label: "Sin estado", value: String(metrics.devicesWithoutStatus), hint: "Equipos a revisar" },
+          ]
+        : devices.map((device) => ({
+            label: device.name || device.deviceId || `Dispositivo ${device.id}`,
+            value: device.status || "Sin status",
+            hint: device.ownerUserName || device.ownerUserEmail || device.educationalCenterName || "Sin referencia registrada",
+            badge: device.assignmentScope || undefined,
+          })),
+      syncs: usesSystemSummary
+        ? [
+            { label: "Syncs", value: String(metrics.totalSyncs), hint: `${metrics.syncsWithRaw} con raw disponible` },
+            { label: "Sin raw", value: String(metrics.syncsWithoutRaw), hint: "Brecha de trazabilidad" },
+            ...trends.slice(-5).map((item) => ({ label: item.date, value: `${item.syncs} syncs`, hint: `${item.games} partidas · ${item.turns} turnos` })),
+          ]
+        : syncs.map((sync) => ({
+            label: sync.deckName || `Sync ${sync.id}`,
+            value: sync.status || "Sin status",
+            hint: `${sync.rawRecordCount || sync.rawRecordIds.length || 0} raw records`,
+            badge: sync.source || sync.sourceType || undefined,
+          })),
+      games: usesSystemSummary
+        ? [
+            { label: "Partidas", value: String(metrics.totalGames), hint: `${metrics.totalTurns} turnos totales` },
+            ...trends.slice(-5).map((item) => ({ label: item.date, value: `${item.games} partidas`, hint: `${item.turns} turnos · ${item.success_rate || 0}% éxito` })),
+          ]
+        : games.map((game) => ({
+            label: game.deckName || `Partida ${game.id}`,
+            value: `${game.turns.length} turnos`,
+            hint: `${game.totalPlayers || game.players?.length || 0} jugadores`,
+            badge: game.educationalCenterId || undefined,
+          })),
+      profiles: [
+        { label: "Perfiles", value: String(metrics.totalProfiles), hint: `${metrics.activeProfiles} activos` },
+        { label: "Con binding", value: String(metrics.profilesWithBindings), hint: "Cobertura activa" },
+        { label: "Con sesiones", value: String(metrics.profilesWithSessions), hint: "Uso observable" },
+      ],
+      health: canSeeHealthModule
+        ? [
+            { label: "Readiness", value: metrics.readiness, hint: `Backend ${metrics.version}` },
+            { label: "Checks degradados", value: String(metrics.degradedChecks), hint: metrics.environment },
+            ...Object.entries(readinessChecks).map(([key, check], index) => ({ label: key || `Check ${index + 1}`, value: check?.status || "unknown", hint: check?.message || "Sin detalle" })),
+          ]
+        : [],
+    };
+
+    switch (selectedDetail.kind) {
+      case "metric-users":
+        return { title: "Detalle de usuarios", description: "Padrón actual de usuarios.", filterLabel: selectedDetail.label, rows: metricRowsByType.users };
+      case "metric-institutions":
+        return { title: "Detalle de instituciones", description: "Instituciones incluidas en la vista principal.", filterLabel: selectedDetail.label, rows: metricRowsByType.institutions };
+      case "metric-devices":
+        return { title: "Detalle de dispositivos", description: "Cobertura del parque y su estado.", filterLabel: selectedDetail.label, rows: metricRowsByType.devices };
+      case "metric-syncs":
+        return { title: "Detalle de sincronizaciones", description: "Lectura ampliada de cobertura y trazabilidad.", filterLabel: selectedDetail.label, rows: metricRowsByType.syncs };
+      case "metric-games":
+        return { title: "Detalle de partidas", description: "Movimiento real del sistema.", filterLabel: selectedDetail.label, rows: metricRowsByType.games };
+      case "metric-profiles":
+        return { title: "Detalle de perfiles", description: "Madurez real a nivel perfil.", filterLabel: selectedDetail.label, rows: metricRowsByType.profiles };
+      case "metric-health":
+        return { title: "Detalle de salud", description: "Estado de readiness y checks disponibles en la home.", filterLabel: selectedDetail.label, rows: metricRowsByType.health };
+      case "trend-date": {
+        const selectedTrend = trends.find((item) => item.date === selectedDetail.label);
+        return {
+          title: `Mini tendencias · ${selectedDetail.label}`,
+          description: "Detalle del bucket temporal seleccionado en la serie comparada.",
+          filterLabel: selectedDetail.label,
+          rows: selectedTrend ? [
+            { label: "Syncs", value: String(selectedTrend.syncs), hint: "Volumen del día/bucket" },
+            { label: "Partidas", value: String(selectedTrend.games), hint: "Actividad de sesiones" },
+            { label: "Turnos", value: String(selectedTrend.turns), hint: `${selectedTrend.success_rate || 0}% de éxito` },
+          ] : [],
+        };
+      }
+      case "profile-coverage": {
+        const normalized = normalizeLabel(selectedDetail.label);
+        const rows = [
+          { label: "Activos", value: String(metrics.activeProfiles), hint: `${metrics.totalProfiles} perfiles totales` },
+          { label: "Con binding", value: String(metrics.profilesWithBindings), hint: "Cobertura activa" },
+          { label: "Con sesiones", value: String(metrics.profilesWithSessions), hint: "Uso observable" },
+          { label: "Sin binding", value: String(Math.max(metrics.totalProfiles - metrics.profilesWithBindings, 0)), hint: "Brecha por cerrar" },
+        ];
+        return { title: `Cobertura de perfiles · ${selectedDetail.label}`, description: "Desglose del indicador seleccionado.", filterLabel: selectedDetail.label, rows: rows.filter((row) => normalizeLabel(row.label) === normalized) };
+      }
+      case "role":
+        return { title: `Usuarios por rol · ${selectedDetail.label}`, description: "Rol seleccionado dentro de la distribución actual.", filterLabel: selectedDetail.label, rows: executiveRoleSeries.filter((item) => item.label === selectedDetail.label).map((item) => ({ label: item.label, value: String(item.value), hint: "Usuarios en este rol" })) };
+      case "user-type":
+        return { title: `Usuarios por tipo · ${selectedDetail.label}`, description: "Tipo de usuario seleccionado dentro de la distribución actual.", filterLabel: selectedDetail.label, rows: executiveUserTypeSeries.filter((item) => item.label === selectedDetail.label).map((item) => ({ label: item.label, value: String(item.value), hint: "Usuarios en este tipo" })) };
+      case "institution-load":
+        return { title: `Institución · ${selectedDetail.label}`, description: "Detalle ampliado de la institución seleccionada.", filterLabel: selectedDetail.label, rows: metricRowsByType.institutions.filter((row) => row.label === selectedDetail.label) };
+      default:
+        return null;
+    }
+  })();
 
   return (
     <div className="space-y-8">
       <SectionHeader
         eyebrow={scopeLabel}
         title="Centro de control MagicBox"
-        description="Home operativa para leer estado, riesgos y próximos focos sin perderte entre módulos."
+        description="Panel principal para leer estado, riesgos y próximos focos sin perderte entre módulos."
       />
+
+      {detailPanel ? (
+        <DashboardDetailPanel
+          title={detailPanel.title}
+          description={detailPanel.description}
+          rows={detailPanel.rows}
+          activeFilterLabel={detailPanel.filterLabel}
+          onClear={() => setSelectedDetail(null)}
+        />
+      ) : null}
 
       <div className="grid gap-6 2xl:grid-cols-[1.35fr_0.95fr]">
         <Card className="overflow-hidden border-none bg-[linear-gradient(135deg,#1f2a37_0%,#2c4156_55%,#39546f_100%)] text-white shadow-[0_20px_60px_rgba(31,42,55,0.22)]">
           <CardContent className="p-8 sm:p-10">
             <div className="flex flex-wrap gap-2">
-              <Badge className="bg-white/14 text-white hover:bg-white/14">Operación real</Badge>
-              <Badge className="bg-white/14 text-white hover:bg-white/14">Dashboard home</Badge>
-              <Badge className="bg-white/14 text-white hover:bg-white/14">MagicBox control plane</Badge>
+              <Badge className="bg-white/14 text-white hover:bg-white/14">Producción</Badge>
+              <Badge className="bg-white/14 text-white hover:bg-white/14">Panel principal</Badge>
+              <Badge className="bg-white/14 text-white hover:bg-white/14">MagicBox plataforma</Badge>
             </div>
 
             {usesSystemSummary ? (
@@ -788,14 +847,14 @@ export function SuperadminDashboard() {
                 Entrá, mirá lo crítico primero y saltá directo al módulo correcto.
               </h2>
               <p className="mt-4 text-base leading-7 text-white/78">
-                Esta portada prioriza estado operativo, filtros activos y puertas de entrada reales para revisar datos, hardware, personas y salud técnica.
+                Esta portada prioriza estado general, filtros activos y accesos directos para revisar datos, hardware, personas y salud técnica.
               </p>
             </div>
 
             <div className="mt-8 grid gap-4 md:grid-cols-3">
               <div className="rounded-3xl bg-white/10 p-4 backdrop-blur-sm">
                 <p className="text-sm text-white/70">Cobertura</p>
-                <p className="mt-2 text-lg font-medium">{metrics.totalUsers} usuarios, {metrics.totalInstitutions} instituciones y {metrics.totalDevices} dispositivos visibles.</p>
+                <p className="mt-2 text-lg font-medium">{metrics.totalUsers} usuarios, {metrics.totalInstitutions} instituciones y {metrics.totalDevices} dispositivos.</p>
                 <p className="mt-2 text-sm text-white/70">{loadedSources}/{totalSources} fuentes cargadas, {failedSources} con error.</p>
               </div>
               <div className="rounded-3xl bg-white/10 p-4 backdrop-blur-sm">
@@ -803,21 +862,21 @@ export function SuperadminDashboard() {
                 <p className="mt-2 text-lg font-medium">{metrics.totalSyncs} syncs, {metrics.totalGames} partidas, {metrics.totalTurns} turnos y {metrics.totalProfiles} profiles.</p>
               </div>
               <div className="rounded-3xl bg-white/10 p-4 backdrop-blur-sm">
-                <p className="text-sm text-white/70">{canSeeHealthModule ? "Salud" : "Alcance"}</p>
+                <p className="text-sm text-white/70">{canSeeHealthModule ? "Salud" : "Resumen"}</p>
                 <p className="mt-2 text-lg font-medium">
                   {canSeeHealthModule
                     ? `${metrics.readiness} · ${metrics.degradedChecks} checks degradados · ${metrics.environment}.`
-                    : `${scopeLabel.toLowerCase()} · ${metrics.totalInstitutions} instituciones visibles · ${metrics.totalDevices} devices.`}
+                    : `${scopeLabel.toLowerCase()} · ${metrics.totalInstitutions} instituciones · ${metrics.totalDevices} dispositivos.`}
                 </p>
               </div>
               {usesSystemSummary ? (
                 <div className="rounded-3xl bg-white/10 p-4 backdrop-blur-sm md:col-span-3">
-                  <p className="text-sm text-white/70">Scope territorial y cohortes</p>
+                  <p className="text-sm text-white/70">Territorio y cohortes</p>
                   <p className="mt-2 text-lg font-medium">
                     {selectedCountryCode || "Todos los países"} · {selectedState || "todos los territorios"} · {selectedCity || "todas las ciudades"}
                   </p>
                   <p className="mt-2 text-sm text-white/70">
-                    Cohortes activas: {selectedUserType || "todos los tipos de usuario"} y {selectedRoleCode || "todos los roles"}. Esta base sirve para una vista territorial tipo gobierno con permisos de solo visualización.
+                    Cohortes activas: {selectedUserType || "todos los tipos de usuario"} y {selectedRoleCode || "todos los roles"}. Esta base sirve para una vista territorial de gobierno con permisos de solo lectura.
                   </p>
                 </div>
               ) : null}
@@ -837,7 +896,7 @@ export function SuperadminDashboard() {
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <p className="text-sm font-medium text-foreground">Instituciones con review pendiente</p>
-                  <p className="mt-1 text-sm leading-6 text-muted-foreground">{metrics.institutionsNeedingReview} instituciones marcan `needs_review` en el resumen operativo.</p>
+                  <p className="mt-1 text-sm leading-6 text-muted-foreground">{metrics.institutionsNeedingReview} instituciones marcan `needs_review` en el resumen institucional.</p>
                 </div>
                 <Badge variant={metrics.institutionsNeedingReview > 0 ? "warning" : "success"}>{metrics.institutionsNeedingReview > 0 ? "Revisar" : "OK"}</Badge>
               </div>
@@ -855,7 +914,7 @@ export function SuperadminDashboard() {
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <p className="text-sm font-medium text-foreground">Cobertura de sync y perfiles</p>
-                  <p className="mt-1 text-sm leading-6 text-muted-foreground">{formatPercent(metrics.syncsWithRaw, metrics.totalSyncs)} de syncs tienen raw visible y {formatPercent(metrics.profilesWithBindings, metrics.totalProfiles)} de perfiles tienen binding activo.</p>
+                  <p className="mt-1 text-sm leading-6 text-muted-foreground">{formatPercent(metrics.syncsWithRaw, metrics.totalSyncs)} de syncs tienen raw disponible y {formatPercent(metrics.profilesWithBindings, metrics.totalProfiles)} de perfiles tienen binding activo.</p>
                 </div>
                 <Badge variant="outline">Seguir</Badge>
               </div>
@@ -869,67 +928,58 @@ export function SuperadminDashboard() {
           Array.from({ length: 6 }).map((_, index) => <Skeleton key={index} className="h-36 rounded-2xl" />)
         ) : (
           <>
-            <SummaryCard label="Usuarios" value={String(metrics.totalUsers)} hint="Padrón operativo visible." icon={Users} isLoading={(usesSystemSummary ? summaryQuery.isLoading : usersQuery.isLoading) && users.length === 0} />
-            <SummaryCard label="Instituciones" value={String(metrics.totalInstitutions)} hint="Clientes y alcance actual." icon={Building2} isLoading={(usesSystemSummary ? summaryQuery.isLoading : institutionsQuery.isLoading) && institutions.length === 0} />
-            <SummaryCard label="Dispositivos" value={String(metrics.totalDevices)} hint={`${metrics.homeDevices} Home y ${metrics.institutionDevices} institucionales.`} icon={Smartphone} isLoading={(usesSystemSummary ? summaryQuery.isLoading : devicesQuery.isLoading) && devices.length === 0} />
-            <SummaryCard label="Sincronizaciones" value={String(metrics.totalSyncs)} hint={`${formatPercent(metrics.syncsWithRaw, metrics.totalSyncs)} con raw visible.`} icon={Layers3} tone="accent" isLoading={(usesSystemSummary ? summaryQuery.isLoading : syncsQuery.isLoading) && syncs.length === 0} />
-            <SummaryCard label="Partidas" value={String(metrics.totalGames)} hint={`${formatAverage(metrics.totalPlayers, metrics.totalGames)} jugadores por partida.`} icon={Database} tone="accent" isLoading={(usesSystemSummary ? summaryQuery.isLoading : gamesQuery.isLoading) && games.length === 0} />
+            <DashboardMetricCard label="Usuarios" value={String(metrics.totalUsers)} hint="Padrón actual de usuarios." icon={Users} isLoading={(usesSystemSummary ? summaryQuery.isLoading : usersQuery.isLoading) && users.length === 0} onSelect={() => setSelectedDetail({ kind: "metric-users", label: "Usuarios" })} isActive={selectedDetail?.kind === "metric-users"} />
+            <DashboardMetricCard label="Instituciones" value={String(metrics.totalInstitutions)} hint="Instituciones incluidas en la vista principal." icon={Building2} isLoading={(usesSystemSummary ? summaryQuery.isLoading : institutionsQuery.isLoading) && institutions.length === 0} onSelect={() => setSelectedDetail({ kind: "metric-institutions", label: "Instituciones" })} isActive={selectedDetail?.kind === "metric-institutions"} />
+            <DashboardMetricCard label="Dispositivos" value={String(metrics.totalDevices)} hint={`${metrics.homeDevices} Home y ${metrics.institutionDevices} institucionales.`} icon={Smartphone} isLoading={(usesSystemSummary ? summaryQuery.isLoading : devicesQuery.isLoading) && devices.length === 0} onSelect={() => setSelectedDetail({ kind: "metric-devices", label: "Dispositivos" })} isActive={selectedDetail?.kind === "metric-devices"} />
+            <DashboardMetricCard label="Sincronizaciones" value={String(metrics.totalSyncs)} hint={`${formatPercent(metrics.syncsWithRaw, metrics.totalSyncs)} con raw disponible.`} icon={Layers3} tone="accent" isLoading={(usesSystemSummary ? summaryQuery.isLoading : syncsQuery.isLoading) && syncs.length === 0} onSelect={() => setSelectedDetail({ kind: "metric-syncs", label: "Sincronizaciones" })} isActive={selectedDetail?.kind === "metric-syncs"} />
+            <DashboardMetricCard label="Partidas" value={String(metrics.totalGames)} hint={`${formatAverage(metrics.totalPlayers, metrics.totalGames)} jugadores por partida.`} icon={Database} tone="accent" isLoading={(usesSystemSummary ? summaryQuery.isLoading : gamesQuery.isLoading) && games.length === 0} onSelect={() => setSelectedDetail({ kind: "metric-games", label: "Partidas" })} isActive={selectedDetail?.kind === "metric-games"} />
             {canSeeHealthModule ? (
-              <SummaryCard label="Salud" value={metrics.readiness} hint={`Backend ${metrics.version}.`} icon={HeartPulse} tone={metrics.degradedChecks === 0 ? "accent" : "warning"} isLoading={canSeeHealthModule && healthQuery.isLoading && !healthQuery.data} />
+              <DashboardMetricCard label="Salud" value={metrics.readiness} hint={`Backend ${metrics.version}.`} icon={HeartPulse} tone={metrics.degradedChecks === 0 ? "accent" : "warning"} isLoading={canSeeHealthModule && healthQuery.isLoading && !healthQuery.data} onSelect={() => setSelectedDetail({ kind: "metric-health", label: "Salud" })} isActive={selectedDetail?.kind === "metric-health"} />
             ) : (
-              <SummaryCard label="Perfiles" value={String(metrics.totalProfiles)} hint={`${metrics.activeProfiles} activos y ${metrics.profilesWithSessions} con sesiones.`} icon={UserSquare2} tone="accent" isLoading={(usesSystemSummary ? summaryQuery.isLoading : profilesQuery.isLoading) && profiles.length === 0} />
+              <DashboardMetricCard label="Perfiles" value={String(metrics.totalProfiles)} hint={`${metrics.activeProfiles} activos y ${metrics.profilesWithSessions} con sesiones.`} icon={UserSquare2} tone="accent" isLoading={(usesSystemSummary ? summaryQuery.isLoading : profilesQuery.isLoading) && profiles.length === 0} onSelect={() => setSelectedDetail({ kind: "metric-profiles", label: "Perfiles" })} isActive={selectedDetail?.kind === "metric-profiles"} />
             )}
           </>
         )}
       </div>
 
       {usesSystemSummary ? (
-        <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
-          <CardHeader>
-            <CardTitle>Mini tendencias</CardTitle>
-            <CardDescription>
-              Evolución diaria de syncs, partidas y turnos para el recorte actual ({trendRangeLabel}). Ideal para la futura vista territorial de gobiernos.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {summaryQuery.isLoading && trends.length === 0 ? (
-              <Skeleton className="h-72 rounded-2xl" />
-            ) : trends.length > 0 ? (
-              <div className="space-y-4">
-                <div className="h-72 w-full">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={trends}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.25)" />
-                      <XAxis dataKey="date" tick={{ fontSize: 12 }} tickMargin={8} />
-                      <Tooltip />
-                      <Line type="monotone" dataKey="syncs" stroke="#2563eb" strokeWidth={2} dot={false} />
-                      <Line type="monotone" dataKey="games" stroke="#7c3aed" strokeWidth={2} dot={false} />
-                      <Line type="monotone" dataKey="turns" stroke="#0f766e" strokeWidth={2} dot={false} />
-                    </LineChart>
-                  </ResponsiveContainer>
+        <DashboardMultiLineChartCard
+          title="Mini tendencias"
+          description={`Evolución diaria de syncs, partidas y turnos para el recorte actual (${trendRangeLabel}). Ideal para la futura vista territorial de gobiernos.`}
+          data={trends.map((item) => ({
+            label: item.date,
+            date: item.date,
+            syncs: item.syncs,
+            games: item.games,
+            turns: item.turns,
+          }))}
+          xAxisDataKey="date"
+          series={[
+            { key: "syncs", label: "Syncs", color: "#2563eb" },
+            { key: "games", label: "Partidas", color: "#7c3aed" },
+            { key: "turns", label: "Turnos", color: "#0f766e" },
+          ]}
+          onDatumSelect={(label) => setSelectedDetail({ kind: "trend-date", label })}
+          activeDatumLabel={selectedDetail?.kind === "trend-date" ? selectedDetail.label : null}
+          footer={
+            trends.length > 0 ? (
+              <div className="grid gap-3 md:grid-cols-3">
+                <div className="rounded-2xl bg-white/80 p-4 text-sm text-muted-foreground">
+                  <p className="font-medium text-foreground">Syncs del período</p>
+                  <p className="mt-1">{trends.reduce((sum, item) => sum + item.syncs, 0)} acumulados en la serie.</p>
                 </div>
-                <div className="grid gap-3 md:grid-cols-3">
-                  <div className="rounded-2xl bg-white/80 p-4 text-sm text-muted-foreground">
-                    <p className="font-medium text-foreground">Syncs del período</p>
-                    <p className="mt-1">{trends.reduce((sum, item) => sum + item.syncs, 0)} acumulados en la serie.</p>
-                  </div>
-                  <div className="rounded-2xl bg-white/80 p-4 text-sm text-muted-foreground">
-                    <p className="font-medium text-foreground">Partidas del período</p>
-                    <p className="mt-1">{trends.reduce((sum, item) => sum + item.games, 0)} registradas en la serie.</p>
-                  </div>
-                  <div className="rounded-2xl bg-white/80 p-4 text-sm text-muted-foreground">
-                    <p className="font-medium text-foreground">Tasa de éxito reciente</p>
-                    <p className="mt-1">{trends.length ? trends[trends.length - 1]?.success_rate || 0 : 0}% en el último bucket visible.</p>
-                  </div>
+                <div className="rounded-2xl bg-white/80 p-4 text-sm text-muted-foreground">
+                  <p className="font-medium text-foreground">Partidas del período</p>
+                  <p className="mt-1">{trends.reduce((sum, item) => sum + item.games, 0)} registradas en la serie.</p>
+                </div>
+                <div className="rounded-2xl bg-white/80 p-4 text-sm text-muted-foreground">
+                  <p className="font-medium text-foreground">Tasa de éxito reciente</p>
+                  <p className="mt-1">{trends[trends.length - 1]?.success_rate || 0}% en el último período de la serie.</p>
                 </div>
               </div>
-            ) : (
-              <div className="rounded-2xl bg-white/80 p-4 text-sm text-muted-foreground">
-                No hay actividad suficiente para dibujar tendencias con el recorte actual.
-              </div>
-            )}
-          </CardContent>
-        </Card>
+            ) : null
+          }
+        />
       ) : null}
 
       {usesSystemSummary ? (
@@ -965,7 +1015,7 @@ export function SuperadminDashboard() {
       {usesSystemSummary ? (
         <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
           <CardHeader>
-            <CardTitle>Semáforos operativos</CardTitle>
+            <CardTitle>Semáforos de seguimiento</CardTitle>
             <CardDescription>
               Alertas rápidas construidas sobre la comparación entre períodos y el estado del recorte actual.
             </CardDescription>
@@ -1196,7 +1246,7 @@ export function SuperadminDashboard() {
           <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)] xl:col-span-2">
             <CardHeader>
               <CardTitle>Territorios con mayor actividad</CardTitle>
-              <CardDescription>Lectura rápida de dónde se concentra hoy la población activa dentro del alcance visible.</CardDescription>
+              <CardDescription>Lectura rápida de dónde se concentra hoy la población activa.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
             {filteredTopTerritories.length > 0 ? (
@@ -1205,7 +1255,7 @@ export function SuperadminDashboard() {
                     <div className="flex items-start justify-between gap-4">
                       <div>
                         <p className="font-medium text-foreground">{index + 1}. {territory.key}</p>
-                        <p className="mt-1">{territory.users} usuarios visibles, {territory.institutions} instituciones, {territory.games} partidas y {territory.turns} turnos.</p>
+                        <p className="mt-1">{territory.users} usuarios, {territory.institutions} instituciones, {territory.games} partidas y {territory.turns} turnos.</p>
                       </div>
                       <Badge variant="secondary">Top territorio</Badge>
                     </div>
@@ -1219,7 +1269,7 @@ export function SuperadminDashboard() {
 
           <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
             <CardHeader>
-              <CardTitle>Cohortes visibles</CardTitle>
+              <CardTitle>Cohortes</CardTitle>
               <CardDescription>Mix resumido de roles y tipos de usuario dentro del territorio.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3 text-sm text-muted-foreground">
@@ -1249,11 +1299,11 @@ export function SuperadminDashboard() {
           <CardContent className="space-y-3 text-sm leading-6 text-muted-foreground">
             <div className="rounded-2xl bg-white/80 p-4">
               <p className="font-medium text-foreground">Turnos y partidas</p>
-              <p className="mt-1">{metrics.totalTurns} turnos visibles, {formatAverage(metrics.totalTurns, metrics.gamesWithTurns || metrics.totalGames)} turnos por partida con actividad.</p>
+              <p className="mt-1">{metrics.totalTurns} turnos, {formatAverage(metrics.totalTurns, metrics.gamesWithTurns || metrics.totalGames)} turnos por partida con actividad.</p>
             </div>
             <div className="rounded-2xl bg-white/80 p-4">
               <p className="font-medium text-foreground">Éxito de turnos</p>
-              <p className="mt-1">{formatPercent(metrics.successfulTurns, metrics.totalTurns)} de los turnos visibles terminaron en éxito.</p>
+              <p className="mt-1">{formatPercent(metrics.successfulTurns, metrics.totalTurns)} de los turnos terminaron en éxito.</p>
             </div>
           </CardContent>
         </Card>
@@ -1261,12 +1311,12 @@ export function SuperadminDashboard() {
         <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
           <CardHeader>
             <CardTitle>Calidad del dato</CardTitle>
-            <CardDescription>Cobertura útil para detectar dónde falta trazabilidad o vínculo operativo.</CardDescription>
+            <CardDescription>Cobertura útil para detectar dónde falta trazabilidad o vínculo entre datos.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3 text-sm leading-6 text-muted-foreground">
             <div className="rounded-2xl bg-white/80 p-4">
               <p className="font-medium text-foreground">Dispositivos identificados</p>
-              <p className="mt-1">{formatPercent(metrics.devicesWithFirmware, metrics.totalDevices)} tienen firmware visible y {formatPercent(metrics.devicesWithOwner, metrics.totalDevices)} tienen owner asociado.</p>
+              <p className="mt-1">{formatPercent(metrics.devicesWithFirmware, metrics.totalDevices)} tienen firmware registrado y {formatPercent(metrics.devicesWithOwner, metrics.totalDevices)} tienen owner asociado.</p>
             </div>
             <div className="rounded-2xl bg-white/80 p-4">
               <p className="font-medium text-foreground">Profiles útiles</p>
@@ -1277,8 +1327,8 @@ export function SuperadminDashboard() {
 
         <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
           <CardHeader>
-            <CardTitle>Distribución operativa</CardTitle>
-            <CardDescription>Cómo está repartido hoy el parque y el alcance visible.</CardDescription>
+            <CardTitle>Distribución general</CardTitle>
+            <CardDescription>Cómo está repartido hoy el parque disponible.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3 text-sm leading-6 text-muted-foreground">
             <div className="rounded-2xl bg-white/80 p-4">
@@ -1287,10 +1337,49 @@ export function SuperadminDashboard() {
             </div>
             <div className="rounded-2xl bg-white/80 p-4">
               <p className="font-medium text-foreground">Cobertura de fuentes</p>
-              <p className="mt-1">{loadedSources} fuentes respondieron correctamente, {failedSources} fallaron y la home sigue operativa con degradación parcial.</p>
+              <p className="mt-1">{loadedSources} fuentes respondieron correctamente y {failedSources} fallaron; la home sigue disponible con degradación parcial.</p>
             </div>
           </CardContent>
         </Card>
+      </div>
+
+      <div className="grid gap-6 xl:grid-cols-2">
+        <DashboardBarChartCard
+          title="Cobertura de perfiles"
+          description="Perfiles activos, con binding y con sesiones para medir madurez real del uso."
+          data={executiveProfileCoverage}
+          onDatumSelect={(label) => setSelectedDetail({ kind: "profile-coverage", label })}
+          activeDatumLabel={selectedDetail?.kind === "profile-coverage" ? selectedDetail.label : null}
+        />
+      </div>
+
+      <div className="grid gap-6 xl:grid-cols-2">
+        <DashboardBarChartCard
+          title="Usuarios por rol"
+          description="Distribución del padrón por rol para entender de un vistazo quién sostiene la operación observada."
+          data={executiveRoleSeries}
+          onDatumSelect={(label) => setSelectedDetail({ kind: "role", label })}
+          activeDatumLabel={selectedDetail?.kind === "role" ? selectedDetail.label : null}
+        />
+        <DashboardBarChartCard
+          title="Usuarios por tipo"
+          description="Composición por tipos de usuario para detectar sesgos de adopción o cobertura."
+          data={executiveUserTypeSeries}
+          onDatumSelect={(label) => setSelectedDetail({ kind: "user-type", label })}
+          activeDatumLabel={selectedDetail?.kind === "user-type" ? selectedDetail.label : null}
+        />
+      </div>
+
+      <div className="grid gap-6 xl:grid-cols-2">
+        <DashboardBarChartCard
+          title="Instituciones con mayor carga"
+          description={usesSystemSummary ? "Comparativa de instituciones por usuarios y referencia secundaria de turnos o actividad observada." : "Comparativa local por estudiantes con referencia secundaria de usuarios."}
+          data={executiveInstitutionLoad}
+          secondaryDataKey="secondaryValue"
+          secondaryLabel={usesSystemSummary ? "Turnos" : "Usuarios"}
+          onDatumSelect={(label) => setSelectedDetail({ kind: "institution-load", label })}
+          activeDatumLabel={selectedDetail?.kind === "institution-load" ? selectedDetail.label : null}
+        />
       </div>
 
       {isGovernmentViewer ? (
@@ -1309,7 +1398,7 @@ export function SuperadminDashboard() {
                 </div>
               ))
             ) : (
-              <div className="rounded-2xl bg-white/80 p-4 text-sm text-muted-foreground">No hay instituciones destacadas para el recorte actual.</div>
+              <div className="rounded-2xl bg-white/80 p-4 text-sm text-muted-foreground">El recorte actual todavía no muestra instituciones con actividad suficiente para destacarlas.</div>
             )}
           </CardContent>
         </Card>
@@ -1323,44 +1412,6 @@ export function SuperadminDashboard() {
         </Card>
       ) : null}
 
-      <div className="grid gap-5 md:grid-cols-2 2xl:grid-cols-3">
-        {moduleCards.map((module) => (
-          <ModuleCard key={module.href} title={module.title} description={module.description} icon={module.icon} href={module.href} />
-        ))}
-      </div>
-
-      <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
-        <CardHeader>
-          <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-            <div>
-              <CardTitle>Prioridad sugerida después de esta home</CardTitle>
-              <CardDescription>
-                {user?.fullName || "La cuenta autenticada"} ya tiene un home operativo. El próximo paso lógico es pulir coherencia transversal, tests y pequeños huecos de contrato, no abrir más placeholders.
-              </CardDescription>
-            </div>
-            <div className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-4 py-2 text-sm font-medium text-primary">
-              Siguiente paso sugerido
-              <ArrowRight className="size-4" />
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-3 md:grid-cols-3">
-            <div className="rounded-2xl bg-white/80 p-4">
-              <p className="text-sm font-medium text-foreground">1. Coherencia de navegación</p>
-              <p className="mt-1 text-sm leading-6 text-muted-foreground">Ajustar accesos y copy para institution-admin/director donde ya aplique.</p>
-            </div>
-            <div className="rounded-2xl bg-white/80 p-4">
-              <p className="text-sm font-medium text-foreground">2. Cobertura de tests UI</p>
-              <p className="mt-1 text-sm leading-6 text-muted-foreground">Agregar pruebas mínimas a los módulos más usados, no solo a Users.</p>
-            </div>
-            <div className="rounded-2xl bg-white/80 p-4">
-              <p className="text-sm font-medium text-foreground">3. QA consolidado</p>
-              <p className="mt-1 text-sm leading-6 text-muted-foreground">Usar esta home como punto de entrada y validar el flujo local completo con foco en desktop.</p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
     </div>
   );
 }

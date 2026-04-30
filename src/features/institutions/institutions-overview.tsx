@@ -397,6 +397,7 @@ export function InstitutionsOverview() {
     if (!matchingInstitution) return;
     if (selectedInstitutionId === matchingInstitution.id) return;
 
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setMode("edit");
     setSelectedInstitutionId(matchingInstitution.id);
     setForm(formFromInstitution(matchingInstitution));
@@ -405,11 +406,13 @@ export function InstitutionsOverview() {
   }, [institutionIdFromUrl, institutionRows, selectedInstitutionId]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setSelectedGroupId(null);
   }, [activeInstitutionId]);
 
   useEffect(() => {
     if (institutionClassGroups.length === 0) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setSelectedGroupId(null);
       return;
     }
@@ -440,6 +443,7 @@ export function InstitutionsOverview() {
   const selectedGroupStudents = useMemo(() => studentsQuery.data?.data ?? [], [studentsQuery.data?.data]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setStudentSearchQuery("");
     setStudentVisibilityFilter(null);
     setStudentSort(null);

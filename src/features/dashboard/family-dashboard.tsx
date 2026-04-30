@@ -1,210 +1,346 @@
 "use client";
 
-import Link from "next/link";
-import { useMemo } from "react";
-import { ArrowRight, BookHeart, Sparkles, Smartphone, Users2, Cable } from "lucide-react";
+import { useState } from "react";
+import { BookHeart, Database, Layers3, Smartphone, TimerReset, Users2 } from "lucide-react";
 import { SectionHeader } from "@/components/section-header";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Card, CardContent } from "@/components/ui/card";
 import { useAuth } from "@/features/auth/auth-context";
+import {
+  DashboardBarChartCard,
+  DashboardDetailPanel,
+  DashboardLineChartCard,
+  type DashboardDetailRow,
+  DashboardMetricCard,
+  DashboardTopListCard,
+} from "@/features/dashboard/dashboard-analytics-shared";
+import {
+  buildDeckUsageSeries,
+  buildGameActivitySeries,
+  buildProfileAgeCategorySeries,
+  buildProfileCoverageSeries,
+  buildProfileRecencySeries,
+  buildResourceBalanceSeries,
+  buildUserRecencySeries,
+  buildUserRoleSeries,
+  getAverageTurnTime,
+  getDateBucketLabel,
+  getSuccessRate,
+} from "@/features/dashboard/dashboard-analytics-utils";
 import { useDevices } from "@/features/devices/api";
 import { useGames } from "@/features/games/api";
+import { useProfilesOverview } from "@/features/profiles/api";
 import { useSyncSessions } from "@/features/syncs/api";
 import { useUsers } from "@/features/users/api";
-import { getErrorMessage } from "@/lib/utils";
+import { formatDurationSeconds, getErrorMessage } from "@/lib/utils";
 
-function MetricCard({
-  label,
-  value,
-  hint,
-  icon: Icon,
-}: {
-  label: string;
-  value: string;
-  hint: string;
-  icon: React.ComponentType<{ className?: string }>;
-}) {
-  return (
-    <Card className="overflow-hidden border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
-      <CardContent className="p-5">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <p className="text-sm text-muted-foreground">{label}</p>
-            <p className="mt-2 text-3xl font-semibold tracking-tight text-foreground">{value}</p>
-            <p className="mt-2 text-sm leading-6 text-muted-foreground">{hint}</p>
-          </div>
-          <div className="rounded-2xl bg-primary/12 p-3 text-primary">
-            <Icon className="size-5" />
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  );
+function normalizeLabel(value?: string | null) {
+  return (value || "sin dato").replace(/[|]/g, " / ").replace(/[-_]/g, " ").trim().toLowerCase();
+}
+
+function getRelativeDays(value?: string | null) {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return Math.floor((Date.now() - date.getTime()) / (1000 * 60 * 60 * 24));
+}
+
+function matchesRecencyLabel(label: string, value?: string | null) {
+  const diffDays = getRelativeDays(value);
+  const normalized = normalizeLabel(label);
+
+  if (diffDays == null) return normalized.includes("sin");
+  if (normalized.includes("7 días")) return diffDays <= 7;
+  if (normalized.includes("8 30 días") || normalized.includes("8/30 días")) return diffDays > 7 && diffDays <= 30;
+  if (normalized.includes("31 90 días") || normalized.includes("31/90 días")) return diffDays > 30 && diffDays <= 90;
+  if (normalized.includes("> 90 días")) return diffDays > 90;
+  return false;
 }
 
 export function FamilyDashboard() {
   const { tokens, user } = useAuth();
+  const [selectedDetail, setSelectedDetail] = useState<{ kind: string; label: string } | null>(null);
   const devicesQuery = useDevices(tokens?.accessToken);
   const gamesQuery = useGames(tokens?.accessToken);
   const syncsQuery = useSyncSessions(tokens?.accessToken);
   const usersQuery = useUsers(tokens?.accessToken);
+  const profilesQuery = useProfilesOverview(tokens?.accessToken);
 
-  const isLoading = devicesQuery.isLoading || gamesQuery.isLoading || syncsQuery.isLoading || usersQuery.isLoading;
-  const error = devicesQuery.error || gamesQuery.error || syncsQuery.error || usersQuery.error;
+  const devices = devicesQuery.data?.data || [];
+  const games = gamesQuery.data?.data || [];
+  const syncs = syncsQuery.data?.data || [];
+  const users = usersQuery.data?.data || [];
+  const profiles = profilesQuery.data || [];
+  const isLoading = devicesQuery.isLoading || gamesQuery.isLoading || syncsQuery.isLoading || usersQuery.isLoading || profilesQuery.isLoading;
+  const error = devicesQuery.error || gamesQuery.error || syncsQuery.error || usersQuery.error || profilesQuery.error;
 
-  const metrics = useMemo(() => {
-    const devices = devicesQuery.data?.data || [];
-    const games = gamesQuery.data?.data || [];
-    const syncs = syncsQuery.data?.data || [];
-    const users = usersQuery.data?.data || [];
+  const totalTurns = games.reduce((sum, game) => sum + game.turns.length, 0);
+  const successRate = getSuccessRate(games);
+  const averageTurnTime = getAverageTurnTime(games);
+  const activitySeries = buildGameActivitySeries(games);
+  const deckUsage = buildDeckUsageSeries(games);
+  const userRoleSeries = buildUserRoleSeries(users);
+  const userRecencySeries = buildUserRecencySeries(users);
+  const profileCoverageSeries = buildProfileCoverageSeries(profiles);
+  const profileAgeSeries = buildProfileAgeCategorySeries(profiles);
+  const profileRecencySeries = buildProfileRecencySeries(profiles);
+  const visibleResources = buildResourceBalanceSeries({
+    users: usersQuery.data?.total || users.length,
+    devices: devicesQuery.data?.total || devices.length,
+    profiles: profiles.length,
+    institutions: undefined,
+  });
+  const gentleSignals = [
+    {
+      label: "Partidas",
+      value: String(gamesQuery.data?.total || games.length),
+      badge: "Actividad reciente",
+    },
+    {
+      label: "Usuarios",
+      value: String(usersQuery.data?.total || users.length),
+      badge: "Personas vinculadas",
+    },
+    {
+      label: "Dispositivos",
+      value: String(devicesQuery.data?.total || devices.length),
+      badge: "Equipos asociados",
+    },
+    {
+      label: "Syncs con evidencia",
+      value: String(syncs.filter((sync) => (sync.rawRecordCount || sync.rawRecordIds.length || 0) > 0).length),
+      badge: "Captura utilizable",
+    },
+  ];
 
-    return {
-      totalDevices: devicesQuery.data?.total || devices.length,
-      totalGames: gamesQuery.data?.total || games.length,
-      totalSyncs: syncsQuery.data?.total || syncs.length,
-      totalUsers: usersQuery.data?.total || users.length,
-    };
-  }, [devicesQuery.data, gamesQuery.data, syncsQuery.data, usersQuery.data]);
+  const detailPanel = (() => {
+    if (!selectedDetail) return null;
+
+    const gameRows = (items = games): DashboardDetailRow[] =>
+      items.map((game) => ({
+        label: game.deckName || `Partida ${game.id}`,
+        value: `${game.turns.length} turnos`,
+        hint: `Fecha ${getDateBucketLabel(game.startDate || game.createdAt || game.updatedAt)} · duración ${formatDurationSeconds(game.turns.reduce((sum, turn) => sum + (turn.playTimeSeconds || 0), 0))}`,
+      }));
+
+    const userRows: DashboardDetailRow[] = users.map((entry) => ({
+      label: entry.fullName || entry.email || `Usuario ${entry.id}`,
+      value: entry.roles?.join(", ") || "Sin rol",
+      hint: entry.email || "Sin email registrado",
+      badge: entry.lastLoginAt ? `Login ${getDateBucketLabel(entry.lastLoginAt)}` : "Sin login",
+    }));
+
+    const deviceRows: DashboardDetailRow[] = devices.map((device) => ({
+      label: device.name || device.deviceId || `Dispositivo ${device.id}`,
+      value: device.status || "Sin status",
+      hint: device.assignmentScope === "home" ? "Uso en casa" : "Uso institucional",
+      badge: device.assignmentScope || "sin asignación",
+    }));
+
+    const profileRows: DashboardDetailRow[] = profiles.map((profile) => ({
+      label: profile.displayName || `Perfil ${profile.id}`,
+      value: `${profile.sessionCount} sesiones`,
+      hint: `${profile.activeBindingCount} bindings activos · ${profile.ageCategory || "sin categoría"}`,
+      badge: profile.isActive ? "Activo" : "Inactivo",
+    }));
+
+    const syncRows: DashboardDetailRow[] = syncs.map((sync) => ({
+      label: sync.deckName || `Sync ${sync.id}`,
+      value: `${sync.rawRecordCount || sync.rawRecordIds.length || 0} raws`,
+      hint: sync.source || sync.sourceType || "Sin fuente registrada",
+    }));
+
+    switch (selectedDetail.kind) {
+      case "metric-games":
+        return { title: "Detalle de partidas", description: "Actividad reciente del grupo familiar.", filterLabel: selectedDetail.label, rows: gameRows() };
+      case "metric-turns":
+        return { title: "Detalle de turnos", description: "Interacciones registradas en las partidas.", filterLabel: selectedDetail.label, rows: gameRows().filter((row) => row.value !== "0 turnos") };
+      case "metric-success":
+        return {
+          title: "Detalle de acierto",
+          description: "Acierto por partida para pasar del agregado al caso concreto.",
+          filterLabel: selectedDetail.label,
+          rows: games.map((game) => {
+            const successes = game.turns.filter((turn) => turn.success).length;
+            const rate = game.turns.length > 0 ? Math.round((successes / game.turns.length) * 100) : 0;
+            return { label: game.deckName || `Partida ${game.id}`, value: `${rate}%`, hint: `${successes}/${game.turns.length} turnos correctos` };
+          }),
+        };
+      case "metric-turn-time":
+        return {
+          title: "Detalle de tiempo por turno",
+          description: "Promedio por partida para entender mejor el ritmo de uso.",
+          filterLabel: selectedDetail.label,
+          rows: games.map((game) => ({
+            label: game.deckName || `Partida ${game.id}`,
+            value: formatDurationSeconds(game.turns.length > 0 ? game.turns.reduce((sum, turn) => sum + (turn.playTimeSeconds || 0), 0) / game.turns.length : 0),
+            hint: `${game.turns.length} turnos medidos`,
+          })),
+        };
+      case "metric-devices":
+        return { title: "Detalle de dispositivos", description: "Equipos asociados a la cuenta.", filterLabel: selectedDetail.label, rows: deviceRows };
+      case "metric-users":
+        return { title: "Detalle de usuarios", description: "Personas asociadas al seguimiento familiar.", filterLabel: selectedDetail.label, rows: userRows };
+      case "metric-profiles":
+        return { title: "Detalle de perfiles", description: "Perfiles ya incorporados al seguimiento familiar.", filterLabel: selectedDetail.label, rows: profileRows };
+      case "activity-date":
+        return { title: `Actividad del ${selectedDetail.label}`, description: "Partidas que caen en la fecha seleccionada.", filterLabel: selectedDetail.label, rows: gameRows(games.filter((game) => getDateBucketLabel(game.startDate || game.createdAt || game.updatedAt) === selectedDetail.label)) };
+      case "deck":
+        return { title: `Mazo ${selectedDetail.label}`, description: "Partidas asociadas al contenido seleccionado.", filterLabel: selectedDetail.label, rows: gameRows(games.filter((game) => normalizeLabel(game.deckName || "Sin mazo") === normalizeLabel(selectedDetail.label))) };
+      case "user-role":
+        return { title: `Usuarios con rol ${selectedDetail.label}`, description: "Personas del rol elegido.", filterLabel: selectedDetail.label, rows: userRows.filter((row) => normalizeLabel(row.value).includes(normalizeLabel(selectedDetail.label))) };
+      case "profile-coverage": {
+        const normalized = normalizeLabel(selectedDetail.label);
+        return {
+          title: `Estado de perfiles · ${selectedDetail.label}`,
+          description: "Perfiles filtrados por el bloque elegido.",
+          filterLabel: selectedDetail.label,
+          rows: profileRows.filter((row, index) => {
+            const profile = profiles[index];
+            if (normalized.includes("activos")) return profile.isActive;
+            if (normalized.includes("binding") && !normalized.includes("sin")) return profile.activeBindingCount > 0;
+            if (normalized.includes("sesiones")) return profile.sessionCount > 0;
+            if (normalized.includes("sin binding")) return profile.activeBindingCount === 0;
+            return false;
+          }),
+        };
+      }
+      case "profile-age":
+        return { title: `Perfiles por categoría · ${selectedDetail.label}`, description: "Perfiles dentro de la cohorte elegida.", filterLabel: selectedDetail.label, rows: profileRows.filter((row, index) => normalizeLabel(profiles[index]?.ageCategory || "Sin categoría") === normalizeLabel(selectedDetail.label)) };
+      case "profile-recency":
+        return { title: `Recencia de perfiles · ${selectedDetail.label}`, description: "Perfiles dentro del período seleccionado.", filterLabel: selectedDetail.label, rows: profileRows.filter((row, index) => matchesRecencyLabel(selectedDetail.label, profiles[index]?.lastSessionAt)) };
+      case "resource": {
+        const normalized = normalizeLabel(selectedDetail.label);
+        if (normalized.includes("usuario")) return { title: "Recursos · usuarios", description: "Personas registradas en esta cuenta.", filterLabel: selectedDetail.label, rows: userRows };
+        if (normalized.includes("dispositivo")) return { title: "Recursos · dispositivos", description: "Equipos asociados a esta cuenta.", filterLabel: selectedDetail.label, rows: deviceRows };
+        return { title: "Recursos · perfiles", description: "Perfiles registrados en esta cuenta.", filterLabel: selectedDetail.label, rows: profileRows };
+      }
+      case "user-recency":
+        return { title: `Recencia de usuarios · ${selectedDetail.label}`, description: "Usuarios dentro del período seleccionado.", filterLabel: selectedDetail.label, rows: userRows.filter((row, index) => matchesRecencyLabel(selectedDetail.label, users[index]?.lastLoginAt)) };
+      case "signal": {
+        const normalized = normalizeLabel(selectedDetail.label);
+        if (normalized.includes("syncs con evidencia")) return { title: "Syncs con evidencia", description: "Sincronizaciones que sí traen captura utilizable.", filterLabel: selectedDetail.label, rows: syncRows.filter((row, index) => (syncs[index]?.rawRecordCount || syncs[index]?.rawRecordIds.length || 0) > 0) };
+        if (normalized.includes("dispositivos")) return { title: "Dispositivos", description: "Equipos asociados al grupo familiar.", filterLabel: selectedDetail.label, rows: deviceRows };
+        if (normalized.includes("usuarios")) return { title: "Usuarios", description: "Personas asociadas al grupo familiar.", filterLabel: selectedDetail.label, rows: userRows };
+        return { title: "Partidas", description: "Actividad registrada del grupo familiar.", filterLabel: selectedDetail.label, rows: gameRows() };
+      }
+      default:
+        return null;
+    }
+  })();
 
   return (
     <div className="space-y-8">
       <SectionHeader
-        eyebrow="Family"
-        title="Home simple para seguir lo visible"
-        description="Esta vista evita módulos técnicos y se concentra en una lectura clara de tus dispositivos, partidas y usuarios visibles."
+        eyebrow="Familia"
+        title={`Dashboard de seguimiento para ${user?.fullName || "familia"}`}
+        description="Esta home mantiene una lectura analítica y simple: actividad, recursos, tiempos y contenidos usados, sin ruido técnico."
       />
 
-      <div className="grid gap-6 2xl:grid-cols-[1.35fr_0.95fr]">
-        <Card className="overflow-hidden border-none bg-[linear-gradient(135deg,#3d4f68_0%,#4f6887_52%,#6d86a5_100%)] text-white shadow-[0_20px_60px_rgba(31,42,55,0.22)]">
-          <CardContent className="p-8 sm:p-10">
-            <div className="flex flex-wrap gap-2">
-              <Badge className="bg-white/14 text-white hover:bg-white/14">Seguimiento</Badge>
-              <Badge className="bg-white/14 text-white hover:bg-white/14">Dispositivos propios</Badge>
-              <Badge className="bg-white/14 text-white hover:bg-white/14">Usuarios visibles</Badge>
-            </div>
-
-            <div className="mt-6 max-w-3xl">
-              <h2 className="text-3xl font-semibold tracking-tight sm:text-4xl">
-                La vista family empieza por lo importante, tus dispositivos, partidas y usuarios visibles.
-              </h2>
-              <p className="mt-4 text-base leading-7 text-white/78">
-                La idea acá no es abrir operación interna, sino ofrecer un resumen amable y entendible del uso reciente.
-              </p>
-            </div>
-
-            <div className="mt-8 flex flex-wrap gap-3">
-              <div className="inline-flex items-center gap-2 rounded-full border border-white/18 bg-white/10 px-4 py-2 text-sm font-medium text-white">
-                Dispositivos
-                <span className="rounded-full bg-white/14 px-2 py-0.5 text-xs text-white/88">{metrics.totalDevices}</span>
-              </div>
-              <div className="inline-flex items-center gap-2 rounded-full border border-white/18 bg-white/10 px-4 py-2 text-sm font-medium text-white">
-                Partidas
-                <span className="rounded-full bg-white/14 px-2 py-0.5 text-xs text-white/88">{metrics.totalGames}</span>
-              </div>
-              <div className="inline-flex items-center gap-2 rounded-full border border-white/18 bg-white/10 px-4 py-2 text-sm font-medium text-white">
-                Usuarios
-                <span className="rounded-full bg-white/14 px-2 py-0.5 text-xs text-white/88">{metrics.totalUsers}</span>
-              </div>
-              <div className="inline-flex items-center gap-2 rounded-full border border-white/18 bg-white/10 px-4 py-2 text-sm font-medium text-white">
-                Syncs
-                <span className="rounded-full bg-white/14 px-2 py-0.5 text-xs text-white/88">{metrics.totalSyncs}</span>
-              </div>
-            </div>
-
-            <div className="mt-8 flex flex-wrap gap-3">
-              <Link
-                href="/devices"
-                className="inline-flex items-center gap-2 rounded-full border border-white/18 bg-white/10 px-4 py-2 text-sm font-medium text-white transition hover:bg-white/16"
-              >
-                Ver dispositivos
-                <ArrowRight className="size-4" />
-              </Link>
-              <Link
-                href="/games"
-                className="inline-flex items-center gap-2 rounded-full border border-white/18 bg-white/10 px-4 py-2 text-sm font-medium text-white transition hover:bg-white/16"
-              >
-                Ver partidas
-                <ArrowRight className="size-4" />
-              </Link>
-              <Link
-                href="/users"
-                className="inline-flex items-center gap-2 rounded-full border border-white/18 bg-white/10 px-4 py-2 text-sm font-medium text-white transition hover:bg-white/16"
-              >
-                Ver usuarios
-                <ArrowRight className="size-4" />
-              </Link>
-              <Link
-                href="/syncs"
-                className="inline-flex items-center gap-2 rounded-full border border-white/18 bg-white/10 px-4 py-2 text-sm font-medium text-white transition hover:bg-white/16"
-              >
-                Ver sincronizaciones
-                <ArrowRight className="size-4" />
-              </Link>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
-          <CardHeader>
-            <CardTitle>Qué muestra esta vista</CardTitle>
-            <CardDescription>
-              Una lectura cuidada de actividad, sin mezclarla con configuración, permisos ni hardware operativo.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="rounded-2xl bg-background/70 p-4">
-              <p className="font-medium text-foreground">Actividad reciente</p>
-              <p className="mt-2 text-sm leading-6 text-muted-foreground">Partidas, dispositivos y señales simples para entender si hubo movimiento.</p>
-            </div>
-            <div className="rounded-2xl bg-background/70 p-4">
-              <p className="font-medium text-foreground">Lenguaje no técnico</p>
-              <p className="mt-2 text-sm leading-6 text-muted-foreground">Esta home evita raw, ACL y módulos internos para que la lectura sea más amable.</p>
-            </div>
-            <div className="rounded-2xl bg-background/70 p-4">
-              <p className="font-medium text-foreground">Próxima capa</p>
-              <p className="mt-2 text-sm leading-6 text-muted-foreground">Si seguimos después, se puede profundizar progreso, hábitos y evolución con mejor narrativa visual.</p>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      {detailPanel ? (
+        <DashboardDetailPanel
+          title={detailPanel.title}
+          description={detailPanel.description}
+          rows={detailPanel.rows}
+          activeFilterLabel={detailPanel.filterLabel}
+          onClear={() => setSelectedDetail(null)}
+        />
+      ) : null}
 
       <div className="grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(220px,1fr))]">
-        {isLoading ? (
-          Array.from({ length: 4 }).map((_, index) => <Skeleton key={index} className="h-36 rounded-2xl" />)
-        ) : (
-          <>
-            <MetricCard label="Dispositivos visibles" value={String(metrics.totalDevices)} hint="Hardware que entra en tu alcance visible." icon={Smartphone} />
-            <MetricCard label="Partidas visibles" value={String(metrics.totalGames)} hint="Sesiones visibles en esta cuenta." icon={BookHeart} />
-            <MetricCard label="Usuarios visibles" value={String(metrics.totalUsers)} hint="Usuarios que podés ver desde esta cuenta." icon={Users2} />
-            <MetricCard label="Syncs visibles" value={String(metrics.totalSyncs)} hint="Sincronizaciones recientes vinculadas a tu alcance." icon={Cable} />
-          </>
-        )}
+        <DashboardMetricCard label="Partidas" value={String(gamesQuery.data?.total || games.length)} hint="Actividad reciente del grupo familiar." icon={BookHeart} isLoading={isLoading} onSelect={() => setSelectedDetail({ kind: "metric-games", label: "Partidas" })} isActive={selectedDetail?.kind === "metric-games"} />
+        <DashboardMetricCard label="Turnos" value={String(totalTurns)} hint="Interacciones registradas dentro de esas partidas." icon={Layers3} isLoading={isLoading} onSelect={() => setSelectedDetail({ kind: "metric-turns", label: "Turnos" })} isActive={selectedDetail?.kind === "metric-turns"} />
+        <DashboardMetricCard label="Acierto general" value={`${successRate}%`} hint="Porcentaje agregado de respuestas correctas en la actividad registrada." icon={Database} isLoading={isLoading} onSelect={() => setSelectedDetail({ kind: "metric-success", label: "Acierto general" })} isActive={selectedDetail?.kind === "metric-success"} />
+        <DashboardMetricCard label="Tiempo por turno" value={formatDurationSeconds(averageTurnTime)} hint="Ritmo promedio de juego en la actividad registrada." icon={TimerReset} isLoading={isLoading} onSelect={() => setSelectedDetail({ kind: "metric-turn-time", label: "Tiempo por turno" })} isActive={selectedDetail?.kind === "metric-turn-time"} />
+        <DashboardMetricCard label="Dispositivos" value={String(devicesQuery.data?.total || devices.length)} hint="Equipos asociados a la cuenta." icon={Smartphone} isLoading={isLoading} onSelect={() => setSelectedDetail({ kind: "metric-devices", label: "Dispositivos" })} isActive={selectedDetail?.kind === "metric-devices"} />
+        <DashboardMetricCard label="Usuarios" value={String(usersQuery.data?.total || users.length)} hint="Personas asociadas a la cuenta." icon={Users2} isLoading={isLoading} onSelect={() => setSelectedDetail({ kind: "metric-users", label: "Usuarios" })} isActive={selectedDetail?.kind === "metric-users"} />
+        <DashboardMetricCard label="Perfiles" value={String(profiles.length)} hint="Perfiles incorporados al seguimiento familiar." icon={BookHeart} isLoading={isLoading} onSelect={() => setSelectedDetail({ kind: "metric-profiles", label: "Perfiles" })} isActive={selectedDetail?.kind === "metric-profiles"} />
       </div>
 
       {error ? (
         <Card className="border-destructive/20 bg-white/85">
-          <CardContent className="p-6 text-sm text-destructive">No pude cargar una parte del dashboard: {getErrorMessage(error)}</CardContent>
+          <CardContent className="p-6 text-sm text-destructive">
+            No pude cargar una parte del dashboard family: {getErrorMessage(error)}
+          </CardContent>
         </Card>
       ) : null}
 
-      <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
-        <CardHeader>
-          <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-            <div>
-              <CardTitle>Base visual family cerrada</CardTitle>
-              <CardDescription>
-                {user?.fullName || "La cuenta autenticada"} ya tiene una entrada más cuidada y entendible.
-                El siguiente paso sería decidir si este perfil necesita solo dashboard o alguna vista adicional de seguimiento simplificado.
-              </CardDescription>
-            </div>
-            <div className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-4 py-2 text-sm font-medium text-primary">
-              Visual base cerrada
-              <Sparkles className="size-4" />
-            </div>
-          </div>
-        </CardHeader>
-      </Card>
+      <div className="grid gap-6 xl:grid-cols-2">
+        <DashboardLineChartCard
+          title="Actividad reciente"
+          description="Partidas y turnos por fecha para ver si hubo movimiento reciente o días más tranquilos."
+          data={activitySeries}
+          onDatumSelect={(label) => setSelectedDetail({ kind: "activity-date", label })}
+          activeDatumLabel={selectedDetail?.kind === "activity-date" ? selectedDetail.label : null}
+        />
+        <DashboardBarChartCard
+          title="Mazos usados"
+          description="Qué tipos de contenido aparecen más en la actividad registrada."
+          data={deckUsage}
+          onDatumSelect={(label) => setSelectedDetail({ kind: "deck", label })}
+          activeDatumLabel={selectedDetail?.kind === "deck" ? selectedDetail.label : null}
+        />
+      </div>
+
+      <div className="grid gap-6 xl:grid-cols-2">
+        <DashboardBarChartCard
+          title="Usuarios por rol"
+          description="Distribución simple de las personas asociadas al grupo familiar."
+          data={userRoleSeries}
+          onDatumSelect={(label) => setSelectedDetail({ kind: "user-role", label })}
+          activeDatumLabel={selectedDetail?.kind === "user-role" ? selectedDetail.label : null}
+        />
+        <DashboardBarChartCard
+          title="Estado de perfiles"
+          description="Perfiles activos, con binding y con sesiones para leer rápidamente qué tan conectada está la experiencia."
+          data={profileCoverageSeries}
+          onDatumSelect={(label) => setSelectedDetail({ kind: "profile-coverage", label })}
+          activeDatumLabel={selectedDetail?.kind === "profile-coverage" ? selectedDetail.label : null}
+        />
+      </div>
+
+      <div className="grid gap-6 xl:grid-cols-2">
+        <DashboardBarChartCard
+          title="Perfiles por categoría"
+          description="Cohortes por categoría para entender si la experiencia actual se concentra en algún tramo específico."
+          data={profileAgeSeries}
+          onDatumSelect={(label) => setSelectedDetail({ kind: "profile-age", label })}
+          activeDatumLabel={selectedDetail?.kind === "profile-age" ? selectedDetail.label : null}
+        />
+        <DashboardBarChartCard
+          title="Recencia de perfiles"
+          description="Última sesión por perfil para ver rápidamente quién viene activo y quién quedó más quieto."
+          data={profileRecencySeries}
+          onDatumSelect={(label) => setSelectedDetail({ kind: "profile-recency", label })}
+          activeDatumLabel={selectedDetail?.kind === "profile-recency" ? selectedDetail.label : null}
+        />
+      </div>
+
+      <div className="grid gap-6 xl:grid-cols-2">
+        <DashboardBarChartCard
+          title="Recursos principales"
+          description="Balance simple entre personas y dispositivos asociados a la cuenta."
+          data={visibleResources}
+          onDatumSelect={(label) => setSelectedDetail({ kind: "resource", label })}
+          activeDatumLabel={selectedDetail?.kind === "resource" ? selectedDetail.label : null}
+        />
+        <DashboardBarChartCard
+          title="Recencia de usuarios"
+          description="Lectura suave de accesos recientes para detectar si el entorno viene activo o con señales más frías."
+          data={userRecencySeries}
+          onDatumSelect={(label) => setSelectedDetail({ kind: "user-recency", label })}
+          activeDatumLabel={selectedDetail?.kind === "user-recency" ? selectedDetail.label : null}
+        />
+      </div>
+
+      <div className="grid gap-6 xl:grid-cols-2">
+        <DashboardTopListCard
+          title="Resumen rápido"
+          description="Lectura amable de los tres frentes más importantes de tu cuenta."
+          items={gentleSignals}
+          onItemSelect={(label) => setSelectedDetail({ kind: "signal", label })}
+          activeItemLabel={selectedDetail?.kind === "signal" ? selectedDetail.label : null}
+        />
+      </div>
     </div>
   );
 }

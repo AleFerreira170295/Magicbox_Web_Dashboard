@@ -7,6 +7,7 @@ import {
   useReducer,
 } from "react";
 import { clearStoredSession, readStoredSession, writeStoredSession } from "@/features/auth/storage";
+import { AUTH_SESSION_EXPIRED_EVENT } from "@/lib/api/fetcher";
 import {
   getMe,
   login as loginRequest,
@@ -85,6 +86,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     dispatch({ type: "restore", payload: readStoredSession() });
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return undefined;
+
+    const handleExpiredSession = () => {
+      clearStoredSession();
+      dispatch({ type: "clear-session" });
+    };
+
+    window.addEventListener(AUTH_SESSION_EXPIRED_EVENT, handleExpiredSession);
+    return () => window.removeEventListener(AUTH_SESSION_EXPIRED_EVENT, handleExpiredSession);
   }, []);
 
   function persist(nextTokens: AuthTokens, nextUser: AuthUser) {

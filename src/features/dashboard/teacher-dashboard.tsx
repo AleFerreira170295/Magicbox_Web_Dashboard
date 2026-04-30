@@ -1,418 +1,448 @@
 "use client";
 
-import Link from "next/link";
-import { useMemo } from "react";
-import {
-  Activity,
-  ArrowRight,
-  BookOpen,
-  Database,
-  Link2,
-  Layers3,
-  Sparkles,
-  Smartphone,
-  Users2,
-} from "lucide-react";
-import {
-  Bar,
-  BarChart,
-  CartesianGrid,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
+import { useState } from "react";
+import { Activity, BookOpen, Database, Layers3, Smartphone, TimerReset } from "lucide-react";
 import { SectionHeader } from "@/components/section-header";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Card, CardContent } from "@/components/ui/card";
 import { useAuth } from "@/features/auth/auth-context";
+import {
+  DashboardBarChartCard,
+  DashboardDetailPanel,
+  DashboardLineChartCard,
+  type DashboardDetailRow,
+  DashboardMetricCard,
+  DashboardTopListCard,
+} from "@/features/dashboard/dashboard-analytics-shared";
+import {
+  buildDeckUsageSeries,
+  buildGameActivitySeries,
+  buildProfileAgeCategorySeries,
+  buildProfileCoverageSeries,
+  buildProfileRecencySeries,
+  buildSyncSourceSeries,
+  buildUserRecencySeries,
+  buildUserRoleSeries,
+  getAverageGameTime,
+  getAverageTurnTime,
+  getDateBucketLabel,
+  getSuccessRate,
+} from "@/features/dashboard/dashboard-analytics-utils";
 import { useDevices } from "@/features/devices/api";
 import { useGames } from "@/features/games/api";
+import { useProfilesOverview } from "@/features/profiles/api";
 import { useSyncSessions } from "@/features/syncs/api";
-import { getErrorMessage, formatDurationSeconds } from "@/lib/utils";
+import { useUsers } from "@/features/users/api";
+import { formatDurationSeconds, getErrorMessage } from "@/lib/utils";
 
-function MetricCard({
-  label,
-  value,
-  hint,
-  icon: Icon,
-}: {
-  label: string;
-  value: string;
-  hint: string;
-  icon: React.ComponentType<{ className?: string }>;
-}) {
-  return (
-    <Card className="overflow-hidden border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
-      <CardContent className="p-5">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <p className="text-sm text-muted-foreground">{label}</p>
-            <p className="mt-2 text-3xl font-semibold tracking-tight text-foreground">{value}</p>
-            <p className="mt-2 text-sm leading-6 text-muted-foreground">{hint}</p>
-          </div>
-          <div className="rounded-2xl bg-primary/12 p-3 text-primary">
-            <Icon className="size-5" />
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  );
+function normalizeLabel(value?: string | null) {
+  return (value || "sin dato").replace(/[|]/g, " / ").replace(/[-_]/g, " ").trim().toLowerCase();
 }
 
-function InsightRow({
-  title,
-  description,
-  icon: Icon,
-}: {
-  title: string;
-  description: string;
-  icon: React.ComponentType<{ className?: string }>;
-}) {
-  return (
-    <div className="flex items-start gap-3 rounded-2xl bg-white/70 p-4">
-      <div className="rounded-2xl bg-accent p-2.5 text-accent-foreground">
-        <Icon className="size-4" />
-      </div>
-      <div>
-        <p className="font-medium text-foreground">{title}</p>
-        <p className="mt-1 text-sm leading-6 text-muted-foreground">{description}</p>
-      </div>
-    </div>
-  );
+function getRelativeDays(value?: string | null) {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return Math.floor((Date.now() - date.getTime()) / (1000 * 60 * 60 * 24));
 }
 
-function ModuleCard({
-  href,
-  title,
-  description,
-  icon: Icon,
-}: {
-  href: string;
-  title: string;
-  description: string;
-  icon: React.ComponentType<{ className?: string }>;
-}) {
-  return (
-    <Link href={href}>
-      <Card className="h-full border-border/80 bg-card/95 transition-transform duration-150 hover:-translate-y-0.5 hover:shadow-[0_18px_44px_rgba(31,42,55,0.08)]">
-        <CardContent className="flex h-full flex-col p-5">
-          <div className="flex items-start justify-between gap-4">
-            <div className="rounded-2xl bg-primary/12 p-3 text-primary">
-              <Icon className="size-5" />
-            </div>
-            <Badge variant="outline">Docente</Badge>
-          </div>
-          <div className="mt-5">
-            <h3 className="text-lg font-semibold text-foreground">{title}</h3>
-            <p className="mt-2 text-sm leading-6 text-muted-foreground">{description}</p>
-          </div>
-          <div className="mt-auto pt-5 text-sm font-medium text-primary">Abrir módulo</div>
-        </CardContent>
-      </Card>
-    </Link>
-  );
-}
+function matchesRecencyLabel(label: string, value?: string | null) {
+  const diffDays = getRelativeDays(value);
+  const normalized = normalizeLabel(label);
 
-function QuickActionLink({ href, label, value }: { href: string; label: string; value: string }) {
-  return (
-    <Link
-      href={href}
-      className="inline-flex items-center gap-2 rounded-full border border-white/18 bg-white/10 px-4 py-2 text-sm font-medium text-white transition hover:bg-white/16"
-    >
-      <span>{label}</span>
-      <span className="rounded-full bg-white/14 px-2 py-0.5 text-xs text-white/88">{value}</span>
-      <ArrowRight className="size-4" />
-    </Link>
-  );
+  if (diffDays == null) {
+    return normalized.includes("sin");
+  }
+
+  if (normalized.includes("7 días")) return diffDays <= 7;
+  if (normalized.includes("8 30 días") || normalized.includes("8/30 días")) return diffDays > 7 && diffDays <= 30;
+  if (normalized.includes("31 90 días") || normalized.includes("31/90 días")) return diffDays > 30 && diffDays <= 90;
+  if (normalized.includes("> 90 días")) return diffDays > 90;
+
+  return false;
 }
 
 export function TeacherDashboard() {
-  const { tokens, user } = useAuth();
+  const { tokens } = useAuth();
+  const [selectedDetail, setSelectedDetail] = useState<{ kind: string; label: string } | null>(null);
   const gamesQuery = useGames(tokens?.accessToken);
   const devicesQuery = useDevices(tokens?.accessToken);
   const syncsQuery = useSyncSessions(tokens?.accessToken);
+  const usersQuery = useUsers(tokens?.accessToken);
+  const profilesQuery = useProfilesOverview(tokens?.accessToken);
 
-  const isLoading = gamesQuery.isLoading || devicesQuery.isLoading || syncsQuery.isLoading;
-  const error = gamesQuery.error || devicesQuery.error || syncsQuery.error;
+  const games = gamesQuery.data?.data || [];
+  const devices = devicesQuery.data?.data || [];
+  const syncs = syncsQuery.data?.data || [];
+  const users = usersQuery.data?.data || [];
+  const profiles = profilesQuery.data || [];
+  const isLoading = gamesQuery.isLoading || devicesQuery.isLoading || syncsQuery.isLoading || usersQuery.isLoading || profilesQuery.isLoading;
+  const error = gamesQuery.error || devicesQuery.error || syncsQuery.error || usersQuery.error || profilesQuery.error;
 
-  const metrics = useMemo(() => {
-    const games = gamesQuery.data?.data || [];
-    const devices = devicesQuery.data?.data || [];
-    const syncs = syncsQuery.data?.data || [];
-    const totalTurns = games.reduce((sum, game) => sum + game.turns.length, 0);
-    const totalTurnTime = games.reduce(
-      (sum, game) => sum + game.turns.reduce((turnSum, turn) => turnSum + (turn.playTimeSeconds || 0), 0),
-      0,
-    );
-    const avgTurnTime = totalTurns > 0 ? totalTurnTime / totalTurns : 0;
-
-    return {
-      totalGames: gamesQuery.data?.total || games.length,
-      totalDevices: devicesQuery.data?.total || devices.length,
-      totalSyncs: syncsQuery.data?.total || syncs.length,
-      avgTurnTime,
-      devicesWithoutStatus: devices.filter((device) => !device.status).length,
-      gamesWithoutTurns: games.filter((game) => game.turns.length === 0).length,
-      syncsWithoutRaw: syncs.filter((sync) => (sync.rawRecordCount || sync.rawRecordIds.length || 0) === 0).length,
-      deckChart: Object.entries(
-        games.reduce<Record<string, number>>((acc, game) => {
-          const key = game.deckName || "Sin mazo";
-          acc[key] = (acc[key] || 0) + 1;
-          return acc;
-        }, {}),
-      )
-        .map(([name, total]) => ({ name, total }))
-        .sort((a, b) => b.total - a.total)
-        .slice(0, 6),
-      syncSourceChart: Object.entries(
-        syncs.reduce<Record<string, number>>((acc, sync) => {
-          const key = sync.source || sync.sourceType || "desconocido";
-          acc[key] = (acc[key] || 0) + 1;
-          return acc;
-        }, {}),
-      ).map(([name, total]) => ({ name, total })),
-    };
-  }, [devicesQuery.data, gamesQuery.data, syncsQuery.data]);
-
-  const priorities = [
+  const totalTurns = games.reduce((sum, game) => sum + game.turns.length, 0);
+  const successRate = getSuccessRate(games);
+  const averageTurnTime = getAverageTurnTime(games);
+  const averageGameTime = getAverageGameTime(games);
+  const deckUsage = buildDeckUsageSeries(games);
+  const activitySeries = buildGameActivitySeries(games);
+  const syncSourceSeries = buildSyncSourceSeries(syncs);
+  const userRoleSeries = buildUserRoleSeries(users);
+  const userRecencySeries = buildUserRecencySeries(users);
+  const profileCoverageSeries = buildProfileCoverageSeries(profiles);
+  const profileAgeSeries = buildProfileAgeCategorySeries(profiles);
+  const profileRecencySeries = buildProfileRecencySeries(profiles);
+  const attentionRows = [
     {
-      title: "Partidas sin turnos",
-      value: metrics.gamesWithoutTurns,
-      description: "Ayuda a detectar sesiones que se crean pero no terminan de arrancar en aula.",
-      icon: Database,
+      label: "Partidas sin turnos",
+      value: String(games.filter((game) => game.turns.length === 0).length),
+      badge: "Revisar sesión incompleta",
     },
     {
-      title: "Dispositivos sin status",
-      value: metrics.devicesWithoutStatus,
-      description: "Conviene revisar parque visible antes de la próxima clase o instancia de uso.",
-      icon: Smartphone,
+      label: "Dispositivos sin status",
+      value: String(devices.filter((device) => !device.status).length),
+      badge: "Chequeo técnico sugerido",
     },
     {
-      title: "Syncs sin raw",
-      value: metrics.syncsWithoutRaw,
-      description: "Sirve como alerta temprana para trazabilidad incompleta o captura parcial.",
-      icon: Layers3,
+      label: "Syncs sin raw",
+      value: String(syncs.filter((sync) => (sync.rawRecordCount || sync.rawRecordIds.length || 0) === 0).length),
+      badge: "Cobertura de evidencia",
     },
-  ].filter((item) => item.value > 0);
+  ].filter((item) => Number(item.value) > 0);
+
+  const detailPanel = (() => {
+    if (!selectedDetail) return null;
+
+    const gameRows = (items = games): DashboardDetailRow[] =>
+      items.map((game) => {
+        const totalDuration = game.turns.reduce((sum, turn) => sum + (turn.playTimeSeconds || 0), 0);
+        return {
+          label: game.deckName || `Partida ${game.id}`,
+          value: `${game.turns.length} turnos`,
+          hint: `Fecha ${getDateBucketLabel(game.startDate || game.createdAt || game.updatedAt)} · duración ${formatDurationSeconds(totalDuration)}`,
+          badge: game.turns.length > 0 ? "Con actividad" : "Sin turnos",
+        };
+      });
+
+    const deviceRows = devices.map((device) => ({
+      label: device.name || device.deviceId || `Dispositivo ${device.id}`,
+      value: device.status || "Sin status",
+      hint: device.ownerUserName || device.ownerUserEmail || "Sin owner asignado",
+      badge: device.assignmentScope || "sin asignación",
+    }));
+
+    const userRows = users.map((user) => ({
+      label: user.fullName || user.email || `Usuario ${user.id}`,
+      value: user.roles.join(", ") || "Sin rol",
+      hint: user.email || "Sin email registrado",
+      badge: user.lastLoginAt ? `Login ${getDateBucketLabel(user.lastLoginAt)}` : "Sin login",
+    }));
+
+    const profileRows = profiles.map((profile) => ({
+      label: profile.displayName || `Perfil ${profile.id}`,
+      value: `${profile.sessionCount} sesiones`,
+      hint: `${profile.activeBindingCount} bindings activos · ${profile.ageCategory || "sin categoría"}`,
+      badge: profile.isActive ? "Activo" : "Inactivo",
+    }));
+
+    switch (selectedDetail.kind) {
+      case "metric-games":
+        return {
+          title: "Detalle de partidas",
+          description: "Sesiones registradas en el contexto docente.",
+          filterLabel: selectedDetail.label,
+          rows: gameRows(),
+        };
+      case "metric-turns":
+        return {
+          title: "Detalle de turnos jugados",
+          description: "Desglose por partida para ver dónde está concentrada la interacción.",
+          filterLabel: selectedDetail.label,
+          rows: gameRows().filter((row) => row.value !== "0 turnos"),
+        };
+      case "metric-success":
+        return {
+          title: "Detalle de acierto general",
+          description: "Acierto por partida para bajar del agregado al caso concreto.",
+          filterLabel: selectedDetail.label,
+          rows: games.map((game) => {
+            const successes = game.turns.filter((turn) => turn.success).length;
+            const rate = game.turns.length > 0 ? Math.round((successes / game.turns.length) * 100) : 0;
+            return {
+              label: game.deckName || `Partida ${game.id}`,
+              value: `${rate}%`,
+              hint: `${successes}/${game.turns.length} turnos correctos`,
+            };
+          }),
+        };
+      case "metric-turn-time":
+        return {
+          title: "Detalle de tiempo por turno",
+          description: "Promedio por partida para detectar ritmos más altos o más lentos.",
+          filterLabel: selectedDetail.label,
+          rows: games.map((game) => {
+            const total = game.turns.reduce((sum, turn) => sum + (turn.playTimeSeconds || 0), 0);
+            const average = game.turns.length > 0 ? total / game.turns.length : 0;
+            return {
+              label: game.deckName || `Partida ${game.id}`,
+              value: formatDurationSeconds(average),
+              hint: `${game.turns.length} turnos medidos`,
+            };
+          }),
+        };
+      case "metric-game-time":
+        return {
+          title: "Detalle de duración por partida",
+          description: "Tiempo acumulado por sesión usando la suma de turnos registrados.",
+          filterLabel: selectedDetail.label,
+          rows: games.map((game) => ({
+            label: game.deckName || `Partida ${game.id}`,
+            value: formatDurationSeconds(game.turns.reduce((sum, turn) => sum + (turn.playTimeSeconds || 0), 0)),
+            hint: `${game.turns.length} turnos`,
+          })),
+        };
+      case "metric-devices":
+        return {
+          title: "Detalle de dispositivos",
+          description: "Estado y owner asignado para el parque docente.",
+          filterLabel: selectedDetail.label,
+          rows: deviceRows,
+        };
+      case "metric-users":
+        return {
+          title: "Detalle de usuarios",
+          description: "Quiénes participan hoy y con qué roles.",
+          filterLabel: selectedDetail.label,
+          rows: userRows,
+        };
+      case "metric-profiles":
+        return {
+          title: "Detalle de perfiles",
+          description: "Perfiles disponibles con actividad y binding.",
+          filterLabel: selectedDetail.label,
+          rows: profileRows,
+        };
+      case "activity-date":
+        return {
+          title: `Actividad del ${selectedDetail.label}`,
+          description: "Partidas que caen en la fecha seleccionada del gráfico.",
+          filterLabel: selectedDetail.label,
+          rows: gameRows(games.filter((game) => getDateBucketLabel(game.startDate || game.createdAt || game.updatedAt) === selectedDetail.label)),
+        };
+      case "deck":
+        return {
+          title: `Detalle del mazo ${selectedDetail.label}`,
+          description: "Partidas asociadas al contenido seleccionado.",
+          filterLabel: selectedDetail.label,
+          rows: gameRows(games.filter((game) => normalizeLabel(game.deckName || "Sin mazo") === normalizeLabel(selectedDetail.label))),
+        };
+      case "user-role":
+        return {
+          title: `Usuarios con rol ${selectedDetail.label}`,
+          description: "Padrón filtrado según el rol elegido en la gráfica.",
+          filterLabel: selectedDetail.label,
+          rows: userRows.filter((row) => normalizeLabel(row.value).includes(normalizeLabel(selectedDetail.label))),
+        };
+      case "profile-coverage":
+        return {
+          title: `Cobertura de perfiles · ${selectedDetail.label}`,
+          description: "Perfiles que caen dentro del segmento seleccionado.",
+          filterLabel: selectedDetail.label,
+          rows: profileRows.filter((row, index) => {
+            const profile = profiles[index];
+            const normalized = normalizeLabel(selectedDetail.label);
+            if (normalized.includes("activos")) return profile.isActive;
+            if (normalized.includes("binding") && !normalized.includes("sin")) return profile.activeBindingCount > 0;
+            if (normalized.includes("sesiones")) return profile.sessionCount > 0;
+            if (normalized.includes("sin binding")) return profile.activeBindingCount === 0;
+            return false;
+          }),
+        };
+      case "user-recency":
+        return {
+          title: `Recencia de usuarios · ${selectedDetail.label}`,
+          description: "Usuarios que coinciden con el período seleccionado.",
+          filterLabel: selectedDetail.label,
+          rows: userRows.filter((row, index) => matchesRecencyLabel(selectedDetail.label, users[index]?.lastLoginAt)),
+        };
+      case "profile-age":
+        return {
+          title: `Perfiles por categoría · ${selectedDetail.label}`,
+          description: "Perfiles dentro de la cohorte elegida.",
+          filterLabel: selectedDetail.label,
+          rows: profileRows.filter((row, index) => normalizeLabel(profiles[index]?.ageCategory || "Sin categoría") === normalizeLabel(selectedDetail.label)),
+        };
+      case "sync-source":
+        return {
+          title: `Fuentes de sincronización · ${selectedDetail.label}`,
+          description: "Sesiones de sync que pertenecen a la fuente elegida.",
+          filterLabel: selectedDetail.label,
+          rows: syncs
+            .filter((sync) => normalizeLabel(sync.source || sync.sourceType || "desconocido") === normalizeLabel(selectedDetail.label))
+            .map((sync) => ({
+              label: sync.deckName || `Sync ${sync.id}`,
+              value: sync.status || "sin status",
+              hint: `${sync.rawRecordCount || sync.rawRecordIds.length || 0} raw records · ${getDateBucketLabel(sync.startedAt || sync.createdAt || sync.updatedAt)}`,
+              badge: sync.deviceId || sync.bleDeviceId || "sin device",
+            })),
+        };
+      case "profile-recency":
+        return {
+          title: `Recencia de perfiles · ${selectedDetail.label}`,
+          description: "Perfiles dentro del período seleccionado.",
+          filterLabel: selectedDetail.label,
+          rows: profileRows.filter((row, index) => matchesRecencyLabel(selectedDetail.label, profiles[index]?.lastSessionAt)),
+        };
+      case "alert": {
+        const normalized = normalizeLabel(selectedDetail.label);
+        if (normalized.includes("partidas sin turnos")) {
+          return {
+            title: "Partidas sin turnos",
+            description: "Sesiones que conviene revisar porque no muestran interacción.",
+            filterLabel: selectedDetail.label,
+            rows: gameRows(games.filter((game) => game.turns.length === 0)),
+          };
+        }
+        if (normalized.includes("dispositivos sin status")) {
+          return {
+            title: "Dispositivos sin status",
+            description: "Equipos que necesitan chequeo técnico o actualización de estado.",
+            filterLabel: selectedDetail.label,
+            rows: deviceRows.filter((row) => row.value === "Sin status"),
+          };
+        }
+        return {
+          title: "Syncs sin raw",
+          description: "Sincronizaciones sin evidencia cruda disponible.",
+          filterLabel: selectedDetail.label,
+          rows: syncs
+            .filter((sync) => (sync.rawRecordCount || sync.rawRecordIds.length || 0) === 0)
+            .map((sync) => ({
+              label: sync.deckName || `Sync ${sync.id}`,
+              value: sync.status || "sin status",
+              hint: `Fuente ${sync.source || sync.sourceType || "desconocida"}`,
+            })),
+        };
+      }
+      default:
+        return null;
+    }
+  })();
 
   return (
     <div className="space-y-8">
       <SectionHeader
         eyebrow="Docente"
-        title="Home operativa para acompañar el aula"
-        description="La base visual puede seguir mejorando después, pero esta pantalla ya prioriza lo que una cuenta docente necesita ver para operar: partidas, dispositivos, sincronizaciones y señales concretas de revisión."
+        title="Dashboard analítico del aula"
+        description="Esta home deja de ser una portada y pasa a ser un tablero de lectura rápida: actividad, acierto, tiempos, mazos usados, sincronización y señales claras para intervenir." 
       />
 
-      <div className="grid gap-6 2xl:grid-cols-[1.4fr_0.9fr]">
-        <Card className="overflow-hidden border-none bg-[linear-gradient(135deg,#1f2a37_0%,#31465e_52%,#3f5a74_100%)] text-white shadow-[0_20px_60px_rgba(31,42,55,0.22)]">
-          <CardContent className="p-8 sm:p-10">
-            <div className="flex flex-wrap gap-2">
-              <Badge className="bg-white/14 text-white hover:bg-white/14">Aprendizaje colaborativo</Badge>
-              <Badge className="bg-white/14 text-white hover:bg-white/14">Sin pantallas</Badge>
-              <Badge className="bg-white/14 text-white hover:bg-white/14">Datos accionables</Badge>
-            </div>
-
-            <div className="mt-6 max-w-3xl">
-              <h2 className="text-3xl font-semibold tracking-tight sm:text-4xl">
-                La home docente ya no es solo una dirección visual, ahora también sirve para operar el día.
-              </h2>
-              <p className="mt-4 text-base leading-7 text-white/78">
-                Ordena rápido la actividad visible, señala fricciones comunes y deja accesos directos a los módulos que una sesión docente realmente usa.
-              </p>
-            </div>
-
-            <div className="mt-8 grid gap-4 md:grid-cols-3">
-              <div className="rounded-3xl bg-white/10 p-4 backdrop-blur-sm">
-                <p className="text-sm text-white/70">Visión general</p>
-                <p className="mt-2 text-lg font-medium">Panorama rápido de juego, parque y sincronización reciente.</p>
-              </div>
-              <div className="rounded-3xl bg-white/10 p-4 backdrop-blur-sm">
-                <p className="text-sm text-white/70">Operación cotidiana</p>
-                <p className="mt-2 text-lg font-medium">Qué revisar antes de una clase o de una nueva ronda de uso.</p>
-              </div>
-              <div className="rounded-3xl bg-white/10 p-4 backdrop-blur-sm">
-                <p className="text-sm text-white/70">Próxima capa</p>
-                <p className="mt-2 text-lg font-medium">Después podemos profundizar progreso por grupo y narrativa pedagógica.</p>
-              </div>
-            </div>
-
-            <div className="mt-8 flex flex-wrap gap-3">
-              <QuickActionLink href="/games" label="Ir a partidas" value={String(metrics.totalGames)} />
-              <QuickActionLink href="/devices" label="Revisar dispositivos" value={String(metrics.totalDevices)} />
-              <QuickActionLink href="/syncs" label="Ver syncs" value={String(metrics.totalSyncs)} />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
-          <CardHeader>
-            <CardTitle>Qué mirar hoy</CardTitle>
-            <CardDescription>
-              Señales concretas para ordenar la revisión diaria sin entrar todavía a cada módulo.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {priorities.length > 0 ? (
-              priorities.map((item) => (
-                <InsightRow key={item.title} title={`${item.title}: ${item.value}`} description={item.description} icon={item.icon} />
-              ))
-            ) : (
-              <>
-                <InsightRow
-                  title="Actividad reciente"
-                  description="Ver si hubo nuevas partidas, sincronizaciones o dispositivos activos desde la última revisión."
-                  icon={Sparkles}
-                />
-                <InsightRow
-                  title="Participación del grupo"
-                  description="Preparar una lectura más pedagógica sobre colaboración, progreso y tiempos de respuesta."
-                  icon={Users2}
-                />
-                <InsightRow
-                  title="Seguimiento por contenido"
-                  description="Identificar qué mazos o desafíos están apareciendo más para ordenar el análisis didáctico."
-                  icon={BookOpen}
-                />
-              </>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+      {detailPanel ? (
+        <DashboardDetailPanel
+          title={detailPanel.title}
+          description={detailPanel.description}
+          rows={detailPanel.rows}
+          activeFilterLabel={detailPanel.filterLabel}
+          onClear={() => setSelectedDetail(null)}
+        />
+      ) : null}
 
       <div className="grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(220px,1fr))]">
-        {isLoading ? (
-          Array.from({ length: 4 }).map((_, index) => <Skeleton key={index} className="h-36 rounded-2xl" />)
-        ) : (
-          <>
-            <MetricCard
-              label="Partidas visibles"
-              value={String(metrics.totalGames)}
-              hint="Lectura actual desde /game-data/, útil como primer termómetro del uso real."
-              icon={Database}
-            />
-            <MetricCard
-              label="Dispositivos visibles"
-              value={String(metrics.totalDevices)}
-              hint="Fuente base para el mapa operativo del parque MagicBox en circulación."
-              icon={Smartphone}
-            />
-            <MetricCard
-              label="Sincronizaciones visibles"
-              value={String(metrics.totalSyncs)}
-              hint="Sirve para validar el flujo actual mientras completamos la capa lossless."
-              icon={Layers3}
-            />
-            <MetricCard
-              label="Tiempo promedio por turno"
-              value={formatDurationSeconds(metrics.avgTurnTime)}
-              hint="Una señal temprana para detectar ritmo de juego y carga cognitiva."
-              icon={Activity}
-            />
-          </>
-        )}
+        <DashboardMetricCard label="Partidas" value={String(gamesQuery.data?.total || games.length)} hint="Volumen total de sesiones registradas en el contexto docente." icon={Database} isLoading={isLoading} onSelect={() => setSelectedDetail({ kind: "metric-games", label: "Partidas" })} isActive={selectedDetail?.kind === "metric-games"} />
+        <DashboardMetricCard label="Turnos jugados" value={String(totalTurns)} hint="Interacciones reales registradas en la muestra." icon={Activity} isLoading={isLoading} onSelect={() => setSelectedDetail({ kind: "metric-turns", label: "Turnos jugados" })} isActive={selectedDetail?.kind === "metric-turns"} />
+        <DashboardMetricCard label="Acierto general" value={`${successRate}%`} hint="Porcentaje de turnos correctos para lectura rápida de desempeño." icon={BookOpen} isLoading={isLoading} onSelect={() => setSelectedDetail({ kind: "metric-success", label: "Acierto general" })} isActive={selectedDetail?.kind === "metric-success"} />
+        <DashboardMetricCard label="Tiempo promedio por turno" value={formatDurationSeconds(averageTurnTime)} hint="Señal simple de ritmo de respuesta y carga cognitiva." icon={TimerReset} isLoading={isLoading} onSelect={() => setSelectedDetail({ kind: "metric-turn-time", label: "Tiempo promedio por turno" })} isActive={selectedDetail?.kind === "metric-turn-time"} />
+        <DashboardMetricCard label="Duración promedio por partida" value={formatDurationSeconds(averageGameTime)} hint="Tiempo acumulado por sesión usando los turnos registrados." icon={Layers3} isLoading={isLoading} onSelect={() => setSelectedDetail({ kind: "metric-game-time", label: "Duración promedio por partida" })} isActive={selectedDetail?.kind === "metric-game-time"} />
+        <DashboardMetricCard label="Dispositivos" value={String(devicesQuery.data?.total || devices.length)} hint="Parque disponible para operar la jornada." icon={Smartphone} isLoading={isLoading} onSelect={() => setSelectedDetail({ kind: "metric-devices", label: "Dispositivos" })} isActive={selectedDetail?.kind === "metric-devices"} />
+        <DashboardMetricCard label="Usuarios" value={String(usersQuery.data?.total || users.length)} hint="Padrón docente o institucional asociado a esta vista." icon={Database} isLoading={isLoading} onSelect={() => setSelectedDetail({ kind: "metric-users", label: "Usuarios" })} isActive={selectedDetail?.kind === "metric-users"} />
+        <DashboardMetricCard label="Perfiles" value={String(profiles.length)} hint="Perfiles o estudiantes que ya aparecen en la lectura del aula." icon={BookOpen} isLoading={isLoading} onSelect={() => setSelectedDetail({ kind: "metric-profiles", label: "Perfiles" })} isActive={selectedDetail?.kind === "metric-profiles"} />
       </div>
 
       {error ? (
         <Card className="border-destructive/20 bg-white/85">
           <CardContent className="p-6 text-sm text-destructive">
-            No pude cargar una parte del dashboard: {getErrorMessage(error)}
+            No pude cargar una parte del dashboard docente: {getErrorMessage(error)}
           </CardContent>
         </Card>
       ) : null}
 
-      <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
-        <CardHeader>
-          <CardTitle>Módulos principales</CardTitle>
-          <CardDescription>
-            Accesos rápidos a los frentes operativos que este perfil usa de verdad.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-5 md:grid-cols-3">
-            <ModuleCard href="/games" title="Partidas" description="Lectura del uso real, mazos activos y sesiones visibles." icon={Database} />
-            <ModuleCard href="/devices" title="Dispositivos" description="Chequeo rápido del parque visible y de señales de hardware para el aula." icon={Smartphone} />
-            <ModuleCard href="/syncs" title="Sincronizaciones" description="Validación del flujo reciente y trazabilidad básica de la captura." icon={Link2} />
-          </div>
-        </CardContent>
-      </Card>
-
-      <div className="grid gap-6 2xl:grid-cols-2">
-        <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
-          <CardHeader>
-            <CardTitle>Partidas por mazo</CardTitle>
-            <CardDescription>
-              Un primer bloque de lectura curricular para ver qué materiales están teniendo más movimiento.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="h-80">
-            {isLoading ? (
-              <Skeleton className="h-full w-full rounded-2xl" />
-            ) : metrics.deckChart.length === 0 ? (
-              <div className="flex h-full items-center justify-center rounded-2xl border border-dashed border-border text-sm text-muted-foreground">
-                Sin partidas para graficar todavía.
-              </div>
-            ) : (
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={metrics.deckChart}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e7dcc9" />
-                  <XAxis dataKey="name" tickLine={false} axisLine={false} fontSize={12} />
-                  <YAxis allowDecimals={false} tickLine={false} axisLine={false} />
-                  <Tooltip />
-                  <Bar dataKey="total" fill="#e67e22" radius={[10, 10, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
-          <CardHeader>
-            <CardTitle>Sincronizaciones por origen</CardTitle>
-            <CardDescription>
-              Este bloque después puede evolucionar a salud de sincronización y consistencia de captura.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="h-80">
-            {isLoading ? (
-              <Skeleton className="h-full w-full rounded-2xl" />
-            ) : metrics.syncSourceChart.length === 0 ? (
-              <div className="flex h-full items-center justify-center rounded-2xl border border-dashed border-border text-sm text-muted-foreground">
-                No hay sincronizaciones visibles todavía.
-              </div>
-            ) : (
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={metrics.syncSourceChart}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e7dcc9" />
-                  <XAxis dataKey="name" tickLine={false} axisLine={false} fontSize={12} />
-                  <YAxis allowDecimals={false} tickLine={false} axisLine={false} />
-                  <Tooltip />
-                  <Bar dataKey="total" fill="#3f7d6b" radius={[10, 10, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            )}
-          </CardContent>
-        </Card>
+      <div className="grid gap-6 xl:grid-cols-2">
+        <DashboardLineChartCard
+          title="Actividad reciente"
+          description="Cruza partidas y turnos por fecha para ver si la jornada viene cargada, plana o con caídas puntuales."
+          data={activitySeries}
+          onDatumSelect={(label) => setSelectedDetail({ kind: "activity-date", label })}
+          activeDatumLabel={selectedDetail?.kind === "activity-date" ? selectedDetail.label : null}
+        />
+        <DashboardBarChartCard
+          title="Mazos más usados"
+          description="Qué contenidos aparecen más en la actividad del aula."
+          data={deckUsage}
+          onDatumSelect={(label) => setSelectedDetail({ kind: "deck", label })}
+          activeDatumLabel={selectedDetail?.kind === "deck" ? selectedDetail.label : null}
+        />
       </div>
 
-      <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
-        <CardHeader>
-          <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-            <div>
-              <CardTitle>Base visual de teacher ya encaminada</CardTitle>
-              <CardDescription>
-                {user?.fullName || "La cuenta autenticada"} ya tiene un circuito más consistente entre home, partidas, dispositivos y syncs.
-                Si seguimos después, el siguiente salto natural sería profundizar lectura pedagógica por grupo y estudiante.
-              </CardDescription>
-            </div>
-            <div className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-4 py-2 text-sm font-medium text-primary">
-              Visual base cerrada
-              <ArrowRight className="size-4" />
-            </div>
-          </div>
-        </CardHeader>
-      </Card>
+      <div className="grid gap-6 xl:grid-cols-2">
+        <DashboardBarChartCard
+          title="Usuarios por rol"
+          description="Cómo se reparte hoy la actividad entre los tipos de usuario que participan de la experiencia."
+          data={userRoleSeries}
+          onDatumSelect={(label) => setSelectedDetail({ kind: "user-role", label })}
+          activeDatumLabel={selectedDetail?.kind === "user-role" ? selectedDetail.label : null}
+        />
+        <DashboardBarChartCard
+          title="Cobertura de perfiles"
+          description="Lectura rápida de perfiles activos, con binding y con sesiones reales dentro del aula."
+          data={profileCoverageSeries}
+          onDatumSelect={(label) => setSelectedDetail({ kind: "profile-coverage", label })}
+          activeDatumLabel={selectedDetail?.kind === "profile-coverage" ? selectedDetail.label : null}
+        />
+      </div>
+
+      <div className="grid gap-6 xl:grid-cols-2">
+        <DashboardBarChartCard
+          title="Recencia del padrón"
+          description="Qué parte de los usuarios tuvo login reciente y qué parte sigue fría o sin señales de acceso."
+          data={userRecencySeries}
+          onDatumSelect={(label) => setSelectedDetail({ kind: "user-recency", label })}
+          activeDatumLabel={selectedDetail?.kind === "user-recency" ? selectedDetail.label : null}
+        />
+        <DashboardBarChartCard
+          title="Perfiles por categoría"
+          description="Cohortes por categoría etaria para entender rápidamente a qué tramo del aula responde más la actividad."
+          data={profileAgeSeries}
+          onDatumSelect={(label) => setSelectedDetail({ kind: "profile-age", label })}
+          activeDatumLabel={selectedDetail?.kind === "profile-age" ? selectedDetail.label : null}
+        />
+      </div>
+
+      <div className="grid gap-6 xl:grid-cols-2">
+        <DashboardBarChartCard
+          title="Fuentes de sincronización"
+          description="Cómo está entrando la actividad: útil para detectar dependencia de una sola fuente o huecos de captura."
+          data={syncSourceSeries}
+          onDatumSelect={(label) => setSelectedDetail({ kind: "sync-source", label })}
+          activeDatumLabel={selectedDetail?.kind === "sync-source" ? selectedDetail.label : null}
+        />
+        <DashboardBarChartCard
+          title="Recencia de perfiles"
+          description="Qué tan recientes son las últimas sesiones por perfil para detectar cohortes activas, tibias o inactivas."
+          data={profileRecencySeries}
+          onDatumSelect={(label) => setSelectedDetail({ kind: "profile-recency", label })}
+          activeDatumLabel={selectedDetail?.kind === "profile-recency" ? selectedDetail.label : null}
+        />
+      </div>
+
+      <div className="grid gap-6 xl:grid-cols-2">
+        <DashboardTopListCard
+          title="Qué conviene mirar hoy"
+          description="Alertas priorizadas para no tener que entrar a ciegas a cada módulo."
+          items={attentionRows}
+          emptyLabel="No aparecen alertas fuertes ahora mismo. La actividad se ve razonablemente sana."
+          onItemSelect={(label) => setSelectedDetail({ kind: "alert", label })}
+          activeItemLabel={selectedDetail?.kind === "alert" ? selectedDetail.label : null}
+        />
+      </div>
+
     </div>
   );
 }

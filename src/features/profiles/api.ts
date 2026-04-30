@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { apiEndpoints } from "@/lib/api/endpoints";
-import { apiRequest } from "@/lib/api/fetcher";
+import { apiRequest, normalizeImageUrl } from "@/lib/api/fetcher";
 import type { JsonObject } from "@/lib/api/types";
 import type { ProfileOverviewRecord } from "@/features/profiles/types";
 
@@ -25,7 +25,7 @@ function normalizeProfile(input: unknown): ProfileOverviewRecord {
   return {
     id: String(record.id || ""),
     displayName: String(record.display_name || ""),
-    avatarUrl: (record.avatar_url as string | undefined) || null,
+    avatarUrl: normalizeImageUrl((record.avatar_url as string | undefined) || null),
     age: typeof record.age === "number" ? record.age : record.age == null ? null : Number(record.age),
     ageCategory: (record.age_category as string | undefined) || null,
     isActive: Boolean(record.is_active),

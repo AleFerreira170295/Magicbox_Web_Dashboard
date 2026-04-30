@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { apiEndpoints } from "@/lib/api/endpoints";
-import { apiRequest } from "@/lib/api/fetcher";
+import { apiRequest, normalizeImageUrl } from "@/lib/api/fetcher";
 import type { JsonObject, PaginatedResponse } from "@/lib/api/types";
 import { resolvePermissions, resolveRoles } from "@/features/auth/role-resolver";
 import type {
@@ -76,7 +76,7 @@ function normalizeUser(input: unknown): UserRecord {
     status: deletedAt ? "deleted" : "active",
     phoneNumber: readString(record, "phone_number", "phoneNumber") || null,
     address: normalizeAddress(record.address),
-    imageUrl: readString(record, "image_url", "imageUrl") || null,
+    imageUrl: normalizeImageUrl(readString(record, "image_url", "imageUrl")),
     createdAt: readString(record, "created_at", "createdAt") || null,
     updatedAt: readString(record, "updated_at", "updatedAt") || null,
     deletedAt,

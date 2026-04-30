@@ -125,7 +125,7 @@ describe("AppShell navigation", () => {
     expect(screen.getAllByText("Alertas territoriales").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Territorios e instituciones").length).toBeGreaterThan(0);
     expect(screen.getByText("Vista gobierno")).toBeInTheDocument();
-    expect(screen.getByText(/lectura territorial, alertas ejecutivas y seguimiento agregado/i)).toBeInTheDocument();
+    expect(screen.getByText(/seguimiento territorial, alertas ejecutivas y lectura agregada/i)).toBeInTheDocument();
 
     expect(screen.queryByText("Usuarios")).not.toBeInTheDocument();
     expect(screen.queryByText("Permisos")).not.toBeInTheDocument();
@@ -151,7 +151,7 @@ describe("AppShell navigation", () => {
     expect(screen.getAllByText("Partidas").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Sincronizaciones").length).toBeGreaterThan(0);
     expect(screen.getByText("Vista investigación")).toBeInTheDocument();
-    expect(screen.getByText(/evidencia visible, consistencia entre sync y partida/i)).toBeInTheDocument();
+    expect(screen.getByText(/evidencia capturada, consistencia entre sync y partida/i)).toBeInTheDocument();
 
     expect(screen.queryByText("Dispositivos")).not.toBeInTheDocument();
     expect(screen.queryByText("Usuarios")).not.toBeInTheDocument();
@@ -176,7 +176,7 @@ describe("AppShell navigation", () => {
     expect(screen.getAllByText("Partidas").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Sincronizaciones").length).toBeGreaterThan(0);
     expect(screen.getByText("Vista familia")).toBeInTheDocument();
-    expect(screen.getByText(/lectura simple y cuidada de actividad visible/i)).toBeInTheDocument();
+    expect(screen.getByText(/seguimiento simple y claro de la actividad/i)).toBeInTheDocument();
 
     expect(screen.getAllByText("Dispositivos").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Usuarios").length).toBeGreaterThan(0);

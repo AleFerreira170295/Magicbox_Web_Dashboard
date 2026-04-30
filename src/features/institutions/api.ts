@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { apiEndpoints } from "@/lib/api/endpoints";
-import { apiRequest } from "@/lib/api/fetcher";
+import { apiRequest, normalizeImageUrl } from "@/lib/api/fetcher";
 import type { JsonObject, PaginatedResponse } from "@/lib/api/types";
 import type {
   CreateInstitutionPayload,
@@ -70,7 +70,7 @@ function normalizeOperationalPreview(value: unknown): InstitutionOperationalPrev
             : Array.isArray(user.roleCodes)
               ? user.roleCodes.filter((value): value is string => typeof value === "string")
               : [],
-          imageUrl: readString(user, "image_url", "imageUrl") || null,
+          imageUrl: normalizeImageUrl(readString(user, "image_url", "imageUrl")),
           updatedAt: readString(user, "updated_at", "updatedAt") || null,
         };
       })
@@ -143,7 +143,7 @@ function normalizeInstitution(input: unknown): InstitutionRecord {
     name,
     email,
     phoneNumber: readString(record, "phone_number", "phoneNumber", "phone") || "",
-    imageUrl: readString(record, "image_url", "imageUrl") || null,
+    imageUrl: normalizeImageUrl(readString(record, "image_url", "imageUrl")),
     address,
     url: readString(record, "url", "website") || null,
     code: readString(record, "code", "slug") || null,

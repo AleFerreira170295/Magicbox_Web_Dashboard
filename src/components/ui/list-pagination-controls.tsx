@@ -1,26 +1,17 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 
 export type PaginationPageSize = 10 | 20 | 50;
 
 export function useListPagination<T>(items: T[], initialPageSize: PaginationPageSize = 10) {
   const [pageSize, setPageSize] = useState<PaginationPageSize>(initialPageSize);
-  const [currentPage, setCurrentPage] = useState(1);
+  const [requestedPage, setRequestedPage] = useState(1);
 
   const totalItems = items.length;
   const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
-
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [items, pageSize]);
-
-  useEffect(() => {
-    if (currentPage > totalPages) {
-      setCurrentPage(totalPages);
-    }
-  }, [currentPage, totalPages]);
+  const currentPage = Math.min(Math.max(requestedPage, 1), totalPages);
 
   const paginatedItems = useMemo(() => {
     const start = (currentPage - 1) * pageSize;
@@ -32,16 +23,19 @@ export function useListPagination<T>(items: T[], initialPageSize: PaginationPage
 
   return {
     pageSize,
-    setPageSize,
+    setPageSize: (value: PaginationPageSize) => {
+      setPageSize(value);
+      setRequestedPage(1);
+    },
     currentPage,
-    setCurrentPage,
+    setCurrentPage: setRequestedPage,
     totalItems,
     totalPages,
     paginatedItems,
     paginationStart,
     paginationEnd,
-    goToPreviousPage: () => setCurrentPage((page) => Math.max(1, page - 1)),
-    goToNextPage: () => setCurrentPage((page) => Math.min(totalPages, page + 1)),
+    goToPreviousPage: () => setRequestedPage((page) => Math.max(1, Math.min(page, totalPages) - 1)),
+    goToNextPage: () => setRequestedPage((page) => Math.min(totalPages, Math.max(page, 1) + 1)),
   };
 }
 

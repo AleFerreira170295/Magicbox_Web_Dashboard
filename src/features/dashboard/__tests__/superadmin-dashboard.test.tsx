@@ -63,10 +63,13 @@ vi.mock("@/features/health/api", () => ({
 
 vi.mock("recharts", () => ({
   ResponsiveContainer: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+  BarChart: ({ children }: { children: ReactNode }) => <div>{children}</div>,
   LineChart: ({ children }: { children: ReactNode }) => <div>{children}</div>,
   CartesianGrid: () => null,
   XAxis: () => null,
+  YAxis: () => null,
   Tooltip: () => null,
+  Bar: () => null,
   Line: () => null,
 }));
 
@@ -131,7 +134,8 @@ describe("SuperadminDashboard", () => {
 
     expect(screen.queryByText("Health")).not.toBeInTheDocument();
     expect(screen.queryByText("Settings")).not.toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /Profiles/i })).toBeInTheDocument();
+    expect(screen.getByText("Admin institucional")).toBeInTheDocument();
+    expect(screen.getByText("Centro de control MagicBox")).toBeInTheDocument();
     expect(useBasicHealthMock).toHaveBeenCalledWith({ enabled: false });
     expect(useReadinessHealthMock).toHaveBeenCalledWith({ enabled: false });
   });
@@ -149,8 +153,7 @@ describe("SuperadminDashboard", () => {
     renderDashboard();
 
     expect(screen.getByText("Dirección")).toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: /Usuarios/i })).not.toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /Instituciones/i })).toBeInTheDocument();
+    expect(screen.getByText("Centro de control MagicBox")).toBeInTheDocument();
     expect(screen.queryByText("Health")).not.toBeInTheDocument();
     expect(screen.queryByText("Settings")).not.toBeInTheDocument();
   });
@@ -240,7 +243,9 @@ describe("SuperadminDashboard", () => {
     expect(screen.getByText("Tipo de usuario")).toBeInTheDocument();
     expect(screen.getByText("Mini tendencias")).toBeInTheDocument();
     expect(screen.getByText("Comparativa entre períodos")).toBeInTheDocument();
-    expect(screen.getByText("Semáforos operativos")).toBeInTheDocument();
+    expect(screen.getByText("Semáforos de seguimiento")).toBeInTheDocument();
+    expect(screen.getByText("Usuarios por rol")).toBeInTheDocument();
+    expect(screen.getByText("Instituciones con mayor carga")).toBeInTheDocument();
     expect(useSystemDashboardSummaryMock).toHaveBeenCalledWith(
       "token",
       {
@@ -336,10 +341,13 @@ describe("SuperadminDashboard", () => {
     expect(screen.getByText("Gobierno")).toBeInTheDocument();
     expect(screen.getByText("Mini tendencias")).toBeInTheDocument();
     expect(screen.getByText("Comparativa entre períodos")).toBeInTheDocument();
-    expect(screen.getByText("Semáforos operativos")).toBeInTheDocument();
+    expect(screen.getByText("Semáforos de seguimiento")).toBeInTheDocument();
     expect(screen.getByText("Drilldown territorial")).toBeInTheDocument();
     expect(screen.getByText("Alertas por territorio")).toBeInTheDocument();
     expect(screen.getByText("Índice territorial compuesto")).toBeInTheDocument();
+    expect(screen.getByText("Usuarios por tipo")).toBeInTheDocument();
+    expect(screen.getByText("Cobertura de perfiles")).toBeInTheDocument();
+    expect(screen.getByText("Instituciones con mayor carga")).toBeInTheDocument();
     expect(screen.getByText("Vistas ejecutivas guardadas")).toBeInTheDocument();
     expect(screen.getByText("Presets inteligentes del sistema")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Territorios críticos/i })).toBeInTheDocument();
@@ -541,5 +549,78 @@ describe("SuperadminDashboard", () => {
     fireEvent.click(screen.getByRole("button", { name: /Volver a vista general/i }));
 
     expect(replaceMock).toHaveBeenCalledWith("/dashboard?range=30d");
+  });
+
+  it("opens executive detail filters from cards and charts", () => {
+    useAuthMock.mockReturnValue({
+      tokens: { accessToken: "token", refreshToken: "refresh" },
+      user: {
+        fullName: "Ada Admin",
+        roles: ["admin"],
+        permissions: ["feature:read", "ble_device:read"],
+      },
+    });
+    useSystemDashboardSummaryMock.mockReturnValue(
+      okQuery({
+        filters: {
+          selected_range: "30d",
+          selected_institution_id: null,
+          selected_country_code: null,
+          selected_state: null,
+          selected_city: null,
+          selected_user_type: null,
+          selected_role_code: null,
+          range_options: [{ value: "30d", label: "30 días" }],
+          institutions: [{ id: "ec-1", name: "Colegio Norte" }],
+          countries: [],
+          states: [],
+          cities: [],
+          user_types: ["web"],
+          role_codes: ["admin"],
+          window_start: null,
+          trend_range: "30d",
+        },
+        totals: { users: 25, institutions: 1, devices: 5, syncs: 2, games: 8, profiles: 4, turns: 14 },
+        stats: {
+          institutions_needing_review: 0,
+          devices_without_status: 1,
+          devices_with_owner: 5,
+          devices_with_firmware: 3,
+          home_devices: 1,
+          institution_devices: 4,
+          syncs_with_raw: 2,
+          total_players: 16,
+          successful_turns: 10,
+          games_with_turns: 5,
+          active_profiles: 4,
+          profiles_with_bindings: 3,
+          profiles_with_sessions: 2,
+        },
+        trends: [
+          { date: "2026-04-20", syncs: 1, games: 2, turns: 3, successful_turns: 2, success_rate: 66.7 },
+        ],
+        comparisons: { window_label: "30d", current_start: "2026-03-20T00:00:00Z", current_end: "2026-04-20T00:00:00Z", previous_start: "2026-02-18T00:00:00Z", previous_end: "2026-03-20T00:00:00Z", metrics: [] },
+        alerts: [],
+        segments: {
+          role_mix: [{ key: "admin", count: 1 }],
+          user_type_mix: [{ key: "web", count: 1 }],
+          top_institutions: [{ id: "ec-1", name: "Colegio Norte", users: 10, games: 8, turns: 14, state: "Metropolitana", city: "Santiago" }],
+          top_territories: [],
+          territorial_hierarchy: [],
+          territory_alerts: [],
+          territory_scores: [],
+        },
+      }),
+    );
+
+    renderDashboard();
+
+    fireEvent.click(screen.getByRole("button", { name: /Ver detalle Usuarios/i }));
+    expect(screen.getByText(/Detalle de usuarios/i)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /Filtrar Mini tendencias por 2026-04-20/i }));
+    expect(screen.getByText(/Mini tendencias · 2026-04-20/i)).toBeInTheDocument();
+
+    expect(screen.queryByText(/Balance operativo del alcance/i)).not.toBeInTheDocument();
   });
 });

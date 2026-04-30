@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { FileSpreadsheet, FolderPlus, Upload, Users } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -56,6 +56,22 @@ export function StudentImportPanel({
   institutionName?: string | null;
   user?: AuthUser | null;
 }) {
+  if (!institutionId) return null;
+
+  return <StudentImportPanelContent key={institutionId} token={token} institutionId={institutionId} institutionName={institutionName} user={user} />;
+}
+
+function StudentImportPanelContent({
+  token,
+  institutionId,
+  institutionName,
+  user,
+}: {
+  token?: string;
+  institutionId: string;
+  institutionName?: string | null;
+  user?: AuthUser | null;
+}) {
   const queryClient = useQueryClient();
   const [selectedGroupId, setSelectedGroupId] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -68,23 +84,8 @@ export function StudentImportPanel({
   const classGroups = useMemo(() => classGroupsQuery.data?.data ?? [], [classGroupsQuery.data?.data]);
   const importEnabled = canImportStudents(user);
   const createEnabled = canCreateGroups(user);
-
-  useEffect(() => {
-    setSelectedFile(null);
-    setFeedback(null);
-    setGroupFeedback(null);
-    setGroupName("");
-    setGroupCode("");
-    setSelectedGroupId("");
-  }, [institutionId]);
-
-  useEffect(() => {
-    if (!selectedGroupId && classGroups.length > 0) {
-      setSelectedGroupId(classGroups[0].id);
-    }
-  }, [classGroups, selectedGroupId]);
-
-  const selectedGroup = classGroups.find((item) => item.id === selectedGroupId) ?? null;
+  const effectiveSelectedGroupId = selectedGroupId || classGroups[0]?.id || "";
+  const selectedGroup = classGroups.find((item) => item.id === effectiveSelectedGroupId) ?? null;
 
   const createGroupMutation = useMutation({
     mutationFn: async () => {
@@ -122,9 +123,9 @@ export function StudentImportPanel({
   const importMutation = useMutation({
     mutationFn: async () => {
       if (!token) throw new Error("La sesión no tiene token activo.");
-      if (!selectedGroupId) throw new Error("Seleccioná primero el grupo destino.");
+      if (!effectiveSelectedGroupId) throw new Error("Seleccioná primero el grupo destino.");
       if (!selectedFile) throw new Error("Elegí un archivo Excel .xlsx para continuar.");
-      return importClassGroupStudents(token, selectedGroupId, selectedFile);
+      return importClassGroupStudents(token, effectiveSelectedGroupId, selectedFile);
     },
     onSuccess: async (result) => {
       setFeedback({
@@ -141,8 +142,6 @@ export function StudentImportPanel({
       setFeedback({ type: "error", message: getErrorMessage(error) });
     },
   });
-
-  if (!institutionId) return null;
 
   return (
     <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
@@ -231,7 +230,7 @@ export function StudentImportPanel({
                 <Label htmlFor="student-import-group">Grupo destino</Label>
                 <select
                   id="student-import-group"
-                  value={selectedGroupId}
+                  value={effectiveSelectedGroupId}
                   onChange={(event) => setSelectedGroupId(event.target.value)}
                   disabled={!importEnabled || classGroupsQuery.isLoading || importMutation.isPending}
                   className="flex h-11 w-full rounded-2xl border border-input bg-white/92 px-4 py-2 text-sm text-foreground shadow-[0_10px_24px_rgba(66,128,164,0.08)] outline-none transition focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
@@ -252,7 +251,7 @@ export function StudentImportPanel({
                       key={group.id}
                       type="button"
                       onClick={() => setSelectedGroupId(group.id)}
-                      className={`rounded-full border px-3 py-1.5 text-xs transition ${selectedGroupId === group.id ? "border-primary/40 bg-primary/10 text-primary" : "border-border bg-white/80 text-muted-foreground hover:border-primary/30 hover:text-foreground"}`}
+                      className={`rounded-full border px-3 py-1.5 text-xs transition ${effectiveSelectedGroupId === group.id ? "border-primary/40 bg-primary/10 text-primary" : "border-border bg-white/80 text-muted-foreground hover:border-primary/30 hover:text-foreground"}`}
                     >
                       {group.name}
                     </button>

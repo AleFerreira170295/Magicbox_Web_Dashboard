@@ -1,5 +1,5 @@
 import { apiEndpoints } from "@/lib/api/endpoints";
-import { apiRequest, ApiError } from "@/lib/api/fetcher";
+import { apiRequest, ApiError, normalizeImageUrl } from "@/lib/api/fetcher";
 import type { JsonObject } from "@/lib/api/types";
 import { resolvePermissions, resolveRoles } from "@/features/auth/role-resolver";
 import type { AuthTokens, AuthUser, LoginPayload } from "@/features/auth/types";
@@ -36,7 +36,7 @@ export function normalizeAuthUser(input: unknown): AuthUser {
     firstName,
     lastName,
     fullName,
-    imageUrl: readString(record, "image_url", "imageUrl") || null,
+    imageUrl: normalizeImageUrl(readString(record, "image_url", "imageUrl")),
     userType: readString(record, "user_type", "userType") || null,
     educationalCenterId:
       readString(record, "educational_center_id", "educationalCenterId") || null,

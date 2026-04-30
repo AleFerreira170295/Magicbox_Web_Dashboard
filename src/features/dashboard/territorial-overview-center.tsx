@@ -96,7 +96,7 @@ export function TerritorialOverviewCenter() {
       <SectionHeader
         eyebrow="Gobierno"
         title="Territorios e instituciones"
-        description="Pantalla operativa para ubicar dónde están hoy las instituciones con más movimiento y cómo se distribuye el rendimiento territorial."
+        description="Pantalla para ubicar dónde están hoy las instituciones con más movimiento y cómo se distribuye el rendimiento territorial."
         actions={
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-sm text-muted-foreground">Rango</span>
@@ -125,7 +125,7 @@ export function TerritorialOverviewCenter() {
               </div>
             </div>
             <Button type="button" variant="outline" size="sm" onClick={clearTerritorialScope}>
-              Limpiar scope
+              Limpiar filtros
             </Button>
           </CardContent>
         </Card>
@@ -136,21 +136,21 @@ export function TerritorialOverviewCenter() {
           <CardContent className="p-5">
             <p className="text-sm text-muted-foreground">Territorios destacados</p>
             <p className="mt-2 text-3xl font-semibold text-foreground">{topTerritories.length}</p>
-            <p className="mt-2 text-sm text-muted-foreground">Con actividad visible para revisión ejecutiva.</p>
+            <p className="mt-2 text-sm text-muted-foreground">Con actividad reciente para revisión ejecutiva.</p>
           </CardContent>
         </Card>
         <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
           <CardContent className="p-5">
             <p className="text-sm text-muted-foreground">Instituciones destacadas</p>
             <p className="mt-2 text-3xl font-semibold text-foreground">{topInstitutions.length}</p>
-            <p className="mt-2 text-sm text-muted-foreground">Instituciones visibles en el top operativo actual.</p>
+            <p className="mt-2 text-sm text-muted-foreground">Instituciones presentes en el top actual.</p>
           </CardContent>
         </Card>
         <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
           <CardContent className="p-5">
             <p className="text-sm text-muted-foreground">Usuarios en top instituciones</p>
             <p className="mt-2 text-3xl font-semibold text-foreground">{topInstitutions.reduce((sum, item) => sum + item.users, 0)}</p>
-            <p className="mt-2 text-sm text-muted-foreground">Aparecen como señal rápida de cobertura visible.</p>
+            <p className="mt-2 text-sm text-muted-foreground">Aparecen como señal rápida de cobertura territorial.</p>
           </CardContent>
         </Card>
         <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
@@ -215,7 +215,7 @@ export function TerritorialOverviewCenter() {
                 </div>
               ))
             ) : (
-              <div className="rounded-2xl bg-white/80 p-4 text-sm text-muted-foreground">No hay jerarquía territorial visible con el recorte actual.</div>
+              <div className="rounded-2xl bg-white/80 p-4 text-sm text-muted-foreground">No hay jerarquía territorial disponible para el recorte actual.</div>
             )}
           </CardContent>
         </Card>
@@ -223,7 +223,7 @@ export function TerritorialOverviewCenter() {
         <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
           <CardHeader>
             <CardTitle>Territorios destacados</CardTitle>
-            <CardDescription>Los cortes con más movimiento visible para abrir seguimiento rápido.</CardDescription>
+            <CardDescription>Los cortes con más movimiento para abrir seguimiento rápido.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             {summaryQuery.isLoading ? (
@@ -250,7 +250,7 @@ export function TerritorialOverviewCenter() {
       <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
         <CardHeader>
           <CardTitle>Instituciones destacadas</CardTitle>
-          <CardDescription>Lectura operativa de instituciones visibles, con accesos rápidos a dashboard y alertas territoriales.</CardDescription>
+          <CardDescription>Lectura de instituciones destacadas, con accesos rápidos a dashboard y alertas territoriales.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
           {summaryQuery.isLoading ? (
@@ -292,7 +292,7 @@ export function TerritorialOverviewCenter() {
               </div>
             ))
           ) : (
-            <div className="rounded-2xl bg-white/80 p-4 text-sm text-muted-foreground">No hay instituciones destacadas visibles con el recorte actual.</div>
+            <div className="rounded-2xl bg-white/80 p-4 text-sm text-muted-foreground">No hay instituciones destacadas para el recorte actual.</div>
           )}
 
           {summaryQuery.error ? (
@@ -306,7 +306,7 @@ export function TerritorialOverviewCenter() {
       <Card className="border-none bg-[linear-gradient(135deg,#1f2a37_0%,#2c4156_55%,#39546f_100%)] text-white shadow-[0_20px_60px_rgba(31,42,55,0.22)]">
         <CardContent className="flex flex-wrap items-center justify-between gap-4 p-6">
           <div>
-            <p className="text-lg font-semibold">Siguiente salto operativo</p>
+            <p className="text-lg font-semibold">Siguiente paso</p>
             <p className="mt-2 text-sm text-white/72">Desde aquí puedes seguir a alertas territoriales o abrir el dashboard ejecutivo ya recortado al mismo contexto.</p>
           </div>
           <div className="flex flex-wrap gap-2">

@@ -207,12 +207,12 @@ describe("RelevantProfiles", () => {
     cleanup();
   });
 
-  it("anchors profiles and students to the visible institution when the view is institution-scoped", () => {
+  it("anchors profiles and students to the institution when the view is institution-scoped", () => {
     renderProfiles();
 
     expect(screen.getAllByText("Institution admin")[0]).toBeInTheDocument();
     expect(screen.getByText(/Institución activa: Colegio Norte/)).toBeInTheDocument();
-    expect(screen.getByText(/ahora suma estudiantes además de perfiles Home/i)).toBeInTheDocument();
+    expect(screen.getByText(/la tabla queda anclada a la institución asignada y suma estudiantes además de perfiles Home/i)).toBeInTheDocument();
     expect(screen.getAllByRole("combobox")[0]).toBeDisabled();
     expect(screen.getByRole("link", { name: "Luna Pérez" })).toHaveAttribute(
       "href",
@@ -242,13 +242,13 @@ describe("RelevantProfiles", () => {
     renderProfiles();
 
     expect(screen.getByText("Director")).toBeInTheDocument();
-    expect(screen.getByText(/mezclando perfiles Home y estudiantes visibles/i)).toBeInTheDocument();
+    expect(screen.getByText(/integrando perfiles Home y estudiantes/i)).toBeInTheDocument();
 
     expect(screen.getByRole("link", { name: "Luna Pérez" })).toHaveAttribute(
       "href",
       "/profiles/detail?kind=student&entityId=student-1&institutionId=ec-1&classGroupId=group-1",
     );
-    expect(screen.getByText(/Detalle visible en página dedicada/i)).toBeInTheDocument();
+    expect(screen.getByText(/Detalle en página dedicada/i)).toBeInTheDocument();
   });
 
   it("keeps the institution-scoped explanation even when no profiles or students are returned", () => {
@@ -266,8 +266,8 @@ describe("RelevantProfiles", () => {
     renderProfiles();
 
     expect(screen.getAllByText("Institution admin")[0]).toBeInTheDocument();
-    expect(screen.getByText(/ahora suma estudiantes además de perfiles Home/i)).toBeInTheDocument();
-    expect(screen.getByText(/No hay perfiles ni estudiantes visibles dentro de la institución actual/i)).toBeInTheDocument();
+    expect(screen.getByText(/la tabla queda anclada a la institución asignada y suma estudiantes además de perfiles Home/i)).toBeInTheDocument();
+    expect(screen.getByText(/No hay perfiles ni estudiantes dentro de la institución actual/i)).toBeInTheDocument();
     expect(screen.getAllByRole("combobox")[0]).toBeDisabled();
   });
 
@@ -281,7 +281,7 @@ describe("RelevantProfiles", () => {
     );
   });
 
-  it("lets the user paginate the listing and choose 10, 20 or 50 visible rows", () => {
+  it("lets the user paginate the listing and choose 10, 20 or 50 rows", () => {
     useProfilesOverviewMock.mockReturnValue(
       okQuery(
         Array.from({ length: 12 }, (_, index) => ({

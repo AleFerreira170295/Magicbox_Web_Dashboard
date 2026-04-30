@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { apiEndpoints } from "@/lib/api/endpoints";
-import { apiRequest } from "@/lib/api/fetcher";
+import { apiRequest, normalizeImageUrl } from "@/lib/api/fetcher";
 import type { JsonObject, PaginatedResponse } from "@/lib/api/types";
 import type { ListStudentsParams, StudentRecord } from "@/features/students/types";
 
@@ -30,7 +30,7 @@ function normalizeStudent(input: unknown): StudentRecord {
     lastName,
     fullName,
     fileNumber: readString(record, "file_number", "fileNumber") || "sin-legajo",
-    imageUrl: readString(record, "image_url", "imageUrl") || null,
+    imageUrl: normalizeImageUrl(readString(record, "image_url", "imageUrl")),
     createdAt: readString(record, "created_at", "createdAt") || null,
     updatedAt: readString(record, "updated_at", "updatedAt") || null,
     deletedAt: readString(record, "deleted_at", "deletedAt") || null,

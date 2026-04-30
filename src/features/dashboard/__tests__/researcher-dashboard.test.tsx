@@ -1,11 +1,14 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ResearcherDashboard } from "@/features/dashboard/researcher-dashboard";
 
 const useAuthMock = vi.fn();
 const useGamesMock = vi.fn();
 const useSyncSessionsMock = vi.fn();
+const useUsersMock = vi.fn();
+const useProfilesOverviewMock = vi.fn();
 
 vi.mock("@/features/auth/auth-context", () => ({
   useAuth: () => useAuthMock(),
@@ -17,6 +20,26 @@ vi.mock("@/features/games/api", () => ({
 
 vi.mock("@/features/syncs/api", () => ({
   useSyncSessions: (...args: unknown[]) => useSyncSessionsMock(...args),
+}));
+
+vi.mock("@/features/users/api", () => ({
+  useUsers: (...args: unknown[]) => useUsersMock(...args),
+}));
+
+vi.mock("@/features/profiles/api", () => ({
+  useProfilesOverview: (...args: unknown[]) => useProfilesOverviewMock(...args),
+}));
+
+vi.mock("recharts", () => ({
+  ResponsiveContainer: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+  BarChart: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+  LineChart: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+  CartesianGrid: () => null,
+  Tooltip: () => null,
+  XAxis: () => null,
+  YAxis: () => null,
+  Bar: () => null,
+  Line: () => null,
 }));
 
 function okPaginated(data: unknown[]) {
@@ -63,18 +86,43 @@ describe("ResearcherDashboard", () => {
       { id: "sync-1", source: "tablet", rawRecordCount: 0, rawRecordIds: [] },
       { id: "sync-2", source: "tablet", rawRecordCount: 2, rawRecordIds: [] },
     ])));
+    useUsersMock.mockReturnValue(okQuery(okPaginated([
+      { id: "user-1", fullName: "Rita Researcher", userType: "web", roles: ["researcher"] },
+      { id: "user-2", fullName: "Tom Teacher", userType: "mobile", roles: ["teacher"] },
+    ])));
+    useProfilesOverviewMock.mockReturnValue(okQuery([
+      { id: "profile-1", activeBindingCount: 1, isActive: true, sessionCount: 2 },
+      { id: "profile-2", activeBindingCount: 0, isActive: false, sessionCount: 0 },
+    ]));
   });
 
   afterEach(() => {
     cleanup();
   });
 
-  it("renders a research-oriented home with direct links to games and syncs", () => {
+  it("renders a research-oriented dashboard focused on evidence quality", () => {
     renderDashboard();
 
-    expect(screen.getByText("Home operativa para lectura de evidencia")).toBeInTheDocument();
+    expect(screen.getByText("Dashboard de evidencia y trazabilidad")).toBeInTheDocument();
+    expect(screen.getByText(/Alertas de calidad de evidencia/i)).toBeInTheDocument();
+    expect(screen.getByText(/Tipos de usuario en la muestra/i)).toBeInTheDocument();
+    expect(screen.getByText(/Cobertura de perfiles/i)).toBeInTheDocument();
+    expect(screen.getByText(/Altas y logins/i)).toBeInTheDocument();
+    expect(screen.getByText(/Cohortes de profundidad/i)).toBeInTheDocument();
     expect(screen.getByText(/Syncs sin raw/i)).toBeInTheDocument();
-    expect(screen.getAllByRole("link", { name: /Ver partidas|Partidas/i }).length).toBeGreaterThan(0);
-    expect(screen.getAllByRole("link", { name: /Ver syncs|Sincronizaciones/i }).length).toBeGreaterThan(0);
+    expect(screen.getByText(/Mazos en la muestra/i)).toBeInTheDocument();
+  });
+
+  it("opens researcher detail filters from metrics, charts and evidence alerts", () => {
+    renderDashboard();
+
+    fireEvent.click(screen.getByRole("button", { name: /Ver detalle Mazos activos/i }));
+    expect(screen.getByRole("heading", { name: /Mazos activos/i })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /Filtrar Fuentes de sync por tablet/i }));
+    expect(screen.getByText(/Fuentes de sync · tablet/i)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /Ver detalle de Syncs sin raw/i }));
+    expect(screen.getByText(/Focos de trazabilidad incompleta dentro de la muestra/i)).toBeInTheDocument();
   });
 });

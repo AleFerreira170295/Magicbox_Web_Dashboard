@@ -80,7 +80,7 @@ function getExperienceMeta(user: { roles?: string[]; permissions?: string[] } | 
     return {
       title: "Vista investigación",
       description:
-        "Evidencia visible, consistencia entre sync y partida, y lectura de muestra con menos ruido operativo.",
+        "Evidencia capturada, consistencia entre sync y partida, y lectura de muestra con menos ruido técnico.",
     };
   }
 
@@ -88,7 +88,7 @@ function getExperienceMeta(user: { roles?: string[]; permissions?: string[] } | 
     return {
       title: "Vista familia",
       description:
-        "Seguimiento simple y claro de actividad visible, sin fricción técnica ni administrativa.",
+        "Seguimiento simple y claro de la actividad, sin fricción técnica ni administrativa.",
     };
   }
 
@@ -104,7 +104,7 @@ function getExperienceMeta(user: { roles?: string[]; permissions?: string[] } | 
     return {
       title: "Vista institucional",
       description:
-        "Seguimiento institucional, gobernanza cotidiana y foco en lo que requiere acción visible hoy.",
+        "Seguimiento institucional, gobernanza cotidiana y foco en lo que requiere acción hoy.",
     };
   }
 
@@ -142,7 +142,7 @@ const navigation: NavigationItem[] = [
   {
     href: "/territorial-overview",
     label: "Territorios e instituciones",
-    summary: "Drilldown territorial con foco en cohortes e instituciones visibles.",
+    summary: "Drilldown territorial con foco en cohortes e instituciones.",
     section: "Resumen",
     icon: Building2,
     roles: ["government-viewer"] satisfies NavigationRole[],
@@ -150,7 +150,7 @@ const navigation: NavigationItem[] = [
   {
     href: "/devices",
     label: "Dispositivos",
-    summary: "Parque visible, ownership, alcance y estado operativo.",
+    summary: "Parque, ownership y estado de los dispositivos.",
     section: "Operación",
     icon: Smartphone,
     roles: ["teacher", "director", "admin", "institution-admin", "family"] satisfies NavigationRole[],
@@ -166,7 +166,7 @@ const navigation: NavigationItem[] = [
   {
     href: "/syncs",
     label: "Sincronizaciones",
-    summary: "Trazabilidad reciente, captura visible y consistencia de sync.",
+    summary: "Trazabilidad reciente, captura y consistencia de sincronizaciones.",
     section: "Operación",
     icon: Cable,
     roles: ["teacher", "director", "researcher", "family", "admin", "institution-admin"] satisfies NavigationRole[],
@@ -174,7 +174,7 @@ const navigation: NavigationItem[] = [
   {
     href: "/users",
     label: "Usuarios",
-    summary: "Padrón visible, roles y contexto operativo del alcance actual.",
+    summary: "Padrón, roles y contexto de usuarios.",
     section: "Gobernanza",
     icon: Users,
     roles: ["admin", "institution-admin", "family"] satisfies NavigationRole[],
@@ -215,7 +215,7 @@ const navigation: NavigationItem[] = [
   {
     href: "/settings",
     label: "Configuración",
-    summary: "Runtime efectivo, catálogos y configuración visible del sistema.",
+    summary: "Runtime efectivo, catálogos y configuración del sistema.",
     section: "Técnico",
     icon: Settings,
     roles: ["admin"] satisfies NavigationRole[],
