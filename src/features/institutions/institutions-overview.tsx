@@ -39,7 +39,7 @@ import type {
 import { buildInstitutionStudentDetailHref } from "@/features/institutions/student-route";
 import { useAllStudents } from "@/features/students/api";
 import { useUsers } from "@/features/users/api";
-import { cn, formatDateTime, formatDurationSeconds, getErrorMessage } from "@/lib/utils";
+import { cn, formatDateTime, getErrorMessage } from "@/lib/utils";
 
 function SummaryCard({
   label,
@@ -180,17 +180,6 @@ function getPersonInitials(name: string) {
 
   if (parts.length === 0) return "ST";
   return parts.map((part) => part.slice(0, 1).toUpperCase()).join("");
-}
-
-function getDateBucketLabel(value?: string | null) {
-  if (!value) return "Sin fecha";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-
-  return new Intl.DateTimeFormat("es-UY", {
-    day: "2-digit",
-    month: "2-digit",
-  }).format(date);
 }
 
 function InstitutionAvatar({

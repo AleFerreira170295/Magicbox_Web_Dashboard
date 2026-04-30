@@ -72,6 +72,7 @@ export function ProfileDetailPage({
   institutionId?: string | null;
   classGroupId?: string | null;
 }) {
+  void classGroupId;
   const { tokens } = useAuth();
 
   const profilesQuery = useProfilesOverview(tokens?.accessToken);

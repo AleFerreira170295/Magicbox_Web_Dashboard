@@ -294,13 +294,13 @@ export function SyncsTable() {
               {isFamilyView
                 ? "La vista simplifica la lectura y deja visibles solo las relaciones más importantes, sincronización, participantes, dispositivo y vínculo con una partida cuando existe."
                 : isResearcherView
-                ? "La vista mantiene el scope visible real y deja explícita la relación entre sync, dispositivo, usuario y partida correlacionada para revisar evidencia de captura sin bajar directo al raw completo."
+                ? "La vista mantiene el recorte real disponible y deja explícita la relación entre sync, dispositivo, usuario y partida correlacionada para revisar evidencia de captura sin bajar directo al raw completo."
                 : canReadOperationalSyncs
                 ? isTeacherView
                   ? "La lectura docente deja explícito por qué la sync entra en tu alcance, qué dispositivo la originó y si ya se puede conectar con participantes o una partida visible."
                   : isDirectorView
                   ? "La lectura directoral deja en primer plano cobertura, correlación con partidas y señales generales de trazabilidad para seguimiento institucional."
-                  : "Los resultados se abren al parque de dispositivos permitido por ACL. Si tu alcance está scopeado, vas a ver solo syncs de esa institución."
+                  : "Los resultados se abren al parque de dispositivos permitido por ACL. Si tu acceso queda limitado a una institución, vas a ver solo syncs de esa institución."
                 : "Esta sesión no tiene lectura operativa de BLE, así que la tabla queda limitada a tus propias sincronizaciones."}
             </p>
           </div>

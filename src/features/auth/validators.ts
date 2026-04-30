@@ -15,7 +15,7 @@ export function validateEmail(value: string | null | undefined, message = "Ingre
   return emailRegex.test(email) ? true : message;
 }
 
-export function validateName(value: string | null | undefined, message = "Nombre inválido") {
+export function validateName(value: string | null | undefined) {
   const required = requiredField(value, "Ingresa tu nombre");
   if (required) return required;
 
