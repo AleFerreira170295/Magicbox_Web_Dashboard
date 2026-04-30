@@ -25,7 +25,7 @@ function SummaryCard({
 }: {
   label: string;
   value: string;
-  hint: string;
+  hint?: string;
   icon: ComponentType<{ className?: string }>;
   tone?: "primary" | "warning" | "accent";
 }) {
@@ -42,7 +42,7 @@ function SummaryCard({
           <div>
             <p className="text-sm text-muted-foreground">{label}</p>
             <p className="mt-2 text-3xl font-semibold tracking-tight text-foreground">{value}</p>
-            <p className="mt-2 text-sm leading-6 text-muted-foreground">{hint}</p>
+            {hint ? <p className="mt-2 text-sm leading-6 text-muted-foreground">{hint}</p> : null}
           </div>
           <div className={`rounded-2xl p-3 ${toneClass}`}>
             <Icon className="size-5" />
@@ -135,11 +135,11 @@ export function SystemHealthDashboard() {
           Array.from({ length: 5 }).map((_, index) => <Skeleton key={index} className="h-32 rounded-2xl" />)
         ) : (
           <>
-            <SummaryCard label="App" value={metrics.appStatus} hint="Estado básico publicado por el backend." icon={HeartPulse} tone={metrics.appStatus === "healthy" ? "primary" : "warning"} />
-            <SummaryCard label="Readiness" value={metrics.readinessStatus} hint={`Checks degradados: ${metrics.readinessFailures}.`} icon={ShieldCheck} tone={metrics.readinessFailures === 0 ? "accent" : "warning"} />
-            <SummaryCard label="Uptime" value={metrics.uptime} hint="Tiempo de vida reportado por `/health/live`." icon={Activity} />
-            <SummaryCard label="Dispositivos sin estado" value={String(metrics.devicesWithoutStatus)} hint={`Home devices visibles: ${metrics.homeDevices}.`} icon={Smartphone} tone={metrics.devicesWithoutStatus === 0 ? "accent" : "warning"} />
-            <SummaryCard label="Syncs con raw" value={`${metrics.rawAvailableSyncs}/${metrics.totalSyncs}`} hint={`Games: ${metrics.totalGames}, Profiles: ${metrics.totalProfiles}.`} icon={Layers3} tone="accent" />
+            <SummaryCard label="App" value={metrics.appStatus} icon={HeartPulse} tone={metrics.appStatus === "healthy" ? "primary" : "warning"} />
+            <SummaryCard label="Readiness" value={metrics.readinessStatus} icon={ShieldCheck} tone={metrics.readinessFailures === 0 ? "accent" : "warning"} />
+            <SummaryCard label="Uptime" value={metrics.uptime} icon={Activity} />
+            <SummaryCard label="Dispositivos sin estado" value={String(metrics.devicesWithoutStatus)} icon={Smartphone} tone={metrics.devicesWithoutStatus === 0 ? "accent" : "warning"} />
+            <SummaryCard label="Syncs con raw" value={`${metrics.rawAvailableSyncs}/${metrics.totalSyncs}`} icon={Layers3} tone="accent" />
           </>
         )}
       </div>

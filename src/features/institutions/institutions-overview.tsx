@@ -49,7 +49,7 @@ function SummaryCard({
 }: {
   label: string;
   value: string;
-  hint: string;
+  hint?: string;
   icon: React.ComponentType<{ className?: string }>;
 }) {
   return (
@@ -59,7 +59,7 @@ function SummaryCard({
           <div>
             <p className="text-sm text-muted-foreground">{label}</p>
             <p className="mt-2 text-3xl font-semibold tracking-tight text-foreground">{value}</p>
-            <p className="mt-2 text-sm leading-6 text-muted-foreground">{hint}</p>
+            {hint ? <p className="mt-2 text-sm leading-6 text-muted-foreground">{hint}</p> : null}
           </div>
           <div className="rounded-2xl bg-primary/12 p-3 text-primary">
             <Icon className="size-5" />
@@ -891,43 +891,36 @@ export function InstitutionsOverview() {
             <SummaryCard
               label="Instituciones visibles"
               value={String(metrics.totalInstitutions)}
-              hint="Listado real sobre /educational-center con scope backend aplicado."
               icon={Building2}
             />
             <SummaryCard
               label="Usuarios vinculados"
               value={String(metrics.totalUsersLinked)}
-              hint="Cruce útil para saber qué instituciones tienen operación humana activa."
               icon={Users}
             />
             <SummaryCard
               label="Dispositivos vinculados"
               value={String(metrics.totalDevicesLinked)}
-              hint="Ayuda a leer despliegue físico y cobertura operativa por cliente."
               icon={Smartphone}
             />
             <SummaryCard
               label="Grupos vinculados"
               value={String(metrics.totalClassesLinked)}
-              hint="Ahora sale del backend compartido, útil para leer profundidad pedagógica por institución."
               icon={Building2}
             />
             <SummaryCard
               label="Estudiantes vinculados"
               value={String(metrics.totalStudentsLinked)}
-              hint="También viene consolidado desde el backend para no depender solo del dashboard."
               icon={Users}
             />
             <SummaryCard
               label="Necesitan revisión"
               value={String(metrics.reviewInstitutions)}
-              hint="Falta URL, teléfono o dirección básica para operar con comodidad."
               icon={ShieldCheck}
             />
             <SummaryCard
               label="Con logo cargado"
               value={String(metrics.institutionsWithLogo)}
-              hint="Ayuda a cerrar identidad visual y reconocimiento rápido dentro del dashboard."
               icon={Building2}
             />
           </>

@@ -300,7 +300,7 @@ function SummaryCard({
 }: {
   label: string;
   value: string;
-  hint: string;
+  hint?: string;
   icon: React.ComponentType<{ className?: string }>;
 }) {
   return (
@@ -310,7 +310,7 @@ function SummaryCard({
           <div>
             <p className="text-sm text-muted-foreground">{label}</p>
             <p className="mt-2 text-3xl font-semibold tracking-tight text-foreground">{value}</p>
-            <p className="mt-2 text-sm leading-6 text-muted-foreground">{hint}</p>
+            {hint ? <p className="mt-2 text-sm leading-6 text-muted-foreground">{hint}</p> : null}
           </div>
           <div className="rounded-2xl bg-primary/12 p-3 text-primary">
             <Icon className="size-5" />
@@ -1180,31 +1180,26 @@ export function UsersTable() {
             <SummaryCard
               label="Usuarios cargados"
               value={String(metrics.totalUsers)}
-              hint="Base total del padrón sobre el endpoint real del backend." 
               icon={Users}
             />
             <SummaryCard
               label="Con permisos explícitos"
               value={String(metrics.permissionedUsers)}
-              hint="Usuarios ya conectados a ACL más allá del tipo base." 
               icon={KeyRound}
             />
             <SummaryCard
               label="Perfiles admin"
               value={String(metrics.adminLikeUsers)}
-              hint="Detectados por permisos globales o bundles aplicados." 
               icon={ShieldCheck}
             />
             <SummaryCard
               label="Necesitan revisión"
               value={String(metrics.reviewUsers)}
-              hint="Falta de institución, teléfono o dirección." 
               icon={Phone}
             />
             <SummaryCard
               label="Con imagen cargada"
               value={String(metrics.usersWithImage)}
-              hint="Facilita reconocimiento rápido en lectura operativa y auditoría visual." 
               icon={Users}
             />
           </>

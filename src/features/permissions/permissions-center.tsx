@@ -35,7 +35,7 @@ function SummaryCard({
 }: {
   label: string;
   value: string;
-  hint: string;
+  hint?: string;
   icon: ComponentType<{ className?: string }>;
 }) {
   return (
@@ -45,7 +45,7 @@ function SummaryCard({
           <div>
             <p className="text-sm text-muted-foreground">{label}</p>
             <p className="mt-2 text-3xl font-semibold tracking-tight text-foreground">{value}</p>
-            <p className="mt-2 text-sm leading-6 text-muted-foreground">{hint}</p>
+            {hint ? <p className="mt-2 text-sm leading-6 text-muted-foreground">{hint}</p> : null}
           </div>
           <div className="rounded-2xl bg-primary/12 p-3 text-primary">
             <Icon className="size-5" />
@@ -298,25 +298,21 @@ export function PermissionsCenter() {
             <SummaryCard
               label="Actions activas"
               value={String(actions.length)}
-              hint="Catálogo operativo disponible para construir permisos explícitos."
               icon={KeyRound}
             />
             <SummaryCard
               label="Features modeladas"
               value={String(features.length)}
-              hint="Superficies del backend que hoy pueden participar en ACL."
               icon={Layers3}
             />
             <SummaryCard
               label="Permisos explícitos"
               value={String(permissions.length)}
-              hint="Overrides vigentes detectados por la API real de access-control."
               icon={ShieldEllipsis}
             />
             <SummaryCard
               label="Usuarios con override"
               value={String(model.explicitPermissionUsers)}
-              hint="Cuentas con personalización explícita por fuera del bundle de rol."
               icon={UserRound}
             />
           </>

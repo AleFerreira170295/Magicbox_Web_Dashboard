@@ -36,7 +36,7 @@ function SummaryCard({
 }: {
   label: string;
   value: string;
-  hint: string;
+  hint?: string;
   icon: ComponentType<{ className?: string }>;
 }) {
   return (
@@ -46,7 +46,7 @@ function SummaryCard({
           <div>
             <p className="text-sm text-muted-foreground">{label}</p>
             <p className="mt-2 text-3xl font-semibold tracking-tight text-foreground">{value}</p>
-            <p className="mt-2 text-sm leading-6 text-muted-foreground">{hint}</p>
+            {hint ? <p className="mt-2 text-sm leading-6 text-muted-foreground">{hint}</p> : null}
           </div>
           <div className="rounded-2xl bg-primary/12 p-3 text-primary">
             <Icon className="size-5" />
@@ -256,11 +256,11 @@ export function SystemSettingsCenter() {
           Array.from({ length: 5 }).map((_, index) => <Skeleton key={index} className="h-32 rounded-2xl" />)
         ) : (
           <>
-            <SummaryCard label="Entorno" value={metrics.environment} hint={`Backend ${metrics.version}.`} icon={Settings} />
-            <SummaryCard label="Readiness" value={metrics.readiness} hint={`Checks degradados: ${metrics.degradedChecks}.`} icon={RadioTower} />
-            <SummaryCard label="Features" value={String(metrics.featureCount)} hint="Catálogo real de features ACL." icon={SlidersHorizontal} />
-            <SummaryCard label="Acciones" value={String(metrics.actionCount)} hint="Acciones reales disponibles para permisos." icon={ShieldCheck} />
-            <SummaryCard label="OTA" value={metrics.otaConfigured} hint={`Canal ${metrics.otaChannel}.`} icon={LockKeyhole} />
+            <SummaryCard label="Entorno" value={metrics.environment} icon={Settings} />
+            <SummaryCard label="Readiness" value={metrics.readiness} icon={RadioTower} />
+            <SummaryCard label="Features" value={String(metrics.featureCount)} icon={SlidersHorizontal} />
+            <SummaryCard label="Acciones" value={String(metrics.actionCount)} icon={ShieldCheck} />
+            <SummaryCard label="OTA" value={metrics.otaConfigured} icon={LockKeyhole} />
           </>
         )}
       </div>

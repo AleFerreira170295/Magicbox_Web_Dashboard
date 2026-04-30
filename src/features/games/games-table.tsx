@@ -24,7 +24,7 @@ function SummaryCard({
 }: {
   label: string;
   value: string;
-  hint: string;
+  hint?: string;
   icon: ComponentType<{ className?: string }>;
 }) {
   return (
@@ -34,7 +34,7 @@ function SummaryCard({
           <div>
             <p className="text-sm text-muted-foreground">{label}</p>
             <p className="mt-2 text-3xl font-semibold tracking-tight text-foreground">{value}</p>
-            <p className="mt-2 text-sm leading-6 text-muted-foreground">{hint}</p>
+            {hint ? <p className="mt-2 text-sm leading-6 text-muted-foreground">{hint}</p> : null}
           </div>
           <div className="rounded-2xl bg-primary/12 p-3 text-primary">
             <Icon className="size-5" />
@@ -382,11 +382,11 @@ export function GamesTable() {
           Array.from({ length: 5 }).map((_, index) => <Skeleton key={index} className="h-32 rounded-2xl" />)
         ) : (
           <>
-            <SummaryCard label={isFamilyView ? "Partidas" : isResearcherView ? "Muestra" : "Partidas"} value={String(metrics.totalGames)} hint={isFamilyView ? "Sesiones visibles dentro de esta cuenta." : isResearcherView ? "Sesiones visibles dentro de la muestra actual." : "Juegos visibles en la consulta actual."} icon={Gamepad2} />
-            <SummaryCard label={isResearcherView ? "Participantes" : "Jugadores"} value={String(metrics.totalPlayers)} hint={isResearcherView ? "Volumen proyectado de participantes en la evidencia visible." : "Suma proyectada de participantes en la muestra."} icon={Users} />
-            <SummaryCard label="Turnos" value={String(metrics.totalTurns)} hint={isFamilyView ? "Interacciones visibles dentro de las partidas." : isResearcherView ? "Eventos observables persistidos para análisis." : "Volumen operativo de interacción ya persistido."} icon={TimerReset} />
-            <SummaryCard label={isFamilyView ? "Mazos" : isResearcherView ? "Muestra mixta" : "Mixtas"} value={String(isFamilyView ? new Set(games.map((game) => game.deckName).filter(Boolean)).size : metrics.mixedGames)} hint={isFamilyView ? "Variedad de contenidos que aparecen en la cuenta." : isResearcherView ? "Sesiones con combinación de manuales y registrados." : "Partidas con mezcla de jugadores manuales y registrados."} icon={BookOpen} />
-            <SummaryCard label={isFamilyView ? "Éxito visible" : isResearcherView ? "Sin asociación" : "Sin asociación"} value={isFamilyView ? `${metrics.successRate}%` : String(metrics.unresolvedAssociations)} hint={isFamilyView ? "Lectura agregada del desempeño visible." : isResearcherView ? "Partidas cuya relación con dispositivo o institución pide revisión." : "Partidas cuya relación con dispositivo o institución pide revisión."} icon={isFamilyView ? Trophy : Gamepad2} />
+            <SummaryCard label={isFamilyView ? "Partidas" : isResearcherView ? "Muestra" : "Partidas"} value={String(metrics.totalGames)} icon={Gamepad2} />
+            <SummaryCard label={isResearcherView ? "Participantes" : "Jugadores"} value={String(metrics.totalPlayers)} icon={Users} />
+            <SummaryCard label="Turnos" value={String(metrics.totalTurns)} icon={TimerReset} />
+            <SummaryCard label={isFamilyView ? "Mazos" : isResearcherView ? "Muestra mixta" : "Mixtas"} value={String(isFamilyView ? new Set(games.map((game) => game.deckName).filter(Boolean)).size : metrics.mixedGames)} icon={BookOpen} />
+            <SummaryCard label={isFamilyView ? "Éxito visible" : isResearcherView ? "Sin asociación" : "Sin asociación"} value={isFamilyView ? `${metrics.successRate}%` : String(metrics.unresolvedAssociations)} icon={isFamilyView ? Trophy : Gamepad2} />
           </>
         )}
       </div>

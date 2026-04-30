@@ -38,7 +38,7 @@ function SummaryCard({
 }: {
   label: string;
   value: string;
-  hint: string;
+  hint?: string;
   icon: React.ComponentType<{ className?: string }>;
 }) {
   return (
@@ -48,7 +48,7 @@ function SummaryCard({
           <div>
             <p className="text-sm text-muted-foreground">{label}</p>
             <p className="mt-2 text-3xl font-semibold tracking-tight text-foreground">{value}</p>
-            <p className="mt-2 text-sm leading-6 text-muted-foreground">{hint}</p>
+            {hint ? <p className="mt-2 text-sm leading-6 text-muted-foreground">{hint}</p> : null}
           </div>
           <div className="rounded-2xl bg-primary/12 p-3 text-primary">
             <Icon className="size-5" />
@@ -688,23 +688,23 @@ export function DevicesTable() {
           <>
             {isDirectorView ? (
               <>
-                <SummaryCard label="Dispositivos" value={String(metrics.total)} hint="Parque visible para coordinación institucional." icon={Smartphone} />
-                <SummaryCard label="Institución" value={String(metrics.institutionDevices)} hint="Asignados al centro que dirigís." icon={University} />
-                <SummaryCard label="Online" value={String(metrics.onlineDevices)} hint="Lectura rápida del parque activo." icon={Wifi} />
-                <SummaryCard label="Con actividad" value={String(metrics.devicesWithActivity)} hint="Tuvieron syncs o partidas visibles." icon={ShieldCheck} />
-                <SummaryCard label="Sin sync visible" value={String(metrics.devicesWithoutSync)} hint="Conviene chequear conectividad o uso reciente." icon={Wifi} />
-                <SummaryCard label="Sin responsable" value={String(metrics.devicesWithoutOwner)} hint="Ownership pendiente o incompleto." icon={UserRound} />
-                <SummaryCard label="Conviene revisar" value={String(metrics.reviewDevices)} hint="Tienen alguna señal blanda para seguimiento." icon={Home} />
+                <SummaryCard label="Dispositivos" value={String(metrics.total)} icon={Smartphone} />
+                <SummaryCard label="Institución" value={String(metrics.institutionDevices)} icon={University} />
+                <SummaryCard label="Online" value={String(metrics.onlineDevices)} icon={Wifi} />
+                <SummaryCard label="Con actividad" value={String(metrics.devicesWithActivity)} icon={ShieldCheck} />
+                <SummaryCard label="Sin sync visible" value={String(metrics.devicesWithoutSync)} icon={Wifi} />
+                <SummaryCard label="Sin responsable" value={String(metrics.devicesWithoutOwner)} icon={UserRound} />
+                <SummaryCard label="Conviene revisar" value={String(metrics.reviewDevices)} icon={Home} />
               </>
             ) : (
               <>
-                <SummaryCard label="Dispositivos" value={String(metrics.total)} hint="Inventario visible según ACL real." icon={Smartphone} />
-                <SummaryCard label="Home" value={String(metrics.homeDevices)} hint="Sin centro educativo asociado, por diseño." icon={Home} />
-                <SummaryCard label="Institución" value={String(metrics.institutionDevices)} hint="Asignados a una institución concreta." icon={University} />
-                <SummaryCard label="Online" value={String(metrics.onlineDevices)} hint="Lectura rápida del parque activo." icon={Wifi} />
-                <SummaryCard label="Sin sync visible" value={String(metrics.devicesWithoutSync)} hint="Sirve para detectar equipos apagados o poco usados." icon={Wifi} />
-                <SummaryCard label="Con responsable" value={String(metrics.devicesWithOwner)} hint="Ownership ya resuelto desde backend." icon={UserRound} />
-                <SummaryCard label="Con metadata" value={String(metrics.devicesWithMetadata)} hint="Ayuda a soporte y QA manual." icon={ShieldCheck} />
+                <SummaryCard label="Dispositivos" value={String(metrics.total)} icon={Smartphone} />
+                <SummaryCard label="Home" value={String(metrics.homeDevices)} icon={Home} />
+                <SummaryCard label="Institución" value={String(metrics.institutionDevices)} icon={University} />
+                <SummaryCard label="Online" value={String(metrics.onlineDevices)} icon={Wifi} />
+                <SummaryCard label="Sin sync visible" value={String(metrics.devicesWithoutSync)} icon={Wifi} />
+                <SummaryCard label="Con responsable" value={String(metrics.devicesWithOwner)} icon={UserRound} />
+                <SummaryCard label="Con metadata" value={String(metrics.devicesWithMetadata)} icon={ShieldCheck} />
               </>
             )}
           </>

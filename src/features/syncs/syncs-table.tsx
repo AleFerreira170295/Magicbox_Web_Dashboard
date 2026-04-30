@@ -25,7 +25,7 @@ function SummaryCard({
 }: {
   label: string;
   value: string;
-  hint: string;
+  hint?: string;
   icon: ComponentType<{ className?: string }>;
 }) {
   return (
@@ -35,7 +35,7 @@ function SummaryCard({
           <div>
             <p className="text-sm text-muted-foreground">{label}</p>
             <p className="mt-2 text-3xl font-semibold tracking-tight text-foreground">{value}</p>
-            <p className="mt-2 text-sm leading-6 text-muted-foreground">{hint}</p>
+            {hint ? <p className="mt-2 text-sm leading-6 text-muted-foreground">{hint}</p> : null}
           </div>
           <div className="rounded-2xl bg-primary/12 p-3 text-primary">
             <Icon className="size-5" />
@@ -384,11 +384,11 @@ export function SyncsTable() {
           Array.from({ length: 5 }).map((_, index) => <Skeleton key={index} className="h-32 rounded-2xl" />)
         ) : (
           <>
-            <SummaryCard label={isFamilyView ? "Syncs" : isResearcherView ? "Muestra sync" : "Syncs"} value={String(metrics.total)} hint={isFamilyView ? "Sincronizaciones visibles en esta cuenta." : isResearcherView ? "Sesiones visibles dentro de la evidencia actual." : "Sesiones visibles en la vista operativa actual."} icon={Activity} />
-            <SummaryCard label="Con evidencia" value={String(metrics.withRaw)} hint={isFamilyView ? "Syncs donde quedó alguna evidencia cruda disponible." : isResearcherView ? "Cobertura observable de captura cruda." : "Ayuda a validar trazabilidad e ingestión."} icon={HardDriveDownload} />
-            <SummaryCard label="Con participantes" value={String(metrics.withParticipants)} hint={isFamilyView ? "Syncs con participantes proyectados visibles." : isResearcherView ? "Syncs con proyección de participantes usable para análisis." : "Sesiones con proyección de jugadores usable."} icon={Users} />
-            <SummaryCard label="Con dispositivo" value={String(metrics.withDeviceLink)} hint={isFamilyView ? "Sincronizaciones enlazadas a un dispositivo visible." : isResearcherView ? "Sesiones enlazadas a un dispositivo visible." : "Sesiones enlazadas a BLE o device_id."} icon={Waves} />
-            <SummaryCard label={isFamilyView ? "Con versión" : "Sin asociación"} value={String(isFamilyView ? metrics.withFirmware : metrics.unresolvedAssociations)} hint={isFamilyView ? "Syncs donde quedó registrada alguna versión visible." : isResearcherView ? "Sesiones cuya relación con dispositivo/usuario todavía pide revisión." : "Sesiones cuya relación con dispositivo/usuario todavía pide revisión."} icon={isFamilyView ? Cpu : Activity} />
+            <SummaryCard label={isFamilyView ? "Syncs" : isResearcherView ? "Muestra sync" : "Syncs"} value={String(metrics.total)} icon={Activity} />
+            <SummaryCard label="Con evidencia" value={String(metrics.withRaw)} icon={HardDriveDownload} />
+            <SummaryCard label="Con participantes" value={String(metrics.withParticipants)} icon={Users} />
+            <SummaryCard label="Con dispositivo" value={String(metrics.withDeviceLink)} icon={Waves} />
+            <SummaryCard label={isFamilyView ? "Con versión" : "Sin asociación"} value={String(isFamilyView ? metrics.withFirmware : metrics.unresolvedAssociations)} icon={isFamilyView ? Cpu : Activity} />
           </>
         )}
       </div>
