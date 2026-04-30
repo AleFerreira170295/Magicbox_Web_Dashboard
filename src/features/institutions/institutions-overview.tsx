@@ -14,6 +14,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { ImageUploadField } from "@/components/ui/image-upload-field";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { ListPaginationControls, useListPagination } from "@/components/ui/list-pagination-controls";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useAuth } from "@/features/auth/auth-context";
@@ -544,6 +545,8 @@ export function InstitutionsOverview() {
     });
   }, [focusFilter, institutionRows, query]);
 
+  const pagination = useListPagination(filtered);
+
   const metrics = useMemo(() => {
     return {
       totalInstitutions: institutionRows.length,
@@ -967,7 +970,7 @@ export function InstitutionsOverview() {
       <div className="space-y-6">
         <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
           <CardHeader>
-            <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
               <div>
                 <CardTitle>{isDirectorView ? "Instituciones visibles para seguimiento" : "Mapa institucional"}</CardTitle>
                 <CardDescription>
@@ -976,14 +979,27 @@ export function InstitutionsOverview() {
                     : "Seleccioná una institución para trabajar desde el cuerpo central: ver detalle, editar y operar sin saltar a barras laterales."}
                 </CardDescription>
               </div>
-              <div className="flex flex-wrap gap-3">
-                <Button type="button" onClick={openCreateInstitutionForm} disabled={!canCreateInstitutions}>
-                  <UserPlus className="size-4" />
-                  {canCreateInstitutions ? "Nueva institución" : "Alta no disponible"}
-                </Button>
-                <Button type="button" variant="outline" onClick={openEditInstitutionForm} disabled={!selectedInstitution || mode === "create"}>
-                  Editar seleccionada
-                </Button>
+              <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
+                <div className="flex flex-wrap gap-3">
+                  <Button type="button" onClick={openCreateInstitutionForm} disabled={!canCreateInstitutions}>
+                    <UserPlus className="size-4" />
+                    {canCreateInstitutions ? "Nueva institución" : "Alta no disponible"}
+                  </Button>
+                  <Button type="button" variant="outline" onClick={openEditInstitutionForm} disabled={!selectedInstitution || mode === "create"}>
+                    Editar seleccionada
+                  </Button>
+                </div>
+                <ListPaginationControls
+                  pageSize={pagination.pageSize}
+                  setPageSize={pagination.setPageSize}
+                  currentPage={pagination.currentPage}
+                  totalPages={pagination.totalPages}
+                  totalItems={pagination.totalItems}
+                  paginationStart={pagination.paginationStart}
+                  paginationEnd={pagination.paginationEnd}
+                  goToPreviousPage={pagination.goToPreviousPage}
+                  goToNextPage={pagination.goToNextPage}
+                />
               </div>
             </div>
           </CardHeader>
@@ -1014,7 +1030,7 @@ export function InstitutionsOverview() {
                       </TableCell>
                     </TableRow>
                   ) : (
-                    filtered.map((item) => {
+                    pagination.paginatedItems.map((item) => {
                       const active = mode === "edit" && selectedInstitution?.id === item.id;
                       return (
                         <TableRow key={item.id} className={cn("cursor-pointer", active && "border-primary/30 bg-primary/8")} onClick={() => selectInstitution(item)}>

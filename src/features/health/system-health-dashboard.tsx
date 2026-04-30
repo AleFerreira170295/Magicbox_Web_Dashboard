@@ -5,6 +5,7 @@ import { Activity, AlertTriangle, HeartPulse, Layers3, ShieldCheck, Smartphone }
 import { SectionHeader } from "@/components/section-header";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { ListPaginationControls, useListPagination } from "@/components/ui/list-pagination-controls";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useAuth } from "@/features/auth/auth-context";
@@ -113,10 +114,13 @@ export function SystemHealthDashboard() {
       totalProfiles: profiles.length,
       profilesWithoutBindings,
       readinessChecks,
-      recentDevices: devices.slice(0, 6),
-      recentSyncs: syncs.slice(0, 6),
+      recentDevices: devices,
+      recentSyncs: syncs,
     };
   }, [basicHealthQuery.data, devicesQuery.data, gamesQuery.data, livenessQuery.data, profilesQuery.data, readinessQuery.data, syncsQuery.data]);
+
+  const recentDevicesPagination = useListPagination(metrics.recentDevices);
+  const recentSyncsPagination = useListPagination(metrics.recentSyncs);
 
   return (
     <div className="space-y-6">
@@ -215,10 +219,25 @@ export function SystemHealthDashboard() {
       <div className="grid gap-6 2xl:grid-cols-2">
         <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
           <CardHeader>
-            <CardTitle>Dispositivos recientes</CardTitle>
-            <CardDescription>
-              Últimos dispositivos visibles para una revisión rápida de metadata y estado.
-            </CardDescription>
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+              <div>
+                <CardTitle>Dispositivos recientes</CardTitle>
+                <CardDescription>
+                  Últimos dispositivos visibles para una revisión rápida de metadata y estado.
+                </CardDescription>
+              </div>
+              <ListPaginationControls
+                pageSize={recentDevicesPagination.pageSize}
+                setPageSize={recentDevicesPagination.setPageSize}
+                currentPage={recentDevicesPagination.currentPage}
+                totalPages={recentDevicesPagination.totalPages}
+                totalItems={recentDevicesPagination.totalItems}
+                paginationStart={recentDevicesPagination.paginationStart}
+                paginationEnd={recentDevicesPagination.paginationEnd}
+                goToPreviousPage={recentDevicesPagination.goToPreviousPage}
+                goToNextPage={recentDevicesPagination.goToNextPage}
+              />
+            </div>
           </CardHeader>
           <CardContent className="overflow-x-auto p-0">
             {isLoading ? (
@@ -244,7 +263,7 @@ export function SystemHealthDashboard() {
                       </TableCell>
                     </TableRow>
                   ) : (
-                    metrics.recentDevices.map((device) => (
+                    recentDevicesPagination.paginatedItems.map((device) => (
                       <TableRow key={device.id}>
                         <TableCell className="font-medium">{device.name}</TableCell>
                         <TableCell>
@@ -266,10 +285,25 @@ export function SystemHealthDashboard() {
 
         <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
           <CardHeader>
-            <CardTitle>Syncs recientes</CardTitle>
-            <CardDescription>
-              Trazabilidad rápida sobre sesiones sincronizadas visibles en el dashboard.
-            </CardDescription>
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+              <div>
+                <CardTitle>Syncs recientes</CardTitle>
+                <CardDescription>
+                  Trazabilidad rápida sobre sesiones sincronizadas visibles en el dashboard.
+                </CardDescription>
+              </div>
+              <ListPaginationControls
+                pageSize={recentSyncsPagination.pageSize}
+                setPageSize={recentSyncsPagination.setPageSize}
+                currentPage={recentSyncsPagination.currentPage}
+                totalPages={recentSyncsPagination.totalPages}
+                totalItems={recentSyncsPagination.totalItems}
+                paginationStart={recentSyncsPagination.paginationStart}
+                paginationEnd={recentSyncsPagination.paginationEnd}
+                goToPreviousPage={recentSyncsPagination.goToPreviousPage}
+                goToNextPage={recentSyncsPagination.goToNextPage}
+              />
+            </div>
           </CardHeader>
           <CardContent className="overflow-x-auto p-0">
             {isLoading ? (
@@ -295,7 +329,7 @@ export function SystemHealthDashboard() {
                       </TableCell>
                     </TableRow>
                   ) : (
-                    metrics.recentSyncs.map((sync) => (
+                    recentSyncsPagination.paginatedItems.map((sync) => (
                       <TableRow key={sync.id}>
                         <TableCell className="max-w-52 truncate font-mono text-xs">{sync.syncId || sync.id}</TableCell>
                         <TableCell>

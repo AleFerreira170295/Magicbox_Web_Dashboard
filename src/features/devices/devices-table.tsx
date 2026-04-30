@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { ListPaginationControls, useListPagination } from "@/components/ui/list-pagination-controls";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useAuth } from "@/features/auth/auth-context";
@@ -496,6 +497,8 @@ export function DevicesTable() {
     [deviceRows, filtered, selectedDeviceId],
   );
 
+  const pagination = useListPagination(filtered);
+
   const metrics = useMemo(() => {
     const onlineDevices = deviceRows.filter((device) => (device.status || "").toLowerCase().includes("online") || (device.status || "").toLowerCase().includes("active")).length;
     const homeDevices = deviceRows.filter((device) => device.assignmentScope === "home").length;
@@ -747,14 +750,29 @@ export function DevicesTable() {
       <div className="grid gap-6 2xl:grid-cols-[minmax(0,1.35fr)_420px]">
         <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
           <CardHeader>
-            <CardTitle>Parque de dispositivos</CardTitle>
-            <CardDescription>
-              {isTeacherView
-                ? "Seleccioná un dispositivo para entender por qué lo ves, si tuvo actividad reciente y qué conviene revisar antes de usarlo en aula."
-                : isDirectorView
-                ? "Seleccioná un dispositivo para revisar ownership, actividad y señales de seguimiento antes de coordinar con soporte o con el equipo docente."
-                : "Seleccioná un dispositivo para revisar y editar su alcance, ownership y estado operativo."}
-            </CardDescription>
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+              <div>
+                <CardTitle>Parque de dispositivos</CardTitle>
+                <CardDescription>
+                  {isTeacherView
+                    ? "Seleccioná un dispositivo para entender por qué lo ves, si tuvo actividad reciente y qué conviene revisar antes de usarlo en aula."
+                    : isDirectorView
+                    ? "Seleccioná un dispositivo para revisar ownership, actividad y señales de seguimiento antes de coordinar con soporte o con el equipo docente."
+                    : "Seleccioná un dispositivo para revisar y editar su alcance, ownership y estado operativo."}
+                </CardDescription>
+              </div>
+              <ListPaginationControls
+                pageSize={pagination.pageSize}
+                setPageSize={pagination.setPageSize}
+                currentPage={pagination.currentPage}
+                totalPages={pagination.totalPages}
+                totalItems={pagination.totalItems}
+                paginationStart={pagination.paginationStart}
+                paginationEnd={pagination.paginationEnd}
+                goToPreviousPage={pagination.goToPreviousPage}
+                goToNextPage={pagination.goToNextPage}
+              />
+            </div>
           </CardHeader>
           <CardContent className="overflow-x-auto p-0">
             {devicesQuery.isLoading ? (
@@ -784,7 +802,7 @@ export function DevicesTable() {
                       </TableCell>
                     </TableRow>
                   ) : (
-                    filtered.map((device) => (
+                    pagination.paginatedItems.map((device) => (
                       <TableRow
                         key={device.id}
                         className={cn("cursor-pointer", selectedDeviceId === device.id && "border-primary/30 bg-primary/8")}

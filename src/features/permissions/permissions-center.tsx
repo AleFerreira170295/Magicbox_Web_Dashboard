@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { ListPaginationControls, useListPagination } from "@/components/ui/list-pagination-controls";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useAccessActions, useAccessFeatures, usePermissions } from "@/features/access-control/api";
@@ -225,6 +226,10 @@ export function PermissionsCenter() {
       availableSignals: Array.from(new Set(permissionRows.map((item) => item.signal))),
     };
   }, [actions, featureFilter, features, institutions, permissions, query, scopeFilter, signalFilter, actionFilter, users]);
+
+  const actionsPagination = useListPagination(actions);
+  const permissionRowsPagination = useListPagination(model.permissionRows);
+  const reviewProfilesPagination = useListPagination(model.reviewProfiles);
 
   const canRenderGovernance = canLoadPermissionsGovernance(user);
   const hasContractGap = hasInstitutionAdminPermissionsContractGap(user);
@@ -577,10 +582,25 @@ export function PermissionsCenter() {
 
       <Card className="min-w-0 border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
         <CardHeader>
-          <CardTitle>Catálogo de actions</CardTitle>
-          <CardDescription>
-            El endpoint real de actions ahora queda visible en la UI y deja de ser una dependencia implícita del módulo.
-          </CardDescription>
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+              <CardTitle>Catálogo de actions</CardTitle>
+              <CardDescription>
+                El endpoint real de actions ahora queda visible en la UI y deja de ser una dependencia implícita del módulo.
+              </CardDescription>
+            </div>
+            <ListPaginationControls
+              pageSize={actionsPagination.pageSize}
+              setPageSize={actionsPagination.setPageSize}
+              currentPage={actionsPagination.currentPage}
+              totalPages={actionsPagination.totalPages}
+              totalItems={actionsPagination.totalItems}
+              paginationStart={actionsPagination.paginationStart}
+              paginationEnd={actionsPagination.paginationEnd}
+              goToPreviousPage={actionsPagination.goToPreviousPage}
+              goToNextPage={actionsPagination.goToNextPage}
+            />
+          </div>
         </CardHeader>
         <CardContent className="overflow-x-auto p-0">
           {loading ? (
@@ -605,7 +625,7 @@ export function PermissionsCenter() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  actions.map((action) => (
+                  actionsPagination.paginatedItems.map((action) => (
                     <TableRow key={action.id}>
                       <TableCell><Badge variant="secondary">{action.code}</Badge></TableCell>
                       <TableCell className="font-medium text-foreground">{action.name}</TableCell>
@@ -622,10 +642,25 @@ export function PermissionsCenter() {
 
       <Card className="min-w-0 border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
         <CardHeader>
-          <CardTitle>Overrides explícitos vigentes</CardTitle>
-          <CardDescription>
-            Tabla filtrable para cruzar usuario, feature, action y scope institucional sin salir del dashboard.
-          </CardDescription>
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+              <CardTitle>Overrides explícitos vigentes</CardTitle>
+              <CardDescription>
+                Tabla filtrable para cruzar usuario, feature, action y scope institucional sin salir del dashboard.
+              </CardDescription>
+            </div>
+            <ListPaginationControls
+              pageSize={permissionRowsPagination.pageSize}
+              setPageSize={permissionRowsPagination.setPageSize}
+              currentPage={permissionRowsPagination.currentPage}
+              totalPages={permissionRowsPagination.totalPages}
+              totalItems={permissionRowsPagination.totalItems}
+              paginationStart={permissionRowsPagination.paginationStart}
+              paginationEnd={permissionRowsPagination.paginationEnd}
+              goToPreviousPage={permissionRowsPagination.goToPreviousPage}
+              goToNextPage={permissionRowsPagination.goToNextPage}
+            />
+          </div>
         </CardHeader>
         <CardContent className="overflow-x-auto p-0">
           {loading ? (
@@ -651,7 +686,7 @@ export function PermissionsCenter() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  model.permissionRows.map((row) => (
+                  permissionRowsPagination.paginatedItems.map((row) => (
                     <TableRow key={row.id}>
                       <TableCell>
                         <div>
@@ -684,10 +719,25 @@ export function PermissionsCenter() {
 
       <Card className="min-w-0 border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
         <CardHeader>
-          <CardTitle>Perfiles que conviene revisar</CardTitle>
-          <CardDescription>
-            Usuarios sin rol o con overrides explícitos, para que el módulo también funcione como cola de revisión.
-          </CardDescription>
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+              <CardTitle>Perfiles que conviene revisar</CardTitle>
+              <CardDescription>
+                Usuarios sin rol o con overrides explícitos, para que el módulo también funcione como cola de revisión.
+              </CardDescription>
+            </div>
+            <ListPaginationControls
+              pageSize={reviewProfilesPagination.pageSize}
+              setPageSize={reviewProfilesPagination.setPageSize}
+              currentPage={reviewProfilesPagination.currentPage}
+              totalPages={reviewProfilesPagination.totalPages}
+              totalItems={reviewProfilesPagination.totalItems}
+              paginationStart={reviewProfilesPagination.paginationStart}
+              paginationEnd={reviewProfilesPagination.paginationEnd}
+              goToPreviousPage={reviewProfilesPagination.goToPreviousPage}
+              goToNextPage={reviewProfilesPagination.goToNextPage}
+            />
+          </div>
         </CardHeader>
         <CardContent className="overflow-x-auto p-0">
           {loading ? (
@@ -717,7 +767,7 @@ export function PermissionsCenter() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  model.reviewProfiles.map((item) => (
+                  reviewProfilesPagination.paginatedItems.map((item) => (
                     <TableRow key={item.id}>
                       <TableCell>
                         <div>

@@ -6,6 +6,7 @@ import { SectionHeader } from "@/components/section-header";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { ListPaginationControls, useListPagination } from "@/components/ui/list-pagination-controls";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useAuth } from "@/features/auth/auth-context";
@@ -173,6 +174,8 @@ export function GamesTable() {
         .some((value) => String(value).toLowerCase().includes(normalized));
     });
   }, [accessFilter, gameRows, institutionFilter, playerModeFilter, query, scopedInstitutionId]);
+
+  const pagination = useListPagination(filtered);
 
   const selectedGame = useMemo(
     () => filtered.find((game) => game.id === selectedGameId) || gameRows.find((game) => game.id === selectedGameId) || null,
@@ -396,18 +399,33 @@ export function GamesTable() {
       <div className="grid gap-6 2xl:grid-cols-[minmax(0,1.35fr)_420px]">
         <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
           <CardHeader>
-            <CardTitle>{isFamilyView ? "Actividad visible" : isResearcherView ? "Muestra visible de partidas" : isTeacherView ? "Partidas visibles para aula" : isDirectorView ? "Partidas visibles para seguimiento" : "Listado operativo de partidas"}</CardTitle>
-            <CardDescription>
-              {isFamilyView
-                ? "Seleccioná una partida para ver un resumen simple de participantes, turnos y momento de inicio."
-                : isResearcherView
-                ? "Seleccioná una partida para inspeccionar composición de muestra, turnos y contexto visible sin salir del dashboard."
-                : isTeacherView
-                ? "Seleccioná una partida para entender rápido dispositivo, participantes y ritmo visible antes de bajar a más detalle."
-                : isDirectorView
-                ? "Seleccioná una partida para revisar contexto institucional, volumen de participación y señales generales de seguimiento."
-                : "Seleccioná una partida para inspeccionar mezcla de jugadores, turnos y contexto institucional sin salir del dashboard."}
-            </CardDescription>
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+              <div>
+                <CardTitle>{isFamilyView ? "Actividad visible" : isResearcherView ? "Muestra visible de partidas" : isTeacherView ? "Partidas visibles para aula" : isDirectorView ? "Partidas visibles para seguimiento" : "Listado operativo de partidas"}</CardTitle>
+                <CardDescription>
+                  {isFamilyView
+                    ? "Seleccioná una partida para ver un resumen simple de participantes, turnos y momento de inicio."
+                    : isResearcherView
+                    ? "Seleccioná una partida para inspeccionar composición de muestra, turnos y contexto visible sin salir del dashboard."
+                    : isTeacherView
+                    ? "Seleccioná una partida para entender rápido dispositivo, participantes y ritmo visible antes de bajar a más detalle."
+                    : isDirectorView
+                    ? "Seleccioná una partida para revisar contexto institucional, volumen de participación y señales generales de seguimiento."
+                    : "Seleccioná una partida para inspeccionar mezcla de jugadores, turnos y contexto institucional sin salir del dashboard."}
+                </CardDescription>
+              </div>
+              <ListPaginationControls
+                pageSize={pagination.pageSize}
+                setPageSize={pagination.setPageSize}
+                currentPage={pagination.currentPage}
+                totalPages={pagination.totalPages}
+                totalItems={pagination.totalItems}
+                paginationStart={pagination.paginationStart}
+                paginationEnd={pagination.paginationEnd}
+                goToPreviousPage={pagination.goToPreviousPage}
+                goToNextPage={pagination.goToNextPage}
+              />
+            </div>
           </CardHeader>
           <CardContent className="overflow-x-auto p-0">
             {gamesQuery.isLoading ? (
@@ -438,7 +456,7 @@ export function GamesTable() {
                       </TableCell>
                     </TableRow>
                   ) : (
-                    filtered.map((game) => {
+                    pagination.paginatedItems.map((game) => {
                       const manualCount = game.players.filter((player) => player.playerSource === "manual").length;
                       const registeredCount = game.players.filter((player) => player.playerSource !== "manual").length;
 

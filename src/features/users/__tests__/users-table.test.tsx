@@ -210,7 +210,7 @@ describe("UsersTable", () => {
 
     renderUsersTable();
 
-    expect(screen.getByText("Alta no disponible")).toBeDisabled();
+    expect(screen.getAllByRole("button", { name: "Alta no disponible" })[0]).toBeDisabled();
     expect(screen.getByText("solo lectura")).toBeInTheDocument();
     expect(screen.getByText("ACL bloqueada")).toBeInTheDocument();
 

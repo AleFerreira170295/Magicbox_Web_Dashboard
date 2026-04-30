@@ -12,6 +12,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { ImageUploadField } from "@/components/ui/image-upload-field";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { ListPaginationControls, useListPagination } from "@/components/ui/list-pagination-controls";
 import { Modal } from "@/components/ui/modal";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -521,6 +522,10 @@ export function UsersTable() {
       return matchesQuery && matchesInstitution && matchesRole && matchesFocus;
     });
   }, [focusFilter, institutionFilter, institutionsById, query, roleFilter, users]);
+
+  const pagination = useListPagination(filtered);
+
+  const auditEventsPagination = useListPagination(auditEventsQuery.data || []);
 
   const metrics = useMemo(() => {
     const permissionedUsers = users.filter((item) => item.explicitPermissionKeys.length > 0).length;
@@ -1294,10 +1299,25 @@ export function UsersTable() {
       <div className="grid gap-6 2xl:grid-cols-[1.25fr_0.95fr]">
         <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
           <CardHeader>
-            <CardTitle>Padrón de usuarios</CardTitle>
-            <CardDescription>
-              La tabla muestra roles efectivos, cantidad de permisos explícitos y señales de revisión. Seleccioná un usuario para editar sus datos y su ACL.
-            </CardDescription>
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+              <div>
+                <CardTitle>Padrón de usuarios</CardTitle>
+                <CardDescription>
+                  La tabla muestra roles efectivos, cantidad de permisos explícitos y señales de revisión. Seleccioná un usuario para editar sus datos y su ACL.
+                </CardDescription>
+              </div>
+              <ListPaginationControls
+                pageSize={pagination.pageSize}
+                setPageSize={pagination.setPageSize}
+                currentPage={pagination.currentPage}
+                totalPages={pagination.totalPages}
+                totalItems={pagination.totalItems}
+                paginationStart={pagination.paginationStart}
+                paginationEnd={pagination.paginationEnd}
+                goToPreviousPage={pagination.goToPreviousPage}
+                goToNextPage={pagination.goToNextPage}
+              />
+            </div>
           </CardHeader>
           <CardContent className="overflow-x-auto p-0">
             {usersQuery.isLoading ? (
@@ -1326,7 +1346,7 @@ export function UsersTable() {
                       </TableCell>
                     </TableRow>
                   ) : (
-                    filtered.map((item) => {
+                    pagination.paginatedItems.map((item) => {
                       const active = mode === "edit" && selectedUserId === item.id;
                       return (
                         <TableRow key={item.id} className={cn("cursor-pointer", active && "bg-primary/5")} onClick={() => selectUser(item)}>
@@ -1560,10 +1580,25 @@ export function UsersTable() {
 
           <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
             <CardHeader>
-              <CardTitle>Historial de acceso</CardTitle>
-              <CardDescription>
-                Últimos cambios de roles y permisos del usuario seleccionado.
-              </CardDescription>
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+                <div>
+                  <CardTitle>Historial de acceso</CardTitle>
+                  <CardDescription>
+                    Últimos cambios de roles y permisos del usuario seleccionado.
+                  </CardDescription>
+                </div>
+                <ListPaginationControls
+                  pageSize={auditEventsPagination.pageSize}
+                  setPageSize={auditEventsPagination.setPageSize}
+                  currentPage={auditEventsPagination.currentPage}
+                  totalPages={auditEventsPagination.totalPages}
+                  totalItems={auditEventsPagination.totalItems}
+                  paginationStart={auditEventsPagination.paginationStart}
+                  paginationEnd={auditEventsPagination.paginationEnd}
+                  goToPreviousPage={auditEventsPagination.goToPreviousPage}
+                  goToNextPage={auditEventsPagination.goToNextPage}
+                />
+              </div>
             </CardHeader>
             <CardContent>
               {!selectedUser ? (
@@ -1585,7 +1620,7 @@ export function UsersTable() {
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {auditEventsQuery.data.map((event) => (
+                  {auditEventsPagination.paginatedItems.map((event) => (
                     <div key={event.id} className="rounded-2xl border border-border bg-white/80 p-4">
                       <div className="flex flex-wrap items-center justify-between gap-3">
                         <div>

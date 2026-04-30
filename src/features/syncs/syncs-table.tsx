@@ -6,6 +6,7 @@ import { SectionHeader } from "@/components/section-header";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { ListPaginationControls, useListPagination } from "@/components/ui/list-pagination-controls";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useAuth } from "@/features/auth/auth-context";
@@ -182,6 +183,8 @@ export function SyncsTable() {
         .some((value) => String(value).toLowerCase().includes(normalized));
     });
   }, [accessFilter, query, rawFilter, syncRows]);
+
+  const pagination = useListPagination(filtered);
 
   const selectedSync = useMemo(
     () => filtered.find((sync) => sync.id === selectedSyncId) || syncRows.find((sync) => sync.id === selectedSyncId) || null,
@@ -393,18 +396,33 @@ export function SyncsTable() {
       <div className="grid gap-6 2xl:grid-cols-[minmax(0,1.35fr)_420px]">
         <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
           <CardHeader>
-            <CardTitle>{isFamilyView ? "Actividad de sincronización" : isResearcherView ? "Muestra visible de sincronizaciones" : isTeacherView ? "Sincronizaciones visibles para aula" : isDirectorView ? "Sincronizaciones visibles para seguimiento" : "Sesiones sincronizadas"}</CardTitle>
-            <CardDescription>
-              {isFamilyView
-                ? "Seleccioná una sincronización para ver un resumen simple de participantes, dispositivo y relación con la partida cuando exista."
-                : isResearcherView
-                ? "Seleccioná una sesión para inspeccionar contexto visible, participantes proyectados y correlación con partida sin salir del dashboard."
-                : isTeacherView
-                ? "Seleccioná una sincronización para entender rápido dispositivo, participantes y vínculo con partida desde una lectura docente."
-                : isDirectorView
-                ? "Seleccioná una sincronización para revisar trazabilidad general, correlación con partida y contexto institucional visible."
-                : "Seleccioná una sesión para inspeccionar contexto de dispositivo, usuario, participantes y payload raw más reciente."}
-            </CardDescription>
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+              <div>
+                <CardTitle>{isFamilyView ? "Actividad de sincronización" : isResearcherView ? "Muestra visible de sincronizaciones" : isTeacherView ? "Sincronizaciones visibles para aula" : isDirectorView ? "Sincronizaciones visibles para seguimiento" : "Sesiones sincronizadas"}</CardTitle>
+                <CardDescription>
+                  {isFamilyView
+                    ? "Seleccioná una sincronización para ver un resumen simple de participantes, dispositivo y relación con la partida cuando exista."
+                    : isResearcherView
+                    ? "Seleccioná una sesión para inspeccionar contexto visible, participantes proyectados y correlación con partida sin salir del dashboard."
+                    : isTeacherView
+                    ? "Seleccioná una sincronización para entender rápido dispositivo, participantes y vínculo con partida desde una lectura docente."
+                    : isDirectorView
+                    ? "Seleccioná una sincronización para revisar trazabilidad general, correlación con partida y contexto institucional visible."
+                    : "Seleccioná una sesión para inspeccionar contexto de dispositivo, usuario, participantes y payload raw más reciente."}
+                </CardDescription>
+              </div>
+              <ListPaginationControls
+                pageSize={pagination.pageSize}
+                setPageSize={pagination.setPageSize}
+                currentPage={pagination.currentPage}
+                totalPages={pagination.totalPages}
+                totalItems={pagination.totalItems}
+                paginationStart={pagination.paginationStart}
+                paginationEnd={pagination.paginationEnd}
+                goToPreviousPage={pagination.goToPreviousPage}
+                goToNextPage={pagination.goToNextPage}
+              />
+            </div>
           </CardHeader>
           <CardContent className="overflow-x-auto p-0">
             {syncsQuery.isLoading ? (
@@ -435,7 +453,7 @@ export function SyncsTable() {
                       </TableCell>
                     </TableRow>
                   ) : (
-                    filtered.map((sync) => {
+                    pagination.paginatedItems.map((sync) => {
                       return (
                         <TableRow
                           key={sync.id}

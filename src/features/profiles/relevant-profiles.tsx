@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { ListPaginationControls, useListPagination } from "@/components/ui/list-pagination-controls";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useAuth } from "@/features/auth/auth-context";
@@ -120,8 +121,6 @@ export function RelevantProfiles() {
   const [institutionFilter, setInstitutionFilter] = useState<string>("");
   const [activityFilter, setActivityFilter] = useState<"all" | "active" | "inactive">("all");
   const [focusFilter, setFocusFilter] = useState<ProfilesFocusFilter>("all");
-  const [pageSize, setPageSize] = useState<10 | 20 | 50>(10);
-  const [currentPage, setCurrentPage] = useState(1);
 
   const profilesQuery = useProfilesOverview(tokens?.accessToken);
   const institutionsQuery = useInstitutions(tokens?.accessToken);
@@ -328,22 +327,8 @@ export function RelevantProfiles() {
     });
   }, [activityFilter, effectiveInstitutionFilter, entities, focusFilter, query]);
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
-
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [query, institutionFilter, activityFilter, focusFilter, pageSize]);
-
-  useEffect(() => {
-    if (currentPage > totalPages) {
-      setCurrentPage(totalPages);
-    }
-  }, [currentPage, totalPages]);
-
-  const paginatedFiltered = useMemo(() => {
-    const start = (currentPage - 1) * pageSize;
-    return filtered.slice(start, start + pageSize);
-  }, [currentPage, filtered, pageSize]);
+  const pagination = useListPagination(filtered);
+  const paginatedFiltered = pagination.paginatedItems;
 
   const metrics = useMemo(() => {
     const activeProfiles = entities.filter((profile) => profile.isActive).length;
@@ -381,8 +366,6 @@ export function RelevantProfiles() {
     { key: "institution_linked" as const, label: "Institucionales", count: metrics.institutionLinked },
   ];
 
-  const paginationStart = filtered.length === 0 ? 0 : (currentPage - 1) * pageSize + 1;
-  const paginationEnd = filtered.length === 0 ? 0 : Math.min(currentPage * pageSize, filtered.length);
   const hasAnyError = profilesQuery.error || institutionsQuery.error || classGroupsQuery.error || studentsQuery.error || gamesQuery.error;
   const isLoading = profilesQuery.isLoading || institutionsQuery.isLoading || classGroupsQuery.isLoading || studentsQuery.isLoading || gamesQuery.isLoading;
 
@@ -515,44 +498,19 @@ export function RelevantProfiles() {
                     : "Seleccioná un registro para revisar ownership, contexto institucional y actividad reciente."}
                 </CardDescription>
               </div>
-              <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
-                <label className="flex items-center gap-2 text-sm text-muted-foreground">
-                  Filas visibles
-                  <select
-                    value={String(pageSize)}
-                    onChange={(event) => setPageSize(Number(event.target.value) as 10 | 20 | 50)}
-                    className="h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground"
-                    aria-label="Filas visibles por página"
-                  >
-                    <option value="10">10</option>
-                    <option value="20">20</option>
-                    <option value="50">50</option>
-                  </select>
-                </label>
-                <div className="text-sm text-muted-foreground" data-testid="profiles-pagination-summary">
-                  Mostrando {paginationStart}-{paginationEnd} de {filtered.length}
-                </div>
-                <div className="flex gap-2" data-testid="profiles-pagination-controls">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
-                    disabled={currentPage === 1 || filtered.length === 0}
-                  >
-                    Anterior
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
-                    disabled={currentPage === totalPages || filtered.length === 0}
-                  >
-                    Siguiente
-                  </Button>
-                </div>
-              </div>
+              <ListPaginationControls
+                pageSize={pagination.pageSize}
+                setPageSize={pagination.setPageSize}
+                currentPage={pagination.currentPage}
+                totalPages={pagination.totalPages}
+                totalItems={pagination.totalItems}
+                paginationStart={pagination.paginationStart}
+                paginationEnd={pagination.paginationEnd}
+                goToPreviousPage={pagination.goToPreviousPage}
+                goToNextPage={pagination.goToNextPage}
+                summaryTestId="profiles-pagination-summary"
+                controlsTestId="profiles-pagination-controls"
+              />
             </div>
           </CardHeader>
           <CardContent className="overflow-x-auto p-0">
@@ -662,7 +620,7 @@ export function RelevantProfiles() {
             Podés entrar desde cualquier fila del listado o desde el nombre del perfil/estudiante para abrir su pantalla interna con contexto, identidad, actividad y asignación visibles.
           </div>
           <p className="text-sm text-muted-foreground">
-            Página {currentPage} de {totalPages}
+            Página {pagination.currentPage} de {pagination.totalPages}
           </p>
         </CardContent>
       </Card>

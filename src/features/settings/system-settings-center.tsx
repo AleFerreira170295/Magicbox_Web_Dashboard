@@ -18,6 +18,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { ListPaginationControls, useListPagination } from "@/components/ui/list-pagination-controls";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAccessActions, useAccessFeatures } from "@/features/access-control/api";
 import { useAuth } from "@/features/auth/auth-context";
@@ -168,6 +169,8 @@ export function SystemSettingsCenter() {
     actionsQuery.error;
 
   const releases = otaReleasesQuery.data?.data || [];
+
+  const releasesPagination = useListPagination(releases);
 
   const metrics = useMemo(() => {
     const features = featuresQuery.data?.data || [];
@@ -496,17 +499,32 @@ export function SystemSettingsCenter() {
       <div className="grid gap-6 2xl:grid-cols-2">
         <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
           <CardHeader>
-            <div className="flex items-center gap-2">
-              <History className="size-5 text-primary" />
-              <CardTitle>Historial OTA y rollback</CardTitle>
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+              <div>
+                <div className="flex items-center gap-2">
+                  <History className="size-5 text-primary" />
+                  <CardTitle>Historial OTA y rollback</CardTitle>
+                </div>
+                <CardDescription>Releases persistidas y fallback legacy visible cuando todavía viene desde env.</CardDescription>
+              </div>
+              <ListPaginationControls
+                pageSize={releasesPagination.pageSize}
+                setPageSize={releasesPagination.setPageSize}
+                currentPage={releasesPagination.currentPage}
+                totalPages={releasesPagination.totalPages}
+                totalItems={releasesPagination.totalItems}
+                paginationStart={releasesPagination.paginationStart}
+                paginationEnd={releasesPagination.paginationEnd}
+                goToPreviousPage={releasesPagination.goToPreviousPage}
+                goToNextPage={releasesPagination.goToNextPage}
+              />
             </div>
-            <CardDescription>Releases persistidas y fallback legacy visible cuando todavía viene desde env.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             {releases.length === 0 ? (
               <div className="rounded-2xl bg-background/70 p-4 text-sm text-muted-foreground">Todavía no hay releases OTA persistidas.</div>
             ) : (
-              releases.map((release) => {
+              releasesPagination.paginatedItems.map((release) => {
                 const canActivate = Boolean(release.id) && !release.isActive && release.sourceType !== "env";
                 return (
                   <div key={release.id || `${release.channel}-${release.latestVersion}`} className="rounded-3xl border border-border/70 bg-white/80 p-4">
