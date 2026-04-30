@@ -193,7 +193,7 @@ export function InstitutionStudentProfilePage({
 
   const backHref = buildInstitutionsOverviewHref({ institutionId, groupId });
   const siblingStudents = useMemo(
-    () => studentPerformanceRows.filter((entry) => entry.student.id !== selectedStudent?.id).slice(0, 8),
+    () => studentPerformanceRows.filter((entry) => entry.student.id !== selectedStudent?.id),
     [selectedStudent?.id, studentPerformanceRows],
   );
   const selectedStudentStatus = (selectedStudentPerformance?.gamesCount ?? 0) > 0 ? "Con actividad" : "Sin partidas visibles";
@@ -314,6 +314,10 @@ export function InstitutionStudentProfilePage({
                 </CardDescription>
               </CardHeader>
               <CardContent className="grid gap-3">
+                <div
+                  data-testid="institution-student-navigation-list"
+                  className="grid gap-3 max-h-[420px] overflow-y-auto pr-1"
+                >
                 <div className="rounded-2xl bg-background/70 p-4">
                   <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Grupo activo</p>
                   <p className="mt-2 text-base font-semibold text-foreground">{selectedGroup?.name || "Grupo sin nombre"}</p>
@@ -346,6 +350,7 @@ export function InstitutionStudentProfilePage({
                     No hay otros estudiantes visibles en este grupo por ahora.
                   </div>
                 )}
+                </div>
               </CardContent>
             </Card>
           </div>
