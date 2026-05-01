@@ -16,6 +16,7 @@ const useReadinessHealthMock = vi.fn();
 const useSystemDashboardSummaryMock = vi.fn();
 const replaceMock = vi.fn();
 const writeTextMock = vi.fn();
+const fetchMock = vi.fn();
 let searchParamsMock = new URLSearchParams();
 
 vi.mock("@/features/auth/auth-context", () => ({
@@ -103,6 +104,11 @@ describe("SuperadminDashboard", () => {
     Object.defineProperty(window.navigator, "clipboard", {
       configurable: true,
       value: { writeText: writeTextMock },
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({ results: [] }),
     });
 
     useUsersMock.mockReturnValue(okQuery(okPaginated([])));
@@ -238,6 +244,7 @@ describe("SuperadminDashboard", () => {
     renderDashboard();
 
     expect(screen.getByText("Ventana temporal")).toBeInTheDocument();
+    expect(screen.getByText(/Mapa de instituciones y dispositivos/i)).toBeInTheDocument();
     expect(screen.getByText("Institución")).toBeInTheDocument();
     expect(screen.getByText("País")).toBeInTheDocument();
     expect(screen.getByText("Tipo de usuario")).toBeInTheDocument();

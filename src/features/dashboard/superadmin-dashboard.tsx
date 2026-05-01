@@ -29,6 +29,7 @@ import {
   DashboardMultiLineChartCard,
   useDashboardModuleControls,
 } from "@/features/dashboard/dashboard-analytics-shared";
+import { DashboardLocationMapCard, type DashboardLocationSeed } from "@/features/dashboard/dashboard-location-map-card";
 import {
   buildProfileCoverageBreakdown,
   buildUserRoleSeries,
@@ -173,6 +174,73 @@ function buildInstitutionLoadSeriesFromActivity(institutions: InstitutionRecord[
     .slice(0, 8);
 }
 
+function buildDashboardLocationSeeds(institutions: InstitutionRecord[], devices: Array<{ educationalCenterId?: string | null; ownerUserId?: string | null; assignmentScope?: string | null }>, users: UserRecord[]) {
+  const deviceCountByInstitutionId = new Map<string, number>();
+  const deviceCountByOwnerId = new Map<string, number>();
+
+  for (const device of devices) {
+    if (device.educationalCenterId) {
+      deviceCountByInstitutionId.set(device.educationalCenterId, (deviceCountByInstitutionId.get(device.educationalCenterId) || 0) + 1);
+    }
+    if (device.ownerUserId) {
+      deviceCountByOwnerId.set(device.ownerUserId, (deviceCountByOwnerId.get(device.ownerUserId) || 0) + 1);
+    }
+  }
+
+  const seeds: DashboardLocationSeed[] = [];
+
+  for (const institution of institutions) {
+    const query = [
+      institution.address?.addressFirstLine,
+      institution.address?.city || institution.city,
+      institution.address?.state,
+      institution.address?.countryCode || institution.country,
+    ].filter(Boolean).join(", ");
+
+    if (!query) continue;
+
+    const institutionDeviceCount = deviceCountByInstitutionId.get(institution.id) || institution.operationalSummary?.deviceCount || 0;
+
+    seeds.push({
+      key: `institution-${institution.id}`,
+      label: institution.name,
+      query,
+      detail: [institution.address?.city || institution.city, institution.address?.state, institution.address?.countryCode || institution.country].filter(Boolean).join(" · ") || "Institución con dirección cargada",
+      kind: "institution",
+      deviceCount: institutionDeviceCount,
+      institutionCount: 1,
+    });
+  }
+
+  const ownerSeeds = new Map<string, DashboardLocationSeed>();
+  for (const user of users) {
+    if (!user.address) continue;
+    const ownerDeviceCount = deviceCountByOwnerId.get(user.id) || 0;
+    if (ownerDeviceCount <= 0) continue;
+
+    const query = [user.address.addressFirstLine, user.address.city, user.address.state, user.address.countryCode].filter(Boolean).join(", ");
+    if (!query) continue;
+
+    const key = `owner-${query.toLowerCase()}`;
+    const current = ownerSeeds.get(key) || {
+      key,
+      label: user.fullName || user.email || "Owner home",
+      query,
+      detail: [user.address.city, user.address.state, user.address.countryCode].filter(Boolean).join(" · ") || "Owner con dirección cargada",
+      kind: "home-device",
+      deviceCount: 0,
+      institutionCount: 0,
+    } satisfies DashboardLocationSeed;
+
+    current.deviceCount += ownerDeviceCount;
+    ownerSeeds.set(key, current);
+  }
+
+  return [...seeds, ...ownerSeeds.values()]
+    .filter((seed) => seed.deviceCount > 0 || seed.institutionCount > 0)
+    .sort((a, b) => (b.deviceCount + b.institutionCount) - (a.deviceCount + a.institutionCount));
+}
+
 function readStoredTerritorialPresetsSnapshot() {
   if (typeof window === "undefined") return "[]";
   if (typeof window.localStorage?.getItem !== "function") return "[]";
@@ -246,9 +314,9 @@ export function SuperadminDashboard() {
   };
 
   const summaryQuery = useSystemDashboardSummary(tokens?.accessToken, summaryFilters, usesSystemSummary);
-  const usersQuery = useUsers(!usesSystemSummary ? tokens?.accessToken : undefined);
-  const institutionsQuery = useInstitutions(!usesSystemSummary ? tokens?.accessToken : undefined);
-  const devicesQuery = useDevices(!usesSystemSummary ? tokens?.accessToken : undefined);
+  const usersQuery = useUsers(tokens?.accessToken);
+  const institutionsQuery = useInstitutions(tokens?.accessToken);
+  const devicesQuery = useDevices(tokens?.accessToken);
   const syncsQuery = useSyncSessions(!usesSystemSummary ? tokens?.accessToken : undefined);
   const gamesQuery = useGames(!usesSystemSummary ? tokens?.accessToken : undefined);
   const profilesQuery = useProfilesOverview(!usesSystemSummary ? tokens?.accessToken : undefined);
@@ -309,6 +377,10 @@ export function SuperadminDashboard() {
   const territorialHierarchy = summaryQuery.data?.segments.territorial_hierarchy ?? EMPTY_LIST;
   const territoryAlerts = summaryQuery.data?.segments.territory_alerts ?? EMPTY_LIST;
   const territoryScores = summaryQuery.data?.segments.territory_scores ?? EMPTY_LIST;
+  const locationSeeds = useMemo(
+    () => buildDashboardLocationSeeds(institutions, devices, users),
+    [devices, institutions, users],
+  );
 
   const smartPresets = useMemo(
     () => [
@@ -1092,6 +1164,13 @@ export function SuperadminDashboard() {
           </>
         )}
       </div>
+
+      {usesSystemSummary ? (
+        <DashboardLocationMapCard
+          locations={locationSeeds}
+          isLoading={institutionsQuery.isLoading || usersQuery.isLoading || devicesQuery.isLoading}
+        />
+      ) : null}
 
       {usesSystemSummary ? (
         <DashboardMultiLineChartCard
