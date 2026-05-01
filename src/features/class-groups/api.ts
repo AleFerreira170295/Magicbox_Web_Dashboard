@@ -133,6 +133,13 @@ export async function importClassGroupStudents(token: string, classGroupId: stri
   return normalizeImportResponse(response);
 }
 
+export async function deleteClassGroup(token: string, classGroupId: string) {
+  await apiRequest<void>(apiEndpoints.classGroups.byId(classGroupId), {
+    method: "DELETE",
+    token,
+  });
+}
+
 export function useClassGroups(token?: string, institutionId?: string | null) {
   return useQuery({
     queryKey: ["class-groups", token, institutionId ?? null],

@@ -54,6 +54,8 @@ export const apiEndpoints = {
   },
   profiles: {
     overview: "/home/profiles/overview",
+    byId: (id: string) => `/home/profiles/${id}`,
+    bindingById: (id: string) => `/home/profile-bindings/${id}`,
   },
   settings: {
     otaRelease: "/system/ota/release",

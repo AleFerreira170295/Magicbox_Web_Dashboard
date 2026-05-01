@@ -25,6 +25,7 @@ vi.mock("@/features/auth/auth-context", () => ({
 vi.mock("@/features/devices/api", () => ({
   useDevices: (...args: unknown[]) => useDevicesMock(...args),
   updateDevice: vi.fn(),
+  deleteDevice: vi.fn(),
 }));
 
 vi.mock("@/features/institutions/api", () => ({

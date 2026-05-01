@@ -8,6 +8,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Building2, Globe, GraduationCap, Mail, MapPin, Phone, Search, ShieldCheck, Smartphone, Trash2, UserPlus, Users } from "lucide-react";
 import { SectionHeader } from "@/components/section-header";
+import { DeleteRecordDialog } from "@/components/delete-record-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -18,7 +19,7 @@ import { ListPaginationControls, useListPagination } from "@/components/ui/list-
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useAuth } from "@/features/auth/auth-context";
-import { useClassGroups } from "@/features/class-groups/api";
+import { deleteClassGroup, useClassGroups } from "@/features/class-groups/api";
 import { StudentImportPanel } from "@/features/class-groups/student-import-panel";
 import { useDevices } from "@/features/devices/api";
 import { useGames } from "@/features/games/api";
@@ -223,6 +224,8 @@ export function InstitutionsOverview() {
   const [form, setForm] = useState<InstitutionFormState>(emptyFormState);
   const [feedback, setFeedback] = useState<FeedbackState>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
+  const [isDeleteInstitutionDialogOpen, setIsDeleteInstitutionDialogOpen] = useState(false);
+  const [isDeleteGroupDialogOpen, setIsDeleteGroupDialogOpen] = useState(false);
 
   const institutionsQuery = useInstitutions(tokens?.accessToken);
   const usersQuery = useUsers(tokens?.accessToken);
@@ -261,6 +264,7 @@ export function InstitutionsOverview() {
   const canCreateInstitutions = hasAnyPermission("educational_center:create", "educational-center:create");
   const canUpdateInstitutions = hasAnyPermission("educational_center:update", "educational-center:update");
   const canDeleteInstitutions = hasAnyPermission("educational_center:delete", "educational-center:delete");
+  const canDeleteClassGroups = hasAnyPermission("class_group:delete", "class-group:delete");
   const canSubmitForm = mode === "create" ? canCreateInstitutions : canUpdateInstitutions;
 
   const createInstitutionMutation = useMutation({
@@ -318,6 +322,20 @@ export function InstitutionsOverview() {
       setForm(emptyFormState());
       setImageFile(null);
       setFeedback({ type: "success", message: "Institución eliminada." });
+    },
+    onError: (error) => setFeedback({ type: "error", message: getErrorMessage(error) }),
+  });
+
+  const deleteClassGroupMutation = useMutation({
+    mutationFn: (classGroupId: string) => deleteClassGroup(tokens?.accessToken as string, classGroupId),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["class-groups"] });
+      await queryClient.invalidateQueries({ queryKey: ["students"] });
+      setSelectedGroupId(null);
+      setStudentSearchQuery("");
+      setStudentVisibilityFilter(null);
+      setStudentSort(null);
+      setFeedback({ type: "success", message: "Grupo eliminado correctamente." });
     },
     onError: (error) => setFeedback({ type: "error", message: getErrorMessage(error) }),
   });
@@ -662,9 +680,20 @@ export function InstitutionsOverview() {
       setFeedback({ type: "error", message: "Tu acceso actual no permite eliminar instituciones." });
       return;
     }
-    if (!globalThis.confirm(`¿Eliminar ${selectedInstitution.name}?`)) return;
     setFeedback(null);
     await deleteInstitutionMutation.mutateAsync(selectedInstitutionId);
+    setIsDeleteInstitutionDialogOpen(false);
+  }
+
+  async function handleDeleteSelectedGroup() {
+    if (!selectedGroup) return;
+    if (!canDeleteClassGroups) {
+      setFeedback({ type: "error", message: "Tu acceso actual no permite eliminar grupos." });
+      return;
+    }
+    setFeedback(null);
+    await deleteClassGroupMutation.mutateAsync(selectedGroup.id);
+    setIsDeleteGroupDialogOpen(false);
   }
 
   function renderInstitutionEditorPanel() {
@@ -815,7 +844,7 @@ export function InstitutionsOverview() {
                       Cancelar
                     </Button>
                   ) : canDeleteInstitutions ? (
-                    <Button type="button" variant="destructive" disabled={isSaving || !selectedInstitution} onClick={handleDelete}>
+                    <Button type="button" variant="destructive" disabled={isSaving || !selectedInstitution} onClick={() => setIsDeleteInstitutionDialogOpen(true)}>
                       <Trash2 className="size-4" />
                       Eliminar
                     </Button>
@@ -1289,6 +1318,12 @@ export function InstitutionsOverview() {
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
                     <Badge variant="secondary">{selectedInstitution.classGroupCount} grupos</Badge>
+                    {canDeleteClassGroups ? (
+                      <Button type="button" size="sm" variant="destructive" onClick={() => setIsDeleteGroupDialogOpen(true)} disabled={!selectedGroup || deleteClassGroupMutation.isPending}>
+                        <Trash2 className="size-4" />
+                        Eliminar grupo
+                      </Button>
+                    ) : null}
                     <Button type="button" size="sm" variant="ghost" onClick={clearGroupSelection} disabled={!selectedGroup}>
                       Deseleccionar grupo
                     </Button>
@@ -1474,6 +1509,30 @@ export function InstitutionsOverview() {
         institutionId={selectedInstitution?.id ?? null}
         institutionName={selectedInstitution?.name ?? null}
         user={currentUser}
+      />
+
+      <DeleteRecordDialog
+        open={isDeleteInstitutionDialogOpen}
+        onClose={() => setIsDeleteInstitutionDialogOpen(false)}
+        onConfirm={handleDelete}
+        isPending={deleteInstitutionMutation.isPending}
+        title={selectedInstitution ? `Eliminar ${selectedInstitution.name}` : "Eliminar institución"}
+        description={selectedInstitution
+          ? "La institución seleccionada dejará de estar disponible en el módulo y en sus listados relacionados. Confirmá solo si querés ejecutar la eliminación real."
+          : "Confirmá la eliminación de la institución seleccionada."}
+        confirmLabel="Sí, eliminar institución"
+      />
+
+      <DeleteRecordDialog
+        open={isDeleteGroupDialogOpen}
+        onClose={() => setIsDeleteGroupDialogOpen(false)}
+        onConfirm={handleDeleteSelectedGroup}
+        isPending={deleteClassGroupMutation.isPending}
+        title={selectedGroup ? `Eliminar grupo ${selectedGroup.name}` : "Eliminar grupo"}
+        description={selectedGroup
+          ? "El grupo seleccionado se quitará del detalle institucional y dejará de aparecer en el flujo visible. Confirmá solo si querés ejecutar la eliminación real."
+          : "Confirmá la eliminación del grupo seleccionado."}
+        confirmLabel="Sí, eliminar grupo"
       />
     </div>
   );

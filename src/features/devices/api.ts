@@ -58,6 +58,13 @@ export async function updateDevice(token: string, deviceId: string, payload: Upd
   return normalizeDevice(response);
 }
 
+export async function deleteDevice(token: string, deviceId: string) {
+  await apiRequest<void>(apiEndpoints.devices.byId(deviceId), {
+    method: "DELETE",
+    token,
+  });
+}
+
 export function useDevices(token?: string) {
   return useQuery({
     queryKey: ["devices", token],

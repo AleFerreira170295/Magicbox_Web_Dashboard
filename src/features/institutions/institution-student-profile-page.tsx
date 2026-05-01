@@ -4,8 +4,11 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, Building2, GraduationCap, Search, UserRound } from "lucide-react";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { DeleteRecordDialog } from "@/components/delete-record-dialog";
 import { SectionHeader } from "@/components/section-header";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants, Button } from "@/components/ui/button";
@@ -13,10 +16,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/features/auth/auth-context";
+import { hasAnyUserPermission } from "@/features/auth/permission-contract";
 import { useClassGroups } from "@/features/class-groups/api";
 import { useGames } from "@/features/games/api";
 import { useInstitutions } from "@/features/institutions/api";
-import { useAllStudents } from "@/features/students/api";
+import { deleteStudent, useAllStudents } from "@/features/students/api";
 import { buildInstitutionStudentDetailHref, buildInstitutionsOverviewHref } from "@/features/institutions/student-route";
 import { cn, formatDateTime, formatDurationSeconds, getErrorMessage } from "@/lib/utils";
 
@@ -53,9 +57,12 @@ export function InstitutionStudentProfilePage({
   groupId?: string | null;
   studentId?: string | null;
 }) {
-  const { tokens } = useAuth();
+  const { tokens, user: currentUser } = useAuth();
+  const router = useRouter();
+  const queryClient = useQueryClient();
   const [analyticsScope, setAnalyticsScope] = useState<AnalyticsScope>("student");
   const [studentGamesSearchQuery, setStudentGamesSearchQuery] = useState("");
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
   const institutionsQuery = useInstitutions(tokens?.accessToken);
   const classGroupsQuery = useClassGroups(tokens?.accessToken, institutionId ?? null);
@@ -205,6 +212,28 @@ export function InstitutionStudentProfilePage({
   const missingRequiredIds = !institutionId || !groupId || !studentId;
   const isLoadingData = institutionsQuery.isLoading || classGroupsQuery.isLoading || studentsQuery.isLoading || gamesQuery.isLoading;
   const hasFatalError = institutionsQuery.error || classGroupsQuery.error || studentsQuery.error || gamesQuery.error;
+  const canDeleteStudent = hasAnyUserPermission(currentUser, "student:delete");
+
+  const deleteStudentMutation = useMutation({
+    mutationFn: async () => {
+      if (!selectedStudent || !tokens?.accessToken) throw new Error("No hay estudiante seleccionado.");
+      await deleteStudent(tokens.accessToken, selectedStudent.id);
+    },
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["students"] }),
+        queryClient.invalidateQueries({ queryKey: ["games"] }),
+        queryClient.invalidateQueries({ queryKey: ["class-groups"] }),
+      ]);
+      setIsDeleteDialogOpen(false);
+      router.push(backHref);
+    },
+  });
+
+  async function handleDeleteCurrentStudent() {
+    if (!canDeleteStudent) return;
+    await deleteStudentMutation.mutateAsync();
+  }
 
   return (
     <div className="space-y-6">
@@ -215,10 +244,22 @@ export function InstitutionStudentProfilePage({
           ? `Vista interna del alumno dentro de ${selectedGroup?.name || "su grupo"}, con analítica temporal, métricas y partidas visibles.`
           : "Entrá a un estudiante desde Institutions para revisar su información y comportamiento de juego en una pantalla dedicada."}
         actions={
-          <Link href={backHref} className={cn(buttonVariants({ variant: "outline" }))}>
-            <ArrowLeft className="size-4" />
-            Volver a Institutions
-          </Link>
+          <div className="flex flex-wrap items-center gap-2">
+            {selectedStudent && canDeleteStudent ? (
+              <button
+                type="button"
+                onClick={() => setIsDeleteDialogOpen(true)}
+                className={cn(buttonVariants({ variant: "destructive" }))}
+                disabled={deleteStudentMutation.isPending}
+              >
+                Eliminar estudiante
+              </button>
+            ) : null}
+            <Link href={backHref} className={cn(buttonVariants({ variant: "outline" }))}>
+              <ArrowLeft className="size-4" />
+              Volver a Institutions
+            </Link>
+          </div>
         }
       />
 
@@ -248,6 +289,14 @@ export function InstitutionStudentProfilePage({
         </Card>
       ) : (
         <>
+          {deleteStudentMutation.error ? (
+            <Card className="border-destructive/30 bg-destructive/5 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
+              <CardContent className="p-6 text-sm text-destructive">
+                No pude eliminar el estudiante. {getErrorMessage(deleteStudentMutation.error)}
+              </CardContent>
+            </Card>
+          ) : null}
+
           <div className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
             <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
               <CardContent className="p-5">
@@ -539,6 +588,18 @@ export function InstitutionStudentProfilePage({
           </Card>
         </>
       )}
+
+      <DeleteRecordDialog
+        open={isDeleteDialogOpen}
+        onClose={() => setIsDeleteDialogOpen(false)}
+        onConfirm={handleDeleteCurrentStudent}
+        isPending={deleteStudentMutation.isPending}
+        title={selectedStudent ? `Eliminar a ${selectedStudent.fullName}` : "Eliminar estudiante"}
+        description={selectedStudent
+          ? "Se va a eliminar este estudiante desde su ficha dedicada. Confirmá solo si querés ejecutar la eliminación real."
+          : "Confirmá la eliminación del estudiante seleccionado."}
+        confirmLabel="Sí, eliminar estudiante"
+      />
     </div>
   );
 }

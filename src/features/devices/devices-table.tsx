@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Home, Search, ShieldCheck, Smartphone, University, UserRound, Wifi } from "lucide-react";
+import { DeleteRecordDialog } from "@/components/delete-record-dialog";
 import { SectionHeader } from "@/components/section-header";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -14,7 +15,7 @@ import { ListPaginationControls, useListPagination } from "@/components/ui/list-
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useAuth } from "@/features/auth/auth-context";
-import { updateDevice, useDevices } from "@/features/devices/api";
+import { deleteDevice, updateDevice, useDevices } from "@/features/devices/api";
 import type { DeviceRecord, UpdateDevicePayload } from "@/features/devices/types";
 import { useGames } from "@/features/games/api";
 import { useInstitutions } from "@/features/institutions/api";
@@ -398,8 +399,10 @@ export function DevicesTable() {
   const [focusFilter, setFocusFilter] = useState<DeviceFocusFilter>("all");
   const [accessFilter, setAccessFilter] = useState<"all" | "owned" | "institution" | "shared" | "unresolved">("all");
   const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const linkedOwnerUserId = searchParams.get("ownerUserId")?.trim() || "";
   const linkedOwnerUserName = searchParams.get("ownerUserName")?.trim() || "";
+  const queryClient = useQueryClient();
 
   const devicesQuery = useDevices(tokens?.accessToken);
   const institutionsQuery = useInstitutions(tokens?.accessToken);
@@ -428,9 +431,22 @@ export function DevicesTable() {
   }
 
   const canUpdateDevices = hasAnyPermission("ble_device:update", "ble-device:update");
+  const canDeleteDevices = hasAnyPermission("ble_device:delete", "ble-device:delete");
   const currentUserEmail = (currentUser?.email || "").trim().toLowerCase();
   const isTeacherView = currentUser?.roles.includes("teacher") || false;
   const isDirectorView = currentUser?.roles.includes("director") || false;
+
+  const deleteDeviceMutation = useMutation({
+    mutationFn: (deviceId: string) => deleteDevice(tokens?.accessToken as string, deviceId),
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["devices"] }),
+        queryClient.invalidateQueries({ queryKey: ["games"] }),
+        queryClient.invalidateQueries({ queryKey: ["sync-sessions"] }),
+      ]);
+      setSelectedDeviceId(null);
+    },
+  });
 
   const deviceRows = useMemo(() => {
     return devices.map((device) => {
@@ -553,6 +569,13 @@ export function DevicesTable() {
     () => filtered.find((device) => device.id === selectedDeviceId) || deviceRows.find((device) => device.id === selectedDeviceId) || null,
     [deviceRows, filtered, selectedDeviceId],
   );
+
+  async function handleDeleteSelectedDevice() {
+    if (!selectedDevice) return;
+    if (!canDeleteDevices) return;
+    await deleteDeviceMutation.mutateAsync(selectedDevice.id);
+    setIsDeleteDialogOpen(false);
+  }
 
   function resetFilters() {
     setQuery("");
@@ -986,10 +1009,20 @@ export function DevicesTable() {
                     <Badge variant="outline">{selectedDevice.assignmentScope === "home" ? "Home" : locationLabel(selectedDevice)}</Badge>
                     <Badge variant="outline">{selectedDevice.ownerUserName || selectedDevice.ownerUserEmail || "Sin responsable"}</Badge>
                     <Badge variant="outline">{selectedDevice.firmwareVersion || "Sin firmware"}</Badge>
+                    {canDeleteDevices ? (
+                      <Button type="button" size="sm" variant="destructive" onClick={() => setIsDeleteDialogOpen(true)} disabled={deleteDeviceMutation.isPending}>
+                        Eliminar dispositivo
+                      </Button>
+                    ) : null}
                     <Button type="button" size="sm" variant="ghost" onClick={() => setSelectedDeviceId(null)}>
                       Quitar selección
                     </Button>
                   </div>
+                  {deleteDeviceMutation.error ? (
+                    <div className="mt-4 rounded-2xl border border-destructive/20 bg-destructive/5 p-3 text-sm text-destructive">
+                      No pude eliminar el dispositivo. {getErrorMessage(deleteDeviceMutation.error)}
+                    </div>
+                  ) : null}
                   <div className="mt-4 rounded-2xl border border-border/70 bg-white/80 p-4">
                     <p className="text-sm font-medium text-foreground">Cruces rápidos</p>
                     <p className="mt-1 text-sm text-muted-foreground">
@@ -1050,6 +1083,18 @@ export function DevicesTable() {
           </CardContent>
         </Card>
       </div>
+
+      <DeleteRecordDialog
+        open={isDeleteDialogOpen}
+        onClose={() => setIsDeleteDialogOpen(false)}
+        onConfirm={handleDeleteSelectedDevice}
+        isPending={deleteDeviceMutation.isPending}
+        title={selectedDevice ? `Eliminar ${selectedDevice.name}` : "Eliminar dispositivo"}
+        description={selectedDevice
+          ? "El dispositivo seleccionado dejará de aparecer en los módulos visibles y en sus cruces relacionados. Confirmá solo si querés ejecutar la eliminación real."
+          : "Confirmá la eliminación del dispositivo seleccionado."}
+        confirmLabel="Sí, eliminar dispositivo"
+      />
     </div>
   );
 }

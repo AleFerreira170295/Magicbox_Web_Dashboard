@@ -109,6 +109,13 @@ export async function listAllStudents(token: string, params: Omit<ListStudentsPa
   };
 }
 
+export async function deleteStudent(token: string, studentId: string) {
+  await apiRequest<void>(apiEndpoints.students.byId(studentId), {
+    method: "DELETE",
+    token,
+  });
+}
+
 export function useStudents(token?: string, params?: ListStudentsParams) {
   const safeLimit = Math.min(Math.max(params?.limit ?? 100, 1), 100);
 

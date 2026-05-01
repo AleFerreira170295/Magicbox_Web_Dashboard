@@ -3,20 +3,24 @@
 /* eslint-disable @next/next/no-img-element */
 
 import Link from "next/link";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, Building2, CreditCard, GraduationCap, UserRound, Waves } from "lucide-react";
+import { DeleteRecordDialog } from "@/components/delete-record-dialog";
 import { SectionHeader } from "@/components/section-header";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/features/auth/auth-context";
+import { hasAnyUserPermission } from "@/features/auth/permission-contract";
 import { useClassGroups } from "@/features/class-groups/api";
 import { useGames } from "@/features/games/api";
 import { useInstitutions } from "@/features/institutions/api";
-import { useProfilesOverview } from "@/features/profiles/api";
+import { deleteHomeProfile, useProfilesOverview } from "@/features/profiles/api";
 import { buildProfileDetailHref, buildProfilesOverviewHref } from "@/features/profiles/profile-route";
-import { useStudents } from "@/features/students/api";
+import { deleteStudent, useStudents } from "@/features/students/api";
 import { cn, formatDateTime, getErrorMessage } from "@/lib/utils";
 
 type RelevantEntityKind = "home-profile" | "student";
@@ -73,7 +77,10 @@ export function ProfileDetailPage({
   classGroupId?: string | null;
 }) {
   void classGroupId;
-  const { tokens } = useAuth();
+  const { tokens, user: currentUser } = useAuth();
+  const router = useRouter();
+  const queryClient = useQueryClient();
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
   const profilesQuery = useProfilesOverview(tokens?.accessToken);
   const institutionsQuery = useInstitutions(tokens?.accessToken);
@@ -225,6 +232,38 @@ export function ProfileDetailPage({
   const isLoading = profilesQuery.isLoading || institutionsQuery.isLoading || classGroupsQuery.isLoading || studentsQuery.isLoading || gamesQuery.isLoading;
   const hasFatalError = profilesQuery.error || institutionsQuery.error || classGroupsQuery.error || studentsQuery.error || gamesQuery.error;
   const missingRequiredIds = !kind || !entityId;
+  const canDeleteStudents = hasAnyUserPermission(currentUser, "student:delete");
+  const canDeleteSelectedEntity = Boolean(
+    selectedEntity && (
+      (selectedEntity.kind === "student" && canDeleteStudents)
+      || (selectedEntity.kind === "home-profile" && selectedEntity.userId && selectedEntity.userId === currentUser?.id)
+    ),
+  );
+
+  const deleteEntityMutation = useMutation({
+    mutationFn: async () => {
+      if (!selectedEntity || !tokens?.accessToken) throw new Error("No hay registro seleccionado.");
+      if (selectedEntity.kind === "student") {
+        await deleteStudent(tokens.accessToken, selectedEntity.entityId);
+        return;
+      }
+      await deleteHomeProfile(tokens.accessToken, selectedEntity.entityId);
+    },
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["profiles-overview"] }),
+        queryClient.invalidateQueries({ queryKey: ["students"] }),
+        queryClient.invalidateQueries({ queryKey: ["games"] }),
+      ]);
+      setIsDeleteDialogOpen(false);
+      router.push(backHref);
+    },
+  });
+
+  async function handleDeleteSelectedEntity() {
+    if (!canDeleteSelectedEntity) return;
+    await deleteEntityMutation.mutateAsync();
+  }
 
   return (
     <div className="space-y-6">
@@ -235,10 +274,22 @@ export function ProfileDetailPage({
           ? `Vista dedicada del ${selectedEntity.kind === "student" ? "estudiante" : "perfil Home"} para revisar su contexto, asignación y actividad visible.`
           : "Entrá a un registro desde Profiles para revisar su detalle en una pantalla dedicada."}
         actions={
-          <Link href={backHref} className={cn(buttonVariants({ variant: "outline" }))}>
-            <ArrowLeft className="size-4" />
-            Volver a Profiles
-          </Link>
+          <div className="flex flex-wrap items-center gap-2">
+            {selectedEntity && canDeleteSelectedEntity ? (
+              <button
+                type="button"
+                onClick={() => setIsDeleteDialogOpen(true)}
+                className={cn(buttonVariants({ variant: "destructive" }))}
+                disabled={deleteEntityMutation.isPending}
+              >
+                Eliminar registro
+              </button>
+            ) : null}
+            <Link href={backHref} className={cn(buttonVariants({ variant: "outline" }))}>
+              <ArrowLeft className="size-4" />
+              Volver a Profiles
+            </Link>
+          </div>
         }
       />
 
@@ -267,6 +318,14 @@ export function ProfileDetailPage({
         </Card>
       ) : (
         <>
+          {deleteEntityMutation.error ? (
+            <Card className="border-destructive/30 bg-destructive/5 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
+              <CardContent className="p-6 text-sm text-destructive">
+                No pude eliminar el registro. {getErrorMessage(deleteEntityMutation.error)}
+              </CardContent>
+            </Card>
+          ) : null}
+
           <div className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
             <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
               <CardContent className="p-5">
@@ -493,6 +552,18 @@ export function ProfileDetailPage({
           </div>
         </>
       )}
+
+      <DeleteRecordDialog
+        open={isDeleteDialogOpen}
+        onClose={() => setIsDeleteDialogOpen(false)}
+        onConfirm={handleDeleteSelectedEntity}
+        isPending={deleteEntityMutation.isPending}
+        title={selectedEntity ? `Eliminar ${selectedEntity.displayName}` : "Eliminar registro"}
+        description={selectedEntity
+          ? `Se va a eliminar este ${selectedEntity.kind === "student" ? "estudiante" : "perfil Home"} desde su pantalla de detalle. Confirmá solo si querés ejecutar la eliminación real.`
+          : "Confirmá la eliminación del registro seleccionado."}
+        confirmLabel={selectedEntity?.kind === "student" ? "Sí, eliminar estudiante" : "Sí, eliminar perfil"}
+      />
     </div>
   );
 }

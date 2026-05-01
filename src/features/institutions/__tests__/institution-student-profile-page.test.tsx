@@ -3,6 +3,12 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { InstitutionStudentProfilePage } from "@/features/institutions/institution-student-profile-page";
 
+const routerPushMock = vi.fn();
+
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: routerPushMock }),
+}));
+
 const useAuthMock = vi.fn();
 const useInstitutionsMock = vi.fn();
 const useClassGroupsMock = vi.fn();
@@ -23,6 +29,7 @@ vi.mock("@/features/class-groups/api", () => ({
 
 vi.mock("@/features/students/api", () => ({
   useAllStudents: (...args: unknown[]) => useAllStudentsMock(...args),
+  deleteStudent: vi.fn(),
 }));
 
 vi.mock("@/features/games/api", () => ({
@@ -55,6 +62,7 @@ function renderStudentProfilePage() {
 describe("InstitutionStudentProfilePage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    routerPushMock.mockReset();
 
     useAuthMock.mockReturnValue({
       tokens: { accessToken: "token", refreshToken: "refresh" },

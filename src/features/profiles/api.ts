@@ -52,6 +52,13 @@ export async function listProfilesOverview(token: string) {
   return response.map(normalizeProfile);
 }
 
+export async function deleteHomeProfile(token: string, profileId: string) {
+  await apiRequest<void>(apiEndpoints.profiles.byId(profileId), {
+    method: "DELETE",
+    token,
+  });
+}
+
 export function useProfilesOverview(token?: string) {
   return useQuery({
     queryKey: ["profiles-overview", token],

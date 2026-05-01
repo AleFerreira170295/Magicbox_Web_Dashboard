@@ -7,6 +7,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { KeyRound, Phone, Search, ShieldCheck, Trash2, UserPlus, Users } from "lucide-react";
 import { SectionHeader } from "@/components/section-header";
+import { DeleteRecordDialog } from "@/components/delete-record-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -386,6 +387,7 @@ export function UsersTable() {
   const [aclScope, setAclScope] = useState<string>(GLOBAL_SCOPE);
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
   const [imageFile, setImageFile] = useState<File | null>(null);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
   const auditEventsQuery = useAccessAuditEvents(tokens?.accessToken, selectedUserId || undefined, 20);
 
@@ -963,9 +965,9 @@ export function UsersTable() {
       setFeedback({ type: "error", message: "Tu acceso actual no permite eliminar usuarios." });
       return;
     }
-    if (!globalThis.confirm(`¿Eliminar a ${selectedUser.fullName}?`)) return;
     setFeedback(null);
     await deleteUserMutation.mutateAsync(selectedUser.id);
+    setIsDeleteDialogOpen(false);
   }
 
   function renderUserEditorPanel() {
@@ -1168,7 +1170,7 @@ export function UsersTable() {
                       Cancelar
                     </Button>
                   ) : canDeleteUsers ? (
-                    <Button type="button" variant="destructive" disabled={isSaving || !selectedUser} onClick={handleDelete}>
+                    <Button type="button" variant="destructive" disabled={isSaving || !selectedUser} onClick={() => setIsDeleteDialogOpen(true)}>
                       <Trash2 className="size-4" />
                       Eliminar
                     </Button>
@@ -1544,6 +1546,18 @@ export function UsersTable() {
           >
             {renderUserEditorPanel()}
           </Modal>
+
+          <DeleteRecordDialog
+            open={isDeleteDialogOpen}
+            onClose={() => setIsDeleteDialogOpen(false)}
+            onConfirm={handleDelete}
+            isPending={deleteUserMutation.isPending}
+            title={selectedUser ? `Eliminar a ${selectedUser.fullName}` : "Eliminar usuario"}
+            description={selectedUser
+              ? "Se va a borrar el usuario seleccionado y dejará de estar disponible en el padrón visible. Confirmá solo si querés ejecutar la eliminación real."
+              : "Confirmá la eliminación del usuario seleccionado."}
+            confirmLabel="Sí, eliminar usuario"
+          />
 
           <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
             <CardHeader>
