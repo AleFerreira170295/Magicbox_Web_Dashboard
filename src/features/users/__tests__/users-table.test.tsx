@@ -188,7 +188,7 @@ describe("UsersTable", () => {
 
     fireEvent.click(screen.getAllByText("Juan Pérez")[0]);
 
-    expect(screen.getByText("Scope bloqueado a institución")).toBeInTheDocument();
+    expect(screen.getByText("Alcance fijado por institución")).toBeInTheDocument();
     expect(screen.queryByRole("option", { name: "Global" })).not.toBeInTheDocument();
   });
 
@@ -217,7 +217,7 @@ describe("UsersTable", () => {
     fireEvent.click(screen.getAllByText("Juan Pérez")[0]);
 
     expect(screen.getByText("Sin permiso para eliminar")).toBeInTheDocument();
-    expect(screen.getByText(/no consultar ni editar ACL detallada/i)).toBeInTheDocument();
+    expect(screen.getByText(/no abrir el detalle de permisos/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Edición bloqueada" })).toBeDisabled();
   });
 
@@ -281,5 +281,41 @@ describe("UsersTable", () => {
 
     expect(screen.queryAllByText("Lucía Gómez").length).toBeGreaterThan(0);
     expect(screen.queryAllByText("Juan Pérez")).toHaveLength(0);
+  });
+
+  it("activates focus from summary cards and shows the active result chip", () => {
+    useAuthMock.mockReturnValue({
+      tokens: { accessToken: "token", refreshToken: "refresh" },
+      user: {
+        id: "current-user",
+        email: "director@example.com",
+        firstName: "Ana",
+        lastName: "Director",
+        fullName: "Ana Director",
+        educationalCenterId: "ec-1",
+        roles: ["institution-admin"],
+        permissions: ["user:read", "user:create", "user:update", "access_control:read", "access_control:update"],
+        raw: {},
+      },
+    });
+
+    useUsersMock.mockReturnValue(
+      okQuery({
+        data: [baseUser, userWithoutAcl],
+        page: 1,
+        limit: 2,
+        total: 2,
+        total_pages: 1,
+      }),
+    );
+    usePermissionsMock.mockReturnValue(okQuery({ data: [basePermission], page: 1, limit: 1, total: 1, total_pages: 1 }));
+
+    renderUsersTable();
+
+    fireEvent.click(screen.getByRole("button", { name: /Ver foco Con permisos explícitos/i }));
+
+    expect(screen.getByText(/Enfoque · Con ACL explícita/i)).toBeInTheDocument();
+    expect(screen.getByText(/1 de 2 usuarios con el recorte actual/i)).toBeInTheDocument();
+    expect(screen.queryAllByText("Juan Pérez").length).toBeGreaterThan(0);
   });
 });

@@ -88,7 +88,7 @@ const roleBundles = [
 ] as const;
 
 type FormMode = "create" | "edit";
-type UsersFocusFilter = "all" | "review" | "no_image" | "no_acl" | "teachers" | "admins";
+type UsersFocusFilter = "all" | "review" | "no_image" | "with_image" | "no_acl" | "with_acl" | "teachers" | "admins";
 
 type FeedbackState = {
   type: "success" | "error";
@@ -297,14 +297,20 @@ function SummaryCard({
   value,
   hint,
   icon: Icon,
+  onSelect,
+  isActive = false,
+  actionLabel = "Ver foco",
 }: {
   label: string;
   value: string;
   hint?: string;
   icon: React.ComponentType<{ className?: string }>;
+  onSelect?: () => void;
+  isActive?: boolean;
+  actionLabel?: string;
 }) {
   return (
-    <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
+    <Card className={cn("border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]", isActive && "ring-2 ring-primary/20")}>
       <CardContent className="p-5">
         <div className="flex items-start justify-between gap-4">
           <div>
@@ -316,6 +322,21 @@ function SummaryCard({
             <Icon className="size-5" />
           </div>
         </div>
+        {onSelect ? (
+          <button
+            type="button"
+            onClick={onSelect}
+            aria-label={`${isActive ? "Foco activo para" : actionLabel} ${label}`}
+            className={cn(
+              "mt-4 inline-flex rounded-full border px-3 py-1.5 text-xs font-medium transition",
+              isActive
+                ? "border-primary/30 bg-primary/10 text-primary"
+                : "border-border/70 bg-white/80 text-foreground hover:border-primary/30 hover:bg-primary/5",
+            )}
+          >
+            {isActive ? "Foco activo" : actionLabel}
+          </button>
+        ) : null}
       </CardContent>
     </Card>
   );
@@ -517,8 +538,12 @@ export function UsersTable() {
             return item.needsReview;
           case "no_image":
             return !item.imageUrl;
+          case "with_image":
+            return Boolean(item.imageUrl);
           case "no_acl":
             return item.explicitPermissionKeys.length === 0;
+          case "with_acl":
+            return item.explicitPermissionKeys.length > 0;
           case "teachers":
             return item.inferredRoles.includes("teacher");
           case "admins":
@@ -533,6 +558,10 @@ export function UsersTable() {
   }, [focusFilter, institutionFilter, institutionsById, query, roleFilter, users]);
 
   const pagination = useListPagination(filtered);
+
+  const reviewCandidates = useMemo(() => filtered.filter((item) => item.needsReview), [filtered]);
+
+  const reviewPagination = useListPagination(reviewCandidates);
 
   const auditEventsPagination = useListPagination(auditEventsQuery.data || []);
 
@@ -555,14 +584,29 @@ export function UsersTable() {
     };
   }, [users, usersQuery.data?.total]);
 
-  const focusSegments = [
-    { key: "all" as const, label: "Todos", count: metrics.totalUsers },
-    { key: "review" as const, label: "Con observaciones", count: metrics.reviewUsers },
-    { key: "no_image" as const, label: "Sin imagen", count: metrics.totalUsers - metrics.usersWithImage },
-    { key: "no_acl" as const, label: "Sin ACL explícita", count: metrics.usersWithoutAcl },
-    { key: "teachers" as const, label: "Docentes", count: metrics.teacherUsers },
-    { key: "admins" as const, label: "Admins", count: metrics.adminLikeUsers },
-  ];
+  const focusSegments = useMemo(
+    () => [
+      { key: "all" as const, label: "Todos", count: metrics.totalUsers },
+      { key: "review" as const, label: "Con observaciones", count: metrics.reviewUsers },
+      { key: "with_acl" as const, label: "Con ACL explícita", count: metrics.permissionedUsers },
+      { key: "no_image" as const, label: "Sin imagen", count: metrics.totalUsers - metrics.usersWithImage },
+      { key: "with_image" as const, label: "Con imagen", count: metrics.usersWithImage },
+      { key: "no_acl" as const, label: "Sin ACL explícita", count: metrics.usersWithoutAcl },
+      { key: "teachers" as const, label: "Docentes", count: metrics.teacherUsers },
+      { key: "admins" as const, label: "Admins", count: metrics.adminLikeUsers },
+    ],
+    [metrics.adminLikeUsers, metrics.permissionedUsers, metrics.reviewUsers, metrics.teacherUsers, metrics.totalUsers, metrics.usersWithImage, metrics.usersWithoutAcl],
+  );
+
+  const activeFilterChips = useMemo(
+    () => [
+      query.trim() ? `Búsqueda · ${query.trim()}` : null,
+      institutionFilter ? `Institución · ${institutionsById.get(institutionFilter) || institutionFilter}` : null,
+      roleFilter ? `Rol · ${roleFilter}` : null,
+      focusFilter !== "all" ? `Enfoque · ${focusSegments.find((segment) => segment.key === focusFilter)?.label || focusFilter}` : null,
+    ].filter((value): value is string => Boolean(value)),
+    [focusFilter, focusSegments, institutionFilter, institutionsById, query, roleFilter],
+  );
 
   const permissionsByFeature = useMemo(() => {
     if (!selectedUser) return [] as Array<{ featureId: string; featureName: string; featureCode: string; actions: typeof actions }>;
@@ -722,6 +766,13 @@ export function UsersTable() {
     setForm(formFromUser(user));
     setFeedback(null);
     setImageFile(null);
+  }
+
+  function resetFilters() {
+    setInstitutionFilter(scopedInstitutionId || "");
+    setRoleFilter("");
+    setFocusFilter("all");
+    setQuery("");
   }
 
   function openCreateUserForm() {
@@ -1140,8 +1191,8 @@ export function UsersTable() {
         title="Usuarios"
         description={
           isInstitutionAdminView
-            ? `La vista quedó adaptada a operación institution-admin sobre ${scopedInstitutionName}. Los listados y acciones ya respetan el scope backend.`
-            : "La vista ahora conecta usuarios, roles persistidos y permisos ACL explícitos desde el backend real."
+            ? `Vista ajustada a ${scopedInstitutionName}. Los listados y acciones respetan el acceso disponible.`
+            : "Gestioná usuarios, roles y permisos explícitos desde un solo lugar."
         }
         actions={
           <div className="flex flex-col items-stretch gap-3 md:flex-row md:items-center">
@@ -1181,26 +1232,37 @@ export function UsersTable() {
               label="Usuarios cargados"
               value={String(metrics.totalUsers)}
               icon={Users}
+              onSelect={() => setFocusFilter("all")}
+              isActive={focusFilter === "all"}
+              actionLabel="Ver todos"
             />
             <SummaryCard
               label="Con permisos explícitos"
               value={String(metrics.permissionedUsers)}
               icon={KeyRound}
+              onSelect={() => setFocusFilter("with_acl")}
+              isActive={focusFilter === "with_acl"}
             />
             <SummaryCard
               label="Perfiles admin"
               value={String(metrics.adminLikeUsers)}
               icon={ShieldCheck}
+              onSelect={() => setFocusFilter("admins")}
+              isActive={focusFilter === "admins"}
             />
             <SummaryCard
               label="Necesitan revisión"
               value={String(metrics.reviewUsers)}
               icon={Phone}
+              onSelect={() => setFocusFilter("review")}
+              isActive={focusFilter === "review"}
             />
             <SummaryCard
               label="Con imagen cargada"
               value={String(metrics.usersWithImage)}
               icon={Users}
+              onSelect={() => setFocusFilter("with_image")}
+              isActive={focusFilter === "with_image"}
             />
           </>
         )}
@@ -1235,7 +1297,9 @@ export function UsersTable() {
             <SelectField value={focusFilter} onChange={(value) => setFocusFilter(value as UsersFocusFilter)}>
               <option value="all">Todos</option>
               <option value="review">Con observaciones</option>
+              <option value="with_acl">Con ACL explícita</option>
               <option value="no_image">Sin imagen</option>
+              <option value="with_image">Con imagen</option>
               <option value="no_acl">Sin ACL explícita</option>
               <option value="teachers">Docentes</option>
               <option value="admins">Admins</option>
@@ -1245,12 +1309,7 @@ export function UsersTable() {
             <Button
               type="button"
               variant="outline"
-              onClick={() => {
-                setInstitutionFilter(scopedInstitutionId || "");
-                setRoleFilter("");
-                setFocusFilter("all");
-                setQuery("");
-              }}
+              onClick={resetFilters}
             >
               Limpiar filtros
             </Button>
@@ -1277,6 +1336,28 @@ export function UsersTable() {
         </CardContent>
       </Card>
 
+      <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
+        <CardContent className="flex flex-wrap items-center justify-between gap-4 p-5">
+          <div>
+            <p className="text-sm font-medium text-foreground">Resultados visibles</p>
+            <p className="mt-1 text-sm text-muted-foreground">{filtered.length} de {metrics.totalUsers} usuarios con el recorte actual.</p>
+          </div>
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            {activeFilterChips.length > 0 ? activeFilterChips.map((chip) => <Badge key={chip} variant="outline">{chip}</Badge>) : <Badge variant="outline">Vista general</Badge>}
+            {activeFilterChips.length > 0 ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={resetFilters}
+              >
+                Limpiar
+              </Button>
+            ) : null}
+          </div>
+        </CardContent>
+      </Card>
+
       <div className="grid gap-6 2xl:grid-cols-[1.25fr_0.95fr]">
         <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
           <CardHeader>
@@ -1284,7 +1365,7 @@ export function UsersTable() {
               <div>
                 <CardTitle>Padrón de usuarios</CardTitle>
                 <CardDescription>
-                  La tabla muestra roles efectivos, cantidad de permisos explícitos y señales de revisión. Seleccioná un usuario para editar sus datos y su ACL.
+                  Buscá, filtrá y seleccioná un usuario para editar sus datos o revisar su acceso.
                 </CardDescription>
               </div>
               <ListPaginationControls
@@ -1300,7 +1381,7 @@ export function UsersTable() {
               />
             </div>
           </CardHeader>
-          <CardContent className="overflow-x-auto p-0">
+          <CardContent className="max-h-[720px] overflow-auto p-0">
             {usersQuery.isLoading ? (
               <div className="p-6">
                 <Skeleton className="h-72 w-full rounded-none" />
@@ -1309,7 +1390,7 @@ export function UsersTable() {
               <div className="p-6 text-sm text-destructive">{getErrorMessage(usersQuery.error)}</div>
             ) : (
               <Table>
-                <TableHeader>
+                <TableHeader className="sticky top-0 z-10 bg-white/95 backdrop-blur-sm">
                   <TableRow>
                     <TableHead>Usuario</TableHead>
                     <TableHead>Roles</TableHead>
@@ -1386,7 +1467,7 @@ export function UsersTable() {
             <CardHeader>
               <CardTitle>Edición y alta</CardTitle>
               <CardDescription>
-                Los formularios de usuario ahora se abren como pop-up en ventanas medias/chicas para no comprimir la lectura operativa del módulo.
+                Abrí el formulario sin perder de vista el padrón de usuarios.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -1430,7 +1511,7 @@ export function UsersTable() {
                 <div className="rounded-2xl border border-border/70 bg-background/70 p-4">
                   <p className="text-sm font-medium text-foreground">Cruces rápidos</p>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    Abrí el parque y las partidas ya filtradas por {selectedUser.fullName} para seguir ownership y actividad sin rearmar la búsqueda.
+                    Abrí dispositivos y partidas ya filtrados por {selectedUser.fullName} para seguir actividad y vínculos sin rehacer la búsqueda.
                   </p>
                   <div className="mt-3 flex flex-wrap gap-3">
                     <Link
@@ -1468,7 +1549,7 @@ export function UsersTable() {
             <CardHeader>
               <CardTitle>Roles y permisos</CardTitle>
               <CardDescription>
-                Roles persistidos para cada usuario, bundles operativos y matriz ACL para ajuste fino por feature y acción.
+                Revisá roles guardados, bundles disponibles y permisos explícitos del usuario seleccionado.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-5">
@@ -1478,7 +1559,7 @@ export function UsersTable() {
                 </div>
               ) : !canReadAcl && !canManageAcl ? (
                 <div className="rounded-2xl bg-background/70 p-4 text-sm text-muted-foreground">
-                  Tu acceso actual permite revisar el padrón, pero no consultar ni editar ACL detallada.
+                  Tu acceso actual permite revisar el padrón, pero no abrir el detalle de permisos.
                 </div>
               ) : aclUnavailable ? (
                 <div className="rounded-2xl border border-destructive/20 bg-destructive/5 p-4 text-sm text-destructive">
@@ -1500,7 +1581,7 @@ export function UsersTable() {
                         </p>
                         <div className="mt-2 flex flex-wrap gap-2">
                           <Badge variant="outline">Bundle target: {resolveScopeLabel(aclScope === GLOBAL_SCOPE ? null : aclScope)}</Badge>
-                          {isInstitutionAdminView ? <Badge variant="secondary">Scope bloqueado a institución</Badge> : null}
+                          {isInstitutionAdminView ? <Badge variant="secondary">Alcance fijado por institución</Badge> : null}
                         </div>
                       </div>
                       <div className="space-y-2">
@@ -1548,7 +1629,7 @@ export function UsersTable() {
 
                   <div className="space-y-3">
                     <p className="text-sm font-medium text-foreground">Matriz ACL</p>
-                    <div className="space-y-3">
+                    <div className="max-h-[420px] space-y-3 overflow-auto pr-1">
                       {permissionsByFeature.map((feature) => (
                         <div key={feature.featureId} className="rounded-2xl border border-border bg-white/80 p-4">
                           <div className="flex flex-wrap items-center justify-between gap-3">
@@ -1623,7 +1704,7 @@ export function UsersTable() {
                   Todavía no hay eventos auditados para este usuario.
                 </div>
               ) : (
-                <div className="space-y-3">
+                <div className="max-h-[360px] space-y-3 overflow-auto pr-1">
                   {auditEventsPagination.paginatedItems.map((event) => (
                     <div key={event.id} className="rounded-2xl border border-border bg-white/80 p-4">
                       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -1648,23 +1729,43 @@ export function UsersTable() {
 
       <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
         <CardHeader>
-          <CardTitle>Usuarios que conviene revisar</CardTitle>
-          <CardDescription>
-            Cruce rápido entre datos incompletos y configuración de acceso explícita.
-          </CardDescription>
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+              <CardTitle>Usuarios que conviene revisar</CardTitle>
+              <CardDescription>
+                Cruce rápido entre datos incompletos y el recorte que tenés activo en pantalla.
+              </CardDescription>
+            </div>
+            <div className="flex flex-wrap items-center gap-3">
+              <Badge variant="outline">{reviewCandidates.length} con observaciones</Badge>
+              {focusFilter !== "review" ? (
+                <Button type="button" size="sm" variant="outline" onClick={() => setFocusFilter("review")}>
+                  Ver solo observaciones
+                </Button>
+              ) : null}
+              <ListPaginationControls
+                pageSize={reviewPagination.pageSize}
+                setPageSize={reviewPagination.setPageSize}
+                currentPage={reviewPagination.currentPage}
+                totalPages={reviewPagination.totalPages}
+                totalItems={reviewPagination.totalItems}
+                paginationStart={reviewPagination.paginationStart}
+                paginationEnd={reviewPagination.paginationEnd}
+                goToPreviousPage={reviewPagination.goToPreviousPage}
+                goToNextPage={reviewPagination.goToNextPage}
+              />
+            </div>
+          </div>
         </CardHeader>
         <CardContent className="grid gap-3 md:grid-cols-2 2xl:grid-cols-3">
           {usersQuery.isLoading ? (
             Array.from({ length: 6 }).map((_, index) => <Skeleton key={index} className="h-24 rounded-2xl" />)
-          ) : users.filter((item) => item.needsReview).length === 0 ? (
+          ) : reviewCandidates.length === 0 ? (
             <div className="rounded-2xl bg-background/70 p-4 text-sm text-muted-foreground">
-              No aparecen usuarios con observaciones básicas. Buen momento para seguir afinando bundles o reglas.
+              No aparecen usuarios con observaciones en el recorte actual. Buen momento para seguir afinando roles, bundles o reglas.
             </div>
           ) : (
-            users
-              .filter((item) => item.needsReview)
-              .slice(0, 6)
-              .map((item) => (
+            reviewPagination.paginatedItems.map((item) => (
                 <button
                   key={item.id}
                   type="button"
