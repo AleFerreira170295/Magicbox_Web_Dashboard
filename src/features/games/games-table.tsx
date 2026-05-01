@@ -74,6 +74,9 @@ export function GamesTable() {
   const [selectedGameId, setSelectedGameId] = useState<string | null>(null);
   const linkedOwnerUserId = searchParams.get("ownerUserId")?.trim() || "";
   const linkedOwnerUserName = searchParams.get("ownerUserName")?.trim() || "";
+  const linkedBleDeviceId = searchParams.get("bleDeviceId")?.trim() || "";
+  const linkedDeviceId = searchParams.get("deviceId")?.trim() || "";
+  const linkedDeviceName = searchParams.get("deviceName")?.trim() || "";
 
   const gamesQuery = useGames(tokens?.accessToken);
   const devicesQuery = useDevices(tokens?.accessToken);
@@ -150,6 +153,8 @@ export function GamesTable() {
 
     return gameRows.filter((game) => {
       if (linkedOwnerUserId && game.device?.ownerUserId !== linkedOwnerUserId) return false;
+      if (linkedBleDeviceId && game.bleDeviceId !== linkedBleDeviceId) return false;
+      if (linkedDeviceId && game.device?.deviceId !== linkedDeviceId) return false;
       if (effectiveInstitutionFilter && game.educationalCenterId !== effectiveInstitutionFilter) return false;
 
       const manualCount = game.players.filter((player) => player.playerSource === "manual").length;
@@ -180,7 +185,7 @@ export function GamesTable() {
         .filter(Boolean)
         .some((value) => String(value).toLowerCase().includes(normalized));
     });
-  }, [accessFilter, gameRows, institutionFilter, linkedOwnerUserId, playerModeFilter, query, scopedInstitutionId]);
+  }, [accessFilter, gameRows, institutionFilter, linkedBleDeviceId, linkedDeviceId, linkedOwnerUserId, playerModeFilter, query, scopedInstitutionId]);
 
   const pagination = useListPagination(filtered);
 
@@ -302,13 +307,13 @@ export function GamesTable() {
                   <option value="shared">Compartidas</option>
                   <option value="unresolved">Sin asociación resuelta</option>
                 </select>
-                {linkedOwnerUserId ? (
+                {linkedOwnerUserId || linkedBleDeviceId || linkedDeviceId ? (
                   <button
                     type="button"
                     onClick={() => router.push(pathname)}
                     className="inline-flex h-10 min-w-0 items-center justify-center rounded-md border border-primary/20 bg-primary/5 px-3 text-sm font-medium text-primary transition hover:bg-primary/10"
                   >
-                    Quitar filtro de usuario
+                    Quitar filtro cruzado
                   </button>
                 ) : null}
               </>
@@ -317,10 +322,11 @@ export function GamesTable() {
         }
       />
 
-      {(scopedInstitutionName || linkedOwnerUserId) ? (
+      {(scopedInstitutionName || linkedOwnerUserId || linkedBleDeviceId || linkedDeviceId) ? (
         <div className="flex flex-wrap gap-2">
           {scopedInstitutionName ? <Badge variant="outline">Institución activa: {scopedInstitutionName}</Badge> : null}
           {linkedOwnerUserId ? <Badge variant="outline">Usuario filtrado: {linkedOwnerUserName || linkedOwnerUserId}</Badge> : null}
+          {linkedBleDeviceId || linkedDeviceId ? <Badge variant="outline">Dispositivo filtrado: {linkedDeviceName || linkedDeviceId || linkedBleDeviceId}</Badge> : null}
         </div>
       ) : null}
 

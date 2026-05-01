@@ -8,6 +8,14 @@ const useSyncSessionsMock = vi.fn();
 const useDevicesMock = vi.fn();
 const useUsersMock = vi.fn();
 const useGamesMock = vi.fn();
+const routerPushMock = vi.fn();
+let currentSearch = "";
+
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: routerPushMock }),
+  usePathname: () => "/syncs",
+  useSearchParams: () => new URLSearchParams(currentSearch),
+}));
 
 vi.mock("@/features/auth/auth-context", () => ({
   useAuth: () => useAuthMock(),
@@ -55,6 +63,7 @@ function renderSyncsTable() {
 describe("SyncsTable", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    currentSearch = "";
 
     useSyncSessionsMock.mockReturnValue(
       okQuery({
@@ -523,5 +532,102 @@ describe("SyncsTable", () => {
     expect(screen.getByText("Resumen de sincronización")).toBeInTheDocument();
     expect(screen.getByText("Participantes visibles")).toBeInTheDocument();
     expect(screen.getByText("Señales de sincronización")).toBeInTheDocument();
+  });
+
+  it("can open the syncs view already filtered by device from devices", () => {
+    currentSearch = "bleDeviceId=device-1&deviceId=mb-1&deviceName=MagicBox%20Aula%201";
+
+    useSyncSessionsMock.mockReturnValue(
+      okQuery({
+        data: [
+          {
+            id: "sync-1",
+            userId: "user-1",
+            syncId: "mb-sync-1",
+            source: "magicbox",
+            sourceType: "device",
+            sessionType: null,
+            status: "done",
+            bleDeviceId: "device-1",
+            deviceId: "mb-1",
+            firmwareVersion: "v2.2",
+            appVersion: "1.0.0",
+            payloadSchemaVersion: "1",
+            gameId: null,
+            deckName: "Animales",
+            totalCards: 10,
+            totalPlayers: 2,
+            durationSeconds: 60,
+            score: 100,
+            finalResult: null,
+            gameEndReason: null,
+            startedAt: null,
+            endedAt: null,
+            syncedAt: null,
+            capturedAt: null,
+            participants: [],
+            rawRecordIds: [],
+            rawRecordCount: 0,
+            lastRawRecordId: null,
+            rawPayload: {},
+            fragmentCount: 0,
+            rawFragmentCount: 0,
+            additionalFields: {},
+            receivedAt: null,
+            createdAt: null,
+            updatedAt: null,
+            raw: {},
+          },
+          {
+            id: "sync-2",
+            userId: "user-1",
+            syncId: "mb-sync-2",
+            source: "magicbox",
+            sourceType: "device",
+            sessionType: null,
+            status: "done",
+            bleDeviceId: "device-2",
+            deviceId: "mb-2",
+            firmwareVersion: "v2.2",
+            appVersion: "1.0.0",
+            payloadSchemaVersion: "1",
+            gameId: null,
+            deckName: "Colores",
+            totalCards: 10,
+            totalPlayers: 2,
+            durationSeconds: 60,
+            score: 100,
+            finalResult: null,
+            gameEndReason: null,
+            startedAt: null,
+            endedAt: null,
+            syncedAt: null,
+            capturedAt: null,
+            participants: [],
+            rawRecordIds: [],
+            rawRecordCount: 0,
+            lastRawRecordId: null,
+            rawPayload: {},
+            fragmentCount: 0,
+            rawFragmentCount: 0,
+            additionalFields: {},
+            receivedAt: null,
+            createdAt: null,
+            updatedAt: null,
+            raw: {},
+          },
+        ],
+        page: 1,
+        limit: 2,
+        total: 2,
+        total_pages: 1,
+      }),
+    );
+
+    renderSyncsTable();
+
+    expect(screen.getByText(/Dispositivo filtrado: MagicBox Aula 1/i)).toBeInTheDocument();
+    expect(screen.queryAllByText("mb-sync-1").length).toBeGreaterThan(0);
+    expect(screen.queryAllByText("mb-sync-2")).toHaveLength(0);
   });
 });

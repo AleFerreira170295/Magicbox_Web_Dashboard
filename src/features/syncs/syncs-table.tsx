@@ -1,6 +1,7 @@
 "use client";
 
 import { type ComponentType, useMemo, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Activity, Cpu, HardDriveDownload, Search, Users, Waves } from "lucide-react";
 import { SectionHeader } from "@/components/section-header";
 import { Badge } from "@/components/ui/badge";
@@ -58,10 +59,16 @@ function getSyncInitials(source?: string | null, deckName?: string | null) {
 
 export function SyncsTable() {
   const { tokens, user: currentUser } = useAuth();
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [query, setQuery] = useState("");
   const [rawFilter, setRawFilter] = useState<"all" | "with-raw" | "without-raw">("all");
   const [accessFilter, setAccessFilter] = useState<"all" | "owned" | "institution" | "shared" | "unresolved">("all");
   const [selectedSyncId, setSelectedSyncId] = useState<string | null>(null);
+  const linkedBleDeviceId = searchParams.get("bleDeviceId")?.trim() || "";
+  const linkedDeviceId = searchParams.get("deviceId")?.trim() || "";
+  const linkedDeviceName = searchParams.get("deviceName")?.trim() || "";
 
   const syncsQuery = useSyncSessions(tokens?.accessToken);
   const devicesQuery = useDevices(tokens?.accessToken);
@@ -156,6 +163,8 @@ export function SyncsTable() {
     const normalized = query.trim().toLowerCase();
 
     return syncRows.filter((sync) => {
+      if (linkedBleDeviceId && sync.bleDeviceId !== linkedBleDeviceId) return false;
+      if (linkedDeviceId && sync.deviceId !== linkedDeviceId && sync.device?.deviceId !== linkedDeviceId) return false;
       if (rawFilter === "with-raw" && !sync.hasRaw) return false;
       if (rawFilter === "without-raw" && sync.hasRaw) return false;
       if (accessFilter === "owned" && !sync.isOwnedByCurrentUser) return false;
@@ -182,7 +191,7 @@ export function SyncsTable() {
         .filter(Boolean)
         .some((value) => String(value).toLowerCase().includes(normalized));
     });
-  }, [accessFilter, query, rawFilter, syncRows]);
+  }, [accessFilter, linkedBleDeviceId, linkedDeviceId, query, rawFilter, syncRows]);
 
   const pagination = useListPagination(filtered);
 
@@ -272,11 +281,26 @@ export function SyncsTable() {
                   <option value="shared">Compartidas</option>
                   <option value="unresolved">Sin asociación resuelta</option>
                 </select>
+                {linkedBleDeviceId || linkedDeviceId ? (
+                  <button
+                    type="button"
+                    onClick={() => router.push(pathname)}
+                    className="inline-flex h-10 min-w-0 items-center justify-center rounded-md border border-primary/20 bg-primary/5 px-3 text-sm font-medium text-primary transition hover:bg-primary/10"
+                  >
+                    Quitar filtro cruzado
+                  </button>
+                ) : null}
               </>
             )}
           </div>
         }
       />
+
+      {linkedBleDeviceId || linkedDeviceId ? (
+        <div className="flex flex-wrap gap-2">
+          <Badge variant="outline">Dispositivo filtrado: {linkedDeviceName || linkedDeviceId || linkedBleDeviceId}</Badge>
+        </div>
+      ) : null}
 
       <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
         <CardContent className="flex flex-wrap items-center justify-between gap-4 p-5">

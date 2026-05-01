@@ -233,6 +233,64 @@ describe("DevicesTable", () => {
     expect(screen.queryAllByText("MagicBox Aula 1")).toHaveLength(0);
   });
 
+  it("activates focus from summary cards and shows the active result chip", () => {
+    useDevicesMock.mockReturnValue(
+      okQuery({
+        data: [
+          {
+            id: "device-1",
+            deviceId: "mb-1",
+            name: "MagicBox Aula 1",
+            educationalCenterId: "ec-1",
+            educationalCenterName: "Colegio Norte",
+            assignmentScope: "institution",
+            ownerUserId: "user-1",
+            ownerUserName: "Ana Admin",
+            ownerUserEmail: "ana@example.com",
+            firmwareVersion: "v2.2",
+            status: "online",
+            deviceMetadata: { serial: "SN-1" },
+            createdAt: null,
+            updatedAt: null,
+            deletedAt: null,
+            raw: {},
+          },
+          {
+            id: "device-2",
+            deviceId: "mb-2",
+            name: "MagicBox Aula 2",
+            educationalCenterId: "ec-1",
+            educationalCenterName: "Colegio Norte",
+            assignmentScope: "institution",
+            ownerUserId: null,
+            ownerUserName: null,
+            ownerUserEmail: null,
+            firmwareVersion: null,
+            status: null,
+            deviceMetadata: {},
+            createdAt: null,
+            updatedAt: null,
+            deletedAt: null,
+            raw: {},
+          },
+        ],
+        page: 1,
+        limit: 2,
+        total: 2,
+        total_pages: 1,
+      }),
+    );
+
+    renderDevicesTable();
+
+    fireEvent.click(screen.getByRole("button", { name: /Ver foco Con responsable/i }));
+
+    expect(screen.getByText(/Enfoque · Con responsable/i)).toBeInTheDocument();
+    expect(screen.getByText(/1 de 2 dispositivos con el recorte actual/i)).toBeInTheDocument();
+    expect(screen.queryAllByText("MagicBox Aula 1").length).toBeGreaterThan(0);
+    expect(screen.queryAllByText("MagicBox Aula 2")).toHaveLength(0);
+  });
+
   it("can open the devices view already filtered by user from the roster link", () => {
     currentSearch = "ownerUserId=user-1&ownerUserName=Ana%20Admin";
 
@@ -288,6 +346,18 @@ describe("DevicesTable", () => {
     expect(screen.getByText(/Usuario filtrado: Ana Admin/i)).toBeInTheDocument();
     expect(screen.queryAllByText("MagicBox Aula 1").length).toBeGreaterThan(0);
     expect(screen.queryAllByText("MagicBox Aula 2")).toHaveLength(0);
+  });
+
+  it("adds quick links from the selected device to games and syncs", () => {
+    renderDevicesTable();
+
+    fireEvent.click(screen.getByText("MagicBox Aula 1"));
+
+    const gamesLink = screen.getByRole("link", { name: /Ver partidas del dispositivo/i });
+    const syncsLink = screen.getByRole("link", { name: /Ver syncs del dispositivo/i });
+
+    expect(gamesLink).toHaveAttribute("href", "/games?bleDeviceId=device-1&deviceId=mb-1&deviceName=MagicBox+Aula+1");
+    expect(syncsLink).toHaveAttribute("href", "/syncs?bleDeviceId=device-1&deviceId=mb-1&deviceName=MagicBox+Aula+1");
   });
 
   it("clarifies teacher access and visible activity per device", () => {

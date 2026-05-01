@@ -1,12 +1,13 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Home, Search, ShieldCheck, Smartphone, University, UserRound, Wifi } from "lucide-react";
 import { SectionHeader } from "@/components/section-header";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { ListPaginationControls, useListPagination } from "@/components/ui/list-pagination-controls";
@@ -35,14 +36,20 @@ function SummaryCard({
   value,
   hint,
   icon: Icon,
+  onSelect,
+  isActive = false,
+  actionLabel = "Ver foco",
 }: {
   label: string;
   value: string;
   hint?: string;
   icon: React.ComponentType<{ className?: string }>;
+  onSelect?: () => void;
+  isActive?: boolean;
+  actionLabel?: string;
 }) {
   return (
-    <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
+    <Card className={cn("border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]", isActive && "ring-2 ring-primary/20")}>
       <CardContent className="p-5">
         <div className="flex items-start justify-between gap-4">
           <div>
@@ -54,6 +61,21 @@ function SummaryCard({
             <Icon className="size-5" />
           </div>
         </div>
+        {onSelect ? (
+          <button
+            type="button"
+            onClick={onSelect}
+            aria-label={`${isActive ? "Foco activo para" : actionLabel} ${label}`}
+            className={cn(
+              "mt-4 inline-flex rounded-full border px-3 py-1.5 text-xs font-medium transition",
+              isActive
+                ? "border-primary/30 bg-primary/10 text-primary"
+                : "border-border/70 bg-white/80 text-foreground hover:border-primary/30 hover:bg-primary/5",
+            )}
+          >
+            {isActive ? "Foco activo" : actionLabel}
+          </button>
+        ) : null}
       </CardContent>
     </Card>
   );
@@ -76,6 +98,14 @@ function locationLabel(device: {
 }) {
   if (device.assignmentScope === "home") return "Home";
   return device.educationalCenterName || device.educationalCenterId || "Institución";
+}
+
+function buildDeviceRelationHref(pathname: string, device: Pick<DeviceRecord, "id" | "deviceId" | "name">) {
+  const params = new URLSearchParams();
+  params.set("bleDeviceId", device.id);
+  params.set("deviceId", device.deviceId);
+  params.set("deviceName", device.name);
+  return `${pathname}?${params.toString()}`;
 }
 
 function buildFormState(device: DeviceRecord | null, scopedInstitutionId?: string | null): DeviceFormState {
@@ -151,6 +181,13 @@ function DeviceEditorPanel({
   const [feedback, setFeedback] = useState<{ tone: "error" | "success"; text: string } | null>(null);
 
   const assignmentLockedToInstitution = Boolean(scopedInstitutionId);
+  const deviceContextBadges = [
+    selectedDevice.assignmentScope === "home" ? "Home" : locationLabel(selectedDevice),
+    selectedDevice.ownerUserName || selectedDevice.ownerUserEmail || "Sin responsable",
+    selectedDevice.firmwareVersion || "Sin firmware",
+    selectedDevice.status ? statusLabel(selectedDevice.status) : "Sin status",
+  ];
+
   const availableOwners = useMemo(() => {
     if (formState.assignmentScope === "home") return users;
     if (!formState.educationalCenterId) return users;
@@ -249,6 +286,15 @@ function DeviceEditorPanel({
         </div>
       ) : null}
 
+      <div className="rounded-2xl border border-border/70 bg-white/80 p-4">
+        <p className="text-sm font-medium text-foreground">Contexto visible</p>
+        <div className="mt-3 flex flex-wrap gap-2">
+          {deviceContextBadges.map((badge) => (
+            <Badge key={badge} variant="outline">{badge}</Badge>
+          ))}
+        </div>
+      </div>
+
       <div className="grid gap-4 md:grid-cols-2">
         <div className="space-y-2 md:col-span-2">
           <label className="text-sm font-medium text-foreground">Nombre</label>
@@ -321,7 +367,7 @@ function DeviceEditorPanel({
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-background/70 p-4 text-sm text-muted-foreground">
         <div>
           {formState.assignmentScope === "home"
-            ? "Home es un caso válido. El dispositivo quedará sin centro educativo asociado."
+            ? "Home es válido. El dispositivo queda sin centro educativo asociado."
             : "En modo institución, el dispositivo debe quedar asociado a un centro concreto."}
         </div>
         <Button onClick={handleSubmit} disabled={updateDeviceMutation.isPending || !canUpdateDevices}>
@@ -330,8 +376,8 @@ function DeviceEditorPanel({
       </div>
 
       <div>
-        <p className="text-sm font-medium text-foreground">Metadata cruda</p>
-        <div className="mt-3 rounded-2xl bg-slate-950 p-4 text-xs text-slate-100">
+        <p className="text-sm font-medium text-foreground">Metadata visible</p>
+        <div className="mt-3 max-h-[280px] overflow-auto rounded-2xl bg-slate-950 p-4 text-xs text-slate-100">
           <pre className="overflow-x-auto whitespace-pre-wrap">{JSON.stringify(selectedDevice.deviceMetadata || {}, null, 2)}</pre>
         </div>
       </div>
@@ -339,7 +385,7 @@ function DeviceEditorPanel({
   );
 }
 
-type DeviceFocusFilter = "all" | "review" | "no_owner" | "no_status" | "no_metadata" | "online" | "with_activity" | "without_sync";
+type DeviceFocusFilter = "all" | "review" | "no_owner" | "with_owner" | "no_status" | "no_metadata" | "with_metadata" | "online" | "with_activity" | "without_sync";
 
 export function DevicesTable() {
   const { tokens, user: currentUser } = useAuth();
@@ -467,10 +513,14 @@ export function DevicesTable() {
             return !device.ownerUserId || !device.status || Object.keys(device.deviceMetadata || {}).length === 0;
           case "no_owner":
             return !device.ownerUserId;
+          case "with_owner":
+            return Boolean(device.ownerUserId);
           case "no_status":
             return !device.status;
           case "no_metadata":
             return Object.keys(device.deviceMetadata || {}).length === 0;
+          case "with_metadata":
+            return Object.keys(device.deviceMetadata || {}).length > 0;
           case "online":
             return (device.status || "").toLowerCase().includes("online") || (device.status || "").toLowerCase().includes("active");
           case "with_activity":
@@ -503,6 +553,14 @@ export function DevicesTable() {
     () => filtered.find((device) => device.id === selectedDeviceId) || deviceRows.find((device) => device.id === selectedDeviceId) || null,
     [deviceRows, filtered, selectedDeviceId],
   );
+
+  function resetFilters() {
+    setQuery("");
+    setScopeFilter("all");
+    setInstitutionFilter(scopedInstitutionId || "all");
+    setFocusFilter("all");
+    setAccessFilter("all");
+  }
 
   const pagination = useListPagination(filtered);
 
@@ -537,24 +595,44 @@ export function DevicesTable() {
     };
   }, [deviceRows]);
 
-  const focusSegments = [
-    { key: "all" as const, label: "Todos", count: metrics.total },
-    { key: "review" as const, label: "Conviene revisar", count: metrics.reviewDevices },
-    { key: "no_owner" as const, label: "Sin responsable", count: metrics.devicesWithoutOwner },
-    { key: "no_status" as const, label: "Sin status", count: metrics.devicesWithoutStatus },
-    { key: "no_metadata" as const, label: "Sin metadata", count: metrics.devicesWithoutMetadata },
-    { key: "online" as const, label: "Online", count: metrics.onlineDevices },
-    { key: "with_activity" as const, label: "Con actividad", count: metrics.devicesWithActivity },
-    { key: "without_sync" as const, label: "Sin sync visible", count: metrics.devicesWithoutSync },
-  ];
+  const focusSegments = useMemo(
+    () => [
+      { key: "all" as const, label: "Todos", count: metrics.total },
+      { key: "review" as const, label: "Conviene revisar", count: metrics.reviewDevices },
+      { key: "no_owner" as const, label: "Sin responsable", count: metrics.devicesWithoutOwner },
+      { key: "with_owner" as const, label: "Con responsable", count: metrics.devicesWithOwner },
+      { key: "no_status" as const, label: "Sin status", count: metrics.devicesWithoutStatus },
+      { key: "no_metadata" as const, label: "Sin metadata", count: metrics.devicesWithoutMetadata },
+      { key: "with_metadata" as const, label: "Con metadata", count: metrics.devicesWithMetadata },
+      { key: "online" as const, label: "Online", count: metrics.onlineDevices },
+      { key: "with_activity" as const, label: "Con actividad", count: metrics.devicesWithActivity },
+      { key: "without_sync" as const, label: "Sin sync visible", count: metrics.devicesWithoutSync },
+    ],
+    [metrics.devicesWithActivity, metrics.devicesWithMetadata, metrics.devicesWithOwner, metrics.devicesWithoutMetadata, metrics.devicesWithoutOwner, metrics.devicesWithoutStatus, metrics.devicesWithoutSync, metrics.onlineDevices, metrics.reviewDevices, metrics.total],
+  );
 
-  const accessSegments = [
-    { key: "all" as const, label: "Todos", count: metrics.total },
-    { key: "owned" as const, label: "Mis dispositivos", count: metrics.ownedDevices },
-    { key: "institution" as const, label: "Institución visible", count: metrics.institutionVisibleDevices },
-    { key: "shared" as const, label: "Compartidos", count: metrics.sharedDevices },
-    { key: "unresolved" as const, label: "Sin asociación resuelta", count: metrics.unresolvedDevices },
-  ];
+  const accessSegments = useMemo(
+    () => [
+      { key: "all" as const, label: "Todos", count: metrics.total },
+      { key: "owned" as const, label: "Mis dispositivos", count: metrics.ownedDevices },
+      { key: "institution" as const, label: "Institución visible", count: metrics.institutionVisibleDevices },
+      { key: "shared" as const, label: "Compartidos", count: metrics.sharedDevices },
+      { key: "unresolved" as const, label: "Sin asociación resuelta", count: metrics.unresolvedDevices },
+    ],
+    [metrics.institutionVisibleDevices, metrics.ownedDevices, metrics.sharedDevices, metrics.total, metrics.unresolvedDevices],
+  );
+
+  const activeFilterChips = useMemo(
+    () => [
+      query.trim() ? `Búsqueda · ${query.trim()}` : null,
+      scopeFilter !== "all" ? `Alcance · ${scopeFilter === "home" ? "Home" : "Institución"}` : null,
+      institutionFilter !== "all" ? `Institución · ${institutions.find((institution) => institution.id === institutionFilter)?.name || institutionFilter}` : null,
+      accessFilter !== "all" ? `Acceso · ${accessSegments.find((segment) => segment.key === accessFilter)?.label || accessFilter}` : null,
+      focusFilter !== "all" ? `Enfoque · ${focusSegments.find((segment) => segment.key === focusFilter)?.label || focusFilter}` : null,
+      linkedOwnerUserId ? `Usuario · ${linkedOwnerUserName || linkedOwnerUserId}` : null,
+    ].filter((value): value is string => Boolean(value)),
+    [accessFilter, accessSegments, focusFilter, focusSegments, institutionFilter, institutions, linkedOwnerUserId, linkedOwnerUserName, query, scopeFilter],
+  );
 
   const institutionFilterDisabled = Boolean(scopedInstitutionId) || scopeFilter === "home";
 
@@ -618,13 +696,7 @@ export function DevicesTable() {
             </select>
             <button
               type="button"
-              onClick={() => {
-                setQuery("");
-                setScopeFilter("all");
-                setInstitutionFilter(scopedInstitutionId || "all");
-                setFocusFilter("all");
-                setAccessFilter("all");
-              }}
+              onClick={resetFilters}
               className="inline-flex h-10 items-center justify-center rounded-md border border-input bg-background px-4 text-sm font-medium text-foreground transition hover:bg-accent"
             >
               Limpiar filtros
@@ -688,28 +760,45 @@ export function DevicesTable() {
           <>
             {isDirectorView ? (
               <>
-                <SummaryCard label="Dispositivos" value={String(metrics.total)} icon={Smartphone} />
-                <SummaryCard label="Institución" value={String(metrics.institutionDevices)} icon={University} />
-                <SummaryCard label="Online" value={String(metrics.onlineDevices)} icon={Wifi} />
-                <SummaryCard label="Con actividad" value={String(metrics.devicesWithActivity)} icon={ShieldCheck} />
-                <SummaryCard label="Sin sync visible" value={String(metrics.devicesWithoutSync)} icon={Wifi} />
-                <SummaryCard label="Sin responsable" value={String(metrics.devicesWithoutOwner)} icon={UserRound} />
-                <SummaryCard label="Conviene revisar" value={String(metrics.reviewDevices)} icon={Home} />
+                <SummaryCard label="Dispositivos" value={String(metrics.total)} icon={Smartphone} onSelect={resetFilters} isActive={focusFilter === "all" && accessFilter === "all" && scopeFilter === "all" && institutionFilter === (scopedInstitutionId || "all") && !query.trim()} actionLabel="Ver todos" />
+                <SummaryCard label="Institución" value={String(metrics.institutionDevices)} icon={University} onSelect={() => setScopeFilter("institution")} isActive={scopeFilter === "institution"} actionLabel="Filtrar" />
+                <SummaryCard label="Online" value={String(metrics.onlineDevices)} icon={Wifi} onSelect={() => setFocusFilter("online")} isActive={focusFilter === "online"} />
+                <SummaryCard label="Con actividad" value={String(metrics.devicesWithActivity)} icon={ShieldCheck} onSelect={() => setFocusFilter("with_activity")} isActive={focusFilter === "with_activity"} />
+                <SummaryCard label="Sin sync visible" value={String(metrics.devicesWithoutSync)} icon={Wifi} onSelect={() => setFocusFilter("without_sync")} isActive={focusFilter === "without_sync"} />
+                <SummaryCard label="Sin responsable" value={String(metrics.devicesWithoutOwner)} icon={UserRound} onSelect={() => setFocusFilter("no_owner")} isActive={focusFilter === "no_owner"} />
+                <SummaryCard label="Conviene revisar" value={String(metrics.reviewDevices)} icon={Home} onSelect={() => setFocusFilter("review")} isActive={focusFilter === "review"} />
               </>
             ) : (
               <>
-                <SummaryCard label="Dispositivos" value={String(metrics.total)} icon={Smartphone} />
-                <SummaryCard label="Home" value={String(metrics.homeDevices)} icon={Home} />
-                <SummaryCard label="Institución" value={String(metrics.institutionDevices)} icon={University} />
-                <SummaryCard label="Online" value={String(metrics.onlineDevices)} icon={Wifi} />
-                <SummaryCard label="Sin sync visible" value={String(metrics.devicesWithoutSync)} icon={Wifi} />
-                <SummaryCard label="Con responsable" value={String(metrics.devicesWithOwner)} icon={UserRound} />
-                <SummaryCard label="Con metadata" value={String(metrics.devicesWithMetadata)} icon={ShieldCheck} />
+                <SummaryCard label="Dispositivos" value={String(metrics.total)} icon={Smartphone} onSelect={resetFilters} isActive={focusFilter === "all" && accessFilter === "all" && scopeFilter === "all" && institutionFilter === (scopedInstitutionId || "all") && !query.trim()} actionLabel="Ver todos" />
+                <SummaryCard label="Home" value={String(metrics.homeDevices)} icon={Home} onSelect={() => setScopeFilter("home")} isActive={scopeFilter === "home"} actionLabel="Filtrar" />
+                <SummaryCard label="Institución" value={String(metrics.institutionDevices)} icon={University} onSelect={() => setScopeFilter("institution")} isActive={scopeFilter === "institution"} actionLabel="Filtrar" />
+                <SummaryCard label="Online" value={String(metrics.onlineDevices)} icon={Wifi} onSelect={() => setFocusFilter("online")} isActive={focusFilter === "online"} />
+                <SummaryCard label="Sin sync visible" value={String(metrics.devicesWithoutSync)} icon={Wifi} onSelect={() => setFocusFilter("without_sync")} isActive={focusFilter === "without_sync"} />
+                <SummaryCard label="Con responsable" value={String(metrics.devicesWithOwner)} icon={UserRound} onSelect={() => setFocusFilter("with_owner")} isActive={focusFilter === "with_owner"} />
+                <SummaryCard label="Con metadata" value={String(metrics.devicesWithMetadata)} icon={ShieldCheck} onSelect={() => setFocusFilter("with_metadata")} isActive={focusFilter === "with_metadata"} />
               </>
             )}
           </>
         )}
       </div>
+
+      <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
+        <CardContent className="flex flex-wrap items-center justify-between gap-4 p-5">
+          <div>
+            <p className="text-sm font-medium text-foreground">Resultados visibles</p>
+            <p className="mt-1 text-sm text-muted-foreground">{filtered.length} de {metrics.total} dispositivos con el recorte actual.</p>
+          </div>
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            {activeFilterChips.length > 0 ? activeFilterChips.map((chip) => <Badge key={chip} variant="outline">{chip}</Badge>) : <Badge variant="outline">Vista general</Badge>}
+            {activeFilterChips.length > 0 ? (
+              <Button type="button" variant="ghost" size="sm" onClick={resetFilters}>
+                Limpiar
+              </Button>
+            ) : null}
+          </div>
+        </CardContent>
+      </Card>
 
       <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
         <CardContent className="p-5">
@@ -772,7 +861,7 @@ export function DevicesTable() {
               />
             </div>
           </CardHeader>
-          <CardContent className="overflow-x-auto p-0">
+          <CardContent className="max-h-[720px] overflow-auto p-0">
             {devicesQuery.isLoading ? (
               <div className="p-6">
                 <Skeleton className="h-72 w-full rounded-none" />
@@ -781,7 +870,7 @@ export function DevicesTable() {
               <div className="p-6 text-sm text-destructive">{getErrorMessage(devicesQuery.error)}</div>
             ) : (
               <Table>
-                <TableHeader>
+                <TableHeader className="sticky top-0 z-10 bg-white/95 backdrop-blur-sm">
                   <TableRow>
                     <TableHead>Nombre</TableHead>
                     <TableHead>Device ID</TableHead>
@@ -842,15 +931,15 @@ export function DevicesTable() {
           </CardContent>
         </Card>
 
-        <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
+        <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)] 2xl:sticky 2xl:top-6 2xl:self-start">
           <CardHeader>
             <CardTitle>{isTeacherView ? "Detalle operativo para aula" : isDirectorView ? "Detalle de coordinación" : "Detalle y edición"}</CardTitle>
             <CardDescription>
               {isTeacherView
-                ? "Para docente, este panel deja explícitos ownership, actividad visible y señales de revisión. Si la sesión no puede editar, la lectura sigue siendo útil para decidir rápido qué dispositivo conviene usar o escalar."
+                ? "Para docente, este panel resume ownership, actividad visible y señales de revisión para decidir rápido qué dispositivo conviene usar o escalar."
                 : isDirectorView
-                ? "Para dirección, este panel deja explícitas las señales blandas de seguimiento y si el dispositivo parece estable o necesita coordinación."
-                : <>Este panel usa mutaciones reales sobre <code>/ble-device/&lt;id&gt;</code> para persistir cambios operativos mínimos sin inventar un flujo paralelo.</>}
+                ? "Para dirección, este panel resume señales de seguimiento y si el dispositivo parece estable o necesita coordinación."
+                : "Revisá el contexto visible del dispositivo y editá los datos operativos básicos desde el mismo panel."}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-5">
@@ -891,7 +980,35 @@ export function DevicesTable() {
                     <p>Syncs visibles: {selectedDevice.relatedSyncCount}</p>
                     <p>Partidas visibles: {selectedDevice.relatedGameCount}</p>
                     <p>Última sync visible: {formatDateTime(selectedDevice.lastSyncedAt)}</p>
-                    <p>Contexto: {selectedDevice.isOwnedByCurrentUser ? "owner directo" : selectedDevice.isInstitutionVisible ? "scope institucional" : selectedDevice.hasUnresolvedAssociation ? "falta asociación" : "visible por ACL compartida"}</p>
+                    <p>Contexto: {selectedDevice.isOwnedByCurrentUser ? "owner directo" : selectedDevice.isInstitutionVisible ? "institución visible" : selectedDevice.hasUnresolvedAssociation ? "falta asociación" : "acceso compartido"}</p>
+                  </div>
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <Badge variant="outline">{selectedDevice.assignmentScope === "home" ? "Home" : locationLabel(selectedDevice)}</Badge>
+                    <Badge variant="outline">{selectedDevice.ownerUserName || selectedDevice.ownerUserEmail || "Sin responsable"}</Badge>
+                    <Badge variant="outline">{selectedDevice.firmwareVersion || "Sin firmware"}</Badge>
+                    <Button type="button" size="sm" variant="ghost" onClick={() => setSelectedDeviceId(null)}>
+                      Quitar selección
+                    </Button>
+                  </div>
+                  <div className="mt-4 rounded-2xl border border-border/70 bg-white/80 p-4">
+                    <p className="text-sm font-medium text-foreground">Cruces rápidos</p>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      Abrí partidas y syncs ya filtradas por {selectedDevice.name} para seguir actividad sin rehacer la búsqueda.
+                    </p>
+                    <div className="mt-3 flex flex-wrap gap-3">
+                      <Link
+                        href={buildDeviceRelationHref("/games", selectedDevice)}
+                        className={buttonVariants({ variant: "outline", size: "sm" })}
+                      >
+                        Ver partidas del dispositivo
+                      </Link>
+                      <Link
+                        href={buildDeviceRelationHref("/syncs", selectedDevice)}
+                        className={buttonVariants({ variant: "outline", size: "sm" })}
+                      >
+                        Ver syncs del dispositivo
+                      </Link>
+                    </div>
                   </div>
                   {isTeacherView || isDirectorView ? (
                     <div className="mt-4 rounded-2xl bg-white/80 p-4 text-sm text-muted-foreground">
