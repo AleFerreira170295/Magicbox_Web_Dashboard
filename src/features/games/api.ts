@@ -95,6 +95,13 @@ export async function listGames(token: string, params: ListGamesParams = {}) {
   } as PaginatedResponse<GameRecord>;
 }
 
+export async function deleteGame(token: string, gameId: string) {
+  await apiRequest<void>(apiEndpoints.games.byId(gameId), {
+    method: "DELETE",
+    token,
+  });
+}
+
 export function useGames(token?: string, params?: ListGamesParams) {
   const safeLimit = Math.min(Math.max(params?.limit ?? 50, 1), 100);
 

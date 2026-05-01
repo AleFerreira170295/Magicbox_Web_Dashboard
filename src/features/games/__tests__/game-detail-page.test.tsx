@@ -4,6 +4,12 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { GameDetailPage } from "@/features/games/game-detail-page";
 
+const routerPushMock = vi.fn();
+
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: routerPushMock }),
+}));
+
 vi.mock("recharts", () => ({
   ResponsiveContainer: ({ children }: { children: ReactNode }) => <div>{children}</div>,
   BarChart: ({ children }: { children: ReactNode }) => <div>{children}</div>,
@@ -25,6 +31,7 @@ vi.mock("@/features/auth/auth-context", () => ({
 
 vi.mock("@/features/games/api", () => ({
   useGames: (...args: unknown[]) => useGamesMock(...args),
+  deleteGame: vi.fn(),
 }));
 
 vi.mock("@/features/devices/api", () => ({
@@ -71,6 +78,7 @@ function renderGameDetailPage() {
 describe("GameDetailPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    routerPushMock.mockReset();
 
     useAuthMock.mockReturnValue({
       tokens: { accessToken: "token", refreshToken: "refresh" },

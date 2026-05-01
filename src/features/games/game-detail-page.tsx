@@ -1,9 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, BarChart3, Building2, Clock3, Gamepad2, Router, Users } from "lucide-react";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { DeleteRecordDialog } from "@/components/delete-record-dialog";
 import { SectionHeader } from "@/components/section-header";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
@@ -11,8 +14,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { ListPaginationControls, useListPagination } from "@/components/ui/list-pagination-controls";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/features/auth/auth-context";
+import { hasAnyUserPermission } from "@/features/auth/permission-contract";
 import { useDevices } from "@/features/devices/api";
-import { useGames } from "@/features/games/api";
+import { deleteGame, useGames } from "@/features/games/api";
 import { buildGameDetailHref, buildGamesOverviewHref, type GamesOverviewRouteState } from "@/features/games/game-route";
 import { buildGameRows, buildSyncRelationHref, buildTurnOutcomeSeriesByParticipant, resolveTurnPlayerLabel } from "@/features/games/game-view";
 import { useInstitutions } from "@/features/institutions/api";
@@ -26,6 +30,9 @@ export function GameDetailPage({
   overviewState: GamesOverviewRouteState;
 }) {
   const { tokens, user: currentUser } = useAuth();
+  const router = useRouter();
+  const queryClient = useQueryClient();
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
   const gamesQuery = useGames(tokens?.accessToken);
   const devicesQuery = useDevices(tokens?.accessToken);
@@ -63,6 +70,28 @@ export function GameDetailPage({
   const backHref = buildGamesOverviewHref(overviewState);
   const isLoading = gamesQuery.isLoading || devicesQuery.isLoading || institutionsQuery.isLoading;
   const hasFatalError = gamesQuery.error || devicesQuery.error || institutionsQuery.error;
+  const canDeleteGames = hasAnyUserPermission(currentUser, "game_data:delete");
+
+  const deleteGameMutation = useMutation({
+    mutationFn: async () => {
+      if (!selectedGame || !tokens?.accessToken) throw new Error("No hay partida seleccionada.");
+      await deleteGame(tokens.accessToken, selectedGame.id);
+    },
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["games"] }),
+        queryClient.invalidateQueries({ queryKey: ["devices"] }),
+        queryClient.invalidateQueries({ queryKey: ["institutions"] }),
+      ]);
+      setIsDeleteDialogOpen(false);
+      router.push(backHref);
+    },
+  });
+
+  async function handleDeleteCurrentGame() {
+    if (!canDeleteGames) return;
+    await deleteGameMutation.mutateAsync();
+  }
 
   return (
     <div className="space-y-6">
@@ -73,10 +102,22 @@ export function GameDetailPage({
           ? "Pantalla dedicada para revisar contexto, navegación relacionada y rendimiento turno a turno sin depender del panel lateral del listado."
           : "Entrá desde Games para abrir el detalle dedicado de una partida."}
         actions={
-          <Link href={backHref} className={cn(buttonVariants({ variant: "outline" }))}>
-            <ArrowLeft className="size-4" />
-            Volver a Games
-          </Link>
+          <div className="flex flex-wrap items-center gap-2">
+            {selectedGame && canDeleteGames ? (
+              <button
+                type="button"
+                onClick={() => setIsDeleteDialogOpen(true)}
+                className={cn(buttonVariants({ variant: "destructive" }))}
+                disabled={deleteGameMutation.isPending}
+              >
+                Eliminar partida
+              </button>
+            ) : null}
+            <Link href={backHref} className={cn(buttonVariants({ variant: "outline" }))}>
+              <ArrowLeft className="size-4" />
+              Volver a Games
+            </Link>
+          </div>
         }
       />
 
@@ -105,6 +146,14 @@ export function GameDetailPage({
         </Card>
       ) : (
         <>
+          {deleteGameMutation.error ? (
+            <Card className="border-destructive/30 bg-destructive/5 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
+              <CardContent className="p-6 text-sm text-destructive">
+                No pude eliminar la partida. {getErrorMessage(deleteGameMutation.error)}
+              </CardContent>
+            </Card>
+          ) : null}
+
           <div className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
             <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
               <CardContent className="p-5">
@@ -395,6 +444,18 @@ export function GameDetailPage({
           </div>
         </>
       )}
+
+      <DeleteRecordDialog
+        open={isDeleteDialogOpen}
+        onClose={() => setIsDeleteDialogOpen(false)}
+        onConfirm={handleDeleteCurrentGame}
+        isPending={deleteGameMutation.isPending}
+        title={selectedGame ? `Eliminar ${selectedGame.deckName || `Partida ${selectedGame.gameId || ""}`}` : "Eliminar partida"}
+        description={selectedGame
+          ? "La partida seleccionada dejará de estar disponible en Games y en sus cruces relacionados. Confirmá solo si querés ejecutar la eliminación real."
+          : "Confirmá la eliminación de la partida seleccionada."}
+        confirmLabel="Sí, eliminar partida"
+      />
     </div>
   );
 }
