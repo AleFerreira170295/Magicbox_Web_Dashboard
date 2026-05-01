@@ -24,26 +24,29 @@ import {
   DashboardBarChartCard,
   DashboardDetailPanel,
   type DashboardDetailRow,
+  filterDashboardItemsByRange,
   DashboardMetricCard,
   DashboardMultiLineChartCard,
+  useDashboardModuleControls,
 } from "@/features/dashboard/dashboard-analytics-shared";
 import {
-  buildInstitutionCoverageSeries,
-  buildKeyCountSeries,
   buildProfileCoverageBreakdown,
-  buildTopInstitutionLoadSeries,
   buildUserRoleSeries,
   buildUserTypeSeries,
 } from "@/features/dashboard/dashboard-analytics-utils";
 import { useAuth } from "@/features/auth/auth-context";
 import { useDevices } from "@/features/devices/api";
+import type { GameRecord } from "@/features/games/types";
 import { useGames } from "@/features/games/api";
 import { useBasicHealth, useReadinessHealth } from "@/features/health/api";
 import type { HealthCheckItem } from "@/features/health/types";
+import type { InstitutionRecord } from "@/features/institutions/types";
 import { useInstitutions } from "@/features/institutions/api";
 import { useProfilesOverview } from "@/features/profiles/api";
 import { useSyncSessions } from "@/features/syncs/api";
+import type { SyncSessionRecord } from "@/features/syncs/types";
 import { useUsers } from "@/features/users/api";
+import type { UserRecord } from "@/features/users/types";
 import { getErrorMessage } from "@/lib/utils";
 
 function formatPercent(value: number, total: number) {
@@ -70,6 +73,105 @@ const TERRITORIAL_PRESETS_STORAGE_KEY = "magicbox:territorial-presets";
 const EMPTY_LIST: never[] = [];
 const EMPTY_HEALTH_CHECKS: Record<string, HealthCheckItem> = {};
 const territorialPresetListeners = new Set<() => void>();
+
+function getDashboardDateValue(...values: Array<string | null | undefined>) {
+  return values.find((value) => Boolean(value)) || null;
+}
+
+function buildExecutiveTrendSeries(games: GameRecord[], syncs: SyncSessionRecord[]) {
+  const map = new Map<string, { date: string; label: string; syncs: number; games: number; turns: number; success_rate: number; successfulTurns: number; totalTurns: number; sortValue: number }>();
+
+  for (const game of games) {
+    const source = getDashboardDateValue(game.startDate, game.createdAt, game.updatedAt);
+    const date = source ? new Date(source) : null;
+    if (!date || Number.isNaN(date.getTime())) continue;
+    const key = date.toISOString().slice(0, 10);
+    const current = map.get(key) || {
+      date: key,
+      label: key,
+      syncs: 0,
+      games: 0,
+      turns: 0,
+      success_rate: 0,
+      successfulTurns: 0,
+      totalTurns: 0,
+      sortValue: date.getTime(),
+    };
+
+    current.games += 1;
+    current.turns += game.turns.length;
+    current.totalTurns += game.turns.length;
+    current.successfulTurns += game.turns.filter((turn) => turn.success).length;
+    current.success_rate = current.totalTurns > 0 ? Math.round((current.successfulTurns / current.totalTurns) * 100) : 0;
+    map.set(key, current);
+  }
+
+  for (const sync of syncs) {
+    const source = getDashboardDateValue(sync.startedAt, sync.createdAt, sync.updatedAt, sync.receivedAt, sync.capturedAt);
+    const date = source ? new Date(source) : null;
+    if (!date || Number.isNaN(date.getTime())) continue;
+    const key = date.toISOString().slice(0, 10);
+    const current = map.get(key) || {
+      date: key,
+      label: key,
+      syncs: 0,
+      games: 0,
+      turns: 0,
+      success_rate: 0,
+      successfulTurns: 0,
+      totalTurns: 0,
+      sortValue: date.getTime(),
+    };
+
+    current.syncs += 1;
+    map.set(key, current);
+  }
+
+  return [...map.values()]
+    .sort((a, b) => a.sortValue - b.sortValue)
+    .map((item) => ({
+      date: item.date,
+      label: item.label,
+      syncs: item.syncs,
+      games: item.games,
+      turns: item.turns,
+      success_rate: item.success_rate,
+    }));
+}
+
+function buildInstitutionLoadSeriesFromActivity(institutions: InstitutionRecord[], users: UserRecord[], games: GameRecord[]) {
+  const institutionById = new Map(institutions.map((institution) => [institution.id, institution.name]));
+  const totals = new Map<string, { label: string; value: number; secondaryValue: number }>();
+
+  for (const user of users) {
+    const institutionId = user.educationalCenterId;
+    if (!institutionId) continue;
+    const current = totals.get(institutionId) || {
+      label: institutionById.get(institutionId) || `Institución ${institutionId}`,
+      value: 0,
+      secondaryValue: 0,
+    };
+    current.value += 1;
+    totals.set(institutionId, current);
+  }
+
+  for (const game of games) {
+    const institutionId = game.educationalCenterId;
+    if (!institutionId) continue;
+    const current = totals.get(institutionId) || {
+      label: institutionById.get(institutionId) || `Institución ${institutionId}`,
+      value: 0,
+      secondaryValue: 0,
+    };
+    current.secondaryValue += game.turns.length;
+    totals.set(institutionId, current);
+  }
+
+  return [...totals.values()]
+    .filter((item) => item.value > 0 || item.secondaryValue > 0)
+    .sort((a, b) => (b.value + b.secondaryValue) - (a.value + a.secondaryValue))
+    .slice(0, 8);
+}
 
 function readStoredTerritorialPresetsSnapshot() {
   if (typeof window === "undefined") return "[]";
@@ -117,6 +219,7 @@ export function SuperadminDashboard() {
   }, [territorialPresetsSnapshot]);
   const [shareLinkState, setShareLinkState] = useState<"idle" | "copied" | "error">("idle");
   const [selectedDetail, setSelectedDetail] = useState<{ kind: string; label: string } | null>(null);
+  const { getRange: getModuleRange, setRange: setModuleRange } = useDashboardModuleControls();
   const { tokens, user } = useAuth();
   const isAdmin = user?.roles.includes("admin") || false;
   const isGovernmentViewer = user?.roles.includes("government-viewer") || false;
@@ -152,12 +255,12 @@ export function SuperadminDashboard() {
   const healthQuery = useBasicHealth({ enabled: canSeeHealthModule });
   const readinessQuery = useReadinessHealth({ enabled: canSeeHealthModule });
 
-  const users = usesSystemSummary ? EMPTY_LIST : usersQuery.data?.data ?? EMPTY_LIST;
-  const institutions = usesSystemSummary ? EMPTY_LIST : institutionsQuery.data?.data ?? EMPTY_LIST;
-  const devices = usesSystemSummary ? EMPTY_LIST : devicesQuery.data?.data ?? EMPTY_LIST;
-  const syncs = usesSystemSummary ? EMPTY_LIST : syncsQuery.data?.data ?? EMPTY_LIST;
-  const games = usesSystemSummary ? EMPTY_LIST : gamesQuery.data?.data ?? EMPTY_LIST;
-  const profiles = usesSystemSummary ? EMPTY_LIST : profilesQuery.data ?? EMPTY_LIST;
+  const users = usersQuery.data?.data ?? EMPTY_LIST;
+  const institutions = institutionsQuery.data?.data ?? EMPTY_LIST;
+  const devices = devicesQuery.data?.data ?? EMPTY_LIST;
+  const syncs = syncsQuery.data?.data ?? EMPTY_LIST;
+  const games = gamesQuery.data?.data ?? EMPTY_LIST;
+  const profiles = profilesQuery.data ?? EMPTY_LIST;
   const readinessChecks = readinessQuery.data?.checks ?? EMPTY_HEALTH_CHECKS;
 
   const visibleQueryStates = usesSystemSummary
@@ -533,15 +636,63 @@ export function SuperadminDashboard() {
           ? "Dirección"
         : "Operación";
 
-  const executiveInstitutionLoad = usesSystemSummary ? buildTopInstitutionLoadSeries(topInstitutions) : buildInstitutionCoverageSeries(institutions);
-  const executiveRoleSeries = usesSystemSummary ? buildKeyCountSeries(roleMix, "Sin rol") : buildUserRoleSeries(users);
-  const executiveUserTypeSeries = usesSystemSummary ? buildKeyCountSeries(userTypeMix, "Sin tipo") : buildUserTypeSeries(users);
-  const executiveProfileCoverage = buildProfileCoverageBreakdown({
-    totalProfiles: metrics.totalProfiles,
-    activeProfiles: metrics.activeProfiles,
-    profilesWithBindings: metrics.profilesWithBindings,
-    profilesWithSessions: metrics.profilesWithSessions,
-  });
+  const trendRange = getModuleRange("trend-series");
+  const profileCoverageRange = getModuleRange("profile-coverage");
+  const roleRange = getModuleRange("role-series");
+  const userTypeRange = getModuleRange("user-type-series");
+  const institutionLoadRange = getModuleRange("institution-load");
+
+  const filteredTrendGames = useMemo(
+    () => filterDashboardItemsByRange(games, trendRange, (game) => getDashboardDateValue(game.startDate, game.createdAt, game.updatedAt)),
+    [games, trendRange],
+  );
+  const filteredTrendSyncs = useMemo(
+    () => filterDashboardItemsByRange(syncs, trendRange, (sync) => getDashboardDateValue(sync.startedAt, sync.createdAt, sync.updatedAt, sync.receivedAt, sync.capturedAt)),
+    [syncs, trendRange],
+  );
+  const filteredRoleUsers = useMemo(
+    () => filterDashboardItemsByRange(users, roleRange, (entry) => getDashboardDateValue(entry.lastLoginAt, entry.createdAt, entry.updatedAt)),
+    [roleRange, users],
+  );
+  const filteredUserTypeUsers = useMemo(
+    () => filterDashboardItemsByRange(users, userTypeRange, (entry) => getDashboardDateValue(entry.lastLoginAt, entry.createdAt, entry.updatedAt)),
+    [userTypeRange, users],
+  );
+  const filteredProfilesForCoverage = useMemo(
+    () => filterDashboardItemsByRange(profiles, profileCoverageRange, (profile) => getDashboardDateValue(profile.lastSessionAt, profile.createdAt, profile.updatedAt)),
+    [profileCoverageRange, profiles],
+  );
+  const filteredInstitutionUsers = useMemo(
+    () => filterDashboardItemsByRange(users, institutionLoadRange, (entry) => getDashboardDateValue(entry.lastLoginAt, entry.createdAt, entry.updatedAt)),
+    [institutionLoadRange, users],
+  );
+  const filteredInstitutionGames = useMemo(
+    () => filterDashboardItemsByRange(games, institutionLoadRange, (game) => getDashboardDateValue(game.startDate, game.createdAt, game.updatedAt)),
+    [games, institutionLoadRange],
+  );
+
+  const trendSeries = useMemo(() => {
+    if (usesSystemSummary) {
+      return trends.filter((item) => filterDashboardItemsByRange([item], trendRange, (entry) => entry.date).length > 0 || trendRange === "all");
+    }
+    return buildExecutiveTrendSeries(filteredTrendGames, filteredTrendSyncs);
+  }, [filteredTrendGames, filteredTrendSyncs, trendRange, trends, usesSystemSummary]);
+
+  const executiveInstitutionLoad = useMemo(
+    () => buildInstitutionLoadSeriesFromActivity(institutions, filteredInstitutionUsers, filteredInstitutionGames),
+    [filteredInstitutionGames, filteredInstitutionUsers, institutions],
+  );
+  const executiveRoleSeries = useMemo(() => buildUserRoleSeries(filteredRoleUsers), [filteredRoleUsers]);
+  const executiveUserTypeSeries = useMemo(() => buildUserTypeSeries(filteredUserTypeUsers), [filteredUserTypeUsers]);
+  const executiveProfileCoverage = useMemo(
+    () => buildProfileCoverageBreakdown({
+      totalProfiles: filteredProfilesForCoverage.length,
+      activeProfiles: filteredProfilesForCoverage.filter((profile) => profile.isActive).length,
+      profilesWithBindings: filteredProfilesForCoverage.filter((profile) => profile.activeBindingCount > 0).length,
+      profilesWithSessions: filteredProfilesForCoverage.filter((profile) => profile.sessionCount > 0).length,
+    }).filter((item) => item.value > 0),
+    [filteredProfilesForCoverage],
+  );
 
   const detailPanel = (() => {
     if (!selectedDetail) return null;
@@ -639,7 +790,7 @@ export function SuperadminDashboard() {
       case "metric-health":
         return { title: "Detalle de salud", description: "Estado de readiness y checks disponibles en la home.", filterLabel: selectedDetail.label, rows: metricRowsByType.health };
       case "trend-date": {
-        const selectedTrend = trends.find((item) => item.date === selectedDetail.label);
+        const selectedTrend = trendSeries.find((item) => item.date === selectedDetail.label);
         return {
           title: `Mini tendencias · ${selectedDetail.label}`,
           description: "Detalle del bucket temporal seleccionado en la serie comparada.",
@@ -654,10 +805,10 @@ export function SuperadminDashboard() {
       case "profile-coverage": {
         const normalized = normalizeLabel(selectedDetail.label);
         const rows = [
-          { label: "Activos", value: String(metrics.activeProfiles), hint: `${metrics.totalProfiles} perfiles totales` },
-          { label: "Con binding", value: String(metrics.profilesWithBindings), hint: "Cobertura activa" },
-          { label: "Con sesiones", value: String(metrics.profilesWithSessions), hint: "Uso observable" },
-          { label: "Sin binding", value: String(Math.max(metrics.totalProfiles - metrics.profilesWithBindings, 0)), hint: "Brecha por cerrar" },
+          { label: "Activos", value: String(filteredProfilesForCoverage.filter((profile) => profile.isActive).length), hint: `${filteredProfilesForCoverage.length} perfiles en el recorte` },
+          { label: "Con binding", value: String(filteredProfilesForCoverage.filter((profile) => profile.activeBindingCount > 0).length), hint: "Cobertura activa" },
+          { label: "Con sesiones", value: String(filteredProfilesForCoverage.filter((profile) => profile.sessionCount > 0).length), hint: "Uso observable" },
+          { label: "Sin binding", value: String(Math.max(filteredProfilesForCoverage.length - filteredProfilesForCoverage.filter((profile) => profile.activeBindingCount > 0).length, 0)), hint: "Brecha por cerrar" },
         ];
         return { title: `Cobertura de perfiles · ${selectedDetail.label}`, description: "Desglose del indicador seleccionado.", filterLabel: selectedDetail.label, rows: rows.filter((row) => normalizeLabel(row.label) === normalized) };
       }
@@ -946,7 +1097,7 @@ export function SuperadminDashboard() {
         <DashboardMultiLineChartCard
           title="Mini tendencias"
           description={`Evolución diaria de syncs, partidas y turnos para el recorte actual (${trendRangeLabel}). Ideal para la futura vista territorial de gobiernos.`}
-          data={trends.map((item) => ({
+          data={trendSeries.map((item) => ({
             label: item.date,
             date: item.date,
             syncs: item.syncs,
@@ -959,22 +1110,25 @@ export function SuperadminDashboard() {
             { key: "games", label: "Partidas", color: "#7c3aed" },
             { key: "turns", label: "Turnos", color: "#0f766e" },
           ]}
+          range={trendRange}
+          onRangeChange={(range) => setModuleRange("trend-series", range)}
+          csvFileName={`dashboard-mini-tendencias-${trendRange}`}
           onDatumSelect={(label) => setSelectedDetail({ kind: "trend-date", label })}
           activeDatumLabel={selectedDetail?.kind === "trend-date" ? selectedDetail.label : null}
           footer={
-            trends.length > 0 ? (
+            trendSeries.length > 0 ? (
               <div className="grid gap-3 md:grid-cols-3">
                 <div className="rounded-2xl bg-white/80 p-4 text-sm text-muted-foreground">
                   <p className="font-medium text-foreground">Syncs del período</p>
-                  <p className="mt-1">{trends.reduce((sum, item) => sum + item.syncs, 0)} acumulados en la serie.</p>
+                  <p className="mt-1">{trendSeries.reduce((sum, item) => sum + item.syncs, 0)} acumulados en la serie.</p>
                 </div>
                 <div className="rounded-2xl bg-white/80 p-4 text-sm text-muted-foreground">
                   <p className="font-medium text-foreground">Partidas del período</p>
-                  <p className="mt-1">{trends.reduce((sum, item) => sum + item.games, 0)} registradas en la serie.</p>
+                  <p className="mt-1">{trendSeries.reduce((sum, item) => sum + item.games, 0)} registradas en la serie.</p>
                 </div>
                 <div className="rounded-2xl bg-white/80 p-4 text-sm text-muted-foreground">
                   <p className="font-medium text-foreground">Tasa de éxito reciente</p>
-                  <p className="mt-1">{trends[trends.length - 1]?.success_rate || 0}% en el último período de la serie.</p>
+                  <p className="mt-1">{trendSeries[trendSeries.length - 1]?.success_rate || 0}% en el último período de la serie.</p>
                 </div>
               </div>
             ) : null
@@ -1348,6 +1502,9 @@ export function SuperadminDashboard() {
           title="Cobertura de perfiles"
           description="Perfiles activos, con binding y con sesiones para medir madurez real del uso."
           data={executiveProfileCoverage}
+          range={profileCoverageRange}
+          onRangeChange={(range) => setModuleRange("profile-coverage", range)}
+          csvFileName={`dashboard-cobertura-perfiles-${profileCoverageRange}`}
           onDatumSelect={(label) => setSelectedDetail({ kind: "profile-coverage", label })}
           activeDatumLabel={selectedDetail?.kind === "profile-coverage" ? selectedDetail.label : null}
         />
@@ -1358,6 +1515,9 @@ export function SuperadminDashboard() {
           title="Usuarios por rol"
           description="Distribución del padrón por rol para entender de un vistazo quién sostiene la operación observada."
           data={executiveRoleSeries}
+          range={roleRange}
+          onRangeChange={(range) => setModuleRange("role-series", range)}
+          csvFileName={`dashboard-usuarios-por-rol-${roleRange}`}
           onDatumSelect={(label) => setSelectedDetail({ kind: "role", label })}
           activeDatumLabel={selectedDetail?.kind === "role" ? selectedDetail.label : null}
         />
@@ -1365,6 +1525,9 @@ export function SuperadminDashboard() {
           title="Usuarios por tipo"
           description="Composición por tipos de usuario para detectar sesgos de adopción o cobertura."
           data={executiveUserTypeSeries}
+          range={userTypeRange}
+          onRangeChange={(range) => setModuleRange("user-type-series", range)}
+          csvFileName={`dashboard-usuarios-por-tipo-${userTypeRange}`}
           onDatumSelect={(label) => setSelectedDetail({ kind: "user-type", label })}
           activeDatumLabel={selectedDetail?.kind === "user-type" ? selectedDetail.label : null}
         />
@@ -1376,7 +1539,10 @@ export function SuperadminDashboard() {
           description={usesSystemSummary ? "Comparativa de instituciones por usuarios y referencia secundaria de turnos o actividad observada." : "Comparativa local por estudiantes con referencia secundaria de usuarios."}
           data={executiveInstitutionLoad}
           secondaryDataKey="secondaryValue"
-          secondaryLabel={usesSystemSummary ? "Turnos" : "Usuarios"}
+          secondaryLabel="Turnos"
+          range={institutionLoadRange}
+          onRangeChange={(range) => setModuleRange("institution-load", range)}
+          csvFileName={`dashboard-instituciones-con-carga-${institutionLoadRange}`}
           onDatumSelect={(label) => setSelectedDetail({ kind: "institution-load", label })}
           activeDatumLabel={selectedDetail?.kind === "institution-load" ? selectedDetail.label : null}
         />

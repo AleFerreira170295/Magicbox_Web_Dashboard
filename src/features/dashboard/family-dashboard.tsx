@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { BookHeart, Database, Layers3, Smartphone, TimerReset, Users2 } from "lucide-react";
 import { SectionHeader } from "@/components/section-header";
 import { Card, CardContent } from "@/components/ui/card";
@@ -12,6 +12,8 @@ import {
   type DashboardDetailRow,
   DashboardMetricCard,
   DashboardTopListCard,
+  filterDashboardItemsByRange,
+  useDashboardModuleControls,
 } from "@/features/dashboard/dashboard-analytics-shared";
 import {
   buildDeckUsageSeries,
@@ -56,37 +58,92 @@ function matchesRecencyLabel(label: string, value?: string | null) {
   return false;
 }
 
+function getDashboardDateValue(...values: Array<string | null | undefined>) {
+  return values.find((value) => Boolean(value)) || null;
+}
+
 export function FamilyDashboard() {
   const { tokens, user } = useAuth();
   const [selectedDetail, setSelectedDetail] = useState<{ kind: string; label: string } | null>(null);
+  const { getRange: getModuleRange, setRange: setModuleRange } = useDashboardModuleControls();
   const devicesQuery = useDevices(tokens?.accessToken);
   const gamesQuery = useGames(tokens?.accessToken);
   const syncsQuery = useSyncSessions(tokens?.accessToken);
   const usersQuery = useUsers(tokens?.accessToken);
   const profilesQuery = useProfilesOverview(tokens?.accessToken);
 
-  const devices = devicesQuery.data?.data || [];
-  const games = gamesQuery.data?.data || [];
-  const syncs = syncsQuery.data?.data || [];
-  const users = usersQuery.data?.data || [];
-  const profiles = profilesQuery.data || [];
+  const devices = useMemo(() => devicesQuery.data?.data || [], [devicesQuery.data?.data]);
+  const games = useMemo(() => gamesQuery.data?.data || [], [gamesQuery.data?.data]);
+  const syncs = useMemo(() => syncsQuery.data?.data || [], [syncsQuery.data?.data]);
+  const users = useMemo(() => usersQuery.data?.data || [], [usersQuery.data?.data]);
+  const profiles = useMemo(() => profilesQuery.data || [], [profilesQuery.data]);
   const isLoading = devicesQuery.isLoading || gamesQuery.isLoading || syncsQuery.isLoading || usersQuery.isLoading || profilesQuery.isLoading;
   const error = devicesQuery.error || gamesQuery.error || syncsQuery.error || usersQuery.error || profilesQuery.error;
+
+  const activityRange = getModuleRange("family-activity");
+  const deckRange = getModuleRange("family-deck");
+  const userRoleRange = getModuleRange("family-user-role");
+  const profileCoverageRange = getModuleRange("family-profile-coverage");
+  const profileAgeRange = getModuleRange("family-profile-age");
+  const profileRecencyRange = getModuleRange("family-profile-recency");
+  const resourceRange = getModuleRange("family-resource-balance");
+  const userRecencyRange = getModuleRange("family-user-recency");
+
+  const activityGames = useMemo(
+    () => filterDashboardItemsByRange(games, activityRange, (game) => getDashboardDateValue(game.startDate, game.createdAt, game.updatedAt)),
+    [activityRange, games],
+  );
+  const deckGames = useMemo(
+    () => filterDashboardItemsByRange(games, deckRange, (game) => getDashboardDateValue(game.startDate, game.createdAt, game.updatedAt)),
+    [deckRange, games],
+  );
+  const userRoleUsers = useMemo(
+    () => filterDashboardItemsByRange(users, userRoleRange, (entry) => getDashboardDateValue(entry.lastLoginAt, entry.createdAt, entry.updatedAt)),
+    [userRoleRange, users],
+  );
+  const profileCoverageProfiles = useMemo(
+    () => filterDashboardItemsByRange(profiles, profileCoverageRange, (profile) => getDashboardDateValue(profile.lastSessionAt, profile.createdAt, profile.updatedAt)),
+    [profileCoverageRange, profiles],
+  );
+  const profileAgeProfiles = useMemo(
+    () => filterDashboardItemsByRange(profiles, profileAgeRange, (profile) => getDashboardDateValue(profile.createdAt, profile.updatedAt, profile.lastSessionAt)),
+    [profileAgeRange, profiles],
+  );
+  const profileRecencyProfiles = useMemo(
+    () => filterDashboardItemsByRange(profiles, profileRecencyRange, (profile) => getDashboardDateValue(profile.lastSessionAt, profile.createdAt, profile.updatedAt)),
+    [profileRecencyRange, profiles],
+  );
+  const resourceUsers = useMemo(
+    () => filterDashboardItemsByRange(users, resourceRange, (entry) => getDashboardDateValue(entry.lastLoginAt, entry.createdAt, entry.updatedAt)),
+    [resourceRange, users],
+  );
+  const resourceDevices = useMemo(
+    () => filterDashboardItemsByRange(devices, resourceRange, (device) => getDashboardDateValue(device.createdAt, device.updatedAt)),
+    [devices, resourceRange],
+  );
+  const resourceProfiles = useMemo(
+    () => filterDashboardItemsByRange(profiles, resourceRange, (profile) => getDashboardDateValue(profile.lastSessionAt, profile.createdAt, profile.updatedAt)),
+    [profiles, resourceRange],
+  );
+  const userRecencyUsers = useMemo(
+    () => filterDashboardItemsByRange(users, userRecencyRange, (entry) => getDashboardDateValue(entry.lastLoginAt, entry.createdAt, entry.updatedAt)),
+    [userRecencyRange, users],
+  );
 
   const totalTurns = games.reduce((sum, game) => sum + game.turns.length, 0);
   const successRate = getSuccessRate(games);
   const averageTurnTime = getAverageTurnTime(games);
-  const activitySeries = buildGameActivitySeries(games);
-  const deckUsage = buildDeckUsageSeries(games);
-  const userRoleSeries = buildUserRoleSeries(users);
-  const userRecencySeries = buildUserRecencySeries(users);
-  const profileCoverageSeries = buildProfileCoverageSeries(profiles);
-  const profileAgeSeries = buildProfileAgeCategorySeries(profiles);
-  const profileRecencySeries = buildProfileRecencySeries(profiles);
+  const activitySeries = buildGameActivitySeries(activityGames);
+  const deckUsage = buildDeckUsageSeries(deckGames);
+  const userRoleSeries = buildUserRoleSeries(userRoleUsers);
+  const userRecencySeries = buildUserRecencySeries(userRecencyUsers);
+  const profileCoverageSeries = buildProfileCoverageSeries(profileCoverageProfiles);
+  const profileAgeSeries = buildProfileAgeCategorySeries(profileAgeProfiles);
+  const profileRecencySeries = buildProfileRecencySeries(profileRecencyProfiles);
   const visibleResources = buildResourceBalanceSeries({
-    users: usersQuery.data?.total || users.length,
-    devices: devicesQuery.data?.total || devices.length,
-    profiles: profiles.length,
+    users: resourceUsers.length,
+    devices: resourceDevices.length,
+    profiles: resourceProfiles.length,
     institutions: undefined,
   });
   const gentleSignals = [
@@ -183,19 +240,24 @@ export function FamilyDashboard() {
       case "metric-profiles":
         return { title: "Detalle de perfiles", description: "Perfiles ya incorporados al seguimiento familiar.", filterLabel: selectedDetail.label, rows: profileRows };
       case "activity-date":
-        return { title: `Actividad del ${selectedDetail.label}`, description: "Partidas que caen en la fecha seleccionada.", filterLabel: selectedDetail.label, rows: gameRows(games.filter((game) => getDateBucketLabel(game.startDate || game.createdAt || game.updatedAt) === selectedDetail.label)) };
+        return { title: `Actividad del ${selectedDetail.label}`, description: "Partidas que caen en la fecha seleccionada.", filterLabel: selectedDetail.label, rows: gameRows(activityGames.filter((game) => getDateBucketLabel(game.startDate || game.createdAt || game.updatedAt) === selectedDetail.label)) };
       case "deck":
-        return { title: `Mazo ${selectedDetail.label}`, description: "Partidas asociadas al contenido seleccionado.", filterLabel: selectedDetail.label, rows: gameRows(games.filter((game) => normalizeLabel(game.deckName || "Sin mazo") === normalizeLabel(selectedDetail.label))) };
+        return { title: `Mazo ${selectedDetail.label}`, description: "Partidas asociadas al contenido seleccionado.", filterLabel: selectedDetail.label, rows: gameRows(deckGames.filter((game) => normalizeLabel(game.deckName || "Sin mazo") === normalizeLabel(selectedDetail.label))) };
       case "user-role":
-        return { title: `Usuarios con rol ${selectedDetail.label}`, description: "Personas del rol elegido.", filterLabel: selectedDetail.label, rows: userRows.filter((row) => normalizeLabel(row.value).includes(normalizeLabel(selectedDetail.label))) };
+        return { title: `Usuarios con rol ${selectedDetail.label}`, description: "Personas del rol elegido.", filterLabel: selectedDetail.label, rows: userRoleUsers.map((entry) => ({ label: entry.fullName || entry.email || `Usuario ${entry.id}`, value: entry.roles?.join(", ") || "Sin rol", hint: entry.email || "Sin email registrado", badge: entry.lastLoginAt ? `Login ${getDateBucketLabel(entry.lastLoginAt)}` : "Sin login" })).filter((row) => normalizeLabel(row.value).includes(normalizeLabel(selectedDetail.label))) };
       case "profile-coverage": {
         const normalized = normalizeLabel(selectedDetail.label);
         return {
           title: `Estado de perfiles · ${selectedDetail.label}`,
           description: "Perfiles filtrados por el bloque elegido.",
           filterLabel: selectedDetail.label,
-          rows: profileRows.filter((row, index) => {
-            const profile = profiles[index];
+          rows: profileCoverageProfiles.map((profile) => ({
+            label: profile.displayName || `Perfil ${profile.id}`,
+            value: `${profile.sessionCount} sesiones`,
+            hint: `${profile.activeBindingCount} bindings activos · ${profile.ageCategory || "sin categoría"}`,
+            badge: profile.isActive ? "Activo" : "Inactivo",
+          })).filter((row, index) => {
+            const profile = profileCoverageProfiles[index];
             if (normalized.includes("activos")) return profile.isActive;
             if (normalized.includes("binding") && !normalized.includes("sin")) return profile.activeBindingCount > 0;
             if (normalized.includes("sesiones")) return profile.sessionCount > 0;
@@ -205,9 +267,9 @@ export function FamilyDashboard() {
         };
       }
       case "profile-age":
-        return { title: `Perfiles por categoría · ${selectedDetail.label}`, description: "Perfiles dentro de la cohorte elegida.", filterLabel: selectedDetail.label, rows: profileRows.filter((row, index) => normalizeLabel(profiles[index]?.ageCategory || "Sin categoría") === normalizeLabel(selectedDetail.label)) };
+        return { title: `Perfiles por categoría · ${selectedDetail.label}`, description: "Perfiles dentro de la cohorte elegida.", filterLabel: selectedDetail.label, rows: profileAgeProfiles.map((profile) => ({ label: profile.displayName || `Perfil ${profile.id}`, value: `${profile.sessionCount} sesiones`, hint: `${profile.activeBindingCount} bindings activos · ${profile.ageCategory || "sin categoría"}`, badge: profile.isActive ? "Activo" : "Inactivo" })).filter((row, index) => normalizeLabel(profileAgeProfiles[index]?.ageCategory || "Sin categoría") === normalizeLabel(selectedDetail.label)) };
       case "profile-recency":
-        return { title: `Recencia de perfiles · ${selectedDetail.label}`, description: "Perfiles dentro del período seleccionado.", filterLabel: selectedDetail.label, rows: profileRows.filter((row, index) => matchesRecencyLabel(selectedDetail.label, profiles[index]?.lastSessionAt)) };
+        return { title: `Recencia de perfiles · ${selectedDetail.label}`, description: "Perfiles dentro del período seleccionado.", filterLabel: selectedDetail.label, rows: profileRecencyProfiles.map((profile) => ({ label: profile.displayName || `Perfil ${profile.id}`, value: `${profile.sessionCount} sesiones`, hint: `${profile.activeBindingCount} bindings activos · ${profile.ageCategory || "sin categoría"}`, badge: profile.isActive ? "Activo" : "Inactivo" })).filter((row, index) => matchesRecencyLabel(selectedDetail.label, profileRecencyProfiles[index]?.lastSessionAt)) };
       case "resource": {
         const normalized = normalizeLabel(selectedDetail.label);
         if (normalized.includes("usuario")) return { title: "Recursos · usuarios", description: "Personas registradas en esta cuenta.", filterLabel: selectedDetail.label, rows: userRows };
@@ -215,7 +277,7 @@ export function FamilyDashboard() {
         return { title: "Recursos · perfiles", description: "Perfiles registrados en esta cuenta.", filterLabel: selectedDetail.label, rows: profileRows };
       }
       case "user-recency":
-        return { title: `Recencia de usuarios · ${selectedDetail.label}`, description: "Usuarios dentro del período seleccionado.", filterLabel: selectedDetail.label, rows: userRows.filter((row, index) => matchesRecencyLabel(selectedDetail.label, users[index]?.lastLoginAt)) };
+        return { title: `Recencia de usuarios · ${selectedDetail.label}`, description: "Usuarios dentro del período seleccionado.", filterLabel: selectedDetail.label, rows: userRecencyUsers.map((entry) => ({ label: entry.fullName || entry.email || `Usuario ${entry.id}`, value: entry.roles?.join(", ") || "Sin rol", hint: entry.email || "Sin email registrado", badge: entry.lastLoginAt ? `Login ${getDateBucketLabel(entry.lastLoginAt)}` : "Sin login" })).filter((row, index) => matchesRecencyLabel(selectedDetail.label, userRecencyUsers[index]?.lastLoginAt)) };
       case "signal": {
         const normalized = normalizeLabel(selectedDetail.label);
         if (normalized.includes("syncs con evidencia")) return { title: "Syncs con evidencia", description: "Sincronizaciones que sí traen captura utilizable.", filterLabel: selectedDetail.label, rows: syncRows.filter((row, index) => (syncs[index]?.rawRecordCount || syncs[index]?.rawRecordIds.length || 0) > 0) };
@@ -269,6 +331,9 @@ export function FamilyDashboard() {
           title="Actividad reciente"
           description="Partidas y turnos por fecha para ver si hubo movimiento reciente o días más tranquilos."
           data={activitySeries}
+          range={activityRange}
+          onRangeChange={(range) => setModuleRange("family-activity", range)}
+          csvFileName={`family-dashboard-actividad-${activityRange}`}
           onDatumSelect={(label) => setSelectedDetail({ kind: "activity-date", label })}
           activeDatumLabel={selectedDetail?.kind === "activity-date" ? selectedDetail.label : null}
         />
@@ -276,6 +341,9 @@ export function FamilyDashboard() {
           title="Mazos usados"
           description="Qué tipos de contenido aparecen más en la actividad registrada."
           data={deckUsage}
+          range={deckRange}
+          onRangeChange={(range) => setModuleRange("family-deck", range)}
+          csvFileName={`family-dashboard-mazos-${deckRange}`}
           onDatumSelect={(label) => setSelectedDetail({ kind: "deck", label })}
           activeDatumLabel={selectedDetail?.kind === "deck" ? selectedDetail.label : null}
         />
@@ -286,6 +354,9 @@ export function FamilyDashboard() {
           title="Usuarios por rol"
           description="Distribución simple de las personas asociadas al grupo familiar."
           data={userRoleSeries}
+          range={userRoleRange}
+          onRangeChange={(range) => setModuleRange("family-user-role", range)}
+          csvFileName={`family-dashboard-usuarios-por-rol-${userRoleRange}`}
           onDatumSelect={(label) => setSelectedDetail({ kind: "user-role", label })}
           activeDatumLabel={selectedDetail?.kind === "user-role" ? selectedDetail.label : null}
         />
@@ -293,6 +364,9 @@ export function FamilyDashboard() {
           title="Estado de perfiles"
           description="Perfiles activos, con binding y con sesiones para leer rápidamente qué tan conectada está la experiencia."
           data={profileCoverageSeries}
+          range={profileCoverageRange}
+          onRangeChange={(range) => setModuleRange("family-profile-coverage", range)}
+          csvFileName={`family-dashboard-estado-perfiles-${profileCoverageRange}`}
           onDatumSelect={(label) => setSelectedDetail({ kind: "profile-coverage", label })}
           activeDatumLabel={selectedDetail?.kind === "profile-coverage" ? selectedDetail.label : null}
         />
@@ -303,6 +377,9 @@ export function FamilyDashboard() {
           title="Perfiles por categoría"
           description="Cohortes por categoría para entender si la experiencia actual se concentra en algún tramo específico."
           data={profileAgeSeries}
+          range={profileAgeRange}
+          onRangeChange={(range) => setModuleRange("family-profile-age", range)}
+          csvFileName={`family-dashboard-perfiles-por-categoria-${profileAgeRange}`}
           onDatumSelect={(label) => setSelectedDetail({ kind: "profile-age", label })}
           activeDatumLabel={selectedDetail?.kind === "profile-age" ? selectedDetail.label : null}
         />
@@ -310,6 +387,9 @@ export function FamilyDashboard() {
           title="Recencia de perfiles"
           description="Última sesión por perfil para ver rápidamente quién viene activo y quién quedó más quieto."
           data={profileRecencySeries}
+          range={profileRecencyRange}
+          onRangeChange={(range) => setModuleRange("family-profile-recency", range)}
+          csvFileName={`family-dashboard-recencia-perfiles-${profileRecencyRange}`}
           onDatumSelect={(label) => setSelectedDetail({ kind: "profile-recency", label })}
           activeDatumLabel={selectedDetail?.kind === "profile-recency" ? selectedDetail.label : null}
         />
@@ -320,6 +400,9 @@ export function FamilyDashboard() {
           title="Recursos principales"
           description="Balance simple entre personas y dispositivos asociados a la cuenta."
           data={visibleResources}
+          range={resourceRange}
+          onRangeChange={(range) => setModuleRange("family-resource-balance", range)}
+          csvFileName={`family-dashboard-recursos-${resourceRange}`}
           onDatumSelect={(label) => setSelectedDetail({ kind: "resource", label })}
           activeDatumLabel={selectedDetail?.kind === "resource" ? selectedDetail.label : null}
         />
@@ -327,6 +410,9 @@ export function FamilyDashboard() {
           title="Recencia de usuarios"
           description="Lectura suave de accesos recientes para detectar si el entorno viene activo o con señales más frías."
           data={userRecencySeries}
+          range={userRecencyRange}
+          onRangeChange={(range) => setModuleRange("family-user-recency", range)}
+          csvFileName={`family-dashboard-recencia-usuarios-${userRecencyRange}`}
           onDatumSelect={(label) => setSelectedDetail({ kind: "user-recency", label })}
           activeDatumLabel={selectedDetail?.kind === "user-recency" ? selectedDetail.label : null}
         />

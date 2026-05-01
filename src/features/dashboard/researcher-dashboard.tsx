@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { BookOpen, Database, Layers3, SearchCheck, Target, TimerReset } from "lucide-react";
 import { SectionHeader } from "@/components/section-header";
 import { Card, CardContent } from "@/components/ui/card";
@@ -12,6 +12,8 @@ import {
   type DashboardDetailRow,
   DashboardMetricCard,
   DashboardTopListCard,
+  filterDashboardItemsByRange,
+  useDashboardModuleControls,
 } from "@/features/dashboard/dashboard-analytics-shared";
 import {
   buildDeckUsageSeries,
@@ -58,36 +60,93 @@ function matchesRecencyLabel(label: string, value?: string | null) {
   return false;
 }
 
+function getDashboardDateValue(...values: Array<string | null | undefined>) {
+  return values.find((value) => Boolean(value)) || null;
+}
+
 export function ResearcherDashboard() {
   const { tokens } = useAuth();
   const [selectedDetail, setSelectedDetail] = useState<{ kind: string; label: string } | null>(null);
+  const { getRange: getModuleRange, setRange: setModuleRange } = useDashboardModuleControls();
   const gamesQuery = useGames(tokens?.accessToken);
   const syncsQuery = useSyncSessions(tokens?.accessToken);
   const usersQuery = useUsers(tokens?.accessToken);
   const profilesQuery = useProfilesOverview(tokens?.accessToken);
 
-  const games = gamesQuery.data?.data || [];
-  const syncs = syncsQuery.data?.data || [];
-  const users = usersQuery.data?.data || [];
-  const profiles = profilesQuery.data || [];
+  const games = useMemo(() => gamesQuery.data?.data || [], [gamesQuery.data?.data]);
+  const syncs = useMemo(() => syncsQuery.data?.data || [], [syncsQuery.data?.data]);
+  const users = useMemo(() => usersQuery.data?.data || [], [usersQuery.data?.data]);
+  const profiles = useMemo(() => profilesQuery.data || [], [profilesQuery.data]);
   const isLoading = gamesQuery.isLoading || syncsQuery.isLoading || usersQuery.isLoading || profilesQuery.isLoading;
   const error = gamesQuery.error || syncsQuery.error || usersQuery.error || profilesQuery.error;
+
+  const activityRange = getModuleRange("researcher-activity");
+  const deckRange = getModuleRange("researcher-deck");
+  const userTypeRange = getModuleRange("researcher-user-type");
+  const profileCoverageRange = getModuleRange("researcher-profile-coverage");
+  const userCreationRange = getModuleRange("researcher-user-creation");
+  const userRecencyRange = getModuleRange("researcher-user-recency");
+  const profileAgeRange = getModuleRange("researcher-profile-age");
+  const profileRecencyRange = getModuleRange("researcher-profile-recency");
+  const syncSourceRange = getModuleRange("researcher-sync-source");
+  const profileSessionsRange = getModuleRange("researcher-profile-sessions");
+
+  const activityGames = useMemo(
+    () => filterDashboardItemsByRange(games, activityRange, (game) => getDashboardDateValue(game.startDate, game.createdAt, game.updatedAt)),
+    [activityRange, games],
+  );
+  const deckGames = useMemo(
+    () => filterDashboardItemsByRange(games, deckRange, (game) => getDashboardDateValue(game.startDate, game.createdAt, game.updatedAt)),
+    [deckRange, games],
+  );
+  const userTypeUsers = useMemo(
+    () => filterDashboardItemsByRange(users, userTypeRange, (entry) => getDashboardDateValue(entry.lastLoginAt, entry.createdAt, entry.updatedAt)),
+    [userTypeRange, users],
+  );
+  const profileCoverageProfiles = useMemo(
+    () => filterDashboardItemsByRange(profiles, profileCoverageRange, (profile) => getDashboardDateValue(profile.lastSessionAt, profile.createdAt, profile.updatedAt)),
+    [profileCoverageRange, profiles],
+  );
+  const userCreationUsers = useMemo(
+    () => filterDashboardItemsByRange(users, userCreationRange, (entry) => getDashboardDateValue(entry.createdAt, entry.lastLoginAt, entry.updatedAt)),
+    [userCreationRange, users],
+  );
+  const userRecencyUsers = useMemo(
+    () => filterDashboardItemsByRange(users, userRecencyRange, (entry) => getDashboardDateValue(entry.lastLoginAt, entry.createdAt, entry.updatedAt)),
+    [userRecencyRange, users],
+  );
+  const profileAgeProfiles = useMemo(
+    () => filterDashboardItemsByRange(profiles, profileAgeRange, (profile) => getDashboardDateValue(profile.createdAt, profile.updatedAt, profile.lastSessionAt)),
+    [profileAgeRange, profiles],
+  );
+  const profileRecencyProfiles = useMemo(
+    () => filterDashboardItemsByRange(profiles, profileRecencyRange, (profile) => getDashboardDateValue(profile.lastSessionAt, profile.createdAt, profile.updatedAt)),
+    [profileRecencyRange, profiles],
+  );
+  const syncSourceSyncs = useMemo(
+    () => filterDashboardItemsByRange(syncs, syncSourceRange, (sync) => getDashboardDateValue(sync.startedAt, sync.createdAt, sync.updatedAt, sync.receivedAt, sync.capturedAt)),
+    [syncSourceRange, syncs],
+  );
+  const profileSessionProfiles = useMemo(
+    () => filterDashboardItemsByRange(profiles, profileSessionsRange, (profile) => getDashboardDateValue(profile.lastSessionAt, profile.createdAt, profile.updatedAt)),
+    [profileSessionsRange, profiles],
+  );
 
   const totalTurns = games.reduce((sum, game) => sum + game.turns.length, 0);
   const activeDecks = new Set(games.map((game) => game.deckName).filter(Boolean)).size;
   const successRate = getSuccessRate(games);
   const averageGameTime = getAverageGameTime(games);
   const averageTurnTime = getAverageTurnTime(games);
-  const activitySeries = buildGameActivitySeries(games);
-  const deckUsage = buildDeckUsageSeries(games);
-  const syncSourceSeries = buildSyncSourceSeries(syncs);
-  const userTypeSeries = buildUserTypeSeries(users);
-  const userCreationSeries = buildUserCreationSeries(users);
-  const userRecencySeries = buildUserRecencySeries(users);
-  const profileCoverageSeries = buildProfileCoverageSeries(profiles);
-  const profileAgeSeries = buildProfileAgeCategorySeries(profiles);
-  const profileRecencySeries = buildProfileRecencySeries(profiles);
-  const profileSessionCohorts = buildProfileSessionCohortSeries(profiles);
+  const activitySeries = buildGameActivitySeries(activityGames);
+  const deckUsage = buildDeckUsageSeries(deckGames);
+  const syncSourceSeries = buildSyncSourceSeries(syncSourceSyncs);
+  const userTypeSeries = buildUserTypeSeries(userTypeUsers);
+  const userCreationSeries = buildUserCreationSeries(userCreationUsers);
+  const userRecencySeries = buildUserRecencySeries(userRecencyUsers);
+  const profileCoverageSeries = buildProfileCoverageSeries(profileCoverageProfiles);
+  const profileAgeSeries = buildProfileAgeCategorySeries(profileAgeProfiles);
+  const profileRecencySeries = buildProfileRecencySeries(profileRecencyProfiles);
+  const profileSessionCohorts = buildProfileSessionCohortSeries(profileSessionProfiles);
   const evidenceRows = [
     {
       label: "Syncs sin raw",
@@ -189,19 +248,19 @@ export function ResearcherDashboard() {
       case "metric-profiles":
         return { title: "Perfiles", description: "Perfiles incluidos en la lectura de evidencia actual.", filterLabel: selectedDetail.label, rows: profileRows };
       case "activity-date":
-        return { title: `Actividad del ${selectedDetail.label}`, description: "Partidas que caen en la fecha seleccionada.", filterLabel: selectedDetail.label, rows: gameRows(games.filter((game) => getDateBucketLabel(game.startDate || game.createdAt || game.updatedAt) === selectedDetail.label)) };
+        return { title: `Actividad del ${selectedDetail.label}`, description: "Partidas que caen en la fecha seleccionada.", filterLabel: selectedDetail.label, rows: gameRows(activityGames.filter((game) => getDateBucketLabel(game.startDate || game.createdAt || game.updatedAt) === selectedDetail.label)) };
       case "deck":
-        return { title: `Mazo ${selectedDetail.label}`, description: "Distribución de uso por mazo para orientar el análisis por contenido.", filterLabel: selectedDetail.label, rows: gameRows(games.filter((game) => normalizeLabel(game.deckName || "Sin mazo") === normalizeLabel(selectedDetail.label))) };
+        return { title: `Mazo ${selectedDetail.label}`, description: "Distribución de uso por mazo para orientar el análisis por contenido.", filterLabel: selectedDetail.label, rows: gameRows(deckGames.filter((game) => normalizeLabel(game.deckName || "Sin mazo") === normalizeLabel(selectedDetail.label))) };
       case "user-type":
-        return { title: `Tipos de usuario · ${selectedDetail.label}`, description: "Usuarios dentro del tipo elegido.", filterLabel: selectedDetail.label, rows: userRows.filter((row) => normalizeLabel(row.value) === normalizeLabel(selectedDetail.label)) };
+        return { title: `Tipos de usuario · ${selectedDetail.label}`, description: "Usuarios dentro del tipo elegido.", filterLabel: selectedDetail.label, rows: userTypeUsers.map((entry) => ({ label: entry.fullName || entry.email || `Usuario ${entry.id}`, value: entry.userType || "Sin tipo", hint: entry.roles.join(", ") || "Sin rol", badge: entry.lastLoginAt ? `Login ${getDateBucketLabel(entry.lastLoginAt)}` : "Sin login" })).filter((row) => normalizeLabel(row.value) === normalizeLabel(selectedDetail.label)) };
       case "profile-coverage": {
         const normalized = normalizeLabel(selectedDetail.label);
         return {
           title: `Cobertura de perfiles · ${selectedDetail.label}`,
           description: "Perfiles filtrados por madurez observable.",
           filterLabel: selectedDetail.label,
-          rows: profileRows.filter((row, index) => {
-            const profile = profiles[index];
+          rows: profileCoverageProfiles.map((profile) => ({ label: profile.displayName || `Perfil ${profile.id}`, value: `${profile.sessionCount} sesiones`, hint: `${profile.activeBindingCount} bindings activos · ${profile.ageCategory || "sin categoría"}`, badge: profile.isActive ? "Activo" : "Inactivo" })).filter((row, index) => {
+            const profile = profileCoverageProfiles[index];
             if (normalized.includes("activos")) return profile.isActive;
             if (normalized.includes("binding") && !normalized.includes("sin")) return profile.activeBindingCount > 0;
             if (normalized.includes("sesiones")) return profile.sessionCount > 0;
@@ -215,28 +274,28 @@ export function ResearcherDashboard() {
           title: `Altas y logins · ${selectedDetail.label}`,
           description: "Usuarios creados o con login dentro de la fecha elegida.",
           filterLabel: selectedDetail.label,
-          rows: userRows.filter((row, index) => {
-            const userRecord = users[index];
+          rows: userCreationUsers.map((entry) => ({ label: entry.fullName || entry.email || `Usuario ${entry.id}`, value: entry.userType || "Sin tipo", hint: entry.roles.join(", ") || "Sin rol", badge: entry.lastLoginAt ? `Login ${getDateBucketLabel(entry.lastLoginAt)}` : "Sin login" })).filter((row, index) => {
+            const userRecord = userCreationUsers[index];
             return getDateBucketLabel(userRecord?.createdAt || userRecord?.lastLoginAt) === selectedDetail.label
               || getDateBucketLabel(userRecord?.lastLoginAt) === selectedDetail.label;
           }),
         };
       case "user-recency":
-        return { title: `Recencia del padrón · ${selectedDetail.label}`, description: "Usuarios dentro del período seleccionado.", filterLabel: selectedDetail.label, rows: userRows.filter((row, index) => matchesRecencyLabel(selectedDetail.label, users[index]?.lastLoginAt)) };
+        return { title: `Recencia del padrón · ${selectedDetail.label}`, description: "Usuarios dentro del período seleccionado.", filterLabel: selectedDetail.label, rows: userRecencyUsers.map((entry) => ({ label: entry.fullName || entry.email || `Usuario ${entry.id}`, value: entry.userType || "Sin tipo", hint: entry.roles.join(", ") || "Sin rol", badge: entry.lastLoginAt ? `Login ${getDateBucketLabel(entry.lastLoginAt)}` : "Sin login" })).filter((row, index) => matchesRecencyLabel(selectedDetail.label, userRecencyUsers[index]?.lastLoginAt)) };
       case "profile-age":
-        return { title: `Perfiles por categoría · ${selectedDetail.label}`, description: "Segmentación etaria dentro de la cohorte elegida.", filterLabel: selectedDetail.label, rows: profileRows.filter((row, index) => normalizeLabel(profiles[index]?.ageCategory || "Sin categoría") === normalizeLabel(selectedDetail.label)) };
+        return { title: `Perfiles por categoría · ${selectedDetail.label}`, description: "Segmentación etaria dentro de la cohorte elegida.", filterLabel: selectedDetail.label, rows: profileAgeProfiles.map((profile) => ({ label: profile.displayName || `Perfil ${profile.id}`, value: `${profile.sessionCount} sesiones`, hint: `${profile.activeBindingCount} bindings activos · ${profile.ageCategory || "sin categoría"}`, badge: profile.isActive ? "Activo" : "Inactivo" })).filter((row, index) => normalizeLabel(profileAgeProfiles[index]?.ageCategory || "Sin categoría") === normalizeLabel(selectedDetail.label)) };
       case "profile-recency":
-        return { title: `Recencia de perfiles · ${selectedDetail.label}`, description: "Perfiles dentro del período seleccionado.", filterLabel: selectedDetail.label, rows: profileRows.filter((row, index) => matchesRecencyLabel(selectedDetail.label, profiles[index]?.lastSessionAt)) };
+        return { title: `Recencia de perfiles · ${selectedDetail.label}`, description: "Perfiles dentro del período seleccionado.", filterLabel: selectedDetail.label, rows: profileRecencyProfiles.map((profile) => ({ label: profile.displayName || `Perfil ${profile.id}`, value: `${profile.sessionCount} sesiones`, hint: `${profile.activeBindingCount} bindings activos · ${profile.ageCategory || "sin categoría"}`, badge: profile.isActive ? "Activo" : "Inactivo" })).filter((row, index) => matchesRecencyLabel(selectedDetail.label, profileRecencyProfiles[index]?.lastSessionAt)) };
       case "sync-source":
-        return { title: `Fuentes de sync · ${selectedDetail.label}`, description: "Sesiones de sync que pertenecen a la fuente elegida.", filterLabel: selectedDetail.label, rows: syncRows.filter((row) => normalizeLabel(row.badge) === normalizeLabel(selectedDetail.label)) };
+        return { title: `Fuentes de sync · ${selectedDetail.label}`, description: "Sesiones de sync que pertenecen a la fuente elegida.", filterLabel: selectedDetail.label, rows: syncSourceSyncs.map((sync) => ({ label: sync.deckName || `Sync ${sync.id}`, value: sync.status || "Sin status", hint: `${sync.rawRecordCount || sync.rawRecordIds.length || 0} raw records · ${getDateBucketLabel(sync.startedAt || sync.createdAt || sync.updatedAt)}`, badge: sync.source || sync.sourceType || "Sin fuente" })).filter((row) => normalizeLabel(row.badge) === normalizeLabel(selectedDetail.label)) };
       case "profile-sessions": {
         const normalized = normalizeLabel(selectedDetail.label);
         return {
           title: `Cohortes de profundidad · ${selectedDetail.label}`,
           description: "Perfiles agrupados por cantidad de sesiones.",
           filterLabel: selectedDetail.label,
-          rows: profileRows.filter((row, index) => {
-            const count = profiles[index]?.sessionCount || 0;
+          rows: profileSessionProfiles.map((profile) => ({ label: profile.displayName || `Perfil ${profile.id}`, value: `${profile.sessionCount} sesiones`, hint: `${profile.activeBindingCount} bindings activos · ${profile.ageCategory || "sin categoría"}`, badge: profile.isActive ? "Activo" : "Inactivo" })).filter((row, index) => {
+            const count = profileSessionProfiles[index]?.sessionCount || 0;
             if (normalized.includes("sin sesiones")) return count <= 0;
             if (normalized.includes("1 3 sesiones") || normalized.includes("1/3 sesiones")) return count >= 1 && count <= 3;
             if (normalized.includes("4 10 sesiones") || normalized.includes("4/10 sesiones")) return count >= 4 && count <= 10;
@@ -302,6 +361,9 @@ export function ResearcherDashboard() {
           title="Actividad por fecha"
           description="Partidas y turnos por día para observar estabilidad o picos de la muestra analizada."
           data={activitySeries}
+          range={activityRange}
+          onRangeChange={(range) => setModuleRange("researcher-activity", range)}
+          csvFileName={`researcher-dashboard-actividad-${activityRange}`}
           onDatumSelect={(label) => setSelectedDetail({ kind: "activity-date", label })}
           activeDatumLabel={selectedDetail?.kind === "activity-date" ? selectedDetail.label : null}
         />
@@ -309,6 +371,9 @@ export function ResearcherDashboard() {
           title="Mazos en la muestra"
           description="Distribución de uso por mazo para orientar el análisis por contenido."
           data={deckUsage}
+          range={deckRange}
+          onRangeChange={(range) => setModuleRange("researcher-deck", range)}
+          csvFileName={`researcher-dashboard-mazos-${deckRange}`}
           onDatumSelect={(label) => setSelectedDetail({ kind: "deck", label })}
           activeDatumLabel={selectedDetail?.kind === "deck" ? selectedDetail.label : null}
         />
@@ -319,6 +384,9 @@ export function ResearcherDashboard() {
           title="Tipos de usuario en la muestra"
           description="Distribución de cohortes para saber desde qué tipo de cuenta se compone la evidencia."
           data={userTypeSeries}
+          range={userTypeRange}
+          onRangeChange={(range) => setModuleRange("researcher-user-type", range)}
+          csvFileName={`researcher-dashboard-tipos-usuario-${userTypeRange}`}
           onDatumSelect={(label) => setSelectedDetail({ kind: "user-type", label })}
           activeDatumLabel={selectedDetail?.kind === "user-type" ? selectedDetail.label : null}
         />
@@ -326,6 +394,9 @@ export function ResearcherDashboard() {
           title="Cobertura de perfiles"
           description="Perfiles activos, con binding y con sesiones para medir madurez real de la muestra observable."
           data={profileCoverageSeries}
+          range={profileCoverageRange}
+          onRangeChange={(range) => setModuleRange("researcher-profile-coverage", range)}
+          csvFileName={`researcher-dashboard-cobertura-perfiles-${profileCoverageRange}`}
           onDatumSelect={(label) => setSelectedDetail({ kind: "profile-coverage", label })}
           activeDatumLabel={selectedDetail?.kind === "profile-coverage" ? selectedDetail.label : null}
         />
@@ -336,6 +407,9 @@ export function ResearcherDashboard() {
           title="Altas y logins"
           description="Serie temporal de usuarios creados y usuarios con login para seguir formación y reactivación de la muestra."
           data={userCreationSeries}
+          range={userCreationRange}
+          onRangeChange={(range) => setModuleRange("researcher-user-creation", range)}
+          csvFileName={`researcher-dashboard-altas-logins-${userCreationRange}`}
           onDatumSelect={(label) => setSelectedDetail({ kind: "user-creation-date", label })}
           activeDatumLabel={selectedDetail?.kind === "user-creation-date" ? selectedDetail.label : null}
         />
@@ -343,6 +417,9 @@ export function ResearcherDashboard() {
           title="Recencia del padrón"
           description="Agrupa usuarios por recencia de acceso para detectar rápidamente cohortes activas, tibias o inertes."
           data={userRecencySeries}
+          range={userRecencyRange}
+          onRangeChange={(range) => setModuleRange("researcher-user-recency", range)}
+          csvFileName={`researcher-dashboard-recencia-usuarios-${userRecencyRange}`}
           onDatumSelect={(label) => setSelectedDetail({ kind: "user-recency", label })}
           activeDatumLabel={selectedDetail?.kind === "user-recency" ? selectedDetail.label : null}
         />
@@ -353,6 +430,9 @@ export function ResearcherDashboard() {
           title="Perfiles por categoría"
           description="Segmentación etaria para leer si la muestra está sesgada hacia algún tramo puntual."
           data={profileAgeSeries}
+          range={profileAgeRange}
+          onRangeChange={(range) => setModuleRange("researcher-profile-age", range)}
+          csvFileName={`researcher-dashboard-perfiles-por-categoria-${profileAgeRange}`}
           onDatumSelect={(label) => setSelectedDetail({ kind: "profile-age", label })}
           activeDatumLabel={selectedDetail?.kind === "profile-age" ? selectedDetail.label : null}
         />
@@ -360,6 +440,9 @@ export function ResearcherDashboard() {
           title="Recencia de perfiles"
           description="Última sesión por perfil para medir frescura real de la muestra disponible."
           data={profileRecencySeries}
+          range={profileRecencyRange}
+          onRangeChange={(range) => setModuleRange("researcher-profile-recency", range)}
+          csvFileName={`researcher-dashboard-recencia-perfiles-${profileRecencyRange}`}
           onDatumSelect={(label) => setSelectedDetail({ kind: "profile-recency", label })}
           activeDatumLabel={selectedDetail?.kind === "profile-recency" ? selectedDetail.label : null}
         />
@@ -370,6 +453,9 @@ export function ResearcherDashboard() {
           title="Fuentes de sync"
           description="Cómo entra la evidencia y si hay dependencia de un solo canal de captura."
           data={syncSourceSeries}
+          range={syncSourceRange}
+          onRangeChange={(range) => setModuleRange("researcher-sync-source", range)}
+          csvFileName={`researcher-dashboard-fuentes-sync-${syncSourceRange}`}
           onDatumSelect={(label) => setSelectedDetail({ kind: "sync-source", label })}
           activeDatumLabel={selectedDetail?.kind === "sync-source" ? selectedDetail.label : null}
         />
@@ -377,6 +463,9 @@ export function ResearcherDashboard() {
           title="Cohortes de profundidad"
           description="Perfiles agrupados por cantidad de sesiones para separar exploración temprana de uso sostenido."
           data={profileSessionCohorts}
+          range={profileSessionsRange}
+          onRangeChange={(range) => setModuleRange("researcher-profile-sessions", range)}
+          csvFileName={`researcher-dashboard-cohortes-profundidad-${profileSessionsRange}`}
           onDatumSelect={(label) => setSelectedDetail({ kind: "profile-sessions", label })}
           activeDatumLabel={selectedDetail?.kind === "profile-sessions" ? selectedDetail.label : null}
         />
