@@ -343,7 +343,6 @@ export function SuperadminDashboard() {
         ...(canSeeHealthModule ? [healthQuery, readinessQuery] : []),
       ];
 
-  const totalSources = visibleQueryStates.length;
   const loadedSources = visibleQueryStates.filter((query) => query.data).length;
   const failedSources = visibleQueryStates.filter((query) => query.error).length;
   const hasAnyData = usesSystemSummary
@@ -358,13 +357,6 @@ export function SuperadminDashboard() {
     .map((error) => getErrorMessage(error));
   const error = errors[0] || null;
 
-  const rangeOptions = summaryQuery.data?.filters.range_options ?? EMPTY_LIST;
-  const institutionOptions = summaryQuery.data?.filters.institutions ?? EMPTY_LIST;
-  const countryOptions = summaryQuery.data?.filters.countries ?? EMPTY_LIST;
-  const stateOptions = summaryQuery.data?.filters.states ?? EMPTY_LIST;
-  const cityOptions = summaryQuery.data?.filters.cities ?? EMPTY_LIST;
-  const userTypeOptions = summaryQuery.data?.filters.user_types ?? EMPTY_LIST;
-  const roleCodeOptions = summaryQuery.data?.filters.role_codes ?? EMPTY_LIST;
   const trendRangeLabel = summaryQuery.data?.filters.trend_range || selectedRange;
   const trends = summaryQuery.data?.trends ?? EMPTY_LIST;
   const comparisonMetrics = summaryQuery.data?.comparisons.metrics ?? EMPTY_LIST;
@@ -408,10 +400,6 @@ export function SuperadminDashboard() {
     ],
     [territoryAlerts, territoryScores],
   );
-  const activeSmartPresetMeta = activeSmartPreset === "all"
-    ? null
-    : smartPresets.find((preset) => preset.key === activeSmartPreset) || null;
-
   const filteredTerritoryScores = useMemo(() => {
     switch (activeSmartPreset) {
       case "critical":
@@ -438,23 +426,6 @@ export function SuperadminDashboard() {
     const allowed = new Set(filteredTerritoryScores.map((item) => item.label));
     return territoryAlerts.filter((item) => [...allowed].some((label) => item.label.includes(label)));
   }, [activeSmartPreset, filteredTerritoryScores, territoryAlerts]);
-
-  const activeExecutiveFilters = useMemo(
-    () => [
-      selectedRange !== "30d"
-        ? `Rango · ${rangeOptions.find((option) => option.value === selectedRange)?.label || selectedRange}`
-        : null,
-      selectedInstitutionId
-        ? `Institución · ${institutionOptions.find((institution) => institution.id === selectedInstitutionId)?.name || selectedInstitutionId}`
-        : null,
-      selectedCountryCode ? `País · ${selectedCountryCode}` : null,
-      selectedState ? `Estado · ${selectedState}` : null,
-      selectedCity ? `Ciudad · ${selectedCity}` : null,
-      selectedUserType ? `Tipo · ${selectedUserType}` : null,
-      selectedRoleCode ? `Rol · ${selectedRoleCode}` : null,
-    ].filter((value): value is string => Boolean(value)),
-    [institutionOptions, rangeOptions, selectedCity, selectedCountryCode, selectedInstitutionId, selectedRange, selectedRoleCode, selectedState, selectedUserType],
-  );
 
   function updateFilter(
     key: "range" | "institution_id" | "country_code" | "state" | "city" | "user_type" | "role_code" | "smart_preset",
@@ -501,19 +472,6 @@ export function SuperadminDashboard() {
     }
 
     return params;
-  }
-
-  function resetExecutiveView() {
-    updateFilters({
-      range: "30d",
-      institution_id: "",
-      country_code: "",
-      state: "",
-      city: "",
-      user_type: "",
-      role_code: "",
-      smart_preset: "",
-    });
   }
 
   async function copyCurrentViewLink() {
@@ -913,200 +871,7 @@ export function SuperadminDashboard() {
         />
       ) : null}
 
-      <div className="grid gap-6 2xl:grid-cols-[1.35fr_0.95fr]">
-        <Card className="overflow-hidden border-none bg-[linear-gradient(135deg,#1f2a37_0%,#2c4156_55%,#39546f_100%)] text-white shadow-[0_20px_60px_rgba(31,42,55,0.22)]">
-          <CardContent className="p-8 sm:p-10">
-            <div className="flex flex-wrap gap-2">
-              <Badge className="bg-white/14 text-white hover:bg-white/14">Producción</Badge>
-              <Badge className="bg-white/14 text-white hover:bg-white/14">Panel principal</Badge>
-              <Badge className="bg-white/14 text-white hover:bg-white/14">MagicBox plataforma</Badge>
-            </div>
-
-            {usesSystemSummary ? (
-              <>
-                <div className="mt-6 grid gap-3 md:grid-cols-2 2xl:grid-cols-3">
-                  <label className="rounded-2xl bg-white/10 p-4 text-sm text-white/85 backdrop-blur-sm">
-                    <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.2em] text-white/65">Ventana temporal</span>
-                    <select
-                      className="w-full rounded-xl border border-white/15 bg-slate-950/20 px-3 py-2 text-sm text-white outline-none"
-                      value={selectedRange}
-                      onChange={(event) => updateFilter("range", event.target.value)}
-                    >
-                      {rangeOptions.map((option) => (
-                        <option key={option.value} value={option.value} className="text-slate-950">
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-
-                  <label className="rounded-2xl bg-white/10 p-4 text-sm text-white/85 backdrop-blur-sm">
-                    <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.2em] text-white/65">Institución</span>
-                    <select
-                      className="w-full rounded-xl border border-white/15 bg-slate-950/20 px-3 py-2 text-sm text-white outline-none"
-                      value={selectedInstitutionId || ""}
-                      onChange={(event) => updateFilter("institution_id", event.target.value)}
-                    >
-                      <option value="" className="text-slate-950">Todas</option>
-                      {institutionOptions.map((institution) => (
-                        <option key={institution.id} value={institution.id} className="text-slate-950">
-                          {institution.name}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-
-                  <label className="rounded-2xl bg-white/10 p-4 text-sm text-white/85 backdrop-blur-sm">
-                    <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.2em] text-white/65">País</span>
-                    <select
-                      className="w-full rounded-xl border border-white/15 bg-slate-950/20 px-3 py-2 text-sm text-white outline-none"
-                      value={selectedCountryCode || ""}
-                      onChange={(event) => updateFilter("country_code", event.target.value)}
-                    >
-                      <option value="" className="text-slate-950">Todos</option>
-                      {countryOptions.map((option) => (
-                        <option key={option} value={option} className="text-slate-950">
-                          {option}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-
-                  <label className="rounded-2xl bg-white/10 p-4 text-sm text-white/85 backdrop-blur-sm">
-                    <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.2em] text-white/65">Estado / territorio</span>
-                    <select
-                      className="w-full rounded-xl border border-white/15 bg-slate-950/20 px-3 py-2 text-sm text-white outline-none"
-                      value={selectedState || ""}
-                      onChange={(event) => updateFilter("state", event.target.value)}
-                    >
-                      <option value="" className="text-slate-950">Todos</option>
-                      {stateOptions.map((option) => (
-                        <option key={option} value={option} className="text-slate-950">
-                          {option}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-
-                  <label className="rounded-2xl bg-white/10 p-4 text-sm text-white/85 backdrop-blur-sm">
-                    <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.2em] text-white/65">Ciudad</span>
-                    <select
-                      className="w-full rounded-xl border border-white/15 bg-slate-950/20 px-3 py-2 text-sm text-white outline-none"
-                      value={selectedCity || ""}
-                      onChange={(event) => updateFilter("city", event.target.value)}
-                    >
-                      <option value="" className="text-slate-950">Todas</option>
-                      {cityOptions.map((option) => (
-                        <option key={option} value={option} className="text-slate-950">
-                          {option}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-
-                  <label className="rounded-2xl bg-white/10 p-4 text-sm text-white/85 backdrop-blur-sm">
-                    <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.2em] text-white/65">Tipo de usuario</span>
-                    <select
-                      className="w-full rounded-xl border border-white/15 bg-slate-950/20 px-3 py-2 text-sm text-white outline-none"
-                      value={selectedUserType || ""}
-                      onChange={(event) => updateFilter("user_type", event.target.value)}
-                    >
-                      <option value="" className="text-slate-950">Todos</option>
-                      {userTypeOptions.map((option) => (
-                        <option key={option} value={option} className="text-slate-950">
-                          {option}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-
-                  <label className="rounded-2xl bg-white/10 p-4 text-sm text-white/85 backdrop-blur-sm">
-                    <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.2em] text-white/65">Rol agrupado</span>
-                    <select
-                      className="w-full rounded-xl border border-white/15 bg-slate-950/20 px-3 py-2 text-sm text-white outline-none"
-                      value={selectedRoleCode || ""}
-                      onChange={(event) => updateFilter("role_code", event.target.value)}
-                    >
-                      <option value="" className="text-slate-950">Todos</option>
-                      {roleCodeOptions.map((option) => (
-                        <option key={option} value={option} className="text-slate-950">
-                          {option}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                </div>
-
-                {activeExecutiveFilters.length > 0 || activeSmartPresetMeta ? (
-                  <div className="mt-4 flex flex-wrap items-center justify-between gap-4 rounded-2xl bg-white/10 px-4 py-4 text-sm text-white/85 backdrop-blur-sm">
-                    <div className="flex-1">
-                      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-white/65">Contexto activo</p>
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        {activeSmartPresetMeta ? (
-                          <Badge className="border-transparent bg-white text-slate-950">
-                            Preset activo · {activeSmartPresetMeta.label}
-                          </Badge>
-                        ) : null}
-                        {activeExecutiveFilters.map((filterLabel) => (
-                          <Badge key={filterLabel} variant="outline" className="border-white/20 bg-white/10 text-white">
-                            {filterLabel}
-                          </Badge>
-                        ))}
-                      </div>
-                      <p className="mt-3 text-sm text-white/72">
-                        La vista queda etiquetada para revisar o compartir sin tener que releer todos los selectores.
-                      </p>
-                    </div>
-                    <Button type="button" variant="outline" size="sm" className="border-white/20 bg-white/10 text-white hover:bg-white/15 hover:text-white" onClick={resetExecutiveView}>
-                      Volver a vista general
-                    </Button>
-                  </div>
-                ) : null}
-              </>
-            ) : null}
-
-            <div className="mt-6 max-w-3xl">
-              <h2 className="text-3xl font-semibold tracking-tight sm:text-4xl">
-                Entrá, mirá lo crítico primero y saltá directo al módulo correcto.
-              </h2>
-              <p className="mt-4 text-base leading-7 text-white/78">
-                Esta portada prioriza estado general, filtros activos y accesos directos para revisar datos, hardware, personas y salud técnica.
-              </p>
-            </div>
-
-            <div className="mt-8 grid gap-4 md:grid-cols-3">
-              <div className="rounded-3xl bg-white/10 p-4 backdrop-blur-sm">
-                <p className="text-sm text-white/70">Cobertura</p>
-                <p className="mt-2 text-lg font-medium">{metrics.totalUsers} usuarios, {metrics.totalInstitutions} instituciones y {metrics.totalDevices} dispositivos.</p>
-                <p className="mt-2 text-sm text-white/70">{loadedSources}/{totalSources} fuentes cargadas, {failedSources} con error.</p>
-              </div>
-              <div className="rounded-3xl bg-white/10 p-4 backdrop-blur-sm">
-                <p className="text-sm text-white/70">Actividad</p>
-                <p className="mt-2 text-lg font-medium">{metrics.totalSyncs} syncs, {metrics.totalGames} partidas, {metrics.totalTurns} turnos y {metrics.totalProfiles} profiles.</p>
-              </div>
-              <div className="rounded-3xl bg-white/10 p-4 backdrop-blur-sm">
-                <p className="text-sm text-white/70">{canSeeHealthModule ? "Salud" : "Resumen"}</p>
-                <p className="mt-2 text-lg font-medium">
-                  {canSeeHealthModule
-                    ? `${metrics.readiness} · ${metrics.degradedChecks} checks degradados · ${metrics.environment}.`
-                    : `${scopeLabel.toLowerCase()} · ${metrics.totalInstitutions} instituciones · ${metrics.totalDevices} dispositivos.`}
-                </p>
-              </div>
-              {usesSystemSummary ? (
-                <div className="rounded-3xl bg-white/10 p-4 backdrop-blur-sm md:col-span-3">
-                  <p className="text-sm text-white/70">Territorio y cohortes</p>
-                  <p className="mt-2 text-lg font-medium">
-                    {selectedCountryCode || "Todos los países"} · {selectedState || "todos los territorios"} · {selectedCity || "todas las ciudades"}
-                  </p>
-                  <p className="mt-2 text-sm text-white/70">
-                    Cohortes activas: {selectedUserType || "todos los tipos de usuario"} y {selectedRoleCode || "todos los roles"}. Esta base sirve para una vista territorial de gobierno con permisos de solo lectura.
-                  </p>
-                </div>
-              ) : null}
-            </div>
-          </CardContent>
-        </Card>
-
+      <div>
         <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
           <CardHeader>
             <CardTitle>Qué mirar primero</CardTitle>

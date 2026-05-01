@@ -164,7 +164,7 @@ describe("SuperadminDashboard", () => {
     expect(screen.queryByText("Settings")).not.toBeInTheDocument();
   });
 
-  it("uses the aggregated admin summary endpoint and renders filter controls", () => {
+  it("uses the aggregated admin summary endpoint and renders the executive modules", () => {
     useAuthMock.mockReturnValue({
       tokens: { accessToken: "token", refreshToken: "refresh" },
       user: {
@@ -243,11 +243,8 @@ describe("SuperadminDashboard", () => {
 
     renderDashboard();
 
-    expect(screen.getByText("Ventana temporal")).toBeInTheDocument();
     expect(screen.getByText(/Mapa de instituciones y dispositivos/i)).toBeInTheDocument();
-    expect(screen.getByText("Institución")).toBeInTheDocument();
-    expect(screen.getByText("País")).toBeInTheDocument();
-    expect(screen.getByText("Tipo de usuario")).toBeInTheDocument();
+    expect(screen.getByText(/Qué mirar primero/i)).toBeInTheDocument();
     expect(screen.getByText("Mini tendencias")).toBeInTheDocument();
     expect(screen.getByText("Comparativa entre períodos")).toBeInTheDocument();
     expect(screen.getByText("Semáforos de seguimiento")).toBeInTheDocument();
@@ -467,95 +464,6 @@ describe("SuperadminDashboard", () => {
     });
 
     expect(screen.getByRole("button", { name: /Link copiado/i })).toBeInTheDocument();
-  });
-
-  it("resets the executive view back to the general dashboard", () => {
-    searchParamsMock = new URLSearchParams("range=90d&country_code=UY&state=Montevideo&smart_preset=critical");
-
-    useAuthMock.mockReturnValue({
-      tokens: { accessToken: "token", refreshToken: "refresh" },
-      user: {
-        fullName: "Gobierno Territorial",
-        roles: ["government-viewer"],
-        permissions: ["feature:read"],
-      },
-    });
-    useSystemDashboardSummaryMock.mockReturnValue(
-      okQuery({
-        filters: {
-          selected_range: "90d",
-          selected_institution_id: null,
-          selected_country_code: "UY",
-          selected_state: "Montevideo",
-          selected_city: null,
-          selected_user_type: null,
-          selected_role_code: null,
-          range_options: [{ value: "90d", label: "90 días" }],
-          institutions: [],
-          countries: ["UY"],
-          states: ["Montevideo"],
-          cities: [],
-          user_types: [],
-          role_codes: [],
-          window_start: null,
-          trend_range: "90d",
-        },
-        totals: {
-          users: 10,
-          institutions: 1,
-          devices: 2,
-          syncs: 3,
-          games: 4,
-          profiles: 5,
-          turns: 6,
-        },
-        stats: {
-          institutions_needing_review: 0,
-          devices_without_status: 0,
-          devices_with_owner: 2,
-          devices_with_firmware: 2,
-          home_devices: 0,
-          institution_devices: 2,
-          syncs_with_raw: 3,
-          total_players: 8,
-          successful_turns: 5,
-          games_with_turns: 4,
-          active_profiles: 4,
-          profiles_with_bindings: 3,
-          profiles_with_sessions: 2,
-        },
-        trends: [],
-        comparisons: {
-          window_label: "90d",
-          current_start: "2026-01-20T00:00:00Z",
-          current_end: "2026-04-20T00:00:00Z",
-          previous_start: "2025-10-20T00:00:00Z",
-          previous_end: "2026-01-20T00:00:00Z",
-          metrics: [],
-        },
-        alerts: [],
-        segments: {
-          role_mix: [],
-          user_type_mix: [],
-          top_institutions: [],
-          top_territories: [],
-          territorial_hierarchy: [],
-          territory_alerts: [],
-          territory_scores: [],
-        },
-      }),
-    );
-
-    renderDashboard();
-
-    expect(screen.getByText("Contexto activo")).toBeInTheDocument();
-    expect(screen.getByText(/Preset activo · Territorios críticos/i)).toBeInTheDocument();
-    expect(screen.getByText(/País · UY/i)).toBeInTheDocument();
-    expect(screen.getByText(/Estado · Montevideo/i)).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("button", { name: /Volver a vista general/i }));
-
-    expect(replaceMock).toHaveBeenCalledWith("/dashboard?range=30d");
   });
 
   it("opens executive detail filters from cards and charts", () => {
