@@ -193,6 +193,8 @@ describe("GamesTable", () => {
     expect(screen.getByText("Jugadores y asociaciones")).toBeInTheDocument();
     expect(screen.queryAllByText("Luna").length).toBeGreaterThan(0);
     expect(screen.queryAllByText(/medium/i).length).toBeGreaterThan(0);
+    expect(screen.getByRole("link", { name: /Ver syncs del dispositivo/i })).toHaveAttribute("href", "/syncs?bleDeviceId=device-1&deviceId=mb-1&deviceName=MagicBox+Aula+1");
+    expect(screen.getByRole("button", { name: /Quitar selección/i })).toBeInTheDocument();
   });
 
   it("can open the games view already filtered by user from the roster link", () => {
@@ -387,6 +389,15 @@ describe("GamesTable", () => {
     expect(screen.queryAllByText("202")).toHaveLength(0);
   });
 
+  it("activates focus from summary cards and shows the active result chip", () => {
+    renderGamesTable();
+
+    fireEvent.click(screen.getByRole("button", { name: /Ver foco Sin asociación/i }));
+
+    expect(screen.getByText(/Acceso · Sin asociación resuelta/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Foco activo para Sin asociación/i })).toBeInTheDocument();
+  });
+
   it("adapts copy for researcher sessions without changing the evidence detail", () => {
     useAuthMock.mockReturnValue({
       tokens: { accessToken: "token", refreshToken: "refresh" },
@@ -406,7 +417,7 @@ describe("GamesTable", () => {
     renderGamesTable();
 
     expect(screen.getByText("Researcher")).toBeInTheDocument();
-    expect(screen.getByText(/pensada para leer composición de muestra/i)).toBeInTheDocument();
+    expect(screen.getByText(/vista de muestra de partidas para leer composición/i)).toBeInTheDocument();
 
     fireEvent.click(screen.getByText("101"));
 
@@ -462,7 +473,7 @@ describe("GamesTable", () => {
     renderGamesTable();
 
     expect(screen.getByText("Family")).toBeInTheDocument();
-    expect(screen.getByText(/pensada para entender sesiones, participantes y ritmo general/i)).toBeInTheDocument();
+    expect(screen.getByText(/para entender sesiones, participantes y ritmo general/i)).toBeInTheDocument();
     expect(screen.queryByText("Todos los accesos")).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByText("101"));
