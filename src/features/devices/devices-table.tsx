@@ -1,21 +1,21 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import type { PaginationPageSize } from "@/components/ui/list-pagination-controls";
 import { Home, Search, ShieldCheck, Smartphone, University, UserRound, Wifi } from "lucide-react";
-import { DeleteRecordDialog } from "@/components/delete-record-dialog";
 import { SectionHeader } from "@/components/section-header";
 import { Badge } from "@/components/ui/badge";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { ListPaginationControls, useListPagination } from "@/components/ui/list-pagination-controls";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useAuth } from "@/features/auth/auth-context";
-import { deleteDevice, updateDevice, useDevices } from "@/features/devices/api";
+import { updateDevice, useDevices } from "@/features/devices/api";
+import { buildDeviceDetailHref, type DeviceFocusFilter } from "@/features/devices/device-route";
 import type { DeviceRecord, UpdateDevicePayload } from "@/features/devices/types";
 import { useGames } from "@/features/games/api";
 import { useLanguage, type AppLanguage } from "@/features/i18n/i18n-context";
@@ -24,7 +24,7 @@ import { useSyncSessions } from "@/features/syncs/api";
 import { useUsers } from "@/features/users/api";
 import { cn, formatDateTime, getErrorMessage } from "@/lib/utils";
 
-const devicesMessages: Record<AppLanguage, {
+export const devicesMessages: Record<AppLanguage, {
   eyebrow: { default: string; teacher: string; director: string; institutionAdmin: string };
   title: string;
   description: { default: string; teacher: string; director: (name: string) => string; institutionAdmin: (name: string) => string };
@@ -290,17 +290,17 @@ function SummaryCard({
   );
 }
 
-function statusLabel(status?: string | null, fallback = "sin estado") {
+export function statusLabel(status?: string | null, fallback = "sin estado") {
   if (!status) return fallback;
   return status.replaceAll("_", " ");
 }
 
-function scopeBadge(device: { assignmentScope: "home" | "institution"; educationalCenterName?: string | null }) {
+export function scopeBadge(device: { assignmentScope: "home" | "institution"; educationalCenterName?: string | null }) {
   if (device.assignmentScope === "home") return <Badge variant="secondary">Home</Badge>;
   return <Badge variant="outline">{device.educationalCenterName || "Institución"}</Badge>;
 }
 
-function locationLabel(device: {
+export function locationLabel(device: {
   assignmentScope: "home" | "institution";
   educationalCenterName?: string | null;
   educationalCenterId?: string | null;
@@ -309,7 +309,7 @@ function locationLabel(device: {
   return device.educationalCenterName || device.educationalCenterId || "Institución";
 }
 
-function buildDeviceRelationHref(pathname: string, device: Pick<DeviceRecord, "id" | "deviceId" | "name">) {
+export function buildDeviceRelationHref(pathname: string, device: Pick<DeviceRecord, "id" | "deviceId" | "name">) {
   const params = new URLSearchParams();
   params.set("bleDeviceId", device.id);
   params.set("deviceId", device.deviceId);
@@ -349,7 +349,7 @@ function getDeviceInitials(name: string) {
     .join("") || "DV";
 }
 
-function DeviceAvatar({
+export function DeviceAvatar({
   device,
   className,
 }: {
@@ -368,7 +368,7 @@ function DeviceAvatar({
   );
 }
 
-function DeviceEditorPanel({
+export function DeviceEditorPanel({
   selectedDevice,
   scopedInstitutionId,
   institutions,
@@ -592,8 +592,6 @@ function DeviceEditorPanel({
   );
 }
 
-type DeviceFocusFilter = "all" | "review" | "no_owner" | "with_owner" | "no_status" | "no_metadata" | "with_metadata" | "online" | "with_activity" | "without_sync";
-
 export function DevicesTable() {
   const { language } = useLanguage();
   const t = devicesMessages[language];
@@ -601,16 +599,23 @@ export function DevicesTable() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const [query, setQuery] = useState("");
-  const [institutionFilter, setInstitutionFilter] = useState("all");
-  const [scopeFilter, setScopeFilter] = useState<"all" | "home" | "institution">("all");
-  const [focusFilter, setFocusFilter] = useState<DeviceFocusFilter>("all");
-  const [accessFilter, setAccessFilter] = useState<"all" | "owned" | "institution" | "shared" | "unresolved">("all");
-  const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null);
-  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [query, setQuery] = useState(() => searchParams.get("q")?.trim() || "");
+  const [institutionFilter, setInstitutionFilter] = useState(() => searchParams.get("institutionId") || "all");
+  const [scopeFilter, setScopeFilter] = useState<"all" | "home" | "institution">(() => {
+    const value = searchParams.get("scope");
+    return value === "home" || value === "institution" ? value : "all";
+  });
+  const [focusFilter, setFocusFilter] = useState<DeviceFocusFilter>(() => {
+    const value = searchParams.get("focus");
+    const allowedValues: DeviceFocusFilter[] = ["all", "review", "no_owner", "with_owner", "no_status", "no_metadata", "with_metadata", "online", "with_activity", "without_sync"];
+    return allowedValues.includes((value || "all") as DeviceFocusFilter) ? (value as DeviceFocusFilter) : "all";
+  });
+  const [accessFilter, setAccessFilter] = useState<"all" | "owned" | "institution" | "shared" | "unresolved">(() => {
+    const value = searchParams.get("access");
+    return value === "owned" || value === "institution" || value === "shared" || value === "unresolved" ? value : "all";
+  });
   const linkedOwnerUserId = searchParams.get("ownerUserId")?.trim() || "";
   const linkedOwnerUserName = searchParams.get("ownerUserName")?.trim() || "";
-  const queryClient = useQueryClient();
 
   const devicesQuery = useDevices(tokens?.accessToken);
   const institutionsQuery = useInstitutions(tokens?.accessToken);
@@ -639,22 +644,9 @@ export function DevicesTable() {
   }
 
   const canUpdateDevices = hasAnyPermission("ble_device:update", "ble-device:update");
-  const canDeleteDevices = hasAnyPermission("ble_device:delete", "ble-device:delete");
   const currentUserEmail = (currentUser?.email || "").trim().toLowerCase();
   const isTeacherView = currentUser?.roles.includes("teacher") || false;
   const isDirectorView = currentUser?.roles.includes("director") || false;
-
-  const deleteDeviceMutation = useMutation({
-    mutationFn: (deviceId: string) => deleteDevice(tokens?.accessToken as string, deviceId),
-    onSuccess: async () => {
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["devices"] }),
-        queryClient.invalidateQueries({ queryKey: ["games"] }),
-        queryClient.invalidateQueries({ queryKey: ["sync-sessions"] }),
-      ]);
-      setSelectedDeviceId(null);
-    },
-  });
 
   const deviceRows = useMemo(() => {
     return devices.map((device) => {
@@ -773,18 +765,6 @@ export function DevicesTable() {
     });
   }, [accessFilter, deviceRows, focusFilter, institutionFilter, linkedOwnerUserId, query, scopeFilter, scopedInstitutionId, t.filters.accessShared]);
 
-  const selectedDevice = useMemo(
-    () => filtered.find((device) => device.id === selectedDeviceId) || deviceRows.find((device) => device.id === selectedDeviceId) || null,
-    [deviceRows, filtered, selectedDeviceId],
-  );
-
-  async function handleDeleteSelectedDevice() {
-    if (!selectedDevice) return;
-    if (!canDeleteDevices) return;
-    await deleteDeviceMutation.mutateAsync(selectedDevice.id);
-    setIsDeleteDialogOpen(false);
-  }
-
   function resetFilters() {
     setQuery("");
     setScopeFilter("all");
@@ -793,7 +773,27 @@ export function DevicesTable() {
     setAccessFilter("all");
   }
 
-  const pagination = useListPagination(filtered);
+  const initialPageSize = (() => {
+    const parsed = Number(searchParams.get("pageSize") || 10);
+    return parsed === 20 || parsed === 50 ? parsed : 10;
+  })() as PaginationPageSize;
+  const initialPage = Math.max(1, Number(searchParams.get("page") || 1) || 1);
+
+  const pagination = useListPagination(filtered, initialPageSize, initialPage);
+  const currentOverviewState = useMemo(
+    () => ({
+      q: query.trim() || null,
+      institutionId: institutionFilter !== "all" ? institutionFilter : scopedInstitutionId || null,
+      scope: scopeFilter,
+      access: accessFilter,
+      focus: focusFilter,
+      ownerUserId: linkedOwnerUserId || null,
+      ownerUserName: linkedOwnerUserName || null,
+      page: pagination.currentPage,
+      pageSize: pagination.pageSize,
+    }),
+    [accessFilter, focusFilter, institutionFilter, linkedOwnerUserId, linkedOwnerUserName, pagination.currentPage, pagination.pageSize, query, scopeFilter, scopedInstitutionId],
+  );
 
   const metrics = useMemo(() => {
     const onlineDevices = deviceRows.filter((device) => (device.status || "").toLowerCase().includes("online") || (device.status || "").toLowerCase().includes("active")).length;
@@ -1123,8 +1123,8 @@ export function DevicesTable() {
                     pagination.paginatedItems.map((device) => (
                       <TableRow
                         key={device.id}
-                        className={cn("cursor-pointer", selectedDeviceId === device.id && "border-primary/30 bg-primary/8")}
-                        onClick={() => setSelectedDeviceId(device.id)}
+                        className="cursor-pointer"
+                        onClick={() => router.push(buildDeviceDetailHref({ deviceRecordId: device.id, ...currentOverviewState }))}
                       >
                         <TableCell>
                           <div className="flex min-w-0 items-center gap-3">
@@ -1164,153 +1164,43 @@ export function DevicesTable() {
 
         <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)] 2xl:sticky 2xl:top-6 2xl:self-start">
           <CardHeader>
-            <CardTitle>{isTeacherView ? t.detail.titleTeacher : isDirectorView ? t.detail.titleDirector : t.detail.titleDefault}</CardTitle>
+            <CardTitle>{language === "en" ? "Dedicated device detail" : language === "pt" ? "Detalhe dedicado do dispositivo" : "Detalle dedicado del dispositivo"}</CardTitle>
             <CardDescription>
-              {isTeacherView
-                ? t.detail.descriptionTeacher
-                : isDirectorView
-                ? t.detail.descriptionDirector
-                : t.detail.descriptionDefault}
+              {language === "en"
+                ? "Selecting a row now opens a full page, so editing, context, and related navigation stay visible without scrolling inside the fleet screen."
+                : language === "pt"
+                  ? "Selecionar uma linha agora abre uma página completa, então edição, contexto e navegação relacionada ficam visíveis sem rolar dentro da tela do parque."
+                  : "Seleccionar una fila ahora abre una página completa, así la edición, el contexto y la navegación relacionada quedan visibles sin scrollear dentro de la pantalla del parque."}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-5">
-            {!selectedDevice ? (
-              <div className="rounded-2xl bg-background/70 p-4 text-sm text-muted-foreground">
-                {t.detail.selectDevice}
+            <div className="rounded-2xl bg-background/70 p-4 text-sm text-muted-foreground">
+              {language === "en"
+                ? "Open any device from the table to land on its dedicated page. From there you can edit operational data and jump to games, syncs, or related devices with preserved context."
+                : language === "pt"
+                  ? "Abra qualquer dispositivo da tabela para entrar em sua página dedicada. Dali você pode editar dados operacionais e saltar para games, syncs ou dispositivos relacionados preservando o contexto."
+                  : "Abrí cualquier dispositivo desde la tabla para entrar en su página dedicada. Desde ahí podés editar datos operativos y saltar a games, syncs o dispositivos relacionados preservando el contexto."}
+            </div>
+            <div className="rounded-2xl border border-border/70 bg-white/80 p-4">
+              <p className="text-sm font-medium text-foreground">{language === "en" ? "What changes now" : language === "pt" ? "O que muda agora" : "Qué cambia ahora"}</p>
+              <ul className="mt-3 space-y-2 text-sm text-muted-foreground">
+                <li>• {language === "en" ? "The fleet stays focused on search, filters, and list review." : language === "pt" ? "O parque fica focado em busca, filtros e revisão da lista." : "El parque queda enfocado en búsqueda, filtros y revisión del listado."}</li>
+                <li>• {language === "en" ? "Device editing moves to a dedicated screen with contextual navigation." : language === "pt" ? "A edição do dispositivo passa para uma tela dedicada com navegação contextual." : "La edición del dispositivo pasa a una pantalla dedicada con navegación contextual."}</li>
+                <li>• {language === "en" ? "Quick links and nearby devices remain one click away." : language === "pt" ? "Os links rápidos e dispositivos cercanos ficam a um clique." : "Los cruces rápidos y dispositivos cercanos quedan a un clic."}</li>
+              </ul>
+            </div>
+            {canUpdateDevices ? (
+              <div className="rounded-2xl border border-dashed border-primary/20 bg-primary/5 p-4 text-sm text-primary">
+                {language === "en"
+                  ? "Editing is still available, but now from the dedicated device page."
+                  : language === "pt"
+                    ? "A edição continua disponível, mas agora na página dedicada do dispositivo."
+                    : "La edición sigue disponible, pero ahora desde la página dedicada del dispositivo."}
               </div>
-            ) : (
-              <>
-                <div className="rounded-2xl bg-background/70 p-4">
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div className="flex min-w-0 items-center gap-3">
-                      <DeviceAvatar device={selectedDevice} className="size-14" />
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-semibold text-foreground">{selectedDevice.name}</p>
-                        <p className="mt-1 truncate font-mono text-xs text-muted-foreground">{selectedDevice.deviceId}</p>
-                      </div>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <Badge variant={selectedDevice.hasUnresolvedAssociation ? "warning" : "outline"}>{selectedDevice.accessRelation}</Badge>
-                      {selectedDevice.hasOperationalActivity ? <Badge variant="secondary">{t.detail.visibleActivity}</Badge> : <Badge variant="outline">{t.detail.noVisibleActivity}</Badge>}
-                      <Badge variant={selectedDevice.relatedSyncCount > 0 ? "secondary" : "outline"}>
-                        {selectedDevice.relatedSyncCount > 0 ? t.detail.hasVisibleSync : t.detail.noVisibleSync}
-                      </Badge>
-                      {isTeacherView ? (
-                        <Badge variant={selectedDevice.isReadyForClassroom ? "secondary" : "warning"}>
-                          {selectedDevice.isReadyForClassroom ? t.detail.readyForClassroom : t.detail.reviewRecommended}
-                        </Badge>
-                      ) : null}
-                      {isDirectorView ? (
-                        <Badge variant={selectedDevice.reviewReasons.length === 0 ? "secondary" : "warning"}>
-                          {selectedDevice.reviewReasons.length === 0 ? t.detail.stable : t.detail.needsFollowUp}
-                        </Badge>
-                      ) : null}
-                    </div>
-                  </div>
-                  <div className="mt-3 grid gap-2 text-xs text-muted-foreground sm:grid-cols-2">
-                    <p>{t.detail.visibleSyncs(selectedDevice.relatedSyncCount)}</p>
-                    <p>{t.detail.visibleGames(selectedDevice.relatedGameCount)}</p>
-                    <p>{t.detail.lastVisibleSync(formatDateTime(selectedDevice.lastSyncedAt))}</p>
-                    <p>{t.detail.context(selectedDevice.isOwnedByCurrentUser ? t.detail.contextOwner : selectedDevice.isInstitutionVisible ? t.detail.contextInstitution : selectedDevice.hasUnresolvedAssociation ? t.detail.contextMissing : t.detail.contextShared)}</p>
-                  </div>
-                  <div className="mt-4 flex flex-wrap gap-2">
-                    <Badge variant="outline">{selectedDevice.assignmentScope === "home" ? t.editor.homeLocation : locationLabel(selectedDevice)}</Badge>
-                    <Badge variant="outline">{selectedDevice.ownerUserName || selectedDevice.ownerUserEmail || t.detail.noOwner}</Badge>
-                    <Badge variant="outline">{selectedDevice.firmwareVersion || t.detail.noFirmware}</Badge>
-                    {canDeleteDevices ? (
-                      <Button type="button" size="sm" variant="destructive" onClick={() => setIsDeleteDialogOpen(true)} disabled={deleteDeviceMutation.isPending}>
-                        {t.detail.deleteDevice}
-                      </Button>
-                    ) : null}
-                    <Button type="button" size="sm" variant="ghost" onClick={() => setSelectedDeviceId(null)}>
-                      {t.detail.removeSelection}
-                    </Button>
-                  </div>
-                  {deleteDeviceMutation.error ? (
-                    <div className="mt-4 rounded-2xl border border-destructive/20 bg-destructive/5 p-3 text-sm text-destructive">
-                      {t.detail.deleteError(getErrorMessage(deleteDeviceMutation.error))}
-                    </div>
-                  ) : null}
-                  <div className="mt-4 rounded-2xl border border-border/70 bg-white/80 p-4">
-                    <p className="text-sm font-medium text-foreground">{t.detail.quickLinks}</p>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      {t.detail.quickLinksHint(selectedDevice.name)}
-                    </p>
-                    <div className="mt-3 flex flex-wrap gap-3">
-                      <Link
-                        href={buildDeviceRelationHref("/games", selectedDevice)}
-                        className={buttonVariants({ variant: "outline", size: "sm" })}
-                      >
-                        {t.detail.gamesLink}
-                      </Link>
-                      <Link
-                        href={buildDeviceRelationHref("/syncs", selectedDevice)}
-                        className={buttonVariants({ variant: "outline", size: "sm" })}
-                      >
-                        {t.detail.syncsLink}
-                      </Link>
-                    </div>
-                  </div>
-                  {isTeacherView || isDirectorView ? (
-                    <div className="mt-4 rounded-2xl bg-white/80 p-4 text-sm text-muted-foreground">
-                      <p className="font-medium text-foreground">{isTeacherView ? t.detail.whatToCheckFirst : t.detail.coordinationSignals}</p>
-                      {selectedDevice.reviewReasons.length ? (
-                        <ul className="mt-2 space-y-1">
-                          {selectedDevice.reviewReasons.map((reason) => (
-                            <li key={reason}>• {reason}</li>
-                          ))}
-                        </ul>
-                      ) : (
-                        <p className="mt-2">
-                          {isTeacherView
-                            ? t.detail.teacherOk
-                            : t.detail.directorOk}
-                        </p>
-                      )}
-                    </div>
-                  ) : null}
-                </div>
-
-                <DeviceEditorPanel
-                  key={`${selectedDevice.id}:${scopedInstitutionId || "global"}`}
-                  selectedDevice={selectedDevice}
-                  scopedInstitutionId={scopedInstitutionId}
-                  institutions={institutions.map((institution) => ({ id: institution.id, name: institution.name }))}
-                  users={users.map((user) => ({
-                    id: user.id,
-                    fullName: user.fullName,
-                    email: user.email,
-                    educationalCenterId: user.educationalCenterId,
-                  }))}
-                  token={tokens?.accessToken}
-                  canUpdateDevices={canUpdateDevices}
-                  onUpdated={(deviceId) => setSelectedDeviceId(deviceId)}
-                />
-              </>
-            )}
+            ) : null}
           </CardContent>
         </Card>
       </div>
-
-      <DeleteRecordDialog
-        open={isDeleteDialogOpen}
-        onClose={() => setIsDeleteDialogOpen(false)}
-        onConfirm={handleDeleteSelectedDevice}
-        isPending={deleteDeviceMutation.isPending}
-        title={selectedDevice ? `${t.detail.deleteDevice} ${selectedDevice.name}` : t.detail.deleteDevice}
-        description={selectedDevice
-          ? language === "en"
-            ? "The selected device will stop appearing in visible modules and related cross-links. Confirm only if you want to execute the real deletion."
-            : language === "pt"
-            ? "O dispositivo selecionado deixará de aparecer nos módulos visíveis e em seus cruzamentos relacionados. Confirme apenas se quiser executar a exclusão real."
-            : "El dispositivo seleccionado dejará de aparecer en los módulos visibles y en sus cruces relacionados. Confirmá solo si querés ejecutar la eliminación real."
-          : language === "en"
-          ? "Confirm deletion of the selected device."
-          : language === "pt"
-          ? "Confirme a exclusão do dispositivo selecionado."
-          : "Confirmá la eliminación del dispositivo seleccionado."}
-        confirmLabel={language === "en" ? "Yes, delete device" : language === "pt" ? "Sim, excluir dispositivo" : "Sí, eliminar dispositivo"}
-      />
     </div>
   );
 }

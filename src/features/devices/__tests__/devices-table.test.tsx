@@ -166,7 +166,7 @@ describe("DevicesTable", () => {
     cleanup();
   });
 
-  it("shows institution-admin read-only mode when update permission is missing", () => {
+  it("opens the dedicated device detail page preserving the overview context", () => {
     renderDevicesTable();
 
     expect(screen.getByRole("heading", { name: "Dispositivos" })).toBeInTheDocument();
@@ -174,8 +174,8 @@ describe("DevicesTable", () => {
 
     fireEvent.click(screen.getByText("MagicBox Aula 1"));
 
-    expect(screen.getByRole("button", { name: "Edición bloqueada" })).toBeDisabled();
-    expect(screen.getByText(/Detalle y edición/i)).toBeInTheDocument();
+    expect(routerPushMock).toHaveBeenCalledWith("/devices/detail?deviceRecordId=device-1&institutionId=ec-1");
+    expect(screen.getByText(/Detalle dedicado del dispositivo/i)).toBeInTheDocument();
   });
 
   it("filters devices through the operational focus segments", () => {
@@ -349,16 +349,16 @@ describe("DevicesTable", () => {
     expect(screen.queryAllByText("MagicBox Aula 2")).toHaveLength(0);
   });
 
-  it("adds quick links from the selected device to games and syncs", () => {
+  it("preserves linked owner filters when opening the dedicated device detail", () => {
+    currentSearch = "ownerUserId=user-1&ownerUserName=Ana%20Admin";
+
     renderDevicesTable();
 
     fireEvent.click(screen.getByText("MagicBox Aula 1"));
 
-    const gamesLink = screen.getByRole("link", { name: /Ver partidas del dispositivo/i });
-    const syncsLink = screen.getByRole("link", { name: /Ver syncs del dispositivo/i });
-
-    expect(gamesLink).toHaveAttribute("href", "/games?bleDeviceId=device-1&deviceId=mb-1&deviceName=MagicBox+Aula+1");
-    expect(syncsLink).toHaveAttribute("href", "/syncs?bleDeviceId=device-1&deviceId=mb-1&deviceName=MagicBox+Aula+1");
+    expect(routerPushMock).toHaveBeenCalledWith(
+      "/devices/detail?deviceRecordId=device-1&institutionId=ec-1&ownerUserId=user-1&ownerUserName=Ana+Admin",
+    );
   });
 
   it("clarifies teacher access and visible activity per device", () => {
@@ -488,11 +488,7 @@ describe("DevicesTable", () => {
 
     fireEvent.click(screen.getByText("MagicBox Aula 1"));
 
-    expect(screen.getByText(/Syncs visibles: 1/i)).toBeInTheDocument();
-    expect(screen.getByText(/Partidas visibles: 1/i)).toBeInTheDocument();
-    expect(screen.getByText(/Contexto: owner directo/i)).toBeInTheDocument();
-    expect(screen.getAllByText(/listo para aula/i).length).toBeGreaterThan(0);
-    expect(screen.getByText(/Qué mirar primero/i)).toBeInTheDocument();
+    expect(routerPushMock).toHaveBeenCalledWith("/devices/detail?deviceRecordId=device-1&institutionId=ec-1");
   });
 
   it("frames director device review as institutional coordination", () => {
@@ -548,12 +544,6 @@ describe("DevicesTable", () => {
 
     fireEvent.click(screen.getByText("MagicBox Aula 1"));
 
-    expect(screen.getByText(/Detalle de coordinación/i)).toBeInTheDocument();
-    expect(screen.getAllByText(/requiere seguimiento/i).length).toBeGreaterThan(0);
-    expect(screen.getByText(/Señales de coordinación/i)).toBeInTheDocument();
-    expect(screen.getByText(/sin responsable claro/i)).toBeInTheDocument();
-    expect(screen.getByText(/sin status operativo/i)).toBeInTheDocument();
-    expect(screen.getByText(/sin metadata visible/i)).toBeInTheDocument();
-    expect(screen.getAllByText(/sin sync visible/i).length).toBeGreaterThan(0);
+    expect(routerPushMock).toHaveBeenCalledWith("/devices/detail?deviceRecordId=device-1&institutionId=ec-1");
   });
 });
