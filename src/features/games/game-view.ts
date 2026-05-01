@@ -87,6 +87,39 @@ export function buildTurnOutcomeSeries(turns: GameTurnRecord[]) {
     }));
 }
 
+export function buildTurnOutcomeSeriesByParticipant(game: Pick<GameRowRecord, "id" | "players" | "turns">) {
+  const groups = new Map<
+    string,
+    {
+      participantLabel: string;
+      participantKey: string;
+      turns: GameTurnRecord[];
+    }
+  >();
+
+  for (const turn of [...game.turns].sort((a, b) => a.turnNumber - b.turnNumber)) {
+    const participantKey = turn.gamePlayerId || turn.externalPlayerUid || turn.studentId || `turn-${turn.id}`;
+    const existing = groups.get(participantKey);
+
+    if (existing) {
+      existing.turns.push(turn);
+      continue;
+    }
+
+    groups.set(participantKey, {
+      participantKey,
+      participantLabel: resolveTurnPlayerLabel(game, turn.gamePlayerId, turn.externalPlayerUid, turn.studentId),
+      turns: [turn],
+    });
+  }
+
+  return Array.from(groups.values()).map((group) => ({
+    participantKey: group.participantKey,
+    participantLabel: group.participantLabel,
+    series: buildTurnOutcomeSeries(group.turns),
+  }));
+}
+
 export function buildSyncRelationHref(game: { bleDeviceId?: string | null; device?: { deviceId?: string | null; name?: string | null } | null }) {
   const params = new URLSearchParams();
   if (game.bleDeviceId) params.set("bleDeviceId", game.bleDeviceId);

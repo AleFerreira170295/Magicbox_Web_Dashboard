@@ -114,15 +114,28 @@ describe("GameDetailPage", () => {
                 updatedAt: null,
                 raw: {},
               },
+              {
+                id: "player-2",
+                gameDataId: "game-1",
+                studentId: null,
+                externalPlayerUid: "guest-2",
+                playerName: "Mateo",
+                playerSource: "manual",
+                position: 2,
+                cardColor: "red",
+                createdAt: null,
+                updatedAt: null,
+                raw: {},
+              },
             ],
             turns: Array.from({ length: 11 }, (_, index) => ({
               id: `turn-${index + 1}`,
               gameDataId: "game-1",
-              studentId: "student-1",
-              gamePlayerId: "player-1",
-              externalPlayerUid: null,
+              studentId: index % 2 === 0 ? "student-1" : null,
+              gamePlayerId: index % 2 === 0 ? "player-1" : "player-2",
+              externalPlayerUid: index % 2 === 0 ? null : "guest-2",
               turnNumber: index + 1,
-              position: 1,
+              position: index % 2 === 0 ? 1 : 2,
               cardId: `card-${index + 1}`,
               success: index % 2 === 0,
               difficulty: "medium",
@@ -241,6 +254,10 @@ describe("GameDetailPage", () => {
       "/games?q=animal&access=shared&ownerUserId=user-1&ownerUserName=Ines+Admin&page=2&pageSize=20",
     );
     expect(screen.getByText("Aciertos y errores por turno")).toBeInTheDocument();
+    expect(screen.getAllByText("Luna").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Mateo").length).toBeGreaterThan(0);
+    expect(screen.getByText(/6 turnos registrados/i)).toBeInTheDocument();
+    expect(screen.getByText(/5 turnos registrados/i)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /Ver syncs del dispositivo/i })).toHaveAttribute(
       "href",
       "/syncs?bleDeviceId=device-1&deviceId=mb-1&deviceName=MagicBox+Aula+1",

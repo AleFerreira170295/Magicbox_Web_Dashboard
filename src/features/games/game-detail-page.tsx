@@ -14,7 +14,7 @@ import { useAuth } from "@/features/auth/auth-context";
 import { useDevices } from "@/features/devices/api";
 import { useGames } from "@/features/games/api";
 import { buildGameDetailHref, buildGamesOverviewHref, type GamesOverviewRouteState } from "@/features/games/game-route";
-import { buildGameRows, buildSyncRelationHref, buildTurnOutcomeSeries, resolveTurnPlayerLabel } from "@/features/games/game-view";
+import { buildGameRows, buildSyncRelationHref, buildTurnOutcomeSeriesByParticipant, resolveTurnPlayerLabel } from "@/features/games/game-view";
 import { useInstitutions } from "@/features/institutions/api";
 import { cn, formatDateTime, getErrorMessage } from "@/lib/utils";
 
@@ -51,7 +51,10 @@ export function GameDetailPage({
     return gameRows.filter((game) => game.id !== selectedGame.id && game.educationalCenterId === selectedGame.educationalCenterId && game.bleDeviceId !== selectedGame.bleDeviceId);
   }, [gameRows, selectedGame]);
 
-  const turnOutcomeSeries = useMemo(() => buildTurnOutcomeSeries(selectedGame?.turns ?? []), [selectedGame?.turns]);
+  const turnOutcomeSeriesByParticipant = useMemo(() => {
+    if (!selectedGame) return [];
+    return buildTurnOutcomeSeriesByParticipant(selectedGame);
+  }, [selectedGame]);
   const turnsPagination = useListPagination(selectedGame?.turns ?? [], 10, 1);
   const participantsPagination = useListPagination(selectedGame?.players ?? [], 10, 1);
   const sameDevicePagination = useListPagination(sameDeviceGames, 10, 1);
@@ -258,24 +261,40 @@ export function GameDetailPage({
                   Aciertos y errores por turno
                 </CardTitle>
                 <CardDescription>
-                  Cada barra muestra si ese turno terminó en acierto o error, en el orden real de la partida.
+                  Cada participante tiene su propio gráfico para leer su secuencia de aciertos y errores turno a turno.
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                {turnOutcomeSeries.length === 0 ? (
+                {turnOutcomeSeriesByParticipant.length === 0 ? (
                   <div className="rounded-2xl bg-background/70 p-4 text-sm text-muted-foreground">Sin turnos persistidos para graficar.</div>
                 ) : (
-                  <div className="h-80 w-full">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={turnOutcomeSeries} margin={{ top: 8, right: 12, left: -12, bottom: 0 }}>
-                        <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                        <XAxis dataKey="label" interval="preserveStartEnd" minTickGap={20} />
-                        <YAxis allowDecimals={false} domain={[0, 1]} />
-                        <Tooltip />
-                        <Bar dataKey="aciertos" fill="#16a34a" radius={[6, 6, 0, 0]} />
-                        <Bar dataKey="errores" fill="#dc2626" radius={[6, 6, 0, 0]} />
-                      </BarChart>
-                    </ResponsiveContainer>
+                  <div className="space-y-4">
+                    {turnOutcomeSeriesByParticipant.map((participantSeries) => (
+                      <div key={participantSeries.participantKey} className="rounded-3xl border border-border/70 bg-background/70 p-4">
+                        <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+                          <div>
+                            <p className="text-sm font-semibold text-foreground">{participantSeries.participantLabel}</p>
+                            <p className="text-xs text-muted-foreground">{participantSeries.series.length} turnos registrados</p>
+                          </div>
+                          <div className="flex flex-wrap gap-2">
+                            <Badge variant="outline">Aciertos {participantSeries.series.filter((item) => item.aciertos > 0).length}</Badge>
+                            <Badge variant="outline">Errores {participantSeries.series.filter((item) => item.errores > 0).length}</Badge>
+                          </div>
+                        </div>
+                        <div className="h-64 w-full">
+                          <ResponsiveContainer width="100%" height="100%">
+                            <BarChart data={participantSeries.series} margin={{ top: 8, right: 12, left: -12, bottom: 0 }}>
+                              <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                              <XAxis dataKey="label" interval="preserveStartEnd" minTickGap={20} />
+                              <YAxis allowDecimals={false} domain={[0, 1]} />
+                              <Tooltip />
+                              <Bar dataKey="aciertos" fill="#16a34a" radius={[6, 6, 0, 0]} />
+                              <Bar dataKey="errores" fill="#dc2626" radius={[6, 6, 0, 0]} />
+                            </BarChart>
+                          </ResponsiveContainer>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 )}
               </CardContent>
