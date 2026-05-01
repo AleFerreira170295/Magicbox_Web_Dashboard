@@ -19,10 +19,59 @@ import { useAuth } from "@/features/auth/auth-context";
 import { hasAnyUserPermission } from "@/features/auth/permission-contract";
 import { useClassGroups } from "@/features/class-groups/api";
 import { useGames } from "@/features/games/api";
+import { useLanguage, type AppLanguage } from "@/features/i18n/i18n-context";
 import { useInstitutions } from "@/features/institutions/api";
 import { deleteStudent, useAllStudents } from "@/features/students/api";
 import { buildInstitutionStudentDetailHref, buildInstitutionsOverviewHref } from "@/features/institutions/student-route";
 import { cn, formatDateTime, formatDurationSeconds, getErrorMessage } from "@/lib/utils";
+
+const institutionStudentMessages: Record<AppLanguage, {
+  header: {
+    eyebrow: string;
+    fallbackTitle: string;
+    descriptionDefault: string;
+    descriptionSelected: (group: string) => string;
+    deleteStudent: string;
+    back: string;
+  };
+  states: {
+    missingContext: string;
+    fatalError: (message: string) => string;
+    notFound: string;
+    deleteError: (message: string) => string;
+    withActivity: string;
+    withoutGames: string;
+    playerProfile: string;
+    noParticipation: string;
+    noAddress: string;
+    created: string;
+    updated: string;
+    institution: string;
+    acl: string;
+  };
+  sections: {
+    analytics: string;
+    context: string;
+    turnsByDate: string;
+    participatedGames: string;
+  };
+}> = {
+  es: {
+    header: { eyebrow: "Institutions · detalle interno", fallbackTitle: "Detalle por estudiante", descriptionDefault: "Entrá a un estudiante desde Institutions para revisar su información y comportamiento de juego en una pantalla dedicada.", descriptionSelected: (group) => `Vista interna del alumno dentro de ${group}, con analítica temporal, métricas y partidas registradas.`, deleteStudent: "Eliminar estudiante", back: "Volver a Institutions" },
+    states: { missingContext: "Falta contexto para abrir este detalle. Volvé a Institutions y entrá nuevamente desde la fila del estudiante.", fatalError: (message) => `No pude preparar la vista del estudiante. ${message}`, notFound: "No encontré el estudiante solicitado dentro del grupo actual. Puede haber cambiado el grupo, el filtro base o la carga de datos.", deleteError: (message) => `No pude eliminar el estudiante. ${message}`, withActivity: "Con actividad", withoutGames: "Sin partidas registradas", playerProfile: "Perfil de jugador", noParticipation: "Todavía sin participación registrada", noAddress: "Sin dirección cargada", created: "Creado", updated: "Actualizado", institution: "Institución", acl: "Permisos ACL" },
+    sections: { analytics: "Analítica temporal", context: "Contexto y navegación", turnsByDate: "Turnos por fecha", participatedGames: "Partidas en las que participó" },
+  },
+  en: {
+    header: { eyebrow: "Institutions · internal detail", fallbackTitle: "Student detail", descriptionDefault: "Open a student from Institutions to review their information and gameplay behavior on a dedicated screen.", descriptionSelected: (group) => `Internal student view inside ${group}, with time analytics, metrics, and recorded games.`, deleteStudent: "Delete student", back: "Back to Institutions" },
+    states: { missingContext: "Missing context to open this detail. Go back to Institutions and enter again from the student row.", fatalError: (message) => `Couldn't prepare the student view. ${message}`, notFound: "I couldn't find the requested student inside the current group. The group, base filter, or loaded data may have changed.", deleteError: (message) => `Couldn't delete the student. ${message}`, withActivity: "With activity", withoutGames: "Without recorded games", playerProfile: "Player profile", noParticipation: "No recorded participation yet", noAddress: "No address loaded", created: "Created", updated: "Updated", institution: "Institution", acl: "ACL permissions" },
+    sections: { analytics: "Time analytics", context: "Context and navigation", turnsByDate: "Turns by date", participatedGames: "Games they joined" },
+  },
+  pt: {
+    header: { eyebrow: "Institutions · detalhe interno", fallbackTitle: "Detalhe por estudante", descriptionDefault: "Entre em um estudante a partir de Institutions para revisar suas informações e comportamento de jogo em uma tela dedicada.", descriptionSelected: (group) => `Visão interna do aluno dentro de ${group}, com analítica temporal, métricas e partidas registradas.`, deleteStudent: "Excluir estudante", back: "Voltar para Institutions" },
+    states: { missingContext: "Falta contexto para abrir este detalhe. Volte a Institutions e entre novamente pela linha do estudante.", fatalError: (message) => `Não consegui preparar a visão do estudante. ${message}`, notFound: "Não encontrei o estudante solicitado dentro do grupo atual. O grupo, o filtro base ou a carga de dados podem ter mudado.", deleteError: (message) => `Não consegui excluir o estudante. ${message}`, withActivity: "Com atividade", withoutGames: "Sem partidas registradas", playerProfile: "Perfil de jogador", noParticipation: "Ainda sem participação registrada", noAddress: "Sem endereço carregado", created: "Criado", updated: "Atualizado", institution: "Instituição", acl: "Permissões ACL" },
+    sections: { analytics: "Analítica temporal", context: "Contexto e navegação", turnsByDate: "Turnos por data", participatedGames: "Partidas das quais participou" },
+  },
+};
 
 type AnalyticsScope = "group" | "student";
 
@@ -57,6 +106,8 @@ export function InstitutionStudentProfilePage({
   groupId?: string | null;
   studentId?: string | null;
 }) {
+  const { language } = useLanguage();
+  const t = institutionStudentMessages[language];
   const { tokens, user: currentUser } = useAuth();
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -202,11 +253,11 @@ export function InstitutionStudentProfilePage({
     const otherEntries = studentPerformanceRows.filter((entry) => entry.student.id !== selectedStudent?.id);
     return currentEntry ? [currentEntry, ...otherEntries] : otherEntries;
   }, [selectedStudent?.id, studentPerformanceRows]);
-  const selectedStudentStatus = (selectedStudentPerformance?.gamesCount ?? 0) > 0 ? "Con actividad" : "Sin partidas registradas";
+  const selectedStudentStatus = (selectedStudentPerformance?.gamesCount ?? 0) > 0 ? t.states.withActivity : t.states.withoutGames;
   const selectedStudentStatusVariant = (selectedStudentPerformance?.gamesCount ?? 0) > 0 ? "success" : "outline";
   const selectedStudentLastParticipationLabel = selectedStudentPerformance?.lastParticipation
     ? formatDateTime(selectedStudentPerformance.lastParticipation)
-    : "Todavía sin participación registrada";
+    : t.states.noParticipation;
   const selectedStudentVisibleTurns = selectedStudentGameRows.reduce((sum, game) => sum + game.turnCount, 0);
 
   const missingRequiredIds = !institutionId || !groupId || !studentId;
@@ -238,11 +289,11 @@ export function InstitutionStudentProfilePage({
   return (
     <div className="space-y-6">
       <SectionHeader
-        eyebrow="Institutions · detalle interno"
-        title={selectedStudent ? selectedStudent.fullName : "Detalle por estudiante"}
+        eyebrow={t.header.eyebrow}
+        title={selectedStudent ? selectedStudent.fullName : t.header.fallbackTitle}
         description={selectedStudent
-          ? `Vista interna del alumno dentro de ${selectedGroup?.name || "su grupo"}, con analítica temporal, métricas y partidas registradas.`
-          : "Entrá a un estudiante desde Institutions para revisar su información y comportamiento de juego en una pantalla dedicada."}
+          ? t.header.descriptionSelected(selectedGroup?.name || (language === "en" ? "their group" : language === "pt" ? "seu grupo" : "su grupo"))
+          : t.header.descriptionDefault}
         actions={
           <div className="flex flex-wrap items-center gap-2">
             {selectedStudent && canDeleteStudent ? (
@@ -252,12 +303,12 @@ export function InstitutionStudentProfilePage({
                 className={cn(buttonVariants({ variant: "destructive" }))}
                 disabled={deleteStudentMutation.isPending}
               >
-                Eliminar estudiante
+                {t.header.deleteStudent}
               </button>
             ) : null}
             <Link href={backHref} className={cn(buttonVariants({ variant: "outline" }))}>
               <ArrowLeft className="size-4" />
-              Volver a Institutions
+              {t.header.back}
             </Link>
           </div>
         }
@@ -266,13 +317,13 @@ export function InstitutionStudentProfilePage({
       {missingRequiredIds ? (
         <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
           <CardContent className="p-6 text-sm text-muted-foreground">
-            Falta contexto para abrir este detalle. Volvé a Institutions y entrá nuevamente desde la fila del estudiante.
+            {t.states.missingContext}
           </CardContent>
         </Card>
       ) : hasFatalError ? (
         <Card className="border-destructive/30 bg-destructive/5 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
           <CardContent className="p-6 text-sm text-destructive">
-            No pude preparar la vista del estudiante. {getErrorMessage(hasFatalError)}
+            {t.states.fatalError(getErrorMessage(hasFatalError))}
           </CardContent>
         </Card>
       ) : isLoadingData ? (
@@ -284,7 +335,7 @@ export function InstitutionStudentProfilePage({
       ) : !selectedStudent ? (
         <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
           <CardContent className="p-6 text-sm text-muted-foreground">
-            No encontré el estudiante solicitado dentro del grupo actual. Puede haber cambiado el grupo, el filtro base o la carga de datos.
+            {t.states.notFound}
           </CardContent>
         </Card>
       ) : (
@@ -292,7 +343,7 @@ export function InstitutionStudentProfilePage({
           {deleteStudentMutation.error ? (
             <Card className="border-destructive/30 bg-destructive/5 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
               <CardContent className="p-6 text-sm text-destructive">
-                No pude eliminar el estudiante. {getErrorMessage(deleteStudentMutation.error)}
+                {t.states.deleteError(getErrorMessage(deleteStudentMutation.error))}
               </CardContent>
             </Card>
           ) : null}
@@ -311,7 +362,7 @@ export function InstitutionStudentProfilePage({
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
                       <h2 className="truncate text-2xl font-semibold tracking-[-0.03em] text-foreground">{selectedStudent.fullName}</h2>
-                      <Badge variant="secondary">Perfil de jugador</Badge>
+                      <Badge variant="secondary">{t.states.playerProfile}</Badge>
                       <Badge variant={selectedStudentStatusVariant}>{selectedStudentStatus}</Badge>
                     </div>
                     <div className="mt-3 flex flex-wrap gap-2">
@@ -355,7 +406,7 @@ export function InstitutionStudentProfilePage({
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-lg">
                   <UserRound className="size-5 text-primary" />
-                  Contexto y navegación
+                  {t.sections.context}
                 </CardTitle>
                 <CardDescription>
                   Ves todos los perfiles del grupo en un único bloque con scroll, y podés saltar entre ellos sin volver a la pantalla principal.
@@ -430,7 +481,7 @@ export function InstitutionStudentProfilePage({
             <CardHeader>
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                  <CardTitle>Analítica temporal</CardTitle>
+                <CardTitle>{t.sections.analytics}</CardTitle>
                   <CardDescription>
                     {analyticsTitle}: {analyticsDescription}
                   </CardDescription>
@@ -447,7 +498,7 @@ export function InstitutionStudentProfilePage({
             </CardHeader>
             <CardContent className="grid gap-4 xl:grid-cols-3">
               <div className="rounded-2xl bg-background/70 p-4">
-                <p className="text-sm font-medium text-foreground">Turnos por fecha</p>
+                <p className="text-sm font-medium text-foreground">{t.sections.turnsByDate}</p>
                 <p className="mt-1 text-sm text-muted-foreground">Cantidad de turnos registrados a lo largo del tiempo.</p>
                 <div className="mt-4 h-60">
                   {analyticsSeries.length > 0 ? (
@@ -516,7 +567,7 @@ export function InstitutionStudentProfilePage({
 
           <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
             <CardHeader>
-              <CardTitle>Partidas en las que participó</CardTitle>
+              <CardTitle>{t.sections.participatedGames}</CardTitle>
               <CardDescription>
                 Listado operativo para ver cuándo jugó, cuántos turnos tuvo y cómo rindió en cada partida.
               </CardDescription>

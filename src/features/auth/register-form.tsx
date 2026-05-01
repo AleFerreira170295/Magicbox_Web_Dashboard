@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { register as registerAccount } from "@/features/auth/auth-api";
+import { useLanguage } from "@/features/i18n/i18n-context";
 import {
   validateEmail,
   validateName,
@@ -55,6 +56,8 @@ type RegisterFormValues = {
 
 export function RegisterForm() {
   const router = useRouter();
+  const { t } = useLanguage();
+  const validation = t.auth.validation;
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
   const form = useForm<RegisterFormValues>({
@@ -104,12 +107,12 @@ export function RegisterForm() {
   return (
     <div className="space-y-6">
       <div className="rounded-3xl border border-sky-200 bg-sky-50 px-5 py-4 text-sm leading-6 text-sky-900">
-        El alta autónoma está pensada solo para cuentas <span className="font-semibold">family</span>. Si necesitás otro rol, debe crearlo un administrador.
+        {t.auth.registerForm.autonomousNotice}
       </div>
 
       {done ? (
         <div className="rounded-3xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm text-emerald-800">
-          Cuenta creada. Ya podés iniciar sesión con esos datos.
+          {t.auth.registerForm.success}
         </div>
       ) : null}
 
@@ -120,26 +123,26 @@ export function RegisterForm() {
       <form className="space-y-4" onSubmit={form.handleSubmit(onSubmit)}>
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-2">
-            <Label htmlFor="firstName">Nombre</Label>
-            <Input id="firstName" autoComplete="given-name" {...form.register("firstName", { validate: (value) => validateName(value) })} />
+            <Label htmlFor="firstName">{t.auth.registerForm.firstName}</Label>
+            <Input id="firstName" autoComplete="given-name" {...form.register("firstName", { validate: (value) => validateName(value, validation) })} />
             {form.formState.errors.firstName ? <p className="text-sm text-destructive">{form.formState.errors.firstName.message}</p> : null}
           </div>
           <div className="space-y-2">
-            <Label htmlFor="lastName">Apellido</Label>
-            <Input id="lastName" autoComplete="family-name" {...form.register("lastName", { validate: (value) => validateName(value) })} />
+            <Label htmlFor="lastName">{t.auth.registerForm.lastName}</Label>
+            <Input id="lastName" autoComplete="family-name" {...form.register("lastName", { validate: (value) => validateName(value, validation) })} />
             {form.formState.errors.lastName ? <p className="text-sm text-destructive">{form.formState.errors.lastName.message}</p> : null}
           </div>
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="email">Email</Label>
-          <Input id="email" type="email" autoComplete="email" {...form.register("email", { validate: (value) => validateEmail(value) })} />
+          <Label htmlFor="email">{t.auth.registerForm.email}</Label>
+          <Input id="email" type="email" autoComplete="email" {...form.register("email", { validate: (value) => validateEmail(value, validation) })} />
           {form.formState.errors.email ? <p className="text-sm text-destructive">{form.formState.errors.email.message}</p> : null}
         </div>
 
         <div className="grid gap-3 sm:grid-cols-[132px_minmax(0,1fr)]">
           <div className="space-y-2">
-            <Label htmlFor="countryCode">País</Label>
+            <Label htmlFor="countryCode">{t.auth.registerForm.country}</Label>
             <select
               id="countryCode"
               className="flex h-11 w-full rounded-2xl border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
@@ -153,7 +156,7 @@ export function RegisterForm() {
             </select>
           </div>
           <div className="space-y-2">
-            <Label htmlFor="phoneNumber">Teléfono</Label>
+            <Label htmlFor="phoneNumber">{t.auth.registerForm.phone}</Label>
             <Input
               id="phoneNumber"
               autoComplete="tel"
@@ -165,44 +168,45 @@ export function RegisterForm() {
                     selectedCountry.minDigits,
                     selectedCountry.maxDigits,
                     selectedCountry.name,
+                    validation,
                   ),
               })}
             />
-            <p className="text-xs text-muted-foreground">Usamos el mismo backend y la misma base de usuarios que la app móvil.</p>
+            <p className="text-xs text-muted-foreground">{t.auth.registerForm.phoneHelp}</p>
             {form.formState.errors.phoneNumber ? <p className="text-sm text-destructive">{form.formState.errors.phoneNumber.message}</p> : null}
           </div>
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="password">Contraseña</Label>
-          <Input id="password" type="password" autoComplete="new-password" {...form.register("password", { validate: (value) => validateSecureBackendPassword(value) })} />
+          <Label htmlFor="password">{t.auth.registerForm.password}</Label>
+          <Input id="password" type="password" autoComplete="new-password" {...form.register("password", { validate: (value) => validateSecureBackendPassword(value, validation) })} />
           {form.formState.errors.password ? <p className="text-sm text-destructive">{form.formState.errors.password.message}</p> : null}
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="confirmPassword">Confirmar contraseña</Label>
+          <Label htmlFor="confirmPassword">{t.auth.registerForm.confirmPassword}</Label>
           <Input
             id="confirmPassword"
             type="password"
             autoComplete="new-password"
             {...form.register("confirmPassword", {
-              validate: (value) => validatePasswordConfirmation(value, form.getValues("password")),
+              validate: (value) => validatePasswordConfirmation(value, form.getValues("password"), validation),
             })}
           />
           {form.formState.errors.confirmPassword ? <p className="text-sm text-destructive">{form.formState.errors.confirmPassword.message}</p> : null}
         </div>
 
         <Button className="w-full" type="submit" disabled={form.formState.isSubmitting}>
-          {form.formState.isSubmitting ? "Creando..." : "Crear usuario"}
+          {form.formState.isSubmitting ? t.auth.registerForm.submitting : t.auth.registerForm.submit}
         </Button>
       </form>
 
       <div className="flex items-center justify-between gap-3 text-sm">
         <Link href="/login" className="font-medium text-primary hover:underline">
-          Ya tengo cuenta
+          {t.auth.registerForm.alreadyHaveAccount}
         </Link>
         <button type="button" className="font-medium text-primary hover:underline" onClick={() => router.push("/login")}>
-          Ir al login
+          {t.auth.registerForm.goToLogin}
         </button>
       </div>
     </div>

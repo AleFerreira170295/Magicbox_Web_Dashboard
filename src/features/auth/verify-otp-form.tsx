@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { forgotPassword, verifyOtpCode } from "@/features/auth/auth-api";
+import { useLanguage } from "@/features/i18n/i18n-context";
 import { getErrorMessage } from "@/lib/utils";
 
 const OTP_LENGTH = 6;
@@ -12,6 +13,7 @@ const OTP_LENGTH = 6;
 export function VerifyOtpForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { t } = useLanguage();
   const email = searchParams.get("email") || "";
   const [digits, setDigits] = useState<string[]>(Array.from({ length: OTP_LENGTH }, () => ""));
   const [error, setError] = useState<string | null>(null);
@@ -74,7 +76,7 @@ export function VerifyOtpForm() {
   return (
     <div className="space-y-6">
       <div className="rounded-3xl border border-sky-100 bg-sky-50 px-5 py-4 text-sm leading-6 text-sky-900">
-        Si no lo ves en tu bandeja, revisá spam. El código expira rápido.
+        {t.auth.verifyOtpForm.notice}
       </div>
 
       {error ? (
@@ -82,8 +84,8 @@ export function VerifyOtpForm() {
       ) : null}
 
       <div className="space-y-2 text-sm text-muted-foreground">
-        <p>Enviamos un código a:</p>
-        <p className="font-medium text-foreground">{email || "tu correo"}</p>
+        <p>{t.auth.verifyOtpForm.sentTo}</p>
+        <p className="font-medium text-foreground">{email || t.auth.verifyOtpForm.fallbackEmail}</p>
       </div>
 
       <div className="grid grid-cols-6 gap-2">
@@ -109,19 +111,19 @@ export function VerifyOtpForm() {
 
       <div className="space-y-3">
         <Button className="w-full" type="button" onClick={submit} disabled={!complete || busy}>
-          {busy ? "Continuando..." : "Continuar"}
+          {busy ? t.auth.verifyOtpForm.submitting : t.auth.verifyOtpForm.submit}
         </Button>
         <Button className="w-full" type="button" variant="outline" onClick={resendCode} disabled={busy}>
-          Reenviar código
+          {t.auth.verifyOtpForm.resend}
         </Button>
       </div>
 
       <div className="flex items-center justify-between gap-3 text-sm">
         <Link href="/login" className="font-medium text-primary hover:underline">
-          Volver al login
+          {t.auth.verifyOtpForm.backToLogin}
         </Link>
         <Link href="/forgot-password" className="font-medium text-primary hover:underline">
-          Cambiar email
+          {t.auth.verifyOtpForm.changeEmail}
         </Link>
       </div>
     </div>

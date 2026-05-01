@@ -46,9 +46,38 @@ import { useInstitutions } from "@/features/institutions/api";
 import { useProfilesOverview } from "@/features/profiles/api";
 import { useSyncSessions } from "@/features/syncs/api";
 import type { SyncSessionRecord } from "@/features/syncs/types";
+import { useLanguage, type AppLanguage } from "@/features/i18n/i18n-context";
 import { useUsers } from "@/features/users/api";
 import type { UserRecord } from "@/features/users/types";
 import { getErrorMessage } from "@/lib/utils";
+
+const superadminMessages: Record<AppLanguage, {
+  scope: { admin: string; government: string; institutionAdmin: string; director: string; operation: string };
+  header: { title: string; description: string };
+  quickLook: { title: string; description: string; institutions: string; institutionsHint: (count: number) => string; devices: string; devicesHint: (withoutStatus: number, withoutOwner: number) => string; syncs: string; syncsHint: (syncsRaw: string, profilesBound: string) => string; review: string; attention: string; follow: string; ok: string };
+  metrics: { users: string; usersHint: string; institutions: string; institutionsHint: string; devices: string; devicesHint: (home: number, institution: number) => string; syncs: string; syncsHint: (raw: string) => string; games: string; gamesHint: (avgPlayers: string) => string; health: string; healthHint: (version: string) => string; profiles: string; profilesHint: (active: number, withSessions: number) => string };
+  detail: { users: string; usersHint: string; institutions: string; institutionsHint: string; devices: string; devicesHint: string; syncs: string; syncsHint: string; games: string; gamesHint: string; profiles: string; profilesHint: string; health: string; healthHint: string; trendTitle: (label: string) => string; trendHint: string; trendSyncs: string; trendSyncsHint: string; trendGames: string; trendGamesHint: string; trendTurns: string; trendTurnsHint: (rate: number) => string; activeProfiles: string; activeProfilesHint: (count: number) => string; boundProfiles: string; boundProfilesHint: string; sessionProfiles: string; sessionProfilesHint: string; unboundProfiles: string; unboundProfilesHint: string; coverageTitle: (label: string) => string; coverageHint: string; usersByRoleTitle: (label: string) => string; usersByRoleHint: string; usersInRole: string; usersByTypeTitle: (label: string) => string; usersByTypeHint: string; usersInType: string; institutionTitle: (label: string) => string; institutionHint: string; readiness: string; degradedChecks: string; backend: (version: string) => string; noDetail: string; check: (index: number) => string };
+  executive: { miniTrends: string; miniTrendsDesc: (rangeLabel: string) => string; trendSyncsPeriod: string; trendSyncsPeriodHint: (count: number) => string; trendGamesPeriod: string; trendGamesPeriodHint: (count: number) => string; recentSuccess: string; recentSuccessHint: (rate: number) => string; comparison: string; comparisonDesc: (window: string) => string; previousPeriod: (value: number) => string; semaphores: string; semaphoresDesc: string };
+  territorial: { smartPresets: string; smartPresetsDesc: string; savedViews: string; savedViewsDesc: string; linkCopied: string; linkError: string; copyLink: string; saveView: string; promptName: string; delete: string; generalView: string; applyPreset: string; noPresets: string; drilldown: string; drilldownDesc: string; exportCsv: string; filterCountry: string; filterState: string; noDrilldown: string; territoryAlerts: string; territoryAlertsDesc: string; noTerritoryAlerts: string; territoryIndex: string; territoryIndexDesc: string; noTerritoryIndex: string; topTerritories: string; topTerritoriesDesc: string; topTerritory: string; noTopTerritories: string; cohorts: string; cohortsDesc: string; roles: string; userTypes: string; noData: string; featuredInstitutions: string; featuredInstitutionsDesc: string; noTerritoryDetail: string; noFeaturedInstitutions: string };
+  summaries: { usage: string; usageDesc: string; turnsGames: string; turnsGamesHint: (turns: number, avg: string) => string; turnsSuccess: string; turnsSuccessHint: (rate: string) => string; dataQuality: string; dataQualityDesc: string; identifiedDevices: string; identifiedDevicesHint: (firmware: string, owner: string) => string; usefulProfiles: string; usefulProfilesHint: (sessions: string, bindings: string) => string; distribution: string; distributionDesc: string; homeVsInstitution: string; homeVsInstitutionHint: (home: number, institution: number) => string; sourceCoverage: string; sourceCoverageHint: (loaded: number, failed: number) => string };
+  charts: { profileCoverage: string; profileCoverageDesc: string; usersByRole: string; usersByRoleDesc: string; usersByType: string; usersByTypeDesc: string; institutionLoad: string; institutionLoadDescSystem: string; institutionLoadDescLocal: string; turns: string };
+  error: (message: string) => string;
+}> = {
+  es: {
+    scope: { admin: "Superadmin", government: "Gobierno", institutionAdmin: "Admin institucional", director: "Dirección", operation: "Operación" },
+    header: { title: "Centro de control MagicBox", description: "Panel principal para leer estado, riesgos y próximos focos sin perderte entre módulos." },
+    quickLook: { title: "Qué mirar primero", description: "Tres atajos para arrancar por riesgo y no por intuición.", institutions: "Instituciones con review pendiente", institutionsHint: (count) => `${count} instituciones marcan \`needs_review\` en el resumen institucional.`, devices: "Dispositivos sin estado u owner", devicesHint: (withoutStatus, withoutOwner) => `${withoutStatus} sin estado explícito y ${withoutOwner} sin owner asociado.`, syncs: "Cobertura de sync y perfiles", syncsHint: (syncsRaw, profilesBound) => `${syncsRaw} de syncs tienen raw disponible y ${profilesBound} de perfiles tienen binding activo.`, review: "Revisar", attention: "Atención", follow: "Seguir", ok: "OK" },
+    metrics: { users: "Usuarios", usersHint: "Padrón actual de usuarios.", institutions: "Instituciones", institutionsHint: "Instituciones incluidas en la vista principal.", devices: "Dispositivos", devicesHint: (home, institution) => `${home} Home y ${institution} institucionales.`, syncs: "Sincronizaciones", syncsHint: (raw) => `${raw} con raw disponible.`, games: "Partidas", gamesHint: (avgPlayers) => `${avgPlayers} jugadores por partida.`, health: "Salud", healthHint: (version) => `Backend ${version}.`, profiles: "Perfiles", profilesHint: (active, withSessions) => `${active} activos y ${withSessions} con sesiones.` },
+    detail: { users: "Detalle de usuarios", usersHint: "Padrón actual de usuarios.", institutions: "Detalle de instituciones", institutionsHint: "Instituciones incluidas en la vista principal.", devices: "Detalle de dispositivos", devicesHint: "Cobertura del parque y su estado.", syncs: "Detalle de sincronizaciones", syncsHint: "Lectura ampliada de cobertura y trazabilidad.", games: "Detalle de partidas", gamesHint: "Movimiento real del sistema.", profiles: "Detalle de perfiles", profilesHint: "Madurez real a nivel perfil.", health: "Detalle de salud", healthHint: "Estado de readiness y checks disponibles en la home.", trendTitle: (label) => `Mini tendencias · ${label}`, trendHint: "Detalle del bucket temporal seleccionado en la serie comparada.", trendSyncs: "Syncs", trendSyncsHint: "Volumen del día/bucket", trendGames: "Partidas", trendGamesHint: "Actividad de sesiones", trendTurns: "Turnos", trendTurnsHint: (rate) => `${rate}% de éxito`, activeProfiles: "Activos", activeProfilesHint: (count) => `${count} perfiles en el recorte`, boundProfiles: "Con binding", boundProfilesHint: "Cobertura activa", sessionProfiles: "Con sesiones", sessionProfilesHint: "Uso observable", unboundProfiles: "Sin binding", unboundProfilesHint: "Brecha por cerrar", coverageTitle: (label) => `Cobertura de perfiles · ${label}`, coverageHint: "Desglose del indicador seleccionado.", usersByRoleTitle: (label) => `Usuarios por rol · ${label}`, usersByRoleHint: "Rol seleccionado dentro de la distribución actual.", usersInRole: "Usuarios en este rol", usersByTypeTitle: (label) => `Usuarios por tipo · ${label}`, usersByTypeHint: "Tipo de usuario seleccionado dentro de la distribución actual.", usersInType: "Usuarios en este tipo", institutionTitle: (label) => `Institución · ${label}`, institutionHint: "Detalle ampliado de la institución seleccionada.", readiness: "Readiness", degradedChecks: "Checks degradados", backend: (version) => `Backend ${version}`, noDetail: "Sin detalle", check: (index) => `Check ${index}` },
+    executive: { miniTrends: "Mini tendencias", miniTrendsDesc: (rangeLabel) => `Evolución diaria de syncs, partidas y turnos para el recorte actual (${rangeLabel}). Ideal para la futura vista territorial de gobiernos.`, trendSyncsPeriod: "Syncs del período", trendSyncsPeriodHint: (count) => `${count} acumulados en la serie.`, trendGamesPeriod: "Partidas del período", trendGamesPeriodHint: (count) => `${count} registradas en la serie.`, recentSuccess: "Tasa de éxito reciente", recentSuccessHint: (rate) => `${rate}% en el último período de la serie.`, comparison: "Comparativa entre períodos", comparisonDesc: (window) => `Contraste del período actual contra el bloque inmediatamente anterior (${window}).`, previousPeriod: (value) => `Período anterior: ${value}`, semaphores: "Semáforos de seguimiento", semaphoresDesc: "Alertas rápidas construidas sobre la comparación entre períodos y el estado del recorte actual." },
+    territorial: { smartPresets: "Presets inteligentes del sistema", smartPresetsDesc: "Vistas ejecutivas de fábrica para priorizar territorios sin tener que construir filtros manuales.", savedViews: "Vistas ejecutivas guardadas", savedViewsDesc: "Presets locales para recuperar rápido combinaciones territoriales que revisas seguido.", linkCopied: "Link copiado", linkError: "No pude copiar", copyLink: "Copiar link", saveView: "Guardar vista actual", promptName: "Nombre de la vista", delete: "Borrar", generalView: "Vista general", applyPreset: "Aplicar preset", noPresets: "Todavía no hay presets guardados. Puedes guardar la combinación actual de filtros y reutilizarla después.", drilldown: "Drilldown territorial", drilldownDesc: "Jerarquía país → estado → ciudad para bajar de nivel sin salir de la home.", exportCsv: "Exportar CSV ejecutivo", filterCountry: "Filtrar país", filterState: "Filtrar estado", noDrilldown: "No hay estructura territorial suficiente para mostrar drilldown en el recorte actual.", territoryAlerts: "Alertas por territorio", territoryAlertsDesc: "Focos subterritoriales que pueden quedar ocultos cuando el agregado país todavía se ve sano.", noTerritoryAlerts: "No hay alertas territoriales activas con el recorte actual.", territoryIndex: "Índice territorial compuesto", territoryIndexDesc: "Score ejecutivo para ordenar prioridades por territorio combinando actividad, cobertura y señales de riesgo.", noTerritoryIndex: "Todavía no hay suficiente señal para calcular un índice territorial útil.", topTerritories: "Territorios con mayor actividad", topTerritoriesDesc: "Lectura rápida de dónde se concentra hoy la población activa.", topTerritory: "Top territorio", noTopTerritories: "Todavía no hay suficiente señal para rankear territorios con el recorte actual.", cohorts: "Cohortes", cohortsDesc: "Mix resumido de roles y tipos de usuario dentro del territorio.", roles: "Roles", userTypes: "Tipos de usuario", noData: "Sin datos", featuredInstitutions: "Instituciones destacadas en el territorio", featuredInstitutionsDesc: "Comparativa compacta para detectar dónde hay mayor actividad o cobertura.", noTerritoryDetail: "Sin territorio detallado", noFeaturedInstitutions: "El recorte actual todavía no muestra instituciones con actividad suficiente para destacarlas." },
+    summaries: { usage: "Uso y actividad", usageDesc: "Estadísticas rápidas para leer el movimiento real del sistema.", turnsGames: "Turnos y partidas", turnsGamesHint: (turns, avg) => `${turns} turnos, ${avg} turnos por partida con actividad.`, turnsSuccess: "Éxito de turnos", turnsSuccessHint: (rate) => `${rate} de los turnos terminaron en éxito.`, dataQuality: "Calidad del dato", dataQualityDesc: "Cobertura útil para detectar dónde falta trazabilidad o vínculo entre datos.", identifiedDevices: "Dispositivos identificados", identifiedDevicesHint: (firmware, owner) => `${firmware} tienen firmware registrado y ${owner} tienen owner asociado.`, usefulProfiles: "Profiles útiles", usefulProfilesHint: (sessions, bindings) => `${sessions} tienen sesiones y ${bindings} tienen binding activo.`, distribution: "Distribución general", distributionDesc: "Cómo está repartido hoy el parque disponible.", homeVsInstitution: "Devices Home vs institución", homeVsInstitutionHint: (home, institution) => `${home} Home, ${institution} institucionales.`, sourceCoverage: "Cobertura de fuentes", sourceCoverageHint: (loaded, failed) => `${loaded} fuentes respondieron correctamente y ${failed} fallaron; la home sigue disponible con degradación parcial.` },
+    charts: { profileCoverage: "Cobertura de perfiles", profileCoverageDesc: "Perfiles activos, con binding y con sesiones para medir madurez real del uso.", usersByRole: "Usuarios por rol", usersByRoleDesc: "Distribución del padrón por rol para entender de un vistazo quién sostiene la operación observada.", usersByType: "Usuarios por tipo", usersByTypeDesc: "Composición por tipos de usuario para detectar sesgos de adopción o cobertura.", institutionLoad: "Instituciones con mayor carga", institutionLoadDescSystem: "Comparativa de instituciones por usuarios y referencia secundaria de turnos o actividad observada.", institutionLoadDescLocal: "Comparativa local por estudiantes con referencia secundaria de usuarios.", turns: "Turnos" },
+    error: (message) => `No pude cargar una parte del dashboard: ${message}. La home sigue mostrando las fuentes que sí respondieron.`,
+  },
+  en: { scope: { admin: "Superadmin", government: "Government", institutionAdmin: "Institution admin", director: "Leadership", operation: "Operations" }, header: { title: "MagicBox control center", description: "Main panel to read status, risks, and next priorities without getting lost between modules." }, quickLook: { title: "What to look at first", description: "Three shortcuts to start from risk, not intuition.", institutions: "Institutions pending review", institutionsHint: (count) => `${count} institutions are flagged with \`needs_review\` in the institutional summary.`, devices: "Devices without status or owner", devicesHint: (withoutStatus, withoutOwner) => `${withoutStatus} without explicit status and ${withoutOwner} without an assigned owner.`, syncs: "Sync and profile coverage", syncsHint: (syncsRaw, profilesBound) => `${syncsRaw} of syncs have raw data available and ${profilesBound} of profiles have an active binding.`, review: "Review", attention: "Attention", follow: "Follow up", ok: "OK" }, metrics: { users: "Users", usersHint: "Current user roster.", institutions: "Institutions", institutionsHint: "Institutions included in the main view.", devices: "Devices", devicesHint: (home, institution) => `${home} Home and ${institution} institutional.`, syncs: "Syncs", syncsHint: (raw) => `${raw} with raw data available.`, games: "Games", gamesHint: (avgPlayers) => `${avgPlayers} players per game.`, health: "Health", healthHint: (version) => `Backend ${version}.`, profiles: "Profiles", profilesHint: (active, withSessions) => `${active} active and ${withSessions} with sessions.` }, detail: { users: "User details", usersHint: "Current user roster.", institutions: "Institution details", institutionsHint: "Institutions included in the main view.", devices: "Device details", devicesHint: "Fleet coverage and status.", syncs: "Sync details", syncsHint: "Expanded view of coverage and traceability.", games: "Game details", gamesHint: "Real system activity.", profiles: "Profile details", profilesHint: "Real maturity at profile level.", health: "Health details", healthHint: "Readiness state and checks available in the home view.", trendTitle: (label) => `Mini trends · ${label}`, trendHint: "Details for the selected time bucket in the compared series.", trendSyncs: "Syncs", trendSyncsHint: "Day/bucket volume", trendGames: "Games", trendGamesHint: "Session activity", trendTurns: "Turns", trendTurnsHint: (rate) => `${rate}% success`, activeProfiles: "Active", activeProfilesHint: (count) => `${count} profiles in the slice`, boundProfiles: "With binding", boundProfilesHint: "Active coverage", sessionProfiles: "With sessions", sessionProfilesHint: "Observable usage", unboundProfiles: "Without binding", unboundProfilesHint: "Gap to close", coverageTitle: (label) => `Profile coverage · ${label}`, coverageHint: "Breakdown of the selected indicator.", usersByRoleTitle: (label) => `Users by role · ${label}`, usersByRoleHint: "Selected role inside the current distribution.", usersInRole: "Users in this role", usersByTypeTitle: (label) => `Users by type · ${label}`, usersByTypeHint: "Selected user type inside the current distribution.", usersInType: "Users in this type", institutionTitle: (label) => `Institution · ${label}`, institutionHint: "Expanded detail for the selected institution.", readiness: "Readiness", degradedChecks: "Degraded checks", backend: (version) => `Backend ${version}`, noDetail: "No detail", check: (index) => `Check ${index}` }, executive: { miniTrends: "Mini trends", miniTrendsDesc: (rangeLabel) => `Daily evolution of syncs, games, and turns for the current slice (${rangeLabel}). Ideal for the future territorial government view.`, trendSyncsPeriod: "Syncs in period", trendSyncsPeriodHint: (count) => `${count} accumulated in the series.`, trendGamesPeriod: "Games in period", trendGamesPeriodHint: (count) => `${count} recorded in the series.`, recentSuccess: "Recent success rate", recentSuccessHint: (rate) => `${rate}% in the latest period of the series.`, comparison: "Period comparison", comparisonDesc: (window) => `Contrast between the current period and the immediately previous block (${window}).`, previousPeriod: (value) => `Previous period: ${value}`, semaphores: "Follow-up signals", semaphoresDesc: "Quick alerts built on the period comparison and the state of the current slice." }, territorial: { smartPresets: "Smart system presets", smartPresetsDesc: "Factory executive views to prioritize territories without manually building filters.", savedViews: "Saved executive views", savedViewsDesc: "Local presets to quickly recover territorial combinations you review often.", linkCopied: "Link copied", linkError: "Couldn't copy", copyLink: "Copy link", saveView: "Save current view", promptName: "View name", delete: "Delete", generalView: "General view", applyPreset: "Apply preset", noPresets: "There are no saved presets yet. You can save the current filter combination and reuse it later.", drilldown: "Territorial drilldown", drilldownDesc: "Country → state → city hierarchy to go deeper without leaving home.", exportCsv: "Export executive CSV", filterCountry: "Filter country", filterState: "Filter state", noDrilldown: "There is not enough territorial structure to show drilldown in the current slice.", territoryAlerts: "Territory alerts", territoryAlertsDesc: "Sub-territorial hotspots that can stay hidden when the country aggregate still looks healthy.", noTerritoryAlerts: "There are no active territorial alerts for the current slice.", territoryIndex: "Composite territorial index", territoryIndexDesc: "Executive score to order priorities by territory, combining activity, coverage, and risk signals.", noTerritoryIndex: "There is not enough signal yet to calculate a useful territorial index.", topTerritories: "Territories with highest activity", topTerritoriesDesc: "Quick read of where the active population is concentrated today.", topTerritory: "Top territory", noTopTerritories: "There is not enough signal yet to rank territories in the current slice.", cohorts: "Cohorts", cohortsDesc: "Compact mix of roles and user types inside the territory.", roles: "Roles", userTypes: "User types", noData: "No data", featuredInstitutions: "Featured institutions in the territory", featuredInstitutionsDesc: "Compact comparison to detect where activity or coverage is highest.", noTerritoryDetail: "No territorial detail", noFeaturedInstitutions: "The current slice still does not show institutions with enough activity to feature." }, summaries: { usage: "Usage and activity", usageDesc: "Quick stats to read real system movement.", turnsGames: "Turns and games", turnsGamesHint: (turns, avg) => `${turns} turns, ${avg} turns per active game.`, turnsSuccess: "Turn success", turnsSuccessHint: (rate) => `${rate} of turns ended successfully.`, dataQuality: "Data quality", dataQualityDesc: "Useful coverage to detect where traceability or data links are missing.", identifiedDevices: "Identified devices", identifiedDevicesHint: (firmware, owner) => `${firmware} have recorded firmware and ${owner} have an assigned owner.`, usefulProfiles: "Useful profiles", usefulProfilesHint: (sessions, bindings) => `${sessions} have sessions and ${bindings} have an active binding.`, distribution: "General distribution", distributionDesc: "How the available fleet is distributed today.", homeVsInstitution: "Home vs institution devices", homeVsInstitutionHint: (home, institution) => `${home} Home, ${institution} institutional.`, sourceCoverage: "Source coverage", sourceCoverageHint: (loaded, failed) => `${loaded} sources responded correctly and ${failed} failed; the home view remains available with partial degradation.` }, charts: { profileCoverage: "Profile coverage", profileCoverageDesc: "Active profiles, with binding, and with sessions to measure real usage maturity.", usersByRole: "Users by role", usersByRoleDesc: "Roster distribution by role to quickly understand who sustains the observed operation.", usersByType: "Users by type", usersByTypeDesc: "Composition by user types to detect adoption or coverage bias.", institutionLoad: "Institutions with highest load", institutionLoadDescSystem: "Institution comparison by users with a secondary reference of turns or observed activity.", institutionLoadDescLocal: "Local comparison by students with a secondary reference of users.", turns: "Turns" }, error: (message) => `I couldn't load part of the dashboard: ${message}. The home view still shows the sources that responded.` },
+  pt: { scope: { admin: "Superadmin", government: "Governo", institutionAdmin: "Admin institucional", director: "Direção", operation: "Operação" }, header: { title: "Centro de controle MagicBox", description: "Painel principal para ler estado, riscos e próximos focos sem se perder entre módulos." }, quickLook: { title: "O que olhar primeiro", description: "Três atalhos para começar pelo risco e não pela intuição.", institutions: "Instituições com revisão pendente", institutionsHint: (count) => `${count} instituições marcam \`needs_review\` no resumo institucional.`, devices: "Dispositivos sem estado ou owner", devicesHint: (withoutStatus, withoutOwner) => `${withoutStatus} sem estado explícito e ${withoutOwner} sem owner associado.`, syncs: "Cobertura de sync e perfis", syncsHint: (syncsRaw, profilesBound) => `${syncsRaw} dos syncs têm raw disponível e ${profilesBound} dos perfis têm binding ativo.`, review: "Revisar", attention: "Atenção", follow: "Acompanhar", ok: "OK" }, metrics: { users: "Usuários", usersHint: "Cadastro atual de usuários.", institutions: "Instituições", institutionsHint: "Instituições incluídas na visão principal.", devices: "Dispositivos", devicesHint: (home, institution) => `${home} Home e ${institution} institucionais.`, syncs: "Sincronizações", syncsHint: (raw) => `${raw} com raw disponível.`, games: "Partidas", gamesHint: (avgPlayers) => `${avgPlayers} jogadores por partida.`, health: "Saúde", healthHint: (version) => `Backend ${version}.`, profiles: "Perfis", profilesHint: (active, withSessions) => `${active} ativos e ${withSessions} com sessões.` }, detail: { users: "Detalhe de usuários", usersHint: "Cadastro atual de usuários.", institutions: "Detalhe de instituições", institutionsHint: "Instituições incluídas na visão principal.", devices: "Detalhe de dispositivos", devicesHint: "Cobertura do parque e seu estado.", syncs: "Detalhe de sincronizações", syncsHint: "Leitura ampliada de cobertura e rastreabilidade.", games: "Detalhe de partidas", gamesHint: "Movimento real do sistema.", profiles: "Detalhe de perfis", profilesHint: "Maturidade real no nível de perfil.", health: "Detalhe de saúde", healthHint: "Estado de readiness e checks disponíveis na home.", trendTitle: (label) => `Mini tendências · ${label}`, trendHint: "Detalhe do bucket temporal selecionado na série comparada.", trendSyncs: "Syncs", trendSyncsHint: "Volume do dia/bucket", trendGames: "Partidas", trendGamesHint: "Atividade de sessões", trendTurns: "Turnos", trendTurnsHint: (rate) => `${rate}% de sucesso`, activeProfiles: "Ativos", activeProfilesHint: (count) => `${count} perfis no recorte`, boundProfiles: "Com binding", boundProfilesHint: "Cobertura ativa", sessionProfiles: "Com sessões", sessionProfilesHint: "Uso observável", unboundProfiles: "Sem binding", unboundProfilesHint: "Lacuna a fechar", coverageTitle: (label) => `Cobertura de perfis · ${label}`, coverageHint: "Desdobramento do indicador selecionado.", usersByRoleTitle: (label) => `Usuários por papel · ${label}`, usersByRoleHint: "Papel selecionado dentro da distribuição atual.", usersInRole: "Usuários neste papel", usersByTypeTitle: (label) => `Usuários por tipo · ${label}`, usersByTypeHint: "Tipo de usuário selecionado dentro da distribuição atual.", usersInType: "Usuários neste tipo", institutionTitle: (label) => `Instituição · ${label}`, institutionHint: "Detalhe ampliado da instituição selecionada.", readiness: "Readiness", degradedChecks: "Checks degradados", backend: (version) => `Backend ${version}`, noDetail: "Sem detalhe", check: (index) => `Check ${index}` }, executive: { miniTrends: "Mini tendências", miniTrendsDesc: (rangeLabel) => `Evolução diária de syncs, partidas e turnos para o recorte atual (${rangeLabel}). Ideal para a futura visão territorial de governos.`, trendSyncsPeriod: "Syncs do período", trendSyncsPeriodHint: (count) => `${count} acumulados na série.`, trendGamesPeriod: "Partidas do período", trendGamesPeriodHint: (count) => `${count} registradas na série.`, recentSuccess: "Taxa de sucesso recente", recentSuccessHint: (rate) => `${rate}% no último período da série.`, comparison: "Comparativo entre períodos", comparisonDesc: (window) => `Contraste do período atual com o bloco imediatamente anterior (${window}).`, previousPeriod: (value) => `Período anterior: ${value}`, semaphores: "Semáforos de acompanhamento", semaphoresDesc: "Alertas rápidos construídos sobre a comparação entre períodos e o estado do recorte atual." }, territorial: { smartPresets: "Presets inteligentes do sistema", smartPresetsDesc: "Visões executivas de fábrica para priorizar territórios sem montar filtros manualmente.", savedViews: "Visões executivas salvas", savedViewsDesc: "Presets locais para recuperar rápido combinações territoriais que você revisa com frequência.", linkCopied: "Link copiado", linkError: "Não consegui copiar", copyLink: "Copiar link", saveView: "Salvar visão atual", promptName: "Nome da visão", delete: "Excluir", generalView: "Visão geral", applyPreset: "Aplicar preset", noPresets: "Ainda não há presets salvos. Você pode salvar a combinação atual de filtros e reutilizá-la depois.", drilldown: "Drilldown territorial", drilldownDesc: "Hierarquia país → estado → cidade para descer de nível sem sair da home.", exportCsv: "Exportar CSV executivo", filterCountry: "Filtrar país", filterState: "Filtrar estado", noDrilldown: "Não há estrutura territorial suficiente para mostrar drilldown no recorte atual.", territoryAlerts: "Alertas por território", territoryAlertsDesc: "Focos subterritoriais que podem ficar escondidos quando o agregado do país ainda parece saudável.", noTerritoryAlerts: "Não há alertas territoriais ativos no recorte atual.", territoryIndex: "Índice territorial composto", territoryIndexDesc: "Score executivo para ordenar prioridades por território combinando atividade, cobertura e sinais de risco.", noTerritoryIndex: "Ainda não há sinal suficiente para calcular um índice territorial útil.", topTerritories: "Territórios com maior atividade", topTerritoriesDesc: "Leitura rápida de onde a população ativa se concentra hoje.", topTerritory: "Top território", noTopTerritories: "Ainda não há sinal suficiente para ranquear territórios com o recorte atual.", cohorts: "Coortes", cohortsDesc: "Mix resumido de papéis e tipos de usuário dentro do território.", roles: "Papéis", userTypes: "Tipos de usuário", noData: "Sem dados", featuredInstitutions: "Instituições destacadas no território", featuredInstitutionsDesc: "Comparativo compacto para detectar onde há maior atividade ou cobertura.", noTerritoryDetail: "Sem detalhe territorial", noFeaturedInstitutions: "O recorte atual ainda não mostra instituições com atividade suficiente para destacá-las." }, summaries: { usage: "Uso e atividade", usageDesc: "Estatísticas rápidas para ler o movimento real do sistema.", turnsGames: "Turnos e partidas", turnsGamesHint: (turns, avg) => `${turns} turnos, ${avg} turnos por partida com atividade.`, turnsSuccess: "Sucesso dos turnos", turnsSuccessHint: (rate) => `${rate} dos turnos terminaram com sucesso.`, dataQuality: "Qualidade do dado", dataQualityDesc: "Cobertura útil para detectar onde falta rastreabilidade ou vínculo entre dados.", identifiedDevices: "Dispositivos identificados", identifiedDevicesHint: (firmware, owner) => `${firmware} têm firmware registrado e ${owner} têm owner associado.`, usefulProfiles: "Perfis úteis", usefulProfilesHint: (sessions, bindings) => `${sessions} têm sessões e ${bindings} têm binding ativo.`, distribution: "Distribuição geral", distributionDesc: "Como o parque disponível está distribuído hoje.", homeVsInstitution: "Devices Home vs instituição", homeVsInstitutionHint: (home, institution) => `${home} Home, ${institution} institucionais.`, sourceCoverage: "Cobertura de fontes", sourceCoverageHint: (loaded, failed) => `${loaded} fontes responderam corretamente e ${failed} falharam; a home segue disponível com degradação parcial.` }, charts: { profileCoverage: "Cobertura de perfis", profileCoverageDesc: "Perfis ativos, com binding e com sessões para medir a maturidade real do uso.", usersByRole: "Usuários por papel", usersByRoleDesc: "Distribuição do cadastro por papel para entender rapidamente quem sustenta a operação observada.", usersByType: "Usuários por tipo", usersByTypeDesc: "Composição por tipos de usuário para detectar vieses de adoção ou cobertura.", institutionLoad: "Instituições com maior carga", institutionLoadDescSystem: "Comparativo de instituições por usuários com referência secundária de turnos ou atividade observada.", institutionLoadDescLocal: "Comparativo local por estudantes com referência secundária de usuários.", turns: "Turnos" }, error: (message) => `Não consegui carregar parte do dashboard: ${message}. A home continua mostrando as fontes que responderam.` },
+};
 
 function formatPercent(value: number, total: number) {
   if (total <= 0) return "Sin datos";
@@ -273,6 +302,135 @@ function subscribeToTerritorialPresets(onStoreChange: () => void) {
 }
 
 export function SuperadminDashboard() {
+  const { language } = useLanguage();
+  const t = superadminMessages[language];
+  const formatPercentLocalized = (value: number, total: number) => {
+    if (total <= 0) return t.territorial.noData;
+    return `${Math.round((value / total) * 100)}%`;
+  };
+  const formatAverageLocalized = (total: number, count: number, digits = 1) => {
+    if (count <= 0) return t.territorial.noData;
+    return (total / count).toFixed(digits);
+  };
+  const localText = language === "en"
+    ? {
+        smartPreset: { all: "General view", critical: "Critical territories", scoreLt60: "Score < 60", noTurns: "No turns", highPopulationLowActivity: "High population, low activity" },
+        detail: {
+          total: "Total",
+          role: "Role",
+          roleMix: "Aggregated mix for the current slice",
+          type: "Type",
+          typeMix: "Composition by user type",
+          user: "User",
+          noRole: "No role",
+          homeDevices: "Home devices",
+          homeFleet: "Home fleet",
+          institutionDevices: "Institution devices",
+          institutionFleet: "Institutional fleet",
+          withOwner: "With owner",
+          withOwnerHint: "Devices linked to a person",
+          withFirmware: "With firmware",
+          withFirmwareHint: "Devices with recorded version",
+          withoutStatus: "Without status",
+          withoutStatusHint: "Devices to review",
+          noStatus: "No status",
+          noReference: "No recorded reference",
+          withoutRaw: "Without raw",
+          traceabilityGap: "Traceability gap",
+          totalTurns: (turns: number) => `${turns} total turns`,
+          success: (rate: number) => `${rate}% success`,
+          turns: (count: number) => `${count} turns`,
+          players: (count: number) => `${count} players`,
+          active: (count: number) => `${count} active`,
+          territorySummary: (users: number, institutions: number, games: number, turns: number) => `${users} users, ${institutions} institutions, ${games} games, ${turns} turns.`,
+          citySummary: (city: string, users: number, turns: number) => `${city} · ${users} users · ${turns} turns`,
+          activitySummary: (users: number, games: number, turns: number) => `${users} users, ${games} games, ${turns} turns.`,
+          topTerritorySummary: (users: number, institutions: number, games: number, turns: number) => `${users} users, ${institutions} institutions, ${games} games, and ${turns} turns.`,
+          institutionSummary: (users: number, games: number, turns: number) => `${users} users, ${games} games, ${turns} turns.`,
+          usersGroups: (users: number, groups: number) => `${users} users · ${groups} groups`,
+          rawAvailable: (count: number) => `${count} with raw data available`,
+          rawRecords: (count: number) => `${count} raw records`,
+        },
+      }
+    : language === "pt"
+      ? {
+          smartPreset: { all: "Visão geral", critical: "Territórios críticos", scoreLt60: "Score < 60", noTurns: "Sem turnos", highPopulationLowActivity: "Alta população, baixa atividade" },
+          detail: {
+            total: "Total",
+            role: "Papel",
+            roleMix: "Mix agregado do recorte atual",
+            type: "Tipo",
+            typeMix: "Composição por tipo de usuário",
+            user: "Usuário",
+            noRole: "Sem papel",
+            homeDevices: "Dispositivos Home",
+            homeFleet: "Parque doméstico",
+            institutionDevices: "Dispositivos institucionais",
+            institutionFleet: "Parque institucional",
+            withOwner: "Com owner",
+            withOwnerHint: "Dispositivos associados a uma pessoa",
+            withFirmware: "Com firmware",
+            withFirmwareHint: "Dispositivos com versão registrada",
+            withoutStatus: "Sem estado",
+            withoutStatusHint: "Equipamentos a revisar",
+            noStatus: "Sem status",
+            noReference: "Sem referência registrada",
+            withoutRaw: "Sem raw",
+            traceabilityGap: "Lacuna de rastreabilidade",
+            totalTurns: (turns: number) => `${turns} turnos totais`,
+            success: (rate: number) => `${rate}% de sucesso`,
+            turns: (count: number) => `${count} turnos`,
+            players: (count: number) => `${count} jogadores`,
+            active: (count: number) => `${count} ativos`,
+            territorySummary: (users: number, institutions: number, games: number, turns: number) => `${users} usuários, ${institutions} instituições, ${games} partidas, ${turns} turnos.`,
+            citySummary: (city: string, users: number, turns: number) => `${city} · ${users} usuários · ${turns} turnos`,
+            activitySummary: (users: number, games: number, turns: number) => `${users} usuários, ${games} partidas, ${turns} turnos.`,
+            topTerritorySummary: (users: number, institutions: number, games: number, turns: number) => `${users} usuários, ${institutions} instituições, ${games} partidas e ${turns} turnos.`,
+            institutionSummary: (users: number, games: number, turns: number) => `${users} usuários, ${games} partidas, ${turns} turnos.`,
+            usersGroups: (users: number, groups: number) => `${users} usuários · ${groups} grupos`,
+            rawAvailable: (count: number) => `${count} com raw disponível`,
+            rawRecords: (count: number) => `${count} registros raw`,
+          },
+        }
+      : {
+          smartPreset: { all: "Vista general", critical: "Territorios críticos", scoreLt60: "Score < 60", noTurns: "Sin turnos", highPopulationLowActivity: "Alta población, baja actividad" },
+          detail: {
+            total: "Total",
+            role: "Rol",
+            roleMix: "Mix agregado del recorte actual",
+            type: "Tipo",
+            typeMix: "Composición por tipo de usuario",
+            user: "Usuario",
+            noRole: "Sin rol",
+            homeDevices: "Dispositivos Home",
+            homeFleet: "Parque doméstico",
+            institutionDevices: "Dispositivos institucionales",
+            institutionFleet: "Parque institucional",
+            withOwner: "Con owner",
+            withOwnerHint: "Dispositivos asociados a persona",
+            withFirmware: "Con firmware",
+            withFirmwareHint: "Dispositivos con versión registrada",
+            withoutStatus: "Sin estado",
+            withoutStatusHint: "Equipos a revisar",
+            noStatus: "Sin status",
+            noReference: "Sin referencia registrada",
+            withoutRaw: "Sin raw",
+            traceabilityGap: "Brecha de trazabilidad",
+            totalTurns: (turns: number) => `${turns} turnos totales`,
+            success: (rate: number) => `${rate}% éxito`,
+            turns: (count: number) => `${count} turnos`,
+            players: (count: number) => `${count} jugadores`,
+            active: (count: number) => `${count} activos`,
+            territorySummary: (users: number, institutions: number, games: number, turns: number) => `${users} usuarios, ${institutions} instituciones, ${games} partidas, ${turns} turnos.`,
+            citySummary: (city: string, users: number, turns: number) => `${city} · ${users} usuarios · ${turns} turnos`,
+            activitySummary: (users: number, games: number, turns: number) => `${users} usuarios, ${games} partidas, ${turns} turnos.`,
+            topTerritorySummary: (users: number, institutions: number, games: number, turns: number) => `${users} usuarios, ${institutions} instituciones, ${games} partidas y ${turns} turnos.`,
+            institutionSummary: (users: number, games: number, turns: number) => `${users} usuarios, ${games} partidas, ${turns} turnos.`,
+            usersGroups: (users: number, groups: number) => `${users} usuarios · ${groups} grupos`,
+            rawAvailable: (count: number) => `${count} con raw disponible`,
+            rawRecords: (count: number) => `${count} raw records`,
+          },
+        };
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -376,25 +534,25 @@ export function SuperadminDashboard() {
 
   const smartPresets = useMemo(
     () => [
-      { key: "all", label: "Vista general", count: territoryScores.length },
+      { key: "all", label: localText.smartPreset.all, count: territoryScores.length },
       {
         key: "critical",
-        label: "Territorios críticos",
+        label: localText.smartPreset.critical,
         count: territoryScores.filter((item) => item.status === "warning" || territoryAlerts.some((alert) => alert.label.includes(item.label))).length,
       },
       {
         key: "score_lt_60",
-        label: "Score < 60",
+        label: localText.smartPreset.scoreLt60,
         count: territoryScores.filter((item) => item.score < 60).length,
       },
       {
         key: "no_turns",
-        label: "Sin turnos",
+        label: localText.smartPreset.noTurns,
         count: territoryScores.filter((item) => item.users > 0 && item.turns === 0).length,
       },
       {
         key: "high_population_low_activity",
-        label: "Alta población, baja actividad",
+        label: localText.smartPreset.highPopulationLowActivity,
         count: territoryScores.filter((item) => item.users >= 10 && item.turns / Math.max(item.users, 1) < 0.25).length,
       },
     ],
@@ -550,7 +708,7 @@ export function SuperadminDashboard() {
   function saveCurrentPreset() {
     if (typeof window === "undefined") return;
     const suggestedName = [selectedCountryCode, selectedState, selectedCity, selectedRange].filter(Boolean).join(" · ") || "Vista territorial";
-    const name = window.prompt("Nombre de la vista", suggestedName)?.trim();
+    const name = window.prompt(t.territorial.promptName, suggestedName)?.trim();
     if (!name) return;
 
     const nextPreset: TerritorialPreset = {
@@ -657,14 +815,14 @@ export function SuperadminDashboard() {
   }, [canSeeHealthModule, devices, devicesQuery.data, games, gamesQuery.data, healthQuery.data, institutions, institutionsQuery.data, profiles, readinessChecks, readinessQuery.data, summaryQuery.data, syncs, syncsQuery.data, usesSystemSummary, users, usersQuery.data]);
 
   const scopeLabel = isAdmin
-    ? "Superadmin"
+    ? t.scope.admin
     : isGovernmentViewer
-      ? "Gobierno"
+      ? t.scope.government
       : isInstitutionAdmin
-        ? "Admin institucional"
+        ? t.scope.institutionAdmin
         : isDirector
-          ? "Dirección"
-        : "Operación";
+          ? t.scope.director
+        : t.scope.operation;
 
   const trendRange = getModuleRange("trend-series");
   const profileCoverageRange = getModuleRange("profile-coverage");
@@ -730,124 +888,124 @@ export function SuperadminDashboard() {
     const metricRowsByType: Record<string, DashboardDetailRow[]> = {
       users: usesSystemSummary
         ? [
-            { label: "Total", value: String(metrics.totalUsers), hint: `${roleMix.length} segmentos de rol · ${userTypeMix.length} segmentos de tipo` },
-            ...roleMix.slice(0, 6).map((item) => ({ label: `Rol · ${item.key}`, value: String(item.count), hint: "Mix agregado del recorte actual" })),
-            ...userTypeMix.slice(0, 6).map((item) => ({ label: `Tipo · ${item.key}`, value: String(item.count), hint: "Composición por tipo de usuario" })),
+            { label: localText.detail.total, value: String(metrics.totalUsers), hint: `${roleMix.length} ${localText.detail.role.toLowerCase()} segmentos · ${userTypeMix.length} ${localText.detail.type.toLowerCase()} segmentos` },
+            ...roleMix.slice(0, 6).map((item) => ({ label: `${localText.detail.role} · ${item.key}`, value: String(item.count), hint: localText.detail.roleMix })),
+            ...userTypeMix.slice(0, 6).map((item) => ({ label: `${localText.detail.type} · ${item.key}`, value: String(item.count), hint: localText.detail.typeMix })),
           ]
         : users.map((entry) => ({
-            label: entry.fullName || entry.email || `Usuario ${entry.id}`,
-            value: entry.roles.join(", ") || "Sin rol",
-            hint: entry.email || entry.userType || "Sin detalle",
+            label: entry.fullName || entry.email || `${localText.detail.user} ${entry.id}`,
+            value: entry.roles.join(", ") || localText.detail.noRole,
+            hint: entry.email || entry.userType || t.detail.noDetail,
             badge: entry.lastLoginAt ? `Login ${entry.lastLoginAt}` : undefined,
           })),
       institutions: usesSystemSummary
         ? topInstitutions.map((institution) => ({
             label: institution.name,
-            value: `${institution.users} usuarios`,
-            hint: `${institution.games} partidas · ${institution.turns} turnos`,
+            value: `${institution.users}`,
+            hint: localText.detail.institutionSummary(institution.users, institution.games, institution.turns),
             badge: [institution.state, institution.city].filter(Boolean).join(" / ") || undefined,
           }))
         : institutions.map((institution) => ({
             label: institution.name,
             value: String(institution.operationalSummary?.studentCount ?? 0),
-            hint: `${institution.operationalSummary?.userCount ?? 0} usuarios · ${institution.operationalSummary?.classGroupCount ?? 0} grupos`,
+            hint: localText.detail.usersGroups(institution.operationalSummary?.userCount ?? 0, institution.operationalSummary?.classGroupCount ?? 0),
             badge: institution.status || institution.city || undefined,
           })),
       devices: usesSystemSummary
         ? [
-            { label: "Dispositivos Home", value: String(metrics.homeDevices), hint: "Parque doméstico" },
-            { label: "Dispositivos institucionales", value: String(metrics.institutionDevices), hint: "Parque institucional" },
-            { label: "Con owner", value: String(metrics.devicesWithOwner), hint: "Dispositivos asociados a persona" },
-            { label: "Con firmware", value: String(metrics.devicesWithFirmware), hint: "Dispositivos con versión registrada" },
-            { label: "Sin estado", value: String(metrics.devicesWithoutStatus), hint: "Equipos a revisar" },
+            { label: localText.detail.homeDevices, value: String(metrics.homeDevices), hint: localText.detail.homeFleet },
+            { label: localText.detail.institutionDevices, value: String(metrics.institutionDevices), hint: localText.detail.institutionFleet },
+            { label: localText.detail.withOwner, value: String(metrics.devicesWithOwner), hint: localText.detail.withOwnerHint },
+            { label: localText.detail.withFirmware, value: String(metrics.devicesWithFirmware), hint: localText.detail.withFirmwareHint },
+            { label: localText.detail.withoutStatus, value: String(metrics.devicesWithoutStatus), hint: localText.detail.withoutStatusHint },
           ]
         : devices.map((device) => ({
-            label: device.name || device.deviceId || `Dispositivo ${device.id}`,
-            value: device.status || "Sin status",
-            hint: device.ownerUserName || device.ownerUserEmail || device.educationalCenterName || "Sin referencia registrada",
+            label: device.name || device.deviceId || `${t.metrics.devices} ${device.id}`,
+            value: device.status || localText.detail.noStatus,
+            hint: device.ownerUserName || device.ownerUserEmail || device.educationalCenterName || localText.detail.noReference,
             badge: device.assignmentScope || undefined,
           })),
       syncs: usesSystemSummary
         ? [
-            { label: "Syncs", value: String(metrics.totalSyncs), hint: `${metrics.syncsWithRaw} con raw disponible` },
-            { label: "Sin raw", value: String(metrics.syncsWithoutRaw), hint: "Brecha de trazabilidad" },
-            ...trends.slice(-5).map((item) => ({ label: item.date, value: `${item.syncs} syncs`, hint: `${item.games} partidas · ${item.turns} turnos` })),
+            { label: t.detail.trendSyncs, value: String(metrics.totalSyncs), hint: localText.detail.rawAvailable(metrics.syncsWithRaw) },
+            { label: localText.detail.withoutRaw, value: String(metrics.syncsWithoutRaw), hint: localText.detail.traceabilityGap },
+            ...trends.slice(-5).map((item) => ({ label: item.date, value: `${item.syncs} ${t.detail.trendSyncs.toLowerCase()}`, hint: `${item.games} ${t.metrics.games.toLowerCase()} · ${localText.detail.turns(item.turns)}` })),
           ]
         : syncs.map((sync) => ({
             label: sync.deckName || `Sync ${sync.id}`,
-            value: sync.status || "Sin status",
-            hint: `${sync.rawRecordCount || sync.rawRecordIds.length || 0} raw records`,
+            value: sync.status || localText.detail.noStatus,
+            hint: localText.detail.rawRecords(sync.rawRecordCount || sync.rawRecordIds.length || 0),
             badge: sync.source || sync.sourceType || undefined,
           })),
       games: usesSystemSummary
         ? [
-            { label: "Partidas", value: String(metrics.totalGames), hint: `${metrics.totalTurns} turnos totales` },
-            ...trends.slice(-5).map((item) => ({ label: item.date, value: `${item.games} partidas`, hint: `${item.turns} turnos · ${item.success_rate || 0}% éxito` })),
+            { label: t.metrics.games, value: String(metrics.totalGames), hint: localText.detail.totalTurns(metrics.totalTurns) },
+            ...trends.slice(-5).map((item) => ({ label: item.date, value: `${item.games} ${t.metrics.games.toLowerCase()}`, hint: `${localText.detail.turns(item.turns)} · ${localText.detail.success(item.success_rate || 0)}` })),
           ]
         : games.map((game) => ({
-            label: game.deckName || `Partida ${game.id}`,
-            value: `${game.turns.length} turnos`,
-            hint: `${game.totalPlayers || game.players?.length || 0} jugadores`,
+            label: game.deckName || `${t.metrics.games.slice(0, -1)} ${game.id}`,
+            value: localText.detail.turns(game.turns.length),
+            hint: localText.detail.players(game.totalPlayers || game.players?.length || 0),
             badge: game.educationalCenterId || undefined,
           })),
       profiles: [
-        { label: "Perfiles", value: String(metrics.totalProfiles), hint: `${metrics.activeProfiles} activos` },
-        { label: "Con binding", value: String(metrics.profilesWithBindings), hint: "Cobertura activa" },
-        { label: "Con sesiones", value: String(metrics.profilesWithSessions), hint: "Uso observable" },
+        { label: t.metrics.profiles, value: String(metrics.totalProfiles), hint: localText.detail.active(metrics.activeProfiles) },
+        { label: t.detail.boundProfiles, value: String(metrics.profilesWithBindings), hint: t.detail.boundProfilesHint },
+        { label: t.detail.sessionProfiles, value: String(metrics.profilesWithSessions), hint: t.detail.sessionProfilesHint },
       ],
       health: canSeeHealthModule
         ? [
-            { label: "Readiness", value: metrics.readiness, hint: `Backend ${metrics.version}` },
-            { label: "Checks degradados", value: String(metrics.degradedChecks), hint: metrics.environment },
-            ...Object.entries(readinessChecks).map(([key, check], index) => ({ label: key || `Check ${index + 1}`, value: check?.status || "unknown", hint: check?.message || "Sin detalle" })),
+            { label: t.detail.readiness, value: metrics.readiness, hint: t.detail.backend(metrics.version) },
+            { label: t.detail.degradedChecks, value: String(metrics.degradedChecks), hint: metrics.environment },
+            ...Object.entries(readinessChecks).map(([key, check], index) => ({ label: key || t.detail.check(index + 1), value: check?.status || "unknown", hint: check?.message || t.detail.noDetail })),
           ]
         : [],
     };
 
     switch (selectedDetail.kind) {
       case "metric-users":
-        return { title: "Detalle de usuarios", description: "Padrón actual de usuarios.", filterLabel: selectedDetail.label, rows: metricRowsByType.users };
+        return { title: t.detail.users, description: t.detail.usersHint, filterLabel: selectedDetail.label, rows: metricRowsByType.users };
       case "metric-institutions":
-        return { title: "Detalle de instituciones", description: "Instituciones incluidas en la vista principal.", filterLabel: selectedDetail.label, rows: metricRowsByType.institutions };
+        return { title: t.detail.institutions, description: t.detail.institutionsHint, filterLabel: selectedDetail.label, rows: metricRowsByType.institutions };
       case "metric-devices":
-        return { title: "Detalle de dispositivos", description: "Cobertura del parque y su estado.", filterLabel: selectedDetail.label, rows: metricRowsByType.devices };
+        return { title: t.detail.devices, description: t.detail.devicesHint, filterLabel: selectedDetail.label, rows: metricRowsByType.devices };
       case "metric-syncs":
-        return { title: "Detalle de sincronizaciones", description: "Lectura ampliada de cobertura y trazabilidad.", filterLabel: selectedDetail.label, rows: metricRowsByType.syncs };
+        return { title: t.detail.syncs, description: t.detail.syncsHint, filterLabel: selectedDetail.label, rows: metricRowsByType.syncs };
       case "metric-games":
-        return { title: "Detalle de partidas", description: "Movimiento real del sistema.", filterLabel: selectedDetail.label, rows: metricRowsByType.games };
+        return { title: t.detail.games, description: t.detail.gamesHint, filterLabel: selectedDetail.label, rows: metricRowsByType.games };
       case "metric-profiles":
-        return { title: "Detalle de perfiles", description: "Madurez real a nivel perfil.", filterLabel: selectedDetail.label, rows: metricRowsByType.profiles };
+        return { title: t.detail.profiles, description: t.detail.profilesHint, filterLabel: selectedDetail.label, rows: metricRowsByType.profiles };
       case "metric-health":
-        return { title: "Detalle de salud", description: "Estado de readiness y checks disponibles en la home.", filterLabel: selectedDetail.label, rows: metricRowsByType.health };
+        return { title: t.detail.health, description: t.detail.healthHint, filterLabel: selectedDetail.label, rows: metricRowsByType.health };
       case "trend-date": {
         const selectedTrend = trendSeries.find((item) => item.date === selectedDetail.label);
         return {
-          title: `Mini tendencias · ${selectedDetail.label}`,
-          description: "Detalle del bucket temporal seleccionado en la serie comparada.",
+          title: t.detail.trendTitle(selectedDetail.label),
+          description: t.detail.trendHint,
           filterLabel: selectedDetail.label,
           rows: selectedTrend ? [
-            { label: "Syncs", value: String(selectedTrend.syncs), hint: "Volumen del día/bucket" },
-            { label: "Partidas", value: String(selectedTrend.games), hint: "Actividad de sesiones" },
-            { label: "Turnos", value: String(selectedTrend.turns), hint: `${selectedTrend.success_rate || 0}% de éxito` },
+            { label: t.detail.trendSyncs, value: String(selectedTrend.syncs), hint: t.detail.trendSyncsHint },
+            { label: t.detail.trendGames, value: String(selectedTrend.games), hint: t.detail.trendGamesHint },
+            { label: t.detail.trendTurns, value: String(selectedTrend.turns), hint: t.detail.trendTurnsHint(selectedTrend.success_rate || 0) },
           ] : [],
         };
       }
       case "profile-coverage": {
         const normalized = normalizeLabel(selectedDetail.label);
         const rows = [
-          { label: "Activos", value: String(filteredProfilesForCoverage.filter((profile) => profile.isActive).length), hint: `${filteredProfilesForCoverage.length} perfiles en el recorte` },
-          { label: "Con binding", value: String(filteredProfilesForCoverage.filter((profile) => profile.activeBindingCount > 0).length), hint: "Cobertura activa" },
-          { label: "Con sesiones", value: String(filteredProfilesForCoverage.filter((profile) => profile.sessionCount > 0).length), hint: "Uso observable" },
-          { label: "Sin binding", value: String(Math.max(filteredProfilesForCoverage.length - filteredProfilesForCoverage.filter((profile) => profile.activeBindingCount > 0).length, 0)), hint: "Brecha por cerrar" },
+          { label: t.detail.activeProfiles, value: String(filteredProfilesForCoverage.filter((profile) => profile.isActive).length), hint: t.detail.activeProfilesHint(filteredProfilesForCoverage.length) },
+          { label: t.detail.boundProfiles, value: String(filteredProfilesForCoverage.filter((profile) => profile.activeBindingCount > 0).length), hint: t.detail.boundProfilesHint },
+          { label: t.detail.sessionProfiles, value: String(filteredProfilesForCoverage.filter((profile) => profile.sessionCount > 0).length), hint: t.detail.sessionProfilesHint },
+          { label: t.detail.unboundProfiles, value: String(Math.max(filteredProfilesForCoverage.length - filteredProfilesForCoverage.filter((profile) => profile.activeBindingCount > 0).length, 0)), hint: t.detail.unboundProfilesHint },
         ];
-        return { title: `Cobertura de perfiles · ${selectedDetail.label}`, description: "Desglose del indicador seleccionado.", filterLabel: selectedDetail.label, rows: rows.filter((row) => normalizeLabel(row.label) === normalized) };
+        return { title: t.detail.coverageTitle(selectedDetail.label), description: t.detail.coverageHint, filterLabel: selectedDetail.label, rows: rows.filter((row) => normalizeLabel(row.label) === normalized) };
       }
       case "role":
-        return { title: `Usuarios por rol · ${selectedDetail.label}`, description: "Rol seleccionado dentro de la distribución actual.", filterLabel: selectedDetail.label, rows: executiveRoleSeries.filter((item) => item.label === selectedDetail.label).map((item) => ({ label: item.label, value: String(item.value), hint: "Usuarios en este rol" })) };
+        return { title: t.detail.usersByRoleTitle(selectedDetail.label), description: t.detail.usersByRoleHint, filterLabel: selectedDetail.label, rows: executiveRoleSeries.filter((item) => item.label === selectedDetail.label).map((item) => ({ label: item.label, value: String(item.value), hint: t.detail.usersInRole })) };
       case "user-type":
-        return { title: `Usuarios por tipo · ${selectedDetail.label}`, description: "Tipo de usuario seleccionado dentro de la distribución actual.", filterLabel: selectedDetail.label, rows: executiveUserTypeSeries.filter((item) => item.label === selectedDetail.label).map((item) => ({ label: item.label, value: String(item.value), hint: "Usuarios en este tipo" })) };
+        return { title: t.detail.usersByTypeTitle(selectedDetail.label), description: t.detail.usersByTypeHint, filterLabel: selectedDetail.label, rows: executiveUserTypeSeries.filter((item) => item.label === selectedDetail.label).map((item) => ({ label: item.label, value: String(item.value), hint: t.detail.usersInType })) };
       case "institution-load":
-        return { title: `Institución · ${selectedDetail.label}`, description: "Detalle ampliado de la institución seleccionada.", filterLabel: selectedDetail.label, rows: metricRowsByType.institutions.filter((row) => row.label === selectedDetail.label) };
+        return { title: t.detail.institutionTitle(selectedDetail.label), description: t.detail.institutionHint, filterLabel: selectedDetail.label, rows: metricRowsByType.institutions.filter((row) => row.label === selectedDetail.label) };
       default:
         return null;
     }
@@ -857,8 +1015,8 @@ export function SuperadminDashboard() {
     <div className="space-y-8">
       <SectionHeader
         eyebrow={scopeLabel}
-        title="Centro de control MagicBox"
-        description="Panel principal para leer estado, riesgos y próximos focos sin perderte entre módulos."
+        title={t.header.title}
+        description={t.header.description}
       />
 
       {detailPanel ? (
@@ -874,37 +1032,37 @@ export function SuperadminDashboard() {
       <div>
         <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
           <CardHeader>
-            <CardTitle>Qué mirar primero</CardTitle>
+            <CardTitle>{t.quickLook.title}</CardTitle>
             <CardDescription>
-              Tres atajos para arrancar por riesgo y no por intuición.
+              {t.quickLook.description}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             <Link href="/institutions" className="block rounded-2xl border border-border/70 bg-white/80 p-4 transition hover:border-primary/20 hover:bg-white">
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <p className="text-sm font-medium text-foreground">Instituciones con review pendiente</p>
-                  <p className="mt-1 text-sm leading-6 text-muted-foreground">{metrics.institutionsNeedingReview} instituciones marcan `needs_review` en el resumen institucional.</p>
+                  <p className="text-sm font-medium text-foreground">{t.quickLook.institutions}</p>
+                  <p className="mt-1 text-sm leading-6 text-muted-foreground">{t.quickLook.institutionsHint(metrics.institutionsNeedingReview)}</p>
                 </div>
-                <Badge variant={metrics.institutionsNeedingReview > 0 ? "warning" : "success"}>{metrics.institutionsNeedingReview > 0 ? "Revisar" : "OK"}</Badge>
+                <Badge variant={metrics.institutionsNeedingReview > 0 ? "warning" : "success"}>{metrics.institutionsNeedingReview > 0 ? t.quickLook.review : t.quickLook.ok}</Badge>
               </div>
             </Link>
             <Link href="/devices" className="block rounded-2xl border border-border/70 bg-white/80 p-4 transition hover:border-primary/20 hover:bg-white">
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <p className="text-sm font-medium text-foreground">Dispositivos sin estado u owner</p>
-                  <p className="mt-1 text-sm leading-6 text-muted-foreground">{metrics.devicesWithoutStatus} sin estado explícito y {metrics.totalDevices - metrics.devicesWithOwner} sin owner asociado.</p>
+                  <p className="text-sm font-medium text-foreground">{t.quickLook.devices}</p>
+                  <p className="mt-1 text-sm leading-6 text-muted-foreground">{t.quickLook.devicesHint(metrics.devicesWithoutStatus, metrics.totalDevices - metrics.devicesWithOwner)}</p>
                 </div>
-                <Badge variant={metrics.devicesWithoutStatus > 0 ? "warning" : "success"}>{metrics.devicesWithoutStatus > 0 ? "Atención" : "OK"}</Badge>
+                <Badge variant={metrics.devicesWithoutStatus > 0 ? "warning" : "success"}>{metrics.devicesWithoutStatus > 0 ? t.quickLook.attention : t.quickLook.ok}</Badge>
               </div>
             </Link>
             <Link href="/syncs" className="block rounded-2xl border border-border/70 bg-white/80 p-4 transition hover:border-primary/20 hover:bg-white">
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <p className="text-sm font-medium text-foreground">Cobertura de sync y perfiles</p>
-                  <p className="mt-1 text-sm leading-6 text-muted-foreground">{formatPercent(metrics.syncsWithRaw, metrics.totalSyncs)} de syncs tienen raw disponible y {formatPercent(metrics.profilesWithBindings, metrics.totalProfiles)} de perfiles tienen binding activo.</p>
+                  <p className="text-sm font-medium text-foreground">{t.quickLook.syncs}</p>
+                  <p className="mt-1 text-sm leading-6 text-muted-foreground">{t.quickLook.syncsHint(formatPercentLocalized(metrics.syncsWithRaw, metrics.totalSyncs), formatPercentLocalized(metrics.profilesWithBindings, metrics.totalProfiles))}</p>
                 </div>
-                <Badge variant="outline">Seguir</Badge>
+                <Badge variant="outline">{t.quickLook.follow}</Badge>
               </div>
             </Link>
           </CardContent>
@@ -916,15 +1074,15 @@ export function SuperadminDashboard() {
           Array.from({ length: 6 }).map((_, index) => <Skeleton key={index} className="h-36 rounded-2xl" />)
         ) : (
           <>
-            <DashboardMetricCard label="Usuarios" value={String(metrics.totalUsers)} hint="Padrón actual de usuarios." icon={Users} isLoading={(usesSystemSummary ? summaryQuery.isLoading : usersQuery.isLoading) && users.length === 0} onSelect={() => setSelectedDetail({ kind: "metric-users", label: "Usuarios" })} isActive={selectedDetail?.kind === "metric-users"} />
-            <DashboardMetricCard label="Instituciones" value={String(metrics.totalInstitutions)} hint="Instituciones incluidas en la vista principal." icon={Building2} isLoading={(usesSystemSummary ? summaryQuery.isLoading : institutionsQuery.isLoading) && institutions.length === 0} onSelect={() => setSelectedDetail({ kind: "metric-institutions", label: "Instituciones" })} isActive={selectedDetail?.kind === "metric-institutions"} />
-            <DashboardMetricCard label="Dispositivos" value={String(metrics.totalDevices)} hint={`${metrics.homeDevices} Home y ${metrics.institutionDevices} institucionales.`} icon={Smartphone} isLoading={(usesSystemSummary ? summaryQuery.isLoading : devicesQuery.isLoading) && devices.length === 0} onSelect={() => setSelectedDetail({ kind: "metric-devices", label: "Dispositivos" })} isActive={selectedDetail?.kind === "metric-devices"} />
-            <DashboardMetricCard label="Sincronizaciones" value={String(metrics.totalSyncs)} hint={`${formatPercent(metrics.syncsWithRaw, metrics.totalSyncs)} con raw disponible.`} icon={Layers3} tone="accent" isLoading={(usesSystemSummary ? summaryQuery.isLoading : syncsQuery.isLoading) && syncs.length === 0} onSelect={() => setSelectedDetail({ kind: "metric-syncs", label: "Sincronizaciones" })} isActive={selectedDetail?.kind === "metric-syncs"} />
-            <DashboardMetricCard label="Partidas" value={String(metrics.totalGames)} hint={`${formatAverage(metrics.totalPlayers, metrics.totalGames)} jugadores por partida.`} icon={Database} tone="accent" isLoading={(usesSystemSummary ? summaryQuery.isLoading : gamesQuery.isLoading) && games.length === 0} onSelect={() => setSelectedDetail({ kind: "metric-games", label: "Partidas" })} isActive={selectedDetail?.kind === "metric-games"} />
+            <DashboardMetricCard label={t.metrics.users} value={String(metrics.totalUsers)} hint={t.metrics.usersHint} icon={Users} isLoading={(usesSystemSummary ? summaryQuery.isLoading : usersQuery.isLoading) && users.length === 0} onSelect={() => setSelectedDetail({ kind: "metric-users", label: t.metrics.users })} isActive={selectedDetail?.kind === "metric-users"} />
+            <DashboardMetricCard label={t.metrics.institutions} value={String(metrics.totalInstitutions)} hint={t.metrics.institutionsHint} icon={Building2} isLoading={(usesSystemSummary ? summaryQuery.isLoading : institutionsQuery.isLoading) && institutions.length === 0} onSelect={() => setSelectedDetail({ kind: "metric-institutions", label: t.metrics.institutions })} isActive={selectedDetail?.kind === "metric-institutions"} />
+            <DashboardMetricCard label={t.metrics.devices} value={String(metrics.totalDevices)} hint={t.metrics.devicesHint(metrics.homeDevices, metrics.institutionDevices)} icon={Smartphone} isLoading={(usesSystemSummary ? summaryQuery.isLoading : devicesQuery.isLoading) && devices.length === 0} onSelect={() => setSelectedDetail({ kind: "metric-devices", label: t.metrics.devices })} isActive={selectedDetail?.kind === "metric-devices"} />
+            <DashboardMetricCard label={t.metrics.syncs} value={String(metrics.totalSyncs)} hint={t.metrics.syncsHint(formatPercentLocalized(metrics.syncsWithRaw, metrics.totalSyncs))} icon={Layers3} tone="accent" isLoading={(usesSystemSummary ? summaryQuery.isLoading : syncsQuery.isLoading) && syncs.length === 0} onSelect={() => setSelectedDetail({ kind: "metric-syncs", label: t.metrics.syncs })} isActive={selectedDetail?.kind === "metric-syncs"} />
+            <DashboardMetricCard label={t.metrics.games} value={String(metrics.totalGames)} hint={t.metrics.gamesHint(formatAverageLocalized(metrics.totalPlayers, metrics.totalGames))} icon={Database} tone="accent" isLoading={(usesSystemSummary ? summaryQuery.isLoading : gamesQuery.isLoading) && games.length === 0} onSelect={() => setSelectedDetail({ kind: "metric-games", label: t.metrics.games })} isActive={selectedDetail?.kind === "metric-games"} />
             {canSeeHealthModule ? (
-              <DashboardMetricCard label="Salud" value={metrics.readiness} hint={`Backend ${metrics.version}.`} icon={HeartPulse} tone={metrics.degradedChecks === 0 ? "accent" : "warning"} isLoading={canSeeHealthModule && healthQuery.isLoading && !healthQuery.data} onSelect={() => setSelectedDetail({ kind: "metric-health", label: "Salud" })} isActive={selectedDetail?.kind === "metric-health"} />
+              <DashboardMetricCard label={t.metrics.health} value={metrics.readiness} hint={t.metrics.healthHint(metrics.version)} icon={HeartPulse} tone={metrics.degradedChecks === 0 ? "accent" : "warning"} isLoading={canSeeHealthModule && healthQuery.isLoading && !healthQuery.data} onSelect={() => setSelectedDetail({ kind: "metric-health", label: t.metrics.health })} isActive={selectedDetail?.kind === "metric-health"} />
             ) : (
-              <DashboardMetricCard label="Perfiles" value={String(metrics.totalProfiles)} hint={`${metrics.activeProfiles} activos y ${metrics.profilesWithSessions} con sesiones.`} icon={UserSquare2} tone="accent" isLoading={(usesSystemSummary ? summaryQuery.isLoading : profilesQuery.isLoading) && profiles.length === 0} onSelect={() => setSelectedDetail({ kind: "metric-profiles", label: "Perfiles" })} isActive={selectedDetail?.kind === "metric-profiles"} />
+              <DashboardMetricCard label={t.metrics.profiles} value={String(metrics.totalProfiles)} hint={t.metrics.profilesHint(metrics.activeProfiles, metrics.profilesWithSessions)} icon={UserSquare2} tone="accent" isLoading={(usesSystemSummary ? summaryQuery.isLoading : profilesQuery.isLoading) && profiles.length === 0} onSelect={() => setSelectedDetail({ kind: "metric-profiles", label: t.metrics.profiles })} isActive={selectedDetail?.kind === "metric-profiles"} />
             )}
           </>
         )}
@@ -939,8 +1097,8 @@ export function SuperadminDashboard() {
 
       {usesSystemSummary ? (
         <DashboardMultiLineChartCard
-          title="Mini tendencias"
-          description={`Evolución diaria de syncs, partidas y turnos para el recorte actual (${trendRangeLabel}). Ideal para la futura vista territorial de gobiernos.`}
+          title={t.executive.miniTrends}
+          description={t.executive.miniTrendsDesc(trendRangeLabel)}
           data={trendSeries.map((item) => ({
             label: item.date,
             date: item.date,
@@ -963,16 +1121,16 @@ export function SuperadminDashboard() {
             trendSeries.length > 0 ? (
               <div className="grid gap-3 md:grid-cols-3">
                 <div className="rounded-2xl bg-white/80 p-4 text-sm text-muted-foreground">
-                  <p className="font-medium text-foreground">Syncs del período</p>
-                  <p className="mt-1">{trendSeries.reduce((sum, item) => sum + item.syncs, 0)} acumulados en la serie.</p>
+                  <p className="font-medium text-foreground">{t.executive.trendSyncsPeriod}</p>
+                  <p className="mt-1">{t.executive.trendSyncsPeriodHint(trendSeries.reduce((sum, item) => sum + item.syncs, 0))}</p>
                 </div>
                 <div className="rounded-2xl bg-white/80 p-4 text-sm text-muted-foreground">
-                  <p className="font-medium text-foreground">Partidas del período</p>
-                  <p className="mt-1">{trendSeries.reduce((sum, item) => sum + item.games, 0)} registradas en la serie.</p>
+                  <p className="font-medium text-foreground">{t.executive.trendGamesPeriod}</p>
+                  <p className="mt-1">{t.executive.trendGamesPeriodHint(trendSeries.reduce((sum, item) => sum + item.games, 0))}</p>
                 </div>
                 <div className="rounded-2xl bg-white/80 p-4 text-sm text-muted-foreground">
-                  <p className="font-medium text-foreground">Tasa de éxito reciente</p>
-                  <p className="mt-1">{trendSeries[trendSeries.length - 1]?.success_rate || 0}% en el último período de la serie.</p>
+                  <p className="font-medium text-foreground">{t.executive.recentSuccess}</p>
+                  <p className="mt-1">{t.executive.recentSuccessHint(trendSeries[trendSeries.length - 1]?.success_rate || 0)}</p>
                 </div>
               </div>
             ) : null
@@ -983,9 +1141,9 @@ export function SuperadminDashboard() {
       {usesSystemSummary ? (
         <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
           <CardHeader>
-            <CardTitle>Comparativa entre períodos</CardTitle>
+            <CardTitle>{t.executive.comparison}</CardTitle>
             <CardDescription>
-              Contraste del período actual contra el bloque inmediatamente anterior ({comparisonWindowLabel}).
+              {t.executive.comparisonDesc(comparisonWindowLabel)}
             </CardDescription>
           </CardHeader>
           <CardContent className="grid gap-3 md:grid-cols-2 2xl:grid-cols-4">
@@ -1002,7 +1160,7 @@ export function SuperadminDashboard() {
                     </div>
                     <Badge variant={deltaTone}>{deltaLabel}</Badge>
                   </div>
-                  <p className="mt-2">Período anterior: {metric.previous}</p>
+                  <p className="mt-2">{t.executive.previousPeriod(metric.previous)}</p>
                 </div>
               );
             })}
@@ -1013,9 +1171,9 @@ export function SuperadminDashboard() {
       {usesSystemSummary ? (
         <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
           <CardHeader>
-            <CardTitle>Semáforos de seguimiento</CardTitle>
+            <CardTitle>{t.executive.semaphores}</CardTitle>
             <CardDescription>
-              Alertas rápidas construidas sobre la comparación entre períodos y el estado del recorte actual.
+              {t.executive.semaphoresDesc}
             </CardDescription>
           </CardHeader>
           <CardContent className="grid gap-3 md:grid-cols-2 2xl:grid-cols-3">
@@ -1035,8 +1193,8 @@ export function SuperadminDashboard() {
       {isGovernmentViewer ? (
         <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
           <CardHeader>
-            <CardTitle>Presets inteligentes del sistema</CardTitle>
-            <CardDescription>Vistas ejecutivas de fábrica para priorizar territorios sin tener que construir filtros manuales.</CardDescription>
+            <CardTitle>{t.territorial.smartPresets}</CardTitle>
+            <CardDescription>{t.territorial.smartPresetsDesc}</CardDescription>
           </CardHeader>
           <CardContent className="flex flex-wrap gap-2">
             {smartPresets.map((preset) => (
@@ -1058,20 +1216,20 @@ export function SuperadminDashboard() {
           <CardHeader>
             <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
               <div>
-                <CardTitle>Vistas ejecutivas guardadas</CardTitle>
-                <CardDescription>Presets locales para recuperar rápido combinaciones territoriales que revisas seguido.</CardDescription>
+                <CardTitle>{t.territorial.savedViews}</CardTitle>
+                <CardDescription>{t.territorial.savedViewsDesc}</CardDescription>
               </div>
               <div className="flex flex-wrap gap-2">
                 <Button type="button" variant="outline" size="sm" onClick={copyCurrentViewLink}>
                   {shareLinkState === "copied" ? <Check className="size-4" /> : <Copy className="size-4" />}
                   {shareLinkState === "copied"
-                    ? "Link copiado"
+                    ? t.territorial.linkCopied
                     : shareLinkState === "error"
-                      ? "No pude copiar"
-                      : "Copiar link"}
+                      ? t.territorial.linkError
+                      : t.territorial.copyLink}
                 </Button>
                 <Button type="button" variant="secondary" size="sm" onClick={saveCurrentPreset}>
-                  Guardar vista actual
+                  {t.territorial.saveView}
                 </Button>
               </div>
             </div>
@@ -1087,21 +1245,21 @@ export function SuperadminDashboard() {
                       className="rounded-full bg-secondary px-3 py-1 text-xs font-medium text-secondary-foreground"
                       onClick={() => deletePreset(preset.id)}
                     >
-                      Borrar
+                      {t.territorial.delete}
                     </button>
                   </div>
-                  <p className="mt-2">{Object.values(preset.filters).filter(Boolean).join(" · ") || "Vista general"}</p>
+                  <p className="mt-2">{Object.values(preset.filters).filter(Boolean).join(" · ") || t.territorial.generalView}</p>
                   <button
                     type="button"
                     className="mt-3 rounded-full border border-border bg-white px-3 py-1 text-xs font-medium text-foreground"
                     onClick={() => applyPreset(preset)}
                   >
-                    Aplicar preset
+                    {t.territorial.applyPreset}
                   </button>
                 </div>
               ))
             ) : (
-              <div className="rounded-2xl bg-white/80 p-4 text-sm text-muted-foreground">Todavía no hay presets guardados. Puedes guardar la combinación actual de filtros y reutilizarla después.</div>
+              <div className="rounded-2xl bg-white/80 p-4 text-sm text-muted-foreground">{t.territorial.noPresets}</div>
             )}
           </CardContent>
         </Card>
@@ -1112,15 +1270,15 @@ export function SuperadminDashboard() {
           <CardHeader>
             <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
               <div>
-                <CardTitle>Drilldown territorial</CardTitle>
-                <CardDescription>Jerarquía país → estado → ciudad para bajar de nivel sin salir de la home.</CardDescription>
+                <CardTitle>{t.territorial.drilldown}</CardTitle>
+                <CardDescription>{t.territorial.drilldownDesc}</CardDescription>
               </div>
               <button
                 type="button"
                 className="rounded-full bg-primary/10 px-4 py-2 text-sm font-medium text-primary"
                 onClick={downloadTerritorialReport}
               >
-                Exportar CSV ejecutivo
+                {t.territorial.exportCsv}
               </button>
             </div>
           </CardHeader>
@@ -1131,14 +1289,14 @@ export function SuperadminDashboard() {
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
                       <p className="font-medium text-foreground">{country.key}</p>
-                      <p className="mt-1">{country.users} usuarios, {country.institutions} instituciones, {country.games} partidas, {country.turns} turnos.</p>
+                      <p className="mt-1">{localText.detail.territorySummary(country.users, country.institutions, country.games, country.turns)}</p>
                     </div>
                     <button
                       type="button"
                       className="rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary"
                       onClick={() => updateFilter("country_code", country.key)}
                     >
-                      Filtrar país
+                      {t.territorial.filterCountry}
                     </button>
                   </div>
 
@@ -1148,14 +1306,14 @@ export function SuperadminDashboard() {
                         <div className="flex flex-wrap items-start justify-between gap-3">
                           <div>
                             <p className="font-medium text-foreground">{stateEntry.key}</p>
-                            <p className="mt-1">{stateEntry.users} usuarios, {stateEntry.institutions} instituciones, {stateEntry.games} partidas, {stateEntry.turns} turnos.</p>
+                            <p className="mt-1">{localText.detail.territorySummary(stateEntry.users, stateEntry.institutions, stateEntry.games, stateEntry.turns)}</p>
                           </div>
                           <button
                             type="button"
                             className="rounded-full bg-secondary px-3 py-1 text-xs font-medium text-secondary-foreground"
                             onClick={() => updateFilters({ country_code: country.key, state: stateEntry.key, city: "" })}
                           >
-                            Filtrar estado
+                            {t.territorial.filterState}
                           </button>
                         </div>
                         <div className="mt-3 flex flex-wrap gap-2">
@@ -1166,7 +1324,7 @@ export function SuperadminDashboard() {
                               className="rounded-full border border-border bg-white px-3 py-1 text-xs font-medium text-foreground"
                               onClick={() => updateFilters({ country_code: country.key, state: stateEntry.key, city: cityEntry.key })}
                             >
-                              {cityEntry.key} · {cityEntry.users} usuarios · {cityEntry.turns} turnos
+                              {localText.detail.citySummary(cityEntry.key, cityEntry.users, cityEntry.turns)}
                             </button>
                           ))}
                         </div>
@@ -1176,7 +1334,7 @@ export function SuperadminDashboard() {
                 </div>
               ))
             ) : (
-              <div className="rounded-2xl bg-white/80 p-4 text-sm text-muted-foreground">No hay estructura territorial suficiente para mostrar drilldown en el recorte actual.</div>
+              <div className="rounded-2xl bg-white/80 p-4 text-sm text-muted-foreground">{t.territorial.noDrilldown}</div>
             )}
           </CardContent>
         </Card>
@@ -1185,8 +1343,8 @@ export function SuperadminDashboard() {
       {isGovernmentViewer ? (
         <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
           <CardHeader>
-            <CardTitle>Alertas por territorio</CardTitle>
-            <CardDescription>Focos subterritoriales que pueden quedar ocultos cuando el agregado país todavía se ve sano.</CardDescription>
+            <CardTitle>{t.territorial.territoryAlerts}</CardTitle>
+            <CardDescription>{t.territorial.territoryAlertsDesc}</CardDescription>
           </CardHeader>
           <CardContent className="grid gap-3 md:grid-cols-2 2xl:grid-cols-3">
             {filteredTerritoryAlerts.length > 0 ? (
@@ -1203,7 +1361,7 @@ export function SuperadminDashboard() {
                 </div>
               ))
             ) : (
-              <div className="rounded-2xl bg-white/80 p-4 text-sm text-muted-foreground">No hay alertas territoriales activas con el recorte actual.</div>
+              <div className="rounded-2xl bg-white/80 p-4 text-sm text-muted-foreground">{t.territorial.noTerritoryAlerts}</div>
             )}
           </CardContent>
         </Card>
@@ -1212,8 +1370,8 @@ export function SuperadminDashboard() {
       {isGovernmentViewer ? (
         <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
           <CardHeader>
-            <CardTitle>Índice territorial compuesto</CardTitle>
-            <CardDescription>Score ejecutivo para ordenar prioridades por territorio combinando actividad, cobertura y señales de riesgo.</CardDescription>
+            <CardTitle>{t.territorial.territoryIndex}</CardTitle>
+            <CardDescription>{t.territorial.territoryIndexDesc}</CardDescription>
           </CardHeader>
           <CardContent className="grid gap-3 md:grid-cols-2 2xl:grid-cols-3">
             {filteredTerritoryScores.length > 0 ? (
@@ -1226,14 +1384,14 @@ export function SuperadminDashboard() {
                     </div>
                     <Badge variant={territory.status}>{territory.status}</Badge>
                   </div>
-                  <p className="mt-2">{territory.users} usuarios, {territory.games} partidas, {territory.turns} turnos.</p>
+                  <p className="mt-2">{localText.detail.activitySummary(territory.users, territory.games, territory.turns)}</p>
                   <ul className="mt-3 list-disc space-y-1 pl-4 text-xs">
                     {territory.reasons.slice(0, 3).map((reason) => <li key={reason}>{reason}</li>)}
                   </ul>
                 </div>
               ))
             ) : (
-              <div className="rounded-2xl bg-white/80 p-4 text-sm text-muted-foreground">Todavía no hay suficiente señal para calcular un índice territorial útil.</div>
+              <div className="rounded-2xl bg-white/80 p-4 text-sm text-muted-foreground">{t.territorial.noTerritoryIndex}</div>
             )}
           </CardContent>
         </Card>
@@ -1243,8 +1401,8 @@ export function SuperadminDashboard() {
         <div className="grid gap-5 2xl:grid-cols-3">
           <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)] xl:col-span-2">
             <CardHeader>
-              <CardTitle>Territorios con mayor actividad</CardTitle>
-              <CardDescription>Lectura rápida de dónde se concentra hoy la población activa.</CardDescription>
+              <CardTitle>{t.territorial.topTerritories}</CardTitle>
+              <CardDescription>{t.territorial.topTerritoriesDesc}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
             {filteredTopTerritories.length > 0 ? (
@@ -1253,34 +1411,34 @@ export function SuperadminDashboard() {
                     <div className="flex items-start justify-between gap-4">
                       <div>
                         <p className="font-medium text-foreground">{index + 1}. {territory.key}</p>
-                        <p className="mt-1">{territory.users} usuarios, {territory.institutions} instituciones, {territory.games} partidas y {territory.turns} turnos.</p>
+                        <p className="mt-1">{localText.detail.topTerritorySummary(territory.users, territory.institutions, territory.games, territory.turns)}</p>
                       </div>
-                      <Badge variant="secondary">Top territorio</Badge>
+                      <Badge variant="secondary">{t.territorial.topTerritory}</Badge>
                     </div>
                   </div>
                 ))
               ) : (
-                <div className="rounded-2xl bg-white/80 p-4 text-sm text-muted-foreground">Todavía no hay suficiente señal para rankear territorios con el recorte actual.</div>
+                <div className="rounded-2xl bg-white/80 p-4 text-sm text-muted-foreground">{t.territorial.noTopTerritories}</div>
               )}
             </CardContent>
           </Card>
 
           <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
             <CardHeader>
-              <CardTitle>Cohortes</CardTitle>
-              <CardDescription>Mix resumido de roles y tipos de usuario dentro del territorio.</CardDescription>
+              <CardTitle>{t.territorial.cohorts}</CardTitle>
+              <CardDescription>{t.territorial.cohortsDesc}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3 text-sm text-muted-foreground">
               <div className="rounded-2xl bg-white/80 p-4">
-                <p className="font-medium text-foreground">Roles</p>
+                <p className="font-medium text-foreground">{t.territorial.roles}</p>
                 <div className="mt-2 flex flex-wrap gap-2">
-                  {roleMix.length > 0 ? roleMix.slice(0, 5).map((item) => <Badge key={item.key} variant="secondary">{item.key}: {item.count}</Badge>) : <span>Sin datos</span>}
+                  {roleMix.length > 0 ? roleMix.slice(0, 5).map((item) => <Badge key={item.key} variant="secondary">{item.key}: {item.count}</Badge>) : <span>{t.territorial.noData}</span>}
                 </div>
               </div>
               <div className="rounded-2xl bg-white/80 p-4">
-                <p className="font-medium text-foreground">Tipos de usuario</p>
+                <p className="font-medium text-foreground">{t.territorial.userTypes}</p>
                 <div className="mt-2 flex flex-wrap gap-2">
-                  {userTypeMix.length > 0 ? userTypeMix.slice(0, 5).map((item) => <Badge key={item.key} variant="secondary">{item.key}: {item.count}</Badge>) : <span>Sin datos</span>}
+                  {userTypeMix.length > 0 ? userTypeMix.slice(0, 5).map((item) => <Badge key={item.key} variant="secondary">{item.key}: {item.count}</Badge>) : <span>{t.territorial.noData}</span>}
                 </div>
               </div>
             </CardContent>
@@ -1291,51 +1449,51 @@ export function SuperadminDashboard() {
       <div className="grid gap-5 2xl:grid-cols-3">
         <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
           <CardHeader>
-            <CardTitle>Uso y actividad</CardTitle>
-            <CardDescription>Estadísticas rápidas para leer el movimiento real del sistema.</CardDescription>
+            <CardTitle>{t.summaries.usage}</CardTitle>
+            <CardDescription>{t.summaries.usageDesc}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3 text-sm leading-6 text-muted-foreground">
             <div className="rounded-2xl bg-white/80 p-4">
-              <p className="font-medium text-foreground">Turnos y partidas</p>
-              <p className="mt-1">{metrics.totalTurns} turnos, {formatAverage(metrics.totalTurns, metrics.gamesWithTurns || metrics.totalGames)} turnos por partida con actividad.</p>
+              <p className="font-medium text-foreground">{t.summaries.turnsGames}</p>
+              <p className="mt-1">{t.summaries.turnsGamesHint(metrics.totalTurns, formatAverageLocalized(metrics.totalTurns, metrics.gamesWithTurns || metrics.totalGames))}</p>
             </div>
             <div className="rounded-2xl bg-white/80 p-4">
-              <p className="font-medium text-foreground">Éxito de turnos</p>
-              <p className="mt-1">{formatPercent(metrics.successfulTurns, metrics.totalTurns)} de los turnos terminaron en éxito.</p>
+              <p className="font-medium text-foreground">{t.summaries.turnsSuccess}</p>
+              <p className="mt-1">{t.summaries.turnsSuccessHint(formatPercentLocalized(metrics.successfulTurns, metrics.totalTurns))}</p>
             </div>
           </CardContent>
         </Card>
 
         <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
           <CardHeader>
-            <CardTitle>Calidad del dato</CardTitle>
-            <CardDescription>Cobertura útil para detectar dónde falta trazabilidad o vínculo entre datos.</CardDescription>
+            <CardTitle>{t.summaries.dataQuality}</CardTitle>
+            <CardDescription>{t.summaries.dataQualityDesc}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3 text-sm leading-6 text-muted-foreground">
             <div className="rounded-2xl bg-white/80 p-4">
-              <p className="font-medium text-foreground">Dispositivos identificados</p>
-              <p className="mt-1">{formatPercent(metrics.devicesWithFirmware, metrics.totalDevices)} tienen firmware registrado y {formatPercent(metrics.devicesWithOwner, metrics.totalDevices)} tienen owner asociado.</p>
+              <p className="font-medium text-foreground">{t.summaries.identifiedDevices}</p>
+              <p className="mt-1">{t.summaries.identifiedDevicesHint(formatPercentLocalized(metrics.devicesWithFirmware, metrics.totalDevices), formatPercentLocalized(metrics.devicesWithOwner, metrics.totalDevices))}</p>
             </div>
             <div className="rounded-2xl bg-white/80 p-4">
-              <p className="font-medium text-foreground">Profiles útiles</p>
-              <p className="mt-1">{formatPercent(metrics.profilesWithSessions, metrics.totalProfiles)} tienen sesiones y {formatPercent(metrics.profilesWithBindings, metrics.totalProfiles)} tienen binding activo.</p>
+              <p className="font-medium text-foreground">{t.summaries.usefulProfiles}</p>
+              <p className="mt-1">{t.summaries.usefulProfilesHint(formatPercentLocalized(metrics.profilesWithSessions, metrics.totalProfiles), formatPercentLocalized(metrics.profilesWithBindings, metrics.totalProfiles))}</p>
             </div>
           </CardContent>
         </Card>
 
         <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
           <CardHeader>
-            <CardTitle>Distribución general</CardTitle>
-            <CardDescription>Cómo está repartido hoy el parque disponible.</CardDescription>
+            <CardTitle>{t.summaries.distribution}</CardTitle>
+            <CardDescription>{t.summaries.distributionDesc}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3 text-sm leading-6 text-muted-foreground">
             <div className="rounded-2xl bg-white/80 p-4">
-              <p className="font-medium text-foreground">Devices Home vs institución</p>
-              <p className="mt-1">{metrics.homeDevices} Home, {metrics.institutionDevices} institucionales.</p>
+              <p className="font-medium text-foreground">{t.summaries.homeVsInstitution}</p>
+              <p className="mt-1">{t.summaries.homeVsInstitutionHint(metrics.homeDevices, metrics.institutionDevices)}</p>
             </div>
             <div className="rounded-2xl bg-white/80 p-4">
-              <p className="font-medium text-foreground">Cobertura de fuentes</p>
-              <p className="mt-1">{loadedSources} fuentes respondieron correctamente y {failedSources} fallaron; la home sigue disponible con degradación parcial.</p>
+              <p className="font-medium text-foreground">{t.summaries.sourceCoverage}</p>
+              <p className="mt-1">{t.summaries.sourceCoverageHint(loadedSources, failedSources)}</p>
             </div>
           </CardContent>
         </Card>
@@ -1343,8 +1501,8 @@ export function SuperadminDashboard() {
 
       <div className="grid gap-6 xl:grid-cols-2">
         <DashboardBarChartCard
-          title="Cobertura de perfiles"
-          description="Perfiles activos, con binding y con sesiones para medir madurez real del uso."
+          title={t.charts.profileCoverage}
+          description={t.charts.profileCoverageDesc}
           data={executiveProfileCoverage}
           range={profileCoverageRange}
           onRangeChange={(range) => setModuleRange("profile-coverage", range)}
@@ -1356,8 +1514,8 @@ export function SuperadminDashboard() {
 
       <div className="grid gap-6 xl:grid-cols-2">
         <DashboardBarChartCard
-          title="Usuarios por rol"
-          description="Distribución del padrón por rol para entender de un vistazo quién sostiene la operación observada."
+          title={t.charts.usersByRole}
+          description={t.charts.usersByRoleDesc}
           data={executiveRoleSeries}
           range={roleRange}
           onRangeChange={(range) => setModuleRange("role-series", range)}
@@ -1366,8 +1524,8 @@ export function SuperadminDashboard() {
           activeDatumLabel={selectedDetail?.kind === "role" ? selectedDetail.label : null}
         />
         <DashboardBarChartCard
-          title="Usuarios por tipo"
-          description="Composición por tipos de usuario para detectar sesgos de adopción o cobertura."
+          title={t.charts.usersByType}
+          description={t.charts.usersByTypeDesc}
           data={executiveUserTypeSeries}
           range={userTypeRange}
           onRangeChange={(range) => setModuleRange("user-type-series", range)}
@@ -1379,11 +1537,11 @@ export function SuperadminDashboard() {
 
       <div className="grid gap-6 xl:grid-cols-2">
         <DashboardBarChartCard
-          title="Instituciones con mayor carga"
-          description={usesSystemSummary ? "Comparativa de instituciones por usuarios y referencia secundaria de turnos o actividad observada." : "Comparativa local por estudiantes con referencia secundaria de usuarios."}
+          title={t.charts.institutionLoad}
+          description={usesSystemSummary ? t.charts.institutionLoadDescSystem : t.charts.institutionLoadDescLocal}
           data={executiveInstitutionLoad}
           secondaryDataKey="secondaryValue"
-          secondaryLabel="Turnos"
+          secondaryLabel={t.charts.turns}
           range={institutionLoadRange}
           onRangeChange={(range) => setModuleRange("institution-load", range)}
           csvFileName={`dashboard-instituciones-con-carga-${institutionLoadRange}`}
@@ -1395,20 +1553,20 @@ export function SuperadminDashboard() {
       {isGovernmentViewer ? (
         <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
           <CardHeader>
-            <CardTitle>Instituciones destacadas en el territorio</CardTitle>
-            <CardDescription>Comparativa compacta para detectar dónde hay mayor actividad o cobertura.</CardDescription>
+            <CardTitle>{t.territorial.featuredInstitutions}</CardTitle>
+            <CardDescription>{t.territorial.featuredInstitutionsDesc}</CardDescription>
           </CardHeader>
           <CardContent className="grid gap-3 md:grid-cols-2 2xl:grid-cols-3">
             {topInstitutions.length > 0 ? (
               topInstitutions.map((institution) => (
                 <div key={institution.id} className="rounded-2xl bg-white/80 p-4 text-sm text-muted-foreground">
                   <p className="font-medium text-foreground">{institution.name}</p>
-                  <p className="mt-1">{institution.city || institution.state || "Sin territorio detallado"}</p>
-                  <p className="mt-2">{institution.users} usuarios, {institution.games} partidas, {institution.turns} turnos.</p>
+                  <p className="mt-1">{institution.city || institution.state || t.territorial.noTerritoryDetail}</p>
+                  <p className="mt-2">{localText.detail.institutionSummary(institution.users, institution.games, institution.turns)}</p>
                 </div>
               ))
             ) : (
-              <div className="rounded-2xl bg-white/80 p-4 text-sm text-muted-foreground">El recorte actual todavía no muestra instituciones con actividad suficiente para destacarlas.</div>
+              <div className="rounded-2xl bg-white/80 p-4 text-sm text-muted-foreground">{t.territorial.noFeaturedInstitutions}</div>
             )}
           </CardContent>
         </Card>
@@ -1417,7 +1575,7 @@ export function SuperadminDashboard() {
       {error ? (
         <Card className="border-destructive/20 bg-white/85">
           <CardContent className="p-6 text-sm text-destructive">
-            No pude cargar una parte del dashboard: {error}. La home sigue mostrando las fuentes que sí respondieron.
+            {t.error(error)}
           </CardContent>
         </Card>
       ) : null}

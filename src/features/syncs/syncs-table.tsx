@@ -17,9 +17,194 @@ import { useDevices } from "@/features/devices/api";
 import { useGames } from "@/features/games/api";
 import { buildGameDetailHref, buildGamesOverviewHref } from "@/features/games/game-route";
 import type { GameRecord } from "@/features/games/types";
+import { useLanguage, type AppLanguage } from "@/features/i18n/i18n-context";
 import { useSyncSessions } from "@/features/syncs/api";
 import { useUsers } from "@/features/users/api";
 import { cn, formatDateTime, getErrorMessage } from "@/lib/utils";
+
+const syncsMessages: Record<AppLanguage, {
+  eyebrow: {
+    default: string;
+    teacher: string;
+    director: string;
+    family: string;
+    researcher: string;
+    institutionAdmin: string;
+    personal: string;
+  };
+  title: string;
+  description: {
+    family: string;
+    researcher: string;
+    teacher: string;
+    director: string;
+    operational: string;
+    personal: string;
+  };
+  searchPlaceholder: string;
+  rawOptions: { all: string; withRaw: string; withoutRaw: string };
+  accessOptions: { all: string; owned: string; institution: string; shared: string; unresolved: string };
+  clearCrossFilter: string;
+  filteredDevice: (name: string) => string;
+  accessAvailable: string;
+  accessHint: string;
+  accessState: { family: string; researcher: string; operational: string; personal: string; teacher: string; director: string; institutionAdmin: string };
+  accessDetail: {
+    family: string;
+    researcher: string;
+    teacher: string;
+    director: string;
+    operational: string;
+    personal: string;
+  };
+  researcherCards: { coverage: { title: string; description: string }; correlation: { title: string; description: string }; associations: { title: string; description: string } };
+  familyCards: { activity: { title: string; description: string }; participants: { title: string; description: string }; relation: { title: string; description: string } };
+  summaryLabels: { syncs: string; sample: string; withEvidence: string; withParticipants: string; withDevice: string; withVersion: string; unresolved: string };
+  listTitles: { default: string; teacher: string; director: string; family: string; researcher: string };
+  listDescriptions: { default: string; teacher: string; director: string; family: string; researcher: string };
+}> = {
+  es: {
+    eyebrow: { default: "Trazabilidad", teacher: "Teacher", director: "Director", family: "Family", researcher: "Researcher", institutionAdmin: "Institution admin", personal: "Mi actividad" },
+    title: "Sincronizaciones",
+    description: {
+      family: "Vista simple para seguir la actividad de sincronización reciente, con foco en si hubo captura, participantes y relación básica con las partidas.",
+      researcher: "Vista de evidencia sobre `/sync-sessions`, pensada para leer cobertura de captura, correlación con partidas y asociaciones clave sin quedarse solo en el payload raw.",
+      teacher: "Vista docente de sincronizaciones, pensada para conectar captura, participantes y dispositivo sin convertir la lectura en una consola técnica.",
+      director: "Vista directoral de sincronizaciones, útil para seguir captura, correlación con partidas y señales generales de trazabilidad a nivel institución.",
+      operational: "La vista usa `/sync-sessions` como superficie operativa real del parque disponible por ACL BLE, no solo como historial personal del usuario autenticado.",
+      personal: "Sin permiso BLE operativo, `/sync-sessions` vuelve a comportarse como historial personal del usuario autenticado.",
+    },
+    searchPlaceholder: "Filtrar por syncId, origen, mazo, dispositivo o usuario",
+    rawOptions: { all: "Todas", withRaw: "Solo con raw", withoutRaw: "Solo sin raw" },
+    accessOptions: { all: "Todos los accesos", owned: "Mis dispositivos", institution: "Institución visible", shared: "Compartidas", unresolved: "Sin asociación resuelta" },
+    clearCrossFilter: "Quitar filtro cruzado",
+    filteredDevice: (name) => `Dispositivo filtrado: ${name}`,
+    accessAvailable: "Acceso disponible",
+    accessHint: "Priorizá el recorte por tipo de acceso antes de leer trazabilidad fina.",
+    accessState: { family: "family", researcher: "researcher", operational: "operativo por ACL BLE", personal: "historial personal", teacher: "teacher", director: "director", institutionAdmin: "institution-admin" },
+    accessDetail: {
+      family: "La vista simplifica la lectura y deja a mano solo las relaciones más importantes: sincronización, participantes, dispositivo y vínculo con una partida cuando existe.",
+      researcher: "La vista mantiene el recorte real disponible y deja explícita la relación entre sync, dispositivo, usuario y partida correlacionada para revisar evidencia de captura sin bajar directo al raw completo.",
+      teacher: "La lectura docente deja explícito por qué la sync entra en tu acceso, qué dispositivo la originó y si ya se puede conectar con participantes o una partida asociada.",
+      director: "La lectura directoral deja en primer plano cobertura, correlación con partidas y señales generales de trazabilidad para seguimiento institucional.",
+      operational: "Los resultados se abren al parque de dispositivos permitido por ACL. Si tu acceso queda limitado a una institución, vas a ver solo syncs de esa institución.",
+      personal: "Esta sesión no tiene lectura operativa de BLE, así que la tabla queda limitada a tus propias sincronizaciones.",
+    },
+    researcherCards: {
+      coverage: { title: "Cobertura de captura", description: "Se hace explícito qué parte de la muestra tiene raw disponible y qué parte todavía queda incompleta." },
+      correlation: { title: "Correlación con partida", description: "La relación entre sync y partida asociada ayuda a leer continuidad sin saltar entre pantallas para cada caso." },
+      associations: { title: "Asociaciones clave", description: "Dispositivo, usuario y participantes quedan resumidos con lenguaje de evidencia y no solo de operación." },
+    },
+    familyCards: {
+      activity: { title: "Actividad reciente", description: "La pantalla muestra si hubo sincronizaciones recientes y qué parte de la experiencia quedó capturada." },
+      participants: { title: "Participantes", description: "Cuando hay información disponible, se presenta en lenguaje simple y fácil de seguir." },
+      relation: { title: "Relación con partidas", description: "Si una sync puede vincularse con una partida asociada, la conexión queda resumida sin meterse en detalles técnicos." },
+    },
+    summaryLabels: { syncs: "Syncs", sample: "Muestra sync", withEvidence: "Con evidencia", withParticipants: "Con participantes", withDevice: "Con dispositivo", withVersion: "Con versión", unresolved: "Sin asociación" },
+    listTitles: { default: "Sesiones sincronizadas", teacher: "Sincronizaciones para aula", director: "Sincronizaciones para seguimiento", family: "Actividad de sincronización", researcher: "Muestra de sincronizaciones" },
+    listDescriptions: {
+      default: "Seleccioná una sesión para inspeccionar contexto de dispositivo, usuario, participantes y payload raw más reciente.",
+      teacher: "Seleccioná una sincronización para entender rápido dispositivo, participantes y vínculo con partida desde una lectura docente.",
+      director: "Seleccioná una sincronización para revisar trazabilidad general, correlación con partida y contexto institucional disponible.",
+      family: "Seleccioná una sincronización para ver un resumen simple de participantes, dispositivo y relación con la partida cuando exista.",
+      researcher: "Seleccioná una sesión para inspeccionar contexto disponible, participantes proyectados y correlación con partida sin salir del dashboard.",
+    },
+  },
+  en: {
+    eyebrow: { default: "Traceability", teacher: "Teacher", director: "Director", family: "Family", researcher: "Researcher", institutionAdmin: "Institution admin", personal: "My activity" },
+    title: "Syncs",
+    description: {
+      family: "Simple view to follow recent sync activity, focusing on capture, participants, and the basic relationship with games.",
+      researcher: "Evidence-oriented `/sync-sessions` view to read capture coverage, game correlation, and key associations without staying only at raw payload level.",
+      teacher: "Teacher-facing sync view designed to connect capture, participants, and device without turning the reading into a technical console.",
+      director: "Director-facing sync view to follow capture, game correlation, and broad traceability signals at institution level.",
+      operational: "The view uses `/sync-sessions` as the real operational surface of the BLE-ACL-visible fleet, not only as the authenticated user's personal history.",
+      personal: "Without operational BLE permission, `/sync-sessions` behaves again as the authenticated user's personal history.",
+    },
+    searchPlaceholder: "Filter by syncId, source, deck, device, or user",
+    rawOptions: { all: "All", withRaw: "With raw only", withoutRaw: "Without raw only" },
+    accessOptions: { all: "All access", owned: "My devices", institution: "Institution-visible", shared: "Shared", unresolved: "Unresolved association" },
+    clearCrossFilter: "Clear linked filter",
+    filteredDevice: (name) => `Filtered device: ${name}`,
+    accessAvailable: "Available access",
+    accessHint: "Prioritize the cut by access type before reading fine-grained traceability.",
+    accessState: { family: "family", researcher: "researcher", operational: "operational via BLE ACL", personal: "personal history", teacher: "teacher", director: "director", institutionAdmin: "institution-admin" },
+    accessDetail: {
+      family: "The view simplifies the reading and keeps only the most important relationships at hand: sync, participants, device, and relationship to a game when one exists.",
+      researcher: "The view keeps the real available cut and makes explicit the relationship between sync, device, user, and correlated game to review capture evidence without jumping straight to the full raw payload.",
+      teacher: "The teacher reading makes explicit why the sync is part of your access, which device originated it, and whether it can already be connected with participants or a related game.",
+      director: "The director reading puts coverage, game correlation, and broad traceability signals first for institution follow-up.",
+      operational: "Results open up to the device fleet allowed by ACL. If your access is limited to one institution, you'll see only syncs from that institution.",
+      personal: "This session has no operational BLE read, so the table is limited to your own syncs.",
+    },
+    researcherCards: {
+      coverage: { title: "Capture coverage", description: "It makes clear which part of the sample has raw data available and which part is still incomplete." },
+      correlation: { title: "Game correlation", description: "The relationship between sync and linked game helps read continuity without jumping between screens for each case." },
+      associations: { title: "Key associations", description: "Device, user, and participants are summarized with evidence-oriented language, not just operations language." },
+    },
+    familyCards: {
+      activity: { title: "Recent activity", description: "The screen shows whether there were recent syncs and how much of the experience was captured." },
+      participants: { title: "Participants", description: "When information is available, it is shown in simple, easy-to-follow language." },
+      relation: { title: "Relationship with games", description: "If a sync can be linked to a game, the connection is summarized without diving into technical detail." },
+    },
+    summaryLabels: { syncs: "Syncs", sample: "Sync sample", withEvidence: "With evidence", withParticipants: "With participants", withDevice: "With device", withVersion: "With version", unresolved: "Unresolved" },
+    listTitles: { default: "Synced sessions", teacher: "Syncs for classroom", director: "Syncs for follow-up", family: "Sync activity", researcher: "Sync sample" },
+    listDescriptions: {
+      default: "Select a session to inspect device, user, participant, and latest raw payload context.",
+      teacher: "Select a sync to quickly understand device, participants, and relationship to a game from a teacher-focused reading.",
+      director: "Select a sync to review overall traceability, game correlation, and available institution context.",
+      family: "Select a sync to see a simple summary of participants, device, and relation to the game when available.",
+      researcher: "Select a session to inspect available context, projected participants, and game correlation without leaving the dashboard.",
+    },
+  },
+  pt: {
+    eyebrow: { default: "Rastreabilidade", teacher: "Teacher", director: "Director", family: "Family", researcher: "Researcher", institutionAdmin: "Institution admin", personal: "Minha atividade" },
+    title: "Sincronizações",
+    description: {
+      family: "Visão simples para acompanhar a atividade recente de sincronização, com foco em captura, participantes e relação básica com as partidas.",
+      researcher: "Visão de evidência sobre `/sync-sessions`, pensada para ler cobertura de captura, correlação com partidas e associações-chave sem ficar apenas no payload raw.",
+      teacher: "Visão docente de sincronizações, pensada para conectar captura, participantes e dispositivo sem transformar a leitura em um console técnico.",
+      director: "Visão diretiva de sincronizações, útil para acompanhar captura, correlação com partidas e sinais gerais de rastreabilidade no nível institucional.",
+      operational: "A visão usa `/sync-sessions` como superfície operacional real do parque disponível por ACL BLE, e não apenas como histórico pessoal do usuário autenticado.",
+      personal: "Sem permissão operacional de BLE, `/sync-sessions` volta a se comportar como histórico pessoal do usuário autenticado.",
+    },
+    searchPlaceholder: "Filtrar por syncId, origem, baralho, dispositivo ou usuário",
+    rawOptions: { all: "Todas", withRaw: "Só com raw", withoutRaw: "Só sem raw" },
+    accessOptions: { all: "Todos os acessos", owned: "Meus dispositivos", institution: "Instituição visível", shared: "Compartilhadas", unresolved: "Sem associação resolvida" },
+    clearCrossFilter: "Remover filtro cruzado",
+    filteredDevice: (name) => `Dispositivo filtrado: ${name}`,
+    accessAvailable: "Acesso disponível",
+    accessHint: "Priorize o recorte por tipo de acesso antes de ler a rastreabilidade fina.",
+    accessState: { family: "family", researcher: "researcher", operational: "operacional por ACL BLE", personal: "histórico pessoal", teacher: "teacher", director: "director", institutionAdmin: "institution-admin" },
+    accessDetail: {
+      family: "A visão simplifica a leitura e deixa à mão apenas as relações mais importantes: sincronização, participantes, dispositivo e vínculo com uma partida quando existir.",
+      researcher: "A visão mantém o recorte real disponível e deixa explícita a relação entre sync, dispositivo, usuário e partida correlacionada para revisar evidência de captura sem ir direto ao raw completo.",
+      teacher: "A leitura docente deixa explícito por que a sync entra no seu acesso, qual dispositivo a originou e se ela já pode se conectar com participantes ou com uma partida associada.",
+      director: "A leitura diretiva coloca em primeiro plano cobertura, correlação com partidas e sinais gerais de rastreabilidade para acompanhamento institucional.",
+      operational: "Os resultados se abrem para o parque de dispositivos permitido por ACL. Se o seu acesso ficar limitado a uma instituição, você verá apenas syncs dessa instituição.",
+      personal: "Esta sessão não tem leitura operacional de BLE, então a tabela fica limitada às suas próprias sincronizações.",
+    },
+    researcherCards: {
+      coverage: { title: "Cobertura de captura", description: "Fica explícito que parte da amostra tem raw disponível e que parte ainda está incompleta." },
+      correlation: { title: "Correlação com partida", description: "A relação entre sync e partida associada ajuda a ler continuidade sem saltar entre telas para cada caso." },
+      associations: { title: "Associações-chave", description: "Dispositivo, usuário e participantes ficam resumidos com linguagem de evidência e não só de operação." },
+    },
+    familyCards: {
+      activity: { title: "Atividade recente", description: "A tela mostra se houve sincronizações recentes e que parte da experiência foi capturada." },
+      participants: { title: "Participantes", description: "Quando há informação disponível, ela é apresentada em linguagem simples e fácil de seguir." },
+      relation: { title: "Relação com partidas", description: "Se uma sync pode ser vinculada a uma partida associada, a conexão fica resumida sem entrar em detalhes técnicos." },
+    },
+    summaryLabels: { syncs: "Syncs", sample: "Amostra sync", withEvidence: "Com evidência", withParticipants: "Com participantes", withDevice: "Com dispositivo", withVersion: "Com versão", unresolved: "Sem associação" },
+    listTitles: { default: "Sessões sincronizadas", teacher: "Sincronizações para sala", director: "Sincronizações para acompanhamento", family: "Atividade de sincronização", researcher: "Amostra de sincronizações" },
+    listDescriptions: {
+      default: "Selecione uma sessão para inspecionar contexto de dispositivo, usuário, participantes e payload raw mais recente.",
+      teacher: "Selecione uma sincronização para entender rapidamente dispositivo, participantes e vínculo com a partida em uma leitura docente.",
+      director: "Selecione uma sincronização para revisar rastreabilidade geral, correlação com partida e contexto institucional disponível.",
+      family: "Selecione uma sincronização para ver um resumo simples de participantes, dispositivo e relação com a partida quando existir.",
+      researcher: "Selecione uma sessão para inspecionar contexto disponível, participantes projetados e correlação com a partida sem sair do dashboard.",
+    },
+  },
+};
 
 function SummaryCard({
   label,
@@ -76,6 +261,8 @@ function buildSyncGamesHref(sync: {
 }
 
 export function SyncsTable() {
+  const { language } = useLanguage();
+  const t = syncsMessages[language];
   const { tokens, user: currentUser } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
@@ -241,30 +428,30 @@ export function SyncsTable() {
   const selectedUser = selectedSync?.user || null;
   const selectedRawKeys = Object.keys(selectedSync?.rawPayload || {});
   const accessSegments = [
-    { key: "all" as const, label: "Todas", count: metrics.total },
-    { key: "owned" as const, label: "Mis dispositivos", count: metrics.ownedSyncs },
-    { key: "institution" as const, label: "Institución visible", count: metrics.institutionSyncs },
-    { key: "shared" as const, label: "Compartidas", count: syncRows.filter((sync) => sync.accessRelation === "compartido visible").length },
-    { key: "unresolved" as const, label: "Sin asociación resuelta", count: metrics.unresolvedAssociations },
+    { key: "all" as const, label: t.accessOptions.all, count: metrics.total },
+    { key: "owned" as const, label: t.accessOptions.owned, count: metrics.ownedSyncs },
+    { key: "institution" as const, label: t.accessOptions.institution, count: metrics.institutionSyncs },
+    { key: "shared" as const, label: t.accessOptions.shared, count: syncRows.filter((sync) => sync.accessRelation === "compartido visible").length },
+    { key: "unresolved" as const, label: t.accessOptions.unresolved, count: metrics.unresolvedAssociations },
   ];
 
   return (
     <div className="space-y-6">
       <SectionHeader
-        eyebrow={isFamilyView ? "Family" : isResearcherView ? "Researcher" : canReadOperationalSyncs ? (isTeacherView ? "Teacher" : isDirectorView ? "Director" : isInstitutionAdminView ? "Institution admin" : "Trazabilidad") : isTeacherView ? "Teacher" : "Mi actividad"}
-        title="Sincronizaciones"
+        eyebrow={isFamilyView ? t.eyebrow.family : isResearcherView ? t.eyebrow.researcher : canReadOperationalSyncs ? (isTeacherView ? t.eyebrow.teacher : isDirectorView ? t.eyebrow.director : isInstitutionAdminView ? t.eyebrow.institutionAdmin : t.eyebrow.default) : isTeacherView ? t.eyebrow.teacher : t.eyebrow.personal}
+        title={t.title}
         description={
           isFamilyView
-            ? "Vista simple para seguir la actividad de sincronización reciente, con foco en si hubo captura, participantes y relación básica con las partidas."
+            ? t.description.family
             : isResearcherView
-            ? "Vista de evidencia sobre `/sync-sessions`, pensada para leer cobertura de captura, correlación con partidas y asociaciones clave sin quedarse solo en el payload raw."
+            ? t.description.researcher
             : canReadOperationalSyncs
             ? isTeacherView
-              ? "Vista docente de sincronizaciones, pensada para conectar captura, participantes y dispositivo sin convertir la lectura en una consola técnica."
+              ? t.description.teacher
               : isDirectorView
-              ? "Vista directoral de sincronizaciones, útil para seguir captura, correlación con partidas y señales generales de trazabilidad a nivel institución."
-              : "La vista usa `/sync-sessions` como superficie operativa real del parque disponible por ACL BLE, no solo como historial personal del usuario autenticado."
-            : "Sin permiso BLE operativo, `/sync-sessions` vuelve a comportarse como historial personal del usuario autenticado."
+              ? t.description.director
+              : t.description.operational
+            : t.description.personal
         }
         actions={
           <div className="grid w-full gap-3 md:grid-cols-2 2xl:grid-cols-[minmax(0,1.45fr)_minmax(220px,0.8fr)_minmax(220px,0.8fr)]">
@@ -273,7 +460,7 @@ export function SyncsTable() {
               <Input
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
-                placeholder="Filtrar por syncId, origen, mazo, dispositivo o usuario"
+                placeholder={t.searchPlaceholder}
                 className="w-full pl-9"
               />
             </div>
@@ -284,20 +471,20 @@ export function SyncsTable() {
                   onChange={(event) => setRawFilter(event.target.value as "all" | "with-raw" | "without-raw")}
                   className="h-10 min-w-0 w-full rounded-md border border-input bg-background px-3 text-sm"
                 >
-                  <option value="all">Todas</option>
-                  <option value="with-raw">Solo con raw</option>
-                  <option value="without-raw">Solo sin raw</option>
+                  <option value="all">{t.rawOptions.all}</option>
+                  <option value="with-raw">{t.rawOptions.withRaw}</option>
+                  <option value="without-raw">{t.rawOptions.withoutRaw}</option>
                 </select>
                 <select
                   value={accessFilter}
                   onChange={(event) => setAccessFilter(event.target.value as "all" | "owned" | "institution" | "shared" | "unresolved")}
                   className="h-10 min-w-0 w-full rounded-md border border-input bg-background px-3 text-sm"
                 >
-                  <option value="all">Todos los accesos</option>
-                  <option value="owned">Mis dispositivos</option>
-                  <option value="institution">Institución visible</option>
-                  <option value="shared">Compartidas</option>
-                  <option value="unresolved">Sin asociación resuelta</option>
+                  <option value="all">{t.accessOptions.all}</option>
+                  <option value="owned">{t.accessOptions.owned}</option>
+                  <option value="institution">{t.accessOptions.institution}</option>
+                  <option value="shared">{t.accessOptions.shared}</option>
+                  <option value="unresolved">{t.accessOptions.unresolved}</option>
                 </select>
                 {linkedBleDeviceId || linkedDeviceId ? (
                   <button
@@ -305,7 +492,7 @@ export function SyncsTable() {
                     onClick={() => router.push(pathname)}
                     className="inline-flex h-10 min-w-0 items-center justify-center rounded-md border border-primary/20 bg-primary/5 px-3 text-sm font-medium text-primary transition hover:bg-primary/10"
                   >
-                    Quitar filtro cruzado
+                    {t.clearCrossFilter}
                   </button>
                 ) : null}
               </>
@@ -316,7 +503,7 @@ export function SyncsTable() {
 
       {linkedBleDeviceId || linkedDeviceId ? (
         <div className="flex flex-wrap gap-2">
-          <Badge variant="outline">Dispositivo filtrado: {linkedDeviceName || linkedDeviceId || linkedBleDeviceId}</Badge>
+          <Badge variant="outline">{t.filteredDevice(linkedDeviceName || linkedDeviceId || linkedBleDeviceId)}</Badge>
         </div>
       ) : null}
 
@@ -324,26 +511,26 @@ export function SyncsTable() {
         <CardContent className="flex flex-wrap items-center justify-between gap-4 p-5">
           <div>
             <div className="flex flex-wrap items-center gap-2">
-              <p className="text-sm font-medium text-foreground">Acceso disponible</p>
+              <p className="text-sm font-medium text-foreground">{t.accessAvailable}</p>
               <Badge variant={isFamilyView || isResearcherView || canReadOperationalSyncs ? "secondary" : "outline"}>
-                {isFamilyView ? "family" : isResearcherView ? "researcher" : canReadOperationalSyncs ? "operativo por ACL BLE" : "historial personal"}
+                {isFamilyView ? t.accessState.family : isResearcherView ? t.accessState.researcher : canReadOperationalSyncs ? t.accessState.operational : t.accessState.personal}
               </Badge>
-              {isTeacherView && canReadOperationalSyncs ? <Badge variant="outline">teacher</Badge> : null}
-              {isDirectorView && canReadOperationalSyncs ? <Badge variant="outline">director</Badge> : null}
-              {isInstitutionAdminView ? <Badge variant="outline">institution-admin</Badge> : null}
+              {isTeacherView && canReadOperationalSyncs ? <Badge variant="outline">{t.accessState.teacher}</Badge> : null}
+              {isDirectorView && canReadOperationalSyncs ? <Badge variant="outline">{t.accessState.director}</Badge> : null}
+              {isInstitutionAdminView ? <Badge variant="outline">{t.accessState.institutionAdmin}</Badge> : null}
             </div>
             <p className="mt-2 text-sm text-muted-foreground">
               {isFamilyView
-                ? "La vista simplifica la lectura y deja a mano solo las relaciones más importantes: sincronización, participantes, dispositivo y vínculo con una partida cuando existe."
+                ? t.accessDetail.family
                 : isResearcherView
-                ? "La vista mantiene el recorte real disponible y deja explícita la relación entre sync, dispositivo, usuario y partida correlacionada para revisar evidencia de captura sin bajar directo al raw completo."
+                ? t.accessDetail.researcher
                 : canReadOperationalSyncs
                 ? isTeacherView
-                  ? "La lectura docente deja explícito por qué la sync entra en tu acceso, qué dispositivo la originó y si ya se puede conectar con participantes o una partida asociada."
+                  ? t.accessDetail.teacher
                   : isDirectorView
-                  ? "La lectura directoral deja en primer plano cobertura, correlación con partidas y señales generales de trazabilidad para seguimiento institucional."
-                  : "Los resultados se abren al parque de dispositivos permitido por ACL. Si tu acceso queda limitado a una institución, vas a ver solo syncs de esa institución."
-                : "Esta sesión no tiene lectura operativa de BLE, así que la tabla queda limitada a tus propias sincronizaciones."}
+                  ? t.accessDetail.director
+                  : t.accessDetail.operational
+                : t.accessDetail.personal}
             </p>
           </div>
         </CardContent>
@@ -353,16 +540,16 @@ export function SyncsTable() {
         <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
           <CardContent className="grid gap-3 p-5 md:grid-cols-3">
             <div className="rounded-2xl bg-background/70 p-4">
-              <p className="text-sm font-medium text-foreground">Cobertura de captura</p>
-              <p className="mt-2 text-sm leading-6 text-muted-foreground">Se hace explícito qué parte de la muestra tiene raw disponible y qué parte todavía queda incompleta.</p>
+              <p className="text-sm font-medium text-foreground">{t.researcherCards.coverage.title}</p>
+              <p className="mt-2 text-sm leading-6 text-muted-foreground">{t.researcherCards.coverage.description}</p>
             </div>
             <div className="rounded-2xl bg-background/70 p-4">
-              <p className="text-sm font-medium text-foreground">Correlación con partida</p>
-              <p className="mt-2 text-sm leading-6 text-muted-foreground">La relación entre sync y partida asociada ayuda a leer continuidad sin saltar entre pantallas para cada caso.</p>
+              <p className="text-sm font-medium text-foreground">{t.researcherCards.correlation.title}</p>
+              <p className="mt-2 text-sm leading-6 text-muted-foreground">{t.researcherCards.correlation.description}</p>
             </div>
             <div className="rounded-2xl bg-background/70 p-4">
-              <p className="text-sm font-medium text-foreground">Asociaciones clave</p>
-              <p className="mt-2 text-sm leading-6 text-muted-foreground">Dispositivo, usuario y participantes quedan resumidos con lenguaje de evidencia y no solo de operación.</p>
+              <p className="text-sm font-medium text-foreground">{t.researcherCards.associations.title}</p>
+              <p className="mt-2 text-sm leading-6 text-muted-foreground">{t.researcherCards.associations.description}</p>
             </div>
           </CardContent>
         </Card>
@@ -372,16 +559,16 @@ export function SyncsTable() {
         <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
           <CardContent className="grid gap-3 p-5 md:grid-cols-3">
             <div className="rounded-2xl bg-background/70 p-4">
-              <p className="text-sm font-medium text-foreground">Actividad reciente</p>
-              <p className="mt-2 text-sm leading-6 text-muted-foreground">La pantalla muestra si hubo sincronizaciones recientes y qué parte de la experiencia quedó capturada.</p>
+              <p className="text-sm font-medium text-foreground">{t.familyCards.activity.title}</p>
+              <p className="mt-2 text-sm leading-6 text-muted-foreground">{t.familyCards.activity.description}</p>
             </div>
             <div className="rounded-2xl bg-background/70 p-4">
-              <p className="text-sm font-medium text-foreground">Participantes</p>
-              <p className="mt-2 text-sm leading-6 text-muted-foreground">Cuando hay información disponible, se presenta en lenguaje simple y fácil de seguir.</p>
+              <p className="text-sm font-medium text-foreground">{t.familyCards.participants.title}</p>
+              <p className="mt-2 text-sm leading-6 text-muted-foreground">{t.familyCards.participants.description}</p>
             </div>
             <div className="rounded-2xl bg-background/70 p-4">
-              <p className="text-sm font-medium text-foreground">Relación con partidas</p>
-              <p className="mt-2 text-sm leading-6 text-muted-foreground">Si una sync puede vincularse con una partida asociada, la conexión queda resumida sin meterse en detalles técnicos.</p>
+              <p className="text-sm font-medium text-foreground">{t.familyCards.relation.title}</p>
+              <p className="mt-2 text-sm leading-6 text-muted-foreground">{t.familyCards.relation.description}</p>
             </div>
           </CardContent>
         </Card>
@@ -392,8 +579,8 @@ export function SyncsTable() {
           <CardContent className="p-5">
             <div className="mb-3 flex items-center justify-between gap-3">
               <div>
-                <p className="text-sm font-semibold text-foreground">Acceso disponible</p>
-                <p className="text-sm text-muted-foreground">Priorizá el recorte por tipo de acceso antes de leer trazabilidad fina.</p>
+                <p className="text-sm font-semibold text-foreground">{t.accessAvailable}</p>
+                <p className="text-sm text-muted-foreground">{t.accessHint}</p>
               </div>
               <Badge variant="outline">{filtered.length} resultados</Badge>
             </div>
@@ -426,11 +613,11 @@ export function SyncsTable() {
           Array.from({ length: 5 }).map((_, index) => <Skeleton key={index} className="h-32 rounded-2xl" />)
         ) : (
           <>
-            <SummaryCard label={isFamilyView ? "Syncs" : isResearcherView ? "Muestra sync" : "Syncs"} value={String(metrics.total)} icon={Activity} />
-            <SummaryCard label="Con evidencia" value={String(metrics.withRaw)} icon={HardDriveDownload} />
-            <SummaryCard label="Con participantes" value={String(metrics.withParticipants)} icon={Users} />
-            <SummaryCard label="Con dispositivo" value={String(metrics.withDeviceLink)} icon={Waves} />
-            <SummaryCard label={isFamilyView ? "Con versión" : "Sin asociación"} value={String(isFamilyView ? metrics.withFirmware : metrics.unresolvedAssociations)} icon={isFamilyView ? Cpu : Activity} />
+            <SummaryCard label={isResearcherView ? t.summaryLabels.sample : t.summaryLabels.syncs} value={String(metrics.total)} icon={Activity} />
+            <SummaryCard label={t.summaryLabels.withEvidence} value={String(metrics.withRaw)} icon={HardDriveDownload} />
+            <SummaryCard label={t.summaryLabels.withParticipants} value={String(metrics.withParticipants)} icon={Users} />
+            <SummaryCard label={t.summaryLabels.withDevice} value={String(metrics.withDeviceLink)} icon={Waves} />
+            <SummaryCard label={isFamilyView ? t.summaryLabels.withVersion : t.summaryLabels.unresolved} value={String(isFamilyView ? metrics.withFirmware : metrics.unresolvedAssociations)} icon={isFamilyView ? Cpu : Activity} />
           </>
         )}
       </div>
@@ -440,17 +627,17 @@ export function SyncsTable() {
           <CardHeader>
             <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
               <div>
-                <CardTitle>{isFamilyView ? "Actividad de sincronización" : isResearcherView ? "Muestra de sincronizaciones" : isTeacherView ? "Sincronizaciones para aula" : isDirectorView ? "Sincronizaciones para seguimiento" : "Sesiones sincronizadas"}</CardTitle>
+                <CardTitle>{isFamilyView ? t.listTitles.family : isResearcherView ? t.listTitles.researcher : isTeacherView ? t.listTitles.teacher : isDirectorView ? t.listTitles.director : t.listTitles.default}</CardTitle>
                 <CardDescription>
                   {isFamilyView
-                    ? "Seleccioná una sincronización para ver un resumen simple de participantes, dispositivo y relación con la partida cuando exista."
+                    ? t.listDescriptions.family
                     : isResearcherView
-                    ? "Seleccioná una sesión para inspeccionar contexto disponible, participantes proyectados y correlación con partida sin salir del dashboard."
+                    ? t.listDescriptions.researcher
                     : isTeacherView
-                    ? "Seleccioná una sincronización para entender rápido dispositivo, participantes y vínculo con partida desde una lectura docente."
+                    ? t.listDescriptions.teacher
                     : isDirectorView
-                    ? "Seleccioná una sincronización para revisar trazabilidad general, correlación con partida y contexto institucional disponible."
-                    : "Seleccioná una sesión para inspeccionar contexto de dispositivo, usuario, participantes y payload raw más reciente."}
+                    ? t.listDescriptions.director
+                    : t.listDescriptions.default}
                 </CardDescription>
               </div>
               <ListPaginationControls

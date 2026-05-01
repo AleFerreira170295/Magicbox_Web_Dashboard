@@ -28,6 +28,7 @@ import {
 } from "@/features/access-control/api";
 import type { PermissionRecord } from "@/features/access-control/types";
 import { useAuth } from "@/features/auth/auth-context";
+import { useLanguage, type AppLanguage } from "@/features/i18n/i18n-context";
 import { useInstitutions } from "@/features/institutions/api";
 import { createUser, deleteUser, updateUser, uploadUserImage, useUsers } from "@/features/users/api";
 import type { CreateUserPayload, UpdateUserPayload, UserMutationPayload, UserRecord } from "@/features/users/types";
@@ -87,6 +88,308 @@ const roleBundles = [
     permissionKeys: ["game_data:read"],
   },
 ] as const;
+
+const usersMessages: Record<AppLanguage, {
+  header: {
+    eyebrow: { default: string; scoped: string };
+    title: string;
+    descriptionDefault: string;
+    descriptionScoped: (name: string) => string;
+    searchPlaceholder: string;
+    newUser: string;
+    creationUnavailable: string;
+    activeInstitution: (name: string) => string;
+  };
+  summary: {
+    loadedUsers: string;
+    withExplicitPermissions: string;
+    adminProfiles: string;
+    needsReview: string;
+    withImage: string;
+    viewAll: string;
+    viewFocus: string;
+    activeFocus: string;
+  };
+  filters: {
+    institution: string;
+    role: string;
+    focus: string;
+    all: string;
+    withNotes: string;
+    withAcl: string;
+    withoutImage: string;
+    withImage: string;
+    withoutAcl: string;
+    teachers: string;
+    admins: string;
+    clearFilters: string;
+  };
+  results: {
+    title: string;
+    summary: (filtered: number, total: number) => string;
+    overview: string;
+    clear: string;
+    searchChip: (value: string) => string;
+    institutionChip: (value: string) => string;
+    roleChip: (value: string) => string;
+    focusChip: (value: string) => string;
+  };
+  list: {
+    title: string;
+    description: string;
+    user: string;
+    roles: string;
+    permissions: string;
+    institution: string;
+    state: string;
+    updated: string;
+    empty: string;
+    noRole: string;
+    explicitCount: (count: number) => string;
+    noExplicitAcl: string;
+    active: string;
+    deleted: string;
+    image: string;
+    noImage: string;
+    review: string;
+  };
+  side: {
+    title: string;
+    description: string;
+    empty: string;
+    editSelected: string;
+    quickLinks: string;
+    quickLinksHint: (name: string) => string;
+    userDevices: string;
+    uploadedGames: string;
+  };
+}> = {
+  es: {
+    header: {
+      eyebrow: { default: "Superadmin", scoped: "Institution admin" },
+      title: "Usuarios",
+      descriptionDefault: "Gestioná usuarios, roles y permisos explícitos desde un solo lugar.",
+      descriptionScoped: (name) => `Vista ajustada a ${name}. Los listados y acciones respetan el acceso disponible.`,
+      searchPlaceholder: "Buscar por nombre, email, rol o permiso",
+      newUser: "Nuevo usuario",
+      creationUnavailable: "Alta no disponible",
+      activeInstitution: (name) => `Institución activa: ${name}`,
+    },
+    summary: {
+      loadedUsers: "Usuarios cargados",
+      withExplicitPermissions: "Con permisos explícitos",
+      adminProfiles: "Perfiles admin",
+      needsReview: "Necesitan revisión",
+      withImage: "Con imagen cargada",
+      viewAll: "Ver todos",
+      viewFocus: "Ver foco",
+      activeFocus: "Foco activo",
+    },
+    filters: {
+      institution: "Institución",
+      role: "Rol",
+      focus: "Enfoque",
+      all: "Todos",
+      withNotes: "Con observaciones",
+      withAcl: "Con ACL explícita",
+      withoutImage: "Sin imagen",
+      withImage: "Con imagen",
+      withoutAcl: "Sin ACL explícita",
+      teachers: "Docentes",
+      admins: "Admins",
+      clearFilters: "Limpiar filtros",
+    },
+    results: {
+      title: "Resultados",
+      summary: (filtered, total) => `${filtered} de ${total} usuarios con el recorte actual.`,
+      overview: "Vista general",
+      clear: "Limpiar",
+      searchChip: (value) => `Búsqueda · ${value}`,
+      institutionChip: (value) => `Institución · ${value}`,
+      roleChip: (value) => `Rol · ${value}`,
+      focusChip: (value) => `Enfoque · ${value}`,
+    },
+    list: {
+      title: "Padrón de usuarios",
+      description: "Buscá, filtrá y seleccioná un usuario para editar sus datos o revisar su acceso.",
+      user: "Usuario",
+      roles: "Roles",
+      permissions: "Permisos",
+      institution: "Institución",
+      state: "Estado",
+      updated: "Actualizado",
+      empty: "No hay usuarios para mostrar con los filtros actuales.",
+      noRole: "sin rol",
+      explicitCount: (count) => `${count} explícitos`,
+      noExplicitAcl: "sin ACL explícita",
+      active: "activo",
+      deleted: "eliminado",
+      image: "imagen",
+      noImage: "sin imagen",
+      review: "revisar",
+    },
+    side: {
+      title: "Edición y alta",
+      description: "Abrí el formulario sin perder de vista el padrón de usuarios.",
+      empty: "Seleccioná un usuario de la tabla para editarlo o usá el alta rápida para crear uno nuevo sin perder contexto del padrón.",
+      editSelected: "Editar seleccionado",
+      quickLinks: "Cruces rápidos",
+      quickLinksHint: (name) => `Abrí dispositivos y partidas ya filtrados por ${name} para seguir actividad y vínculos sin rehacer la búsqueda.`,
+      userDevices: "Ver dispositivos del usuario",
+      uploadedGames: "Ver partidas subidas",
+    },
+  },
+  en: {
+    header: {
+      eyebrow: { default: "Superadmin", scoped: "Institution admin" },
+      title: "Users",
+      descriptionDefault: "Manage users, roles, and explicit permissions from one place.",
+      descriptionScoped: (name) => `View scoped to ${name}. Lists and actions respect the available access.`,
+      searchPlaceholder: "Search by name, email, role, or permission",
+      newUser: "New user",
+      creationUnavailable: "Creation unavailable",
+      activeInstitution: (name) => `Active institution: ${name}`,
+    },
+    summary: {
+      loadedUsers: "Loaded users",
+      withExplicitPermissions: "With explicit permissions",
+      adminProfiles: "Admin profiles",
+      needsReview: "Need review",
+      withImage: "With profile image",
+      viewAll: "View all",
+      viewFocus: "View focus",
+      activeFocus: "Active focus",
+    },
+    filters: {
+      institution: "Institution",
+      role: "Role",
+      focus: "Focus",
+      all: "All",
+      withNotes: "With notes",
+      withAcl: "With explicit ACL",
+      withoutImage: "Without image",
+      withImage: "With image",
+      withoutAcl: "Without explicit ACL",
+      teachers: "Teachers",
+      admins: "Admins",
+      clearFilters: "Clear filters",
+    },
+    results: {
+      title: "Results",
+      summary: (filtered, total) => `${filtered} of ${total} users match the current view.`,
+      overview: "Overview",
+      clear: "Clear",
+      searchChip: (value) => `Search · ${value}`,
+      institutionChip: (value) => `Institution · ${value}`,
+      roleChip: (value) => `Role · ${value}`,
+      focusChip: (value) => `Focus · ${value}`,
+    },
+    list: {
+      title: "User roster",
+      description: "Search, filter, and select a user to edit their data or review their access.",
+      user: "User",
+      roles: "Roles",
+      permissions: "Permissions",
+      institution: "Institution",
+      state: "State",
+      updated: "Updated",
+      empty: "There are no users to show with the current filters.",
+      noRole: "no role",
+      explicitCount: (count) => `${count} explicit`,
+      noExplicitAcl: "no explicit ACL",
+      active: "active",
+      deleted: "deleted",
+      image: "image",
+      noImage: "no image",
+      review: "review",
+    },
+    side: {
+      title: "Edit and create",
+      description: "Open the form without losing sight of the user roster.",
+      empty: "Select a user from the table to edit them, or use quick create to add one without losing roster context.",
+      editSelected: "Edit selected",
+      quickLinks: "Quick links",
+      quickLinksHint: (name) => `Open devices and games already filtered by ${name} to follow activity and links without rebuilding the search.`,
+      userDevices: "View user devices",
+      uploadedGames: "View uploaded games",
+    },
+  },
+  pt: {
+    header: {
+      eyebrow: { default: "Superadmin", scoped: "Institution admin" },
+      title: "Usuários",
+      descriptionDefault: "Gerencie usuários, papéis e permissões explícitas em um só lugar.",
+      descriptionScoped: (name) => `Visão ajustada a ${name}. As listas e ações respeitam o acesso disponível.`,
+      searchPlaceholder: "Buscar por nome, email, papel ou permissão",
+      newUser: "Novo usuário",
+      creationUnavailable: "Cadastro indisponível",
+      activeInstitution: (name) => `Instituição ativa: ${name}`,
+    },
+    summary: {
+      loadedUsers: "Usuários carregados",
+      withExplicitPermissions: "Com permissões explícitas",
+      adminProfiles: "Perfis admin",
+      needsReview: "Precisam de revisão",
+      withImage: "Com imagem carregada",
+      viewAll: "Ver todos",
+      viewFocus: "Ver foco",
+      activeFocus: "Foco ativo",
+    },
+    filters: {
+      institution: "Instituição",
+      role: "Papel",
+      focus: "Foco",
+      all: "Todos",
+      withNotes: "Com observações",
+      withAcl: "Com ACL explícita",
+      withoutImage: "Sem imagem",
+      withImage: "Com imagem",
+      withoutAcl: "Sem ACL explícita",
+      teachers: "Docentes",
+      admins: "Admins",
+      clearFilters: "Limpar filtros",
+    },
+    results: {
+      title: "Resultados",
+      summary: (filtered, total) => `${filtered} de ${total} usuários com o recorte atual.`,
+      overview: "Visão geral",
+      clear: "Limpar",
+      searchChip: (value) => `Busca · ${value}`,
+      institutionChip: (value) => `Instituição · ${value}`,
+      roleChip: (value) => `Papel · ${value}`,
+      focusChip: (value) => `Foco · ${value}`,
+    },
+    list: {
+      title: "Lista de usuários",
+      description: "Busque, filtre e selecione um usuário para editar seus dados ou revisar seu acesso.",
+      user: "Usuário",
+      roles: "Papéis",
+      permissions: "Permissões",
+      institution: "Instituição",
+      state: "Estado",
+      updated: "Atualizado",
+      empty: "Não há usuários para mostrar com os filtros atuais.",
+      noRole: "sem papel",
+      explicitCount: (count) => `${count} explícitas`,
+      noExplicitAcl: "sem ACL explícita",
+      active: "ativo",
+      deleted: "excluído",
+      image: "imagem",
+      noImage: "sem imagem",
+      review: "revisar",
+    },
+    side: {
+      title: "Edição e cadastro",
+      description: "Abra o formulário sem perder a lista de usuários de vista.",
+      empty: "Selecione um usuário na tabela para editá-lo ou use o cadastro rápido para criar um novo sem perder o contexto da lista.",
+      editSelected: "Editar selecionado",
+      quickLinks: "Links rápidos",
+      quickLinksHint: (name) => `Abra dispositivos e partidas já filtrados por ${name} para acompanhar atividade e vínculos sem refazer a busca.`,
+      userDevices: "Ver dispositivos do usuário",
+      uploadedGames: "Ver partidas enviadas",
+    },
+  },
+};
 
 type FormMode = "create" | "edit";
 type UsersFocusFilter = "all" | "review" | "no_image" | "with_image" | "no_acl" | "with_acl" | "teachers" | "admins";
@@ -300,7 +603,8 @@ function SummaryCard({
   icon: Icon,
   onSelect,
   isActive = false,
-  actionLabel = "Ver foco",
+  actionLabel,
+  activeLabel,
 }: {
   label: string;
   value: string;
@@ -308,7 +612,8 @@ function SummaryCard({
   icon: React.ComponentType<{ className?: string }>;
   onSelect?: () => void;
   isActive?: boolean;
-  actionLabel?: string;
+  actionLabel: string;
+  activeLabel: string;
 }) {
   return (
     <Card className={cn("border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]", isActive && "ring-2 ring-primary/20")}>
@@ -327,7 +632,7 @@ function SummaryCard({
           <button
             type="button"
             onClick={onSelect}
-            aria-label={`${isActive ? "Foco activo para" : actionLabel} ${label}`}
+            aria-label={`${isActive ? activeLabel : actionLabel} ${label}`}
             className={cn(
               "mt-4 inline-flex rounded-full border px-3 py-1.5 text-xs font-medium transition",
               isActive
@@ -335,7 +640,7 @@ function SummaryCard({
                 : "border-border/70 bg-white/80 text-foreground hover:border-primary/30 hover:bg-primary/5",
             )}
           >
-            {isActive ? "Foco activo" : actionLabel}
+            {isActive ? activeLabel : actionLabel}
           </button>
         ) : null}
       </CardContent>
@@ -367,6 +672,8 @@ function SelectField({
 }
 
 export function UsersTable() {
+  const { language } = useLanguage();
+  const t = usersMessages[language];
   const { tokens, user: currentUser } = useAuth();
   const queryClient = useQueryClient();
   const usersQuery = useUsers(tokens?.accessToken);
@@ -588,26 +895,26 @@ export function UsersTable() {
 
   const focusSegments = useMemo(
     () => [
-      { key: "all" as const, label: "Todos", count: metrics.totalUsers },
-      { key: "review" as const, label: "Con observaciones", count: metrics.reviewUsers },
-      { key: "with_acl" as const, label: "Con ACL explícita", count: metrics.permissionedUsers },
-      { key: "no_image" as const, label: "Sin imagen", count: metrics.totalUsers - metrics.usersWithImage },
-      { key: "with_image" as const, label: "Con imagen", count: metrics.usersWithImage },
-      { key: "no_acl" as const, label: "Sin ACL explícita", count: metrics.usersWithoutAcl },
-      { key: "teachers" as const, label: "Docentes", count: metrics.teacherUsers },
-      { key: "admins" as const, label: "Admins", count: metrics.adminLikeUsers },
+      { key: "all" as const, label: t.filters.all, count: metrics.totalUsers },
+      { key: "review" as const, label: t.filters.withNotes, count: metrics.reviewUsers },
+      { key: "with_acl" as const, label: t.filters.withAcl, count: metrics.permissionedUsers },
+      { key: "no_image" as const, label: t.filters.withoutImage, count: metrics.totalUsers - metrics.usersWithImage },
+      { key: "with_image" as const, label: t.filters.withImage, count: metrics.usersWithImage },
+      { key: "no_acl" as const, label: t.filters.withoutAcl, count: metrics.usersWithoutAcl },
+      { key: "teachers" as const, label: t.filters.teachers, count: metrics.teacherUsers },
+      { key: "admins" as const, label: t.filters.admins, count: metrics.adminLikeUsers },
     ],
-    [metrics.adminLikeUsers, metrics.permissionedUsers, metrics.reviewUsers, metrics.teacherUsers, metrics.totalUsers, metrics.usersWithImage, metrics.usersWithoutAcl],
+    [metrics.adminLikeUsers, metrics.permissionedUsers, metrics.reviewUsers, metrics.teacherUsers, metrics.totalUsers, metrics.usersWithImage, metrics.usersWithoutAcl, t.filters.admins, t.filters.all, t.filters.teachers, t.filters.withAcl, t.filters.withImage, t.filters.withNotes, t.filters.withoutAcl, t.filters.withoutImage],
   );
 
   const activeFilterChips = useMemo(
     () => [
-      query.trim() ? `Búsqueda · ${query.trim()}` : null,
-      institutionFilter ? `Institución · ${institutionsById.get(institutionFilter) || institutionFilter}` : null,
-      roleFilter ? `Rol · ${roleFilter}` : null,
-      focusFilter !== "all" ? `Enfoque · ${focusSegments.find((segment) => segment.key === focusFilter)?.label || focusFilter}` : null,
+      query.trim() ? t.results.searchChip(query.trim()) : null,
+      institutionFilter ? t.results.institutionChip(institutionsById.get(institutionFilter) || institutionFilter) : null,
+      roleFilter ? t.results.roleChip(roleFilter) : null,
+      focusFilter !== "all" ? t.results.focusChip(focusSegments.find((segment) => segment.key === focusFilter)?.label || focusFilter) : null,
     ].filter((value): value is string => Boolean(value)),
-    [focusFilter, focusSegments, institutionFilter, institutionsById, query, roleFilter],
+    [focusFilter, focusSegments, institutionFilter, institutionsById, query, roleFilter, t.results],
   );
 
   const permissionsByFeature = useMemo(() => {
@@ -740,7 +1047,7 @@ export function UsersTable() {
   }
 
   function resolveInstitutionLabel(user: UserRecord) {
-    if (!user.educationalCenterId) return "Sin institución";
+    if (!user.educationalCenterId) return language === "en" ? "No institution" : language === "pt" ? "Sem instituição" : "Sin institución";
     return institutionsById.get(user.educationalCenterId) || user.educationalCenterId;
   }
 
@@ -1189,12 +1496,12 @@ export function UsersTable() {
   return (
     <div className="space-y-6">
       <SectionHeader
-        eyebrow={isInstitutionAdminView ? "Institution admin" : "Superadmin"}
-        title="Usuarios"
+        eyebrow={isInstitutionAdminView ? t.header.eyebrow.scoped : t.header.eyebrow.default}
+        title={t.header.title}
         description={
           isInstitutionAdminView
-            ? `Vista ajustada a ${scopedInstitutionName}. Los listados y acciones respetan el acceso disponible.`
-            : "Gestioná usuarios, roles y permisos explícitos desde un solo lugar."
+            ? t.header.descriptionScoped(scopedInstitutionName || (language === "en" ? "the institution" : language === "pt" ? "a instituição" : "la institución"))
+            : t.header.descriptionDefault
         }
         actions={
           <div className="flex flex-col items-stretch gap-3 md:flex-row md:items-center">
@@ -1203,7 +1510,7 @@ export function UsersTable() {
               <Input
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
-                placeholder="Buscar por nombre, email, rol o permiso"
+                placeholder={t.header.searchPlaceholder}
                 className="pl-9"
               />
             </div>
@@ -1213,7 +1520,7 @@ export function UsersTable() {
               onClick={openCreateUserForm}
             >
               <UserPlus className="size-4" />
-              {canCreateUsers ? "Nuevo usuario" : "Alta no disponible"}
+              {canCreateUsers ? t.header.newUser : t.header.creationUnavailable}
             </Button>
           </div>
         }
@@ -1221,7 +1528,7 @@ export function UsersTable() {
 
       {scopedInstitutionName ? (
         <div className="flex flex-wrap gap-2">
-          <Badge variant="outline">Institución activa: {scopedInstitutionName}</Badge>
+          <Badge variant="outline">{t.header.activeInstitution(scopedInstitutionName)}</Badge>
         </div>
       ) : null}
 
@@ -1231,40 +1538,49 @@ export function UsersTable() {
         ) : (
           <>
             <SummaryCard
-              label="Usuarios cargados"
+              label={t.summary.loadedUsers}
               value={String(metrics.totalUsers)}
               icon={Users}
               onSelect={() => setFocusFilter("all")}
               isActive={focusFilter === "all"}
-              actionLabel="Ver todos"
+              actionLabel={t.summary.viewAll}
+              activeLabel={t.summary.activeFocus}
             />
             <SummaryCard
-              label="Con permisos explícitos"
+              label={t.summary.withExplicitPermissions}
               value={String(metrics.permissionedUsers)}
               icon={KeyRound}
               onSelect={() => setFocusFilter("with_acl")}
               isActive={focusFilter === "with_acl"}
+              actionLabel={t.summary.viewFocus}
+              activeLabel={t.summary.activeFocus}
             />
             <SummaryCard
-              label="Perfiles admin"
+              label={t.summary.adminProfiles}
               value={String(metrics.adminLikeUsers)}
               icon={ShieldCheck}
               onSelect={() => setFocusFilter("admins")}
               isActive={focusFilter === "admins"}
+              actionLabel={t.summary.viewFocus}
+              activeLabel={t.summary.activeFocus}
             />
             <SummaryCard
-              label="Necesitan revisión"
+              label={t.summary.needsReview}
               value={String(metrics.reviewUsers)}
               icon={Phone}
               onSelect={() => setFocusFilter("review")}
               isActive={focusFilter === "review"}
+              actionLabel={t.summary.viewFocus}
+              activeLabel={t.summary.activeFocus}
             />
             <SummaryCard
-              label="Con imagen cargada"
+              label={t.summary.withImage}
               value={String(metrics.usersWithImage)}
               icon={Users}
               onSelect={() => setFocusFilter("with_image")}
               isActive={focusFilter === "with_image"}
+              actionLabel={t.summary.viewFocus}
+              activeLabel={t.summary.activeFocus}
             />
           </>
         )}
@@ -1273,9 +1589,9 @@ export function UsersTable() {
       <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
         <CardContent className="grid gap-4 p-5 md:grid-cols-2 2xl:grid-cols-4">
           <div className="space-y-2">
-            <Label>Institución</Label>
+            <Label>{t.filters.institution}</Label>
             <SelectField value={institutionFilter} onChange={setInstitutionFilter}>
-              {!scopedInstitutionId ? <option value="">Todas</option> : null}
+              {!scopedInstitutionId ? <option value="">{t.filters.all}</option> : null}
               {institutions.map((institution) => (
                 <option key={institution.id} value={institution.id}>
                   {institution.name}
@@ -1284,9 +1600,9 @@ export function UsersTable() {
             </SelectField>
           </div>
           <div className="space-y-2">
-            <Label>Rol</Label>
+            <Label>{t.filters.role}</Label>
             <SelectField value={roleFilter} onChange={setRoleFilter}>
-              <option value="">Todos</option>
+              <option value="">{t.filters.all}</option>
               {availableRoles.map((role) => (
                 <option key={role} value={role}>
                   {role}
@@ -1295,16 +1611,16 @@ export function UsersTable() {
             </SelectField>
           </div>
           <div className="space-y-2">
-            <Label>Enfoque</Label>
+            <Label>{t.filters.focus}</Label>
             <SelectField value={focusFilter} onChange={(value) => setFocusFilter(value as UsersFocusFilter)}>
-              <option value="all">Todos</option>
-              <option value="review">Con observaciones</option>
-              <option value="with_acl">Con ACL explícita</option>
-              <option value="no_image">Sin imagen</option>
-              <option value="with_image">Con imagen</option>
-              <option value="no_acl">Sin ACL explícita</option>
-              <option value="teachers">Docentes</option>
-              <option value="admins">Admins</option>
+              <option value="all">{t.filters.all}</option>
+              <option value="review">{t.filters.withNotes}</option>
+              <option value="with_acl">{t.filters.withAcl}</option>
+              <option value="no_image">{t.filters.withoutImage}</option>
+              <option value="with_image">{t.filters.withImage}</option>
+              <option value="no_acl">{t.filters.withoutAcl}</option>
+              <option value="teachers">{t.filters.teachers}</option>
+              <option value="admins">{t.filters.admins}</option>
             </SelectField>
           </div>
           <div className="flex items-end">
@@ -1313,7 +1629,7 @@ export function UsersTable() {
               variant="outline"
               onClick={resetFilters}
             >
-              Limpiar filtros
+              {t.filters.clearFilters}
             </Button>
           </div>
         </CardContent>
@@ -1341,11 +1657,11 @@ export function UsersTable() {
       <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
         <CardContent className="flex flex-wrap items-center justify-between gap-4 p-5">
           <div>
-            <p className="text-sm font-medium text-foreground">Resultados visibles</p>
-            <p className="mt-1 text-sm text-muted-foreground">{filtered.length} de {metrics.totalUsers} usuarios con el recorte actual.</p>
+            <p className="text-sm font-medium text-foreground">{t.results.title}</p>
+            <p className="mt-1 text-sm text-muted-foreground">{t.results.summary(filtered.length, metrics.totalUsers)}</p>
           </div>
           <div className="flex flex-wrap items-center justify-end gap-2">
-            {activeFilterChips.length > 0 ? activeFilterChips.map((chip) => <Badge key={chip} variant="outline">{chip}</Badge>) : <Badge variant="outline">Vista general</Badge>}
+            {activeFilterChips.length > 0 ? activeFilterChips.map((chip) => <Badge key={chip} variant="outline">{chip}</Badge>) : <Badge variant="outline">{t.results.overview}</Badge>}
             {activeFilterChips.length > 0 ? (
               <Button
                 type="button"
@@ -1353,7 +1669,7 @@ export function UsersTable() {
                 size="sm"
                 onClick={resetFilters}
               >
-                Limpiar
+                {t.results.clear}
               </Button>
             ) : null}
           </div>
@@ -1365,9 +1681,9 @@ export function UsersTable() {
           <CardHeader>
             <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
               <div>
-                <CardTitle>Padrón de usuarios</CardTitle>
+                <CardTitle>{t.list.title}</CardTitle>
                 <CardDescription>
-                  Buscá, filtrá y seleccioná un usuario para editar sus datos o revisar su acceso.
+                  {t.list.description}
                 </CardDescription>
               </div>
               <ListPaginationControls
@@ -1394,19 +1710,19 @@ export function UsersTable() {
               <Table>
                 <TableHeader className="sticky top-0 z-10 bg-white/95 backdrop-blur-sm">
                   <TableRow>
-                    <TableHead>Usuario</TableHead>
-                    <TableHead>Roles</TableHead>
-                    <TableHead>Permisos</TableHead>
-                    <TableHead>Institución</TableHead>
-                    <TableHead>Estado</TableHead>
-                    <TableHead>Actualizado</TableHead>
+                    <TableHead>{t.list.user}</TableHead>
+                    <TableHead>{t.list.roles}</TableHead>
+                    <TableHead>{t.list.permissions}</TableHead>
+                    <TableHead>{t.list.institution}</TableHead>
+                    <TableHead>{t.list.state}</TableHead>
+                    <TableHead>{t.list.updated}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filtered.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={6} className="py-10 text-center text-sm text-muted-foreground">
-                        No hay usuarios para mostrar con los filtros actuales.
+                        {t.list.empty}
                       </TableCell>
                     </TableRow>
                   ) : (
@@ -1432,25 +1748,25 @@ export function UsersTable() {
                                   </Badge>
                                 ))
                               ) : (
-                                <Badge variant="outline">sin rol</Badge>
+                                <Badge variant="outline">{t.list.noRole}</Badge>
                               )}
                             </div>
                           </TableCell>
                           <TableCell>
                             {item.explicitPermissionKeys.length > 0 ? (
-                              <span className="text-sm text-muted-foreground">{item.explicitPermissionKeys.length} explícitos</span>
+                              <span className="text-sm text-muted-foreground">{t.list.explicitCount(item.explicitPermissionKeys.length)}</span>
                             ) : (
-                              <Badge variant="outline">sin ACL explícita</Badge>
+                              <Badge variant="outline">{t.list.noExplicitAcl}</Badge>
                             )}
                           </TableCell>
                           <TableCell>{resolveInstitutionLabel(item)}</TableCell>
                           <TableCell>
                             <div className="flex flex-wrap gap-2">
                               <Badge variant={item.status === "active" ? "success" : "outline"}>
-                                {item.status === "active" ? "activo" : "eliminado"}
+                                {item.status === "active" ? t.list.active : t.list.deleted}
                               </Badge>
-                              <Badge variant={item.imageUrl ? "secondary" : "outline"}>{item.imageUrl ? "imagen" : "sin imagen"}</Badge>
-                              {item.needsReview ? <Badge variant="outline">revisar</Badge> : null}
+                              <Badge variant={item.imageUrl ? "secondary" : "outline"}>{item.imageUrl ? t.list.image : t.list.noImage}</Badge>
+                              {item.needsReview ? <Badge variant="outline">{t.list.review}</Badge> : null}
                             </div>
                           </TableCell>
                           <TableCell>{formatDateTime(item.updatedAt || item.createdAt)}</TableCell>
@@ -1467,9 +1783,9 @@ export function UsersTable() {
         <div className="space-y-6">
           <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
             <CardHeader>
-              <CardTitle>Edición y alta</CardTitle>
+              <CardTitle>{t.side.title}</CardTitle>
               <CardDescription>
-                Abrí el formulario sin perder de vista el padrón de usuarios.
+                {t.side.description}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -1495,38 +1811,38 @@ export function UsersTable() {
                 </div>
               ) : (
                 <div className="rounded-2xl border border-border/70 bg-white/80 p-4 text-sm leading-6 text-muted-foreground">
-                  Seleccioná un usuario de la tabla para editarlo o usá el alta rápida para crear uno nuevo sin perder contexto del padrón.
+                  {t.side.empty}
                 </div>
               )}
 
               <div className="flex flex-wrap gap-3">
                 <Button type="button" onClick={openCreateUserForm} disabled={!canCreateUsers}>
                   <UserPlus className="size-4" />
-                  {canCreateUsers ? "Nuevo usuario" : "Alta no disponible"}
+                  {canCreateUsers ? t.header.newUser : t.header.creationUnavailable}
                 </Button>
                 <Button type="button" variant="outline" onClick={openEditUserForm} disabled={!selectedUser}>
-                  Editar seleccionado
+                  {t.side.editSelected}
                 </Button>
               </div>
 
               {selectedUser ? (
                 <div className="rounded-2xl border border-border/70 bg-background/70 p-4">
-                  <p className="text-sm font-medium text-foreground">Cruces rápidos</p>
+                  <p className="text-sm font-medium text-foreground">{t.side.quickLinks}</p>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    Abrí dispositivos y partidas ya filtrados por {selectedUser.fullName} para seguir actividad y vínculos sin rehacer la búsqueda.
+                    {t.side.quickLinksHint(selectedUser.fullName)}
                   </p>
                   <div className="mt-3 flex flex-wrap gap-3">
                     <Link
                       href={buildUserRelationHref("/devices", selectedUser)}
                       className={buttonVariants({ variant: "outline", size: "sm" })}
                     >
-                      Ver dispositivos del usuario
+                      {t.side.userDevices}
                     </Link>
                     <Link
                       href={buildUserRelationHref("/games", selectedUser)}
                       className={buttonVariants({ variant: "outline", size: "sm" })}
                     >
-                      Ver partidas subidas
+                      {t.side.uploadedGames}
                     </Link>
                   </div>
                 </div>

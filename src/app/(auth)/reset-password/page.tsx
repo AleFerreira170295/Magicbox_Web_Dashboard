@@ -1,11 +1,19 @@
+"use client";
+
 import { Suspense } from "react";
 import { AuthShell } from "@/components/auth-shell";
 import { ResetPasswordForm } from "@/features/auth/reset-password-form";
+import { useLanguage } from "@/features/i18n/i18n-context";
+
+function ResetPasswordFallback() {
+  const { t } = useLanguage();
+  return <div className="text-sm text-muted-foreground">{t.auth.pages.resetPassword.loading}</div>;
+}
 
 export default function ResetPasswordPage() {
   return (
-    <AuthShell title="Nueva contraseña" description="Elegí una clave segura para volver a entrar.">
-      <Suspense fallback={<div className="text-sm text-muted-foreground">Cargando formulario...</div>}>
+    <AuthShell page="resetPassword">
+      <Suspense fallback={<ResetPasswordFallback />}>
         <ResetPasswordForm />
       </Suspense>
     </AuthShell>

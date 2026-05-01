@@ -10,21 +10,22 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/features/auth/auth-context";
+import { useLanguage } from "@/features/i18n/i18n-context";
 import { getErrorMessage } from "@/lib/utils";
 
-const loginSchema = z.object({
-  email: z.string().email("Ingresá un email válido"),
-  password: z.string().min(1, "Ingresá tu contraseña"),
-});
-
-type LoginFormValues = z.infer<typeof loginSchema>;
+type LoginFormValues = { email: string; password: string };
 
 export function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { login, status } = useAuth();
+  const { t } = useLanguage();
   const [error, setError] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
+  const loginSchema = z.object({
+    email: z.string().email(t.auth.loginForm.validation.invalidEmail),
+    password: z.string().min(1, t.auth.loginForm.validation.requiredPassword),
+  });
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
@@ -58,13 +59,13 @@ export function LoginForm() {
   return (
     <form className="space-y-5" onSubmit={onSubmit}>
       <div className="space-y-2">
-        <Label htmlFor="email">Email</Label>
-        <Input id="email" type="email" autoComplete="email" placeholder="tu@magicbox.com" {...form.register("email")} />
+        <Label htmlFor="email">{t.auth.loginForm.emailLabel}</Label>
+        <Input id="email" type="email" autoComplete="email" placeholder={t.auth.loginForm.emailPlaceholder} {...form.register("email")} />
         {form.formState.errors.email ? <p className="text-sm text-destructive">{form.formState.errors.email.message}</p> : null}
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="password">Contraseña</Label>
+        <Label htmlFor="password">{t.auth.loginForm.passwordLabel}</Label>
         <div className="relative">
           <Input
             id="password"
@@ -78,10 +79,10 @@ export function LoginForm() {
             type="button"
             className="absolute inset-y-0 right-3 text-sm font-medium text-primary hover:underline"
             onClick={() => setShowPassword((current) => !current)}
-            aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+            aria-label={showPassword ? t.auth.loginForm.hidePassword : t.auth.loginForm.showPassword}
             aria-pressed={showPassword}
           >
-            {showPassword ? "Ocultar" : "Mostrar"}
+            {showPassword ? t.auth.loginForm.hidePassword : t.auth.loginForm.showPassword}
           </button>
         </div>
         {form.formState.errors.password ? <p className="text-sm text-destructive">{form.formState.errors.password.message}</p> : null}
@@ -93,15 +94,15 @@ export function LoginForm() {
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <Link href="/forgot-password" className="text-sm font-medium text-primary hover:underline">
-          ¿Olvidaste tu contraseña?
+          {t.auth.loginForm.forgotPassword}
         </Link>
         <Link href="/register" className="text-sm font-medium text-primary hover:underline">
-          Crear usuario
+          {t.auth.loginForm.createUser}
         </Link>
       </div>
 
       <Button className="w-full" type="submit" disabled={form.formState.isSubmitting}>
-        {form.formState.isSubmitting ? "Ingresando..." : "Entrar"}
+        {form.formState.isSubmitting ? t.auth.loginForm.submitting : t.auth.loginForm.submit}
       </Button>
     </form>
   );

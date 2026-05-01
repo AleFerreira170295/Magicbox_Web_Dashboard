@@ -7,12 +7,15 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { forgotPassword } from "@/features/auth/auth-api";
+import { useLanguage } from "@/features/i18n/i18n-context";
 import { validateEmail } from "@/features/auth/validators";
 import { getErrorMessage } from "@/lib/utils";
 import { useState } from "react";
 
 export function ForgotPasswordForm() {
   const router = useRouter();
+  const { t } = useLanguage();
+  const validation = t.auth.validation;
   const [error, setError] = useState<string | null>(null);
   const form = useForm<{ email: string }>({
     defaultValues: { email: "" },
@@ -32,7 +35,7 @@ export function ForgotPasswordForm() {
   return (
     <div className="space-y-6">
       <div className="rounded-3xl border border-sky-100 bg-sky-50 px-5 py-4 text-sm leading-6 text-sky-900">
-        Te enviamos un código al correo asociado a tu cuenta para continuar con el restablecimiento.
+        {t.auth.forgotPasswordForm.notice}
       </div>
 
       {error ? (
@@ -41,22 +44,22 @@ export function ForgotPasswordForm() {
 
       <form className="space-y-5" onSubmit={form.handleSubmit(onSubmit)}>
         <div className="space-y-2">
-          <Label htmlFor="email">Email</Label>
-          <Input id="email" type="email" autoComplete="email" {...form.register("email", { validate: (value) => validateEmail(value) })} />
+          <Label htmlFor="email">{t.auth.forgotPasswordForm.email}</Label>
+          <Input id="email" type="email" autoComplete="email" {...form.register("email", { validate: (value) => validateEmail(value, validation) })} />
           {form.formState.errors.email ? <p className="text-sm text-destructive">{form.formState.errors.email.message}</p> : null}
         </div>
 
         <Button className="w-full" type="submit" disabled={form.formState.isSubmitting}>
-          {form.formState.isSubmitting ? "Enviando..." : "Enviar código"}
+          {form.formState.isSubmitting ? t.auth.forgotPasswordForm.submitting : t.auth.forgotPasswordForm.submit}
         </Button>
       </form>
 
       <div className="flex items-center justify-between gap-3 text-sm">
         <Link href="/login" className="font-medium text-primary hover:underline">
-          Volver al login
+          {t.auth.forgotPasswordForm.backToLogin}
         </Link>
         <Link href="/register" className="font-medium text-primary hover:underline">
-          Crear usuario
+          {t.auth.forgotPasswordForm.createUser}
         </Link>
       </div>
     </div>

@@ -23,6 +23,7 @@ import { deleteClassGroup, useClassGroups } from "@/features/class-groups/api";
 import { StudentImportPanel } from "@/features/class-groups/student-import-panel";
 import { useDevices } from "@/features/devices/api";
 import { useGames } from "@/features/games/api";
+import { useLanguage, type AppLanguage } from "@/features/i18n/i18n-context";
 import {
   createInstitution,
   deleteInstitution,
@@ -41,6 +42,134 @@ import { buildInstitutionStudentDetailHref } from "@/features/institutions/stude
 import { useAllStudents } from "@/features/students/api";
 import { useUsers } from "@/features/users/api";
 import { cn, formatDateTime, getErrorMessage } from "@/lib/utils";
+
+const institutionsOverviewMessages: Record<AppLanguage, {
+  header: {
+    eyebrow: { superadmin: string; institutionAdmin: string; director: string };
+    title: string;
+    descriptionDefault: string;
+    descriptionScoped: (name: string) => string;
+    descriptionDirector: (name: string) => string;
+    searchPlaceholder: string;
+    newInstitution: string;
+    creationUnavailable: string;
+    activeInstitution: (name: string) => string;
+  };
+  summaries: {
+    institutions: string;
+    linkedUsers: string;
+    linkedDevices: string;
+    linkedGroups: string;
+    linkedStudents: string;
+    needReview: string;
+    withLogo: string;
+  };
+  focus: {
+    title: string;
+    hint: string;
+    results: (count: number) => string;
+    clear: string;
+  };
+  map: {
+    titleDefault: string;
+    titleDirector: string;
+    descriptionDefault: string;
+    descriptionDirector: string;
+    editSelected: string;
+    clearSelection: string;
+    empty: string;
+    contact: string;
+    users: string;
+    devices: string;
+    state: string;
+    updated: string;
+    noLocation: string;
+    active: string;
+    deleted: string;
+    logo: string;
+    noLogo: string;
+    review: string;
+  };
+  impact: {
+    title: string;
+    description: string;
+    empty: string;
+    noAddress: string;
+    loadedLogo: string;
+    pendingLogo: string;
+    linkedUsers: string;
+    linkedDevices: string;
+    linkedGroups: string;
+    noLinkedUsers: string;
+    noLinkedDevices: string;
+    noLinkedGroups: string;
+    updatedPrefix: string;
+    students: string;
+    groups: string;
+    backendCount: string;
+    institutionWeight: string;
+  };
+  review: {
+    title: string;
+    description: string;
+    count: (count: number) => string;
+    showOnly: string;
+    empty: string;
+    noPhone: string;
+    noUrl: string;
+    noAddress: string;
+    noLogo: string;
+    users: (count: number) => string;
+    devices: (count: number) => string;
+  };
+  groups: {
+    title: string;
+    description: string;
+    empty: string;
+    loadedGroups: string;
+    loadedGroupsHint: string;
+    deleteGroup: string;
+    clearGroup: string;
+  };
+}> = {
+  es: {
+    header: {
+      eyebrow: { superadmin: "Superadmin", institutionAdmin: "Institution admin", director: "Director" },
+      title: "Instituciones",
+      descriptionDefault: "La vista ahora conecta instituciones reales del backend con impacto operativo en usuarios y dispositivos.",
+      descriptionScoped: (name) => `Vista central sobre ${name}. Ya cruza instituciones con usuarios y dispositivos reales.`,
+      descriptionDirector: (name) => `Vista institucional sobre ${name}, pensada para seguimiento general, contacto y cobertura actual.`,
+      searchPlaceholder: "Buscar por institución, email, usuario o dispositivo",
+      newInstitution: "Nueva institución",
+      creationUnavailable: "Alta no disponible",
+      activeInstitution: (name) => `Institución activa: ${name}`,
+    },
+    summaries: { institutions: "Instituciones", linkedUsers: "Usuarios vinculados", linkedDevices: "Dispositivos vinculados", linkedGroups: "Grupos vinculados", linkedStudents: "Estudiantes vinculados", needReview: "Necesitan revisión", withLogo: "Con logo cargado" },
+    focus: { title: "Enfocar listado", hint: "Priorizá instituciones con datos pendientes o señales de seguimiento antes de editar datos base.", results: (count) => `${count} resultados`, clear: "Limpiar foco" },
+    map: { titleDefault: "Mapa institucional", titleDirector: "Instituciones para seguimiento", descriptionDefault: "Seleccioná una institución para trabajar desde el cuerpo central: ver detalle, editar y operar sin saltar a barras laterales.", descriptionDirector: "Seleccioná una institución para revisar contacto, cobertura actual y señales generales de seguimiento.", editSelected: "Editar seleccionada", clearSelection: "Deseleccionar institución", empty: "No hay instituciones para mostrar con los filtros actuales.", contact: "Contacto", users: "Usuarios", devices: "Dispositivos", state: "Estado", updated: "Actualizado", noLocation: "Sin ubicación", active: "activa", deleted: "eliminada", logo: "logo", noLogo: "sin logo", review: "revisar" },
+    impact: { title: "Impacto operativo", description: "Cruce rápido entre la institución seleccionada, las personas vinculadas y el parque de dispositivos asociado.", empty: "Seleccioná una institución para revisar sus vínculos operativos.", noAddress: "Sin dirección cargada", loadedLogo: "logo institucional cargado", pendingLogo: "logo pendiente", linkedUsers: "Usuarios vinculados", linkedDevices: "Dispositivos vinculados", linkedGroups: "Grupos vinculados", noLinkedUsers: "sin usuarios vinculados", noLinkedDevices: "sin dispositivos vinculados", noLinkedGroups: "sin grupos vinculados", updatedPrefix: "act.", students: "estudiantes", groups: "grupos", backendCount: "Conteo expuesto por el backend compartido.", institutionWeight: "Sirve para entender el peso real de la institución." },
+    review: { title: "Instituciones que conviene revisar", description: "Señales rápidas para completar contacto, dirección o presencia web antes de seguir escalando el despliegue.", count: (count) => `${count} resultados`, showOnly: "Ver solo observaciones", empty: "No aparecen instituciones con observaciones básicas. Buen momento para avanzar a salud o syncs por cliente.", noPhone: "sin teléfono", noUrl: "sin URL", noAddress: "sin dirección", noLogo: "sin logo", users: (count) => `${count} usuarios`, devices: (count) => `${count} dispositivos` },
+    groups: { title: "Grupos y perfiles de jugadores", description: "Sin cambiar la base ni los contratos actuales: esta vista toma los grupos cargados y te deja ver los estudiantes y perfiles que quedaron dentro de cada uno.", empty: "Seleccioná una institución para ver sus grupos y los perfiles/jugadores asociados.", loadedGroups: "Grupos cargados", loadedGroupsHint: "Podés seleccionar un grupo o dejar todo sin selección hasta decidir a qué detalle querés entrar.", deleteGroup: "Eliminar grupo", clearGroup: "Deseleccionar grupo" },
+  },
+  en: {
+    header: { eyebrow: { superadmin: "Superadmin", institutionAdmin: "Institution admin", director: "Director" }, title: "Institutions", descriptionDefault: "This view now connects real backend institutions with operational impact across users and devices.", descriptionScoped: (name) => `Central view over ${name}. It already crosses institutions with real users and devices.`, descriptionDirector: (name) => `Institution view for ${name}, designed for general follow-up, contact, and current coverage.`, searchPlaceholder: "Search by institution, email, user, or device", newInstitution: "New institution", creationUnavailable: "Creation unavailable", activeInstitution: (name) => `Active institution: ${name}` },
+    summaries: { institutions: "Institutions", linkedUsers: "Linked users", linkedDevices: "Linked devices", linkedGroups: "Linked groups", linkedStudents: "Linked students", needReview: "Need review", withLogo: "With logo" },
+    focus: { title: "Focus list", hint: "Prioritize institutions with pending data or follow-up signals before editing base data.", results: (count) => `${count} results`, clear: "Clear focus" },
+    map: { titleDefault: "Institution map", titleDirector: "Institutions to follow up", descriptionDefault: "Select an institution to work from the central body: review details, edit, and operate without sidebars.", descriptionDirector: "Select an institution to review contact, current coverage, and general follow-up signals.", editSelected: "Edit selected", clearSelection: "Clear institution", empty: "No institutions to show with the current filters.", contact: "Contact", users: "Users", devices: "Devices", state: "State", updated: "Updated", noLocation: "No location", active: "active", deleted: "deleted", logo: "logo", noLogo: "no logo", review: "review" },
+    impact: { title: "Operational impact", description: "Quick cross-check between the selected institution, linked people, and its associated device fleet.", empty: "Select an institution to review its operational links.", noAddress: "No address loaded", loadedLogo: "institution logo loaded", pendingLogo: "logo pending", linkedUsers: "Linked users", linkedDevices: "Linked devices", linkedGroups: "Linked groups", noLinkedUsers: "no linked users", noLinkedDevices: "no linked devices", noLinkedGroups: "no linked groups", updatedPrefix: "upd.", students: "students", groups: "groups", backendCount: "Count exposed by the shared backend.", institutionWeight: "Useful to understand the institution's real weight." },
+    review: { title: "Institutions worth reviewing", description: "Quick signals to complete contact, address, or web presence before scaling further.", count: (count) => `${count} results`, showOnly: "Show only observations", empty: "No institutions with basic issues appear in the current view. Good moment to move on to health or client syncs.", noPhone: "no phone", noUrl: "no URL", noAddress: "no address", noLogo: "no logo", users: (count) => `${count} users`, devices: (count) => `${count} devices` },
+    groups: { title: "Groups and player profiles", description: "Without changing the current base or contracts: this view takes loaded groups and lets you inspect the students and profiles inside each one.", empty: "Select an institution to see its groups and linked player profiles.", loadedGroups: "Loaded groups", loadedGroupsHint: "You can select a group or leave everything unselected until deciding which detail to open.", deleteGroup: "Delete group", clearGroup: "Clear group" },
+  },
+  pt: {
+    header: { eyebrow: { superadmin: "Superadmin", institutionAdmin: "Institution admin", director: "Director" }, title: "Instituições", descriptionDefault: "A visão agora conecta instituições reais do backend com impacto operacional em usuários e dispositivos.", descriptionScoped: (name) => `Visão central sobre ${name}. Ela já cruza instituições com usuários e dispositivos reais.`, descriptionDirector: (name) => `Visão institucional sobre ${name}, pensada para acompanhamento geral, contato e cobertura atual.`, searchPlaceholder: "Buscar por instituição, email, usuário ou dispositivo", newInstitution: "Nova instituição", creationUnavailable: "Cadastro indisponível", activeInstitution: (name) => `Instituição ativa: ${name}` },
+    summaries: { institutions: "Instituições", linkedUsers: "Usuários vinculados", linkedDevices: "Dispositivos vinculados", linkedGroups: "Grupos vinculados", linkedStudents: "Estudantes vinculados", needReview: "Precisam de revisão", withLogo: "Com logo carregado" },
+    focus: { title: "Focar lista", hint: "Priorize instituições com dados pendentes ou sinais de acompanhamento antes de editar os dados base.", results: (count) => `${count} resultados`, clear: "Limpar foco" },
+    map: { titleDefault: "Mapa institucional", titleDirector: "Instituições para acompanhamento", descriptionDefault: "Selecione uma instituição para trabalhar do corpo central: ver detalhe, editar e operar sem barras laterais.", descriptionDirector: "Selecione uma instituição para revisar contato, cobertura atual e sinais gerais de acompanhamento.", editSelected: "Editar selecionada", clearSelection: "Deselecionar instituição", empty: "Não há instituições para mostrar com os filtros atuais.", contact: "Contato", users: "Usuários", devices: "Dispositivos", state: "Estado", updated: "Atualizado", noLocation: "Sem localização", active: "ativa", deleted: "excluída", logo: "logo", noLogo: "sem logo", review: "revisar" },
+    impact: { title: "Impacto operacional", description: "Cruzamento rápido entre a instituição selecionada, as pessoas vinculadas e o parque de dispositivos associado.", empty: "Selecione uma instituição para revisar seus vínculos operacionais.", noAddress: "Sem endereço carregado", loadedLogo: "logo institucional carregado", pendingLogo: "logo pendente", linkedUsers: "Usuários vinculados", linkedDevices: "Dispositivos vinculados", linkedGroups: "Grupos vinculados", noLinkedUsers: "sem usuários vinculados", noLinkedDevices: "sem dispositivos vinculados", noLinkedGroups: "sem grupos vinculados", updatedPrefix: "att.", students: "estudantes", groups: "grupos", backendCount: "Contagem exposta pelo backend compartilhado.", institutionWeight: "Serve para entender o peso real da instituição." },
+    review: { title: "Instituições que convém revisar", description: "Sinais rápidos para completar contato, endereço ou presença web antes de seguir escalando a operação.", count: (count) => `${count} resultados`, showOnly: "Ver só observações", empty: "Não aparecem instituições com observações básicas. Bom momento para avançar para saúde ou syncs por cliente.", noPhone: "sem telefone", noUrl: "sem URL", noAddress: "sem endereço", noLogo: "sem logo", users: (count) => `${count} usuários`, devices: (count) => `${count} dispositivos` },
+    groups: { title: "Grupos e perfis de jogadores", description: "Sem mudar a base nem os contratos atuais: esta visão usa os grupos carregados e permite ver os estudantes e perfis que ficaram dentro de cada um.", empty: "Selecione uma instituição para ver seus grupos e perfis/jogadores associados.", loadedGroups: "Grupos carregados", loadedGroupsHint: "Você pode selecionar um grupo ou deixar tudo sem seleção até decidir em qual detalhe quer entrar.", deleteGroup: "Excluir grupo", clearGroup: "Deselecionar grupo" },
+  },
+};
 
 function SummaryCard({
   label,
@@ -209,6 +338,8 @@ function InstitutionAvatar({
 }
 
 export function InstitutionsOverview() {
+  const { language } = useLanguage();
+  const t = institutionsOverviewMessages[language];
   const { tokens, user: currentUser } = useAuth();
   const queryClient = useQueryClient();
   const searchParams = useSearchParams();
@@ -863,14 +994,14 @@ export function InstitutionsOverview() {
   return (
     <div className="space-y-6">
       <SectionHeader
-        eyebrow={isInstitutionScopedView ? (isDirectorView ? "Director" : "Institution admin") : "Superadmin"}
-        title="Instituciones"
+        eyebrow={isInstitutionScopedView ? (isDirectorView ? t.header.eyebrow.director : t.header.eyebrow.institutionAdmin) : t.header.eyebrow.superadmin}
+        title={t.header.title}
         description={
           isInstitutionScopedView
             ? isDirectorView
-              ? `Vista institucional sobre ${scopedInstitutionName}, pensada para seguimiento general, contacto y cobertura actual.`
-              : `Vista central sobre ${scopedInstitutionName}. Ya cruza instituciones con usuarios y dispositivos reales.`
-            : "La vista ahora conecta instituciones reales del backend con impacto operativo en usuarios y dispositivos."
+              ? t.header.descriptionDirector(scopedInstitutionName || (language === "en" ? "the institution" : language === "pt" ? "a instituição" : "la institución"))
+              : t.header.descriptionScoped(scopedInstitutionName || (language === "en" ? "the institution" : language === "pt" ? "a instituição" : "la institución"))
+            : t.header.descriptionDefault
         }
         actions={
           <div className="flex flex-col items-stretch gap-3 md:flex-row md:items-center">
@@ -879,7 +1010,7 @@ export function InstitutionsOverview() {
               <Input
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
-                placeholder="Buscar por institución, email, usuario o dispositivo"
+                placeholder={t.header.searchPlaceholder}
                 className="pl-9"
               />
             </div>
@@ -889,7 +1020,7 @@ export function InstitutionsOverview() {
               onClick={openCreateInstitutionForm}
             >
               <UserPlus className="size-4" />
-              {canCreateInstitutions ? "Nueva institución" : "Alta no disponible"}
+              {canCreateInstitutions ? t.header.newInstitution : t.header.creationUnavailable}
             </Button>
           </div>
         }
@@ -897,7 +1028,7 @@ export function InstitutionsOverview() {
 
       {scopedInstitutionName ? (
         <div className="flex flex-wrap gap-2">
-          <Badge variant="outline">Institución activa: {scopedInstitutionName}</Badge>
+          <Badge variant="outline">{t.header.activeInstitution(scopedInstitutionName)}</Badge>
         </div>
       ) : null}
 
@@ -907,37 +1038,37 @@ export function InstitutionsOverview() {
         ) : (
           <>
             <SummaryCard
-              label="Instituciones"
+              label={t.summaries.institutions}
               value={String(metrics.totalInstitutions)}
               icon={Building2}
             />
             <SummaryCard
-              label="Usuarios vinculados"
+              label={t.summaries.linkedUsers}
               value={String(metrics.totalUsersLinked)}
               icon={Users}
             />
             <SummaryCard
-              label="Dispositivos vinculados"
+              label={t.summaries.linkedDevices}
               value={String(metrics.totalDevicesLinked)}
               icon={Smartphone}
             />
             <SummaryCard
-              label="Grupos vinculados"
+              label={t.summaries.linkedGroups}
               value={String(metrics.totalClassesLinked)}
               icon={Building2}
             />
             <SummaryCard
-              label="Estudiantes vinculados"
+              label={t.summaries.linkedStudents}
               value={String(metrics.totalStudentsLinked)}
               icon={Users}
             />
             <SummaryCard
-              label="Necesitan revisión"
+              label={t.summaries.needReview}
               value={String(metrics.reviewInstitutions)}
               icon={ShieldCheck}
             />
             <SummaryCard
-              label="Con logo cargado"
+              label={t.summaries.withLogo}
               value={String(metrics.institutionsWithLogo)}
               icon={Building2}
             />
@@ -949,10 +1080,10 @@ export function InstitutionsOverview() {
         <CardContent className="p-5">
           <div className="mb-3 flex items-center justify-between gap-3">
             <div>
-              <p className="text-sm font-semibold text-foreground">Enfocar listado</p>
-              <p className="text-sm text-muted-foreground">Priorizá instituciones con datos pendientes o señales de seguimiento antes de editar datos base.</p>
+              <p className="text-sm font-semibold text-foreground">{t.focus.title}</p>
+              <p className="text-sm text-muted-foreground">{t.focus.hint}</p>
             </div>
-            <Badge variant="outline">{filtered.length} resultados</Badge>
+            <Badge variant="outline">{t.focus.results(filtered.length)}</Badge>
           </div>
           <div className="flex flex-wrap gap-2">
           {focusSegments.map((segment) => (
@@ -978,7 +1109,7 @@ export function InstitutionsOverview() {
               setQuery("");
             }}
           >
-            Limpiar foco
+            {t.focus.clear}
           </Button>
           </div>
         </CardContent>
@@ -989,24 +1120,24 @@ export function InstitutionsOverview() {
           <CardHeader>
             <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
               <div>
-                <CardTitle>{isDirectorView ? "Instituciones para seguimiento" : "Mapa institucional"}</CardTitle>
+                <CardTitle>{isDirectorView ? t.map.titleDirector : t.map.titleDefault}</CardTitle>
                 <CardDescription>
                   {isDirectorView
-                    ? "Seleccioná una institución para revisar contacto, cobertura actual y señales generales de seguimiento."
-                    : "Seleccioná una institución para trabajar desde el cuerpo central: ver detalle, editar y operar sin saltar a barras laterales."}
+                    ? t.map.descriptionDirector
+                    : t.map.descriptionDefault}
                 </CardDescription>
               </div>
               <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
                 <div className="flex flex-wrap gap-3">
                   <Button type="button" onClick={openCreateInstitutionForm} disabled={!canCreateInstitutions}>
                     <UserPlus className="size-4" />
-                    {canCreateInstitutions ? "Nueva institución" : "Alta no disponible"}
+                    {canCreateInstitutions ? t.header.newInstitution : t.header.creationUnavailable}
                   </Button>
                   <Button type="button" variant="outline" onClick={openEditInstitutionForm} disabled={!selectedInstitution || mode === "create"}>
-                    Editar seleccionada
+                    {t.map.editSelected}
                   </Button>
                   <Button type="button" variant="ghost" onClick={clearInstitutionSelection} disabled={!selectedInstitution}>
-                    Deseleccionar institución
+                    {t.map.clearSelection}
                   </Button>
                 </div>
                 <ListPaginationControls
@@ -1035,18 +1166,18 @@ export function InstitutionsOverview() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Institución</TableHead>
-                    <TableHead>Contacto</TableHead>
-                    <TableHead>Usuarios</TableHead>
-                    <TableHead>Dispositivos</TableHead>
-                    <TableHead>Estado</TableHead>
-                    <TableHead>Actualizado</TableHead>
+                    <TableHead>{t.map.contact}</TableHead>
+                    <TableHead>{t.map.users}</TableHead>
+                    <TableHead>{t.map.devices}</TableHead>
+                    <TableHead>{t.map.state}</TableHead>
+                    <TableHead>{t.map.updated}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filtered.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={6} className="py-10 text-center text-sm text-muted-foreground">
-                        No hay instituciones para mostrar con los filtros actuales.
+                        {t.map.empty}
                       </TableCell>
                     </TableRow>
                   ) : (
@@ -1066,7 +1197,7 @@ export function InstitutionsOverview() {
                           <TableCell>
                             <div>
                               <p>{item.phoneNumber || "-"}</p>
-                              <p className="text-xs text-muted-foreground">{item.city || item.country || "Sin ubicación"}</p>
+                              <p className="text-xs text-muted-foreground">{item.city || item.country || t.map.noLocation}</p>
                             </div>
                           </TableCell>
                           <TableCell>{item.userCount}</TableCell>
@@ -1074,10 +1205,10 @@ export function InstitutionsOverview() {
                           <TableCell>
                             <div className="flex flex-wrap gap-2">
                               <Badge variant={item.status === "active" ? "success" : "outline"}>
-                                {item.status === "active" ? "activa" : "eliminada"}
+                                {item.status === "active" ? t.map.active : t.map.deleted}
                               </Badge>
-                              <Badge variant={item.imageUrl ? "secondary" : "outline"}>{item.imageUrl ? "logo" : "sin logo"}</Badge>
-                              {item.needsReview ? <Badge variant="outline">revisar</Badge> : null}
+                              <Badge variant={item.imageUrl ? "secondary" : "outline"}>{item.imageUrl ? t.map.logo : t.map.noLogo}</Badge>
+                              {item.needsReview ? <Badge variant="outline">{t.map.review}</Badge> : null}
                             </div>
                           </TableCell>
                           <TableCell>{formatDateTime(item.updatedAt || item.createdAt)}</TableCell>
@@ -1095,15 +1226,15 @@ export function InstitutionsOverview() {
 
         <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
           <CardHeader>
-            <CardTitle>Impacto operativo</CardTitle>
+            <CardTitle>{t.impact.title}</CardTitle>
             <CardDescription>
-              Cruce rápido entre la institución seleccionada, las personas vinculadas y el parque de dispositivos asociado.
+              {t.impact.description}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-5">
             {!selectedInstitution ? (
               <div className="rounded-2xl bg-background/70 p-4 text-sm text-muted-foreground">
-                Seleccioná una institución para revisar sus vínculos operativos.
+                {t.impact.empty}
               </div>
             ) : (
               <>
@@ -1114,13 +1245,13 @@ export function InstitutionsOverview() {
                       <p className="text-sm font-semibold text-foreground">{selectedInstitution.name}</p>
                       <div className="mt-2 flex items-center gap-2 text-sm font-medium text-foreground">
                         <MapPin className="size-4 text-primary" />
-                        <span className="min-w-0 truncate">{selectedInstitution.address?.addressFirstLine || "Sin dirección cargada"}</span>
+                        <span className="min-w-0 truncate">{selectedInstitution.address?.addressFirstLine || t.impact.noAddress}</span>
                       </div>
                     </div>
                   </div>
                   <div className="mt-3 flex flex-wrap gap-2">
                     <Badge variant={selectedInstitution.imageUrl ? "secondary" : "outline"}>
-                      {selectedInstitution.imageUrl ? "logo institucional cargado" : "logo pendiente"}
+                      {selectedInstitution.imageUrl ? t.impact.loadedLogo : t.impact.pendingLogo}
                     </Badge>
                     {selectedInstitution.url ? (
                       <Badge variant="outline">
@@ -1144,7 +1275,7 @@ export function InstitutionsOverview() {
                 </div>
 
                 <div>
-                  <p className="text-sm font-medium text-foreground">Usuarios vinculados</p>
+                  <p className="text-sm font-medium text-foreground">{t.impact.linkedUsers}</p>
                   <div className="mt-3 grid gap-3">
                     {previewUsers.length > 0 ? (
                       previewUsers.map((user) => (
@@ -1169,7 +1300,7 @@ export function InstitutionsOverview() {
                             {user.roleCodes.map((roleCode) => (
                               <Badge key={roleCode} variant="outline">{roleCode}</Badge>
                             ))}
-                            {user.updatedAt ? <Badge variant="outline">act. {formatDateTime(user.updatedAt)}</Badge> : null}
+                            {user.updatedAt ? <Badge variant="outline">{t.impact.updatedPrefix} {formatDateTime(user.updatedAt)}</Badge> : null}
                           </div>
                         </div>
                       ))
@@ -1180,13 +1311,13 @@ export function InstitutionsOverview() {
                         ))}
                       </div>
                     ) : (
-                      <Badge variant="outline">sin usuarios vinculados</Badge>
+                      <Badge variant="outline">{t.impact.noLinkedUsers}</Badge>
                     )}
                   </div>
                 </div>
 
                 <div>
-                  <p className="text-sm font-medium text-foreground">Dispositivos vinculados</p>
+                  <p className="text-sm font-medium text-foreground">{t.impact.linkedDevices}</p>
                   <div className="mt-3 grid gap-3">
                     {previewDevices.length > 0 ? (
                       previewDevices.map((device) => (
@@ -1194,7 +1325,7 @@ export function InstitutionsOverview() {
                           <p className="text-sm font-medium text-foreground">{device.name}</p>
                           <div className="mt-2 flex flex-wrap gap-2 text-xs text-muted-foreground">
                             <Badge variant="outline">{device.deviceId}</Badge>
-                            {device.updatedAt ? <Badge variant="outline">act. {formatDateTime(device.updatedAt)}</Badge> : null}
+                            {device.updatedAt ? <Badge variant="outline">{t.impact.updatedPrefix} {formatDateTime(device.updatedAt)}</Badge> : null}
                           </div>
                         </div>
                       ))
@@ -1205,43 +1336,43 @@ export function InstitutionsOverview() {
                         ))}
                       </div>
                     ) : (
-                      <Badge variant="outline">sin dispositivos vinculados</Badge>
+                      <Badge variant="outline">{t.impact.noLinkedDevices}</Badge>
                     )}
                   </div>
                 </div>
 
                 <div>
-                  <p className="text-sm font-medium text-foreground">Grupos vinculados</p>
+                  <p className="text-sm font-medium text-foreground">{t.impact.linkedGroups}</p>
                   <div className="mt-3 grid gap-3">
                     {previewClassGroups.length > 0 ? (
                       previewClassGroups.map((classGroup) => (
                         <div key={classGroup.id} className="rounded-2xl bg-background/70 p-3">
                           <div className="flex flex-wrap items-center justify-between gap-2">
                             <p className="text-sm font-medium text-foreground">{classGroup.name}</p>
-                            <Badge variant="secondary">{classGroup.studentCount} estudiantes</Badge>
+                            <Badge variant="secondary">{classGroup.studentCount} {t.impact.students}</Badge>
                           </div>
                           <div className="mt-2 flex flex-wrap gap-2">
                             <Badge variant="outline">{classGroup.code}</Badge>
-                            {classGroup.updatedAt ? <Badge variant="outline">act. {formatDateTime(classGroup.updatedAt)}</Badge> : null}
+                            {classGroup.updatedAt ? <Badge variant="outline">{t.impact.updatedPrefix} {formatDateTime(classGroup.updatedAt)}</Badge> : null}
                           </div>
                         </div>
                       ))
                     ) : (
-                      <Badge variant="outline">sin grupos vinculados</Badge>
+                      <Badge variant="outline">{t.impact.noLinkedGroups}</Badge>
                     )}
                   </div>
                 </div>
 
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div className="rounded-2xl bg-background/70 p-4">
-                    <p className="text-xs uppercase tracking-[0.24em] text-muted-foreground">grupos</p>
+                    <p className="text-xs uppercase tracking-[0.24em] text-muted-foreground">{t.impact.groups}</p>
                     <p className="mt-2 text-2xl font-semibold text-foreground">{selectedInstitution.classGroupCount}</p>
-                    <p className="mt-1 text-sm text-muted-foreground">Conteo expuesto por el backend compartido.</p>
+                    <p className="mt-1 text-sm text-muted-foreground">{t.impact.backendCount}</p>
                   </div>
                   <div className="rounded-2xl bg-background/70 p-4">
-                    <p className="text-xs uppercase tracking-[0.24em] text-muted-foreground">estudiantes</p>
+                    <p className="text-xs uppercase tracking-[0.24em] text-muted-foreground">{t.impact.students}</p>
                     <p className="mt-2 text-2xl font-semibold text-foreground">{selectedInstitution.studentCount}</p>
-                    <p className="mt-1 text-sm text-muted-foreground">Sirve para entender el peso real de la institución.</p>
+                    <p className="mt-1 text-sm text-muted-foreground">{t.impact.institutionWeight}</p>
                   </div>
                 </div>
               </>
@@ -1252,9 +1383,9 @@ export function InstitutionsOverview() {
 
       <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
         <CardHeader>
-          <CardTitle>Instituciones que conviene revisar</CardTitle>
+          <CardTitle>{t.review.title}</CardTitle>
           <CardDescription>
-            Señales rápidas para completar contacto, dirección o presencia web antes de seguir escalando el despliegue.
+            {t.review.description}
           </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-3 md:grid-cols-2 2xl:grid-cols-3">
@@ -1262,7 +1393,7 @@ export function InstitutionsOverview() {
             Array.from({ length: 3 }).map((_, index) => <Skeleton key={index} className="h-24 rounded-2xl" />)
           ) : institutionRows.filter((item) => item.needsReview).length === 0 ? (
             <div className="rounded-2xl bg-background/70 p-4 text-sm text-muted-foreground">
-              No aparecen instituciones con observaciones básicas. Buen momento para avanzar a salud o syncs por cliente.
+              {t.review.empty}
             </div>
           ) : (
             institutionRows
@@ -1278,12 +1409,12 @@ export function InstitutionsOverview() {
                   <p className="text-sm font-semibold text-foreground">{item.name}</p>
                   <p className="mt-1 text-sm text-muted-foreground">{item.email}</p>
                   <div className="mt-3 flex flex-wrap gap-2">
-                    {!item.phoneNumber ? <Badge variant="outline">sin teléfono</Badge> : null}
-                    {!item.url ? <Badge variant="outline">sin URL</Badge> : null}
-                    {!item.address?.addressFirstLine ? <Badge variant="outline">sin dirección</Badge> : null}
-                    {!item.imageUrl ? <Badge variant="outline">sin logo</Badge> : null}
-                    {item.userCount > 0 ? <Badge variant="secondary">{item.userCount} usuarios</Badge> : null}
-                    {item.deviceCount > 0 ? <Badge variant="outline">{item.deviceCount} dispositivos</Badge> : null}
+                    {!item.phoneNumber ? <Badge variant="outline">{t.review.noPhone}</Badge> : null}
+                    {!item.url ? <Badge variant="outline">{t.review.noUrl}</Badge> : null}
+                    {!item.address?.addressFirstLine ? <Badge variant="outline">{t.review.noAddress}</Badge> : null}
+                    {!item.imageUrl ? <Badge variant="outline">{t.review.noLogo}</Badge> : null}
+                    {item.userCount > 0 ? <Badge variant="secondary">{t.review.users(item.userCount)}</Badge> : null}
+                    {item.deviceCount > 0 ? <Badge variant="outline">{t.review.devices(item.deviceCount)}</Badge> : null}
                   </div>
                 </button>
               ))
@@ -1295,25 +1426,25 @@ export function InstitutionsOverview() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <GraduationCap className="size-5 text-primary" />
-            Grupos y perfiles de jugadores
+            {t.groups.title}
           </CardTitle>
           <CardDescription>
-            Sin cambiar la base ni los contratos actuales: esta vista toma los grupos cargados y te deja ver los estudiantes y perfiles que quedaron dentro de cada uno.
+            {t.groups.description}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-5">
           {!selectedInstitution ? (
             <div className="rounded-2xl border border-dashed border-border/80 bg-muted/20 p-4 text-sm text-muted-foreground">
-              Seleccioná una institución para ver sus grupos y los perfiles/jugadores asociados.
+              {t.groups.empty}
             </div>
           ) : (
             <>
               <div className="rounded-[26px] border border-border/70 bg-background/65 p-4">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
-                    <p className="text-sm font-medium text-foreground">Grupos cargados</p>
+                    <p className="text-sm font-medium text-foreground">{t.groups.loadedGroups}</p>
                     <p className="mt-1 text-sm text-muted-foreground">
-                      Podés seleccionar un grupo o dejar todo sin selección hasta decidir a qué detalle querés entrar.
+                      {t.groups.loadedGroupsHint}
                     </p>
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
@@ -1321,11 +1452,11 @@ export function InstitutionsOverview() {
                     {canDeleteClassGroups ? (
                       <Button type="button" size="sm" variant="destructive" onClick={() => setIsDeleteGroupDialogOpen(true)} disabled={!selectedGroup || deleteClassGroupMutation.isPending}>
                         <Trash2 className="size-4" />
-                        Eliminar grupo
+                        {t.groups.deleteGroup}
                       </Button>
                     ) : null}
                     <Button type="button" size="sm" variant="ghost" onClick={clearGroupSelection} disabled={!selectedGroup}>
-                      Deseleccionar grupo
+                      {t.groups.clearGroup}
                     </Button>
                   </div>
                 </div>

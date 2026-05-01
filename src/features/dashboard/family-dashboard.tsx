@@ -15,6 +15,7 @@ import {
   filterDashboardItemsByRange,
   useDashboardModuleControls,
 } from "@/features/dashboard/dashboard-analytics-shared";
+import { useLanguage, type AppLanguage } from "@/features/i18n/i18n-context";
 import {
   buildDeckUsageSeries,
   buildGameActivitySeries,
@@ -35,6 +36,32 @@ import { useSyncSessions } from "@/features/syncs/api";
 import { useUsers } from "@/features/users/api";
 import { formatDurationSeconds, getErrorMessage } from "@/lib/utils";
 
+const familyDashboardMessages: Record<AppLanguage, {
+  header: { eyebrow: string; title: (name: string) => string; description: string };
+  metrics: { games: string; turns: string; success: string; turnTime: string; devices: string; users: string; profiles: string; gamesHint: string; turnsHint: string; successHint: string; turnTimeHint: string; devicesHint: string; usersHint: string; profilesHint: string };
+  charts: { activity: string; activityDesc: string; decks: string; decksDesc: string; usersByRole: string; usersByRoleDesc: string; profileState: string; profileStateDesc: string; profileAge: string; profileAgeDesc: string; profileRecency: string; profileRecencyDesc: string; resources: string; resourcesDesc: string; userRecency: string; userRecencyDesc: string; summary: string; summaryDesc: string };
+  error: (message: string) => string;
+}> = {
+  es: {
+    header: { eyebrow: "Familia", title: (name) => `Dashboard de seguimiento para ${name}`, description: "Esta home mantiene una lectura analítica y simple: actividad, recursos, tiempos y contenidos usados, sin ruido técnico." },
+    metrics: { games: "Partidas", turns: "Turnos", success: "Acierto general", turnTime: "Tiempo por turno", devices: "Dispositivos", users: "Usuarios", profiles: "Perfiles", gamesHint: "Actividad reciente del grupo familiar.", turnsHint: "Interacciones registradas dentro de esas partidas.", successHint: "Porcentaje agregado de respuestas correctas en la actividad registrada.", turnTimeHint: "Ritmo promedio de juego en la actividad registrada.", devicesHint: "Equipos asociados a la cuenta.", usersHint: "Personas asociadas a la cuenta.", profilesHint: "Perfiles incorporados al seguimiento familiar." },
+    charts: { activity: "Actividad reciente", activityDesc: "Partidas y turnos por fecha para ver si hubo movimiento reciente o días más tranquilos.", decks: "Mazos usados", decksDesc: "Qué tipos de contenido aparecen más en la actividad registrada.", usersByRole: "Usuarios por rol", usersByRoleDesc: "Distribución simple de las personas asociadas al grupo familiar.", profileState: "Estado de perfiles", profileStateDesc: "Perfiles activos, con binding y con sesiones para leer rápidamente qué tan conectada está la experiencia.", profileAge: "Perfiles por categoría", profileAgeDesc: "Cohortes por categoría para entender si la experiencia actual se concentra en algún tramo específico.", profileRecency: "Recencia de perfiles", profileRecencyDesc: "Última sesión por perfil para ver rápidamente quién viene activo y quién quedó más quieto.", resources: "Recursos principales", resourcesDesc: "Balance simple entre personas y dispositivos asociados a la cuenta.", userRecency: "Recencia de usuarios", userRecencyDesc: "Lectura suave de accesos recientes para detectar si el entorno viene activo o con señales más frías.", summary: "Resumen rápido", summaryDesc: "Lectura amable de los tres frentes más importantes de tu cuenta." },
+    error: (message) => `No pude cargar una parte del dashboard family: ${message}`,
+  },
+  en: {
+    header: { eyebrow: "Family", title: (name) => `Follow-up dashboard for ${name}`, description: "This home keeps an analytical but simple reading: activity, resources, timing, and used content, without technical noise." },
+    metrics: { games: "Games", turns: "Turns", success: "Overall success", turnTime: "Turn time", devices: "Devices", users: "Users", profiles: "Profiles", gamesHint: "Recent activity for the family group.", turnsHint: "Interactions recorded inside those games.", successHint: "Aggregate percentage of correct answers in recorded activity.", turnTimeHint: "Average pace of play in recorded activity.", devicesHint: "Devices linked to the account.", usersHint: "People linked to the account.", profilesHint: "Profiles included in family follow-up." },
+    charts: { activity: "Recent activity", activityDesc: "Games and turns by date to see whether there was recent movement or quieter days.", decks: "Used decks", decksDesc: "Which kinds of content appear most in the recorded activity.", usersByRole: "Users by role", usersByRoleDesc: "Simple distribution of the people linked to the family group.", profileState: "Profile state", profileStateDesc: "Active profiles, with bindings and sessions, to quickly read how connected the experience is.", profileAge: "Profiles by category", profileAgeDesc: "Cohorts by category to understand whether the current experience concentrates on a specific segment.", profileRecency: "Profile recency", profileRecencyDesc: "Latest session by profile to quickly see who is active and who has gone quieter.", resources: "Main resources", resourcesDesc: "Simple balance between people and devices linked to the account.", userRecency: "User recency", userRecencyDesc: "Gentle read of recent access to detect whether the environment is active or colder.", summary: "Quick summary", summaryDesc: "Friendly read of the three most important fronts in your account." },
+    error: (message) => `I couldn't load part of the family dashboard: ${message}`,
+  },
+  pt: {
+    header: { eyebrow: "Família", title: (name) => `Dashboard de acompanhamento para ${name}`, description: "Esta home mantém uma leitura analítica e simples: atividade, recursos, tempos e conteúdos usados, sem ruído técnico." },
+    metrics: { games: "Partidas", turns: "Turnos", success: "Acerto geral", turnTime: "Tempo por turno", devices: "Dispositivos", users: "Usuários", profiles: "Perfis", gamesHint: "Atividade recente do grupo familiar.", turnsHint: "Interações registradas dentro dessas partidas.", successHint: "Percentual agregado de respostas corretas na atividade registrada.", turnTimeHint: "Ritmo médio de jogo na atividade registrada.", devicesHint: "Equipamentos associados à conta.", usersHint: "Pessoas associadas à conta.", profilesHint: "Perfis incorporados ao acompanhamento familiar." },
+    charts: { activity: "Atividade recente", activityDesc: "Partidas e turnos por data para ver se houve movimento recente ou dias mais tranquilos.", decks: "Baralhos usados", decksDesc: "Que tipos de conteúdo aparecem mais na atividade registrada.", usersByRole: "Usuários por papel", usersByRoleDesc: "Distribuição simples das pessoas associadas ao grupo familiar.", profileState: "Estado dos perfis", profileStateDesc: "Perfis ativos, com binding e com sessões para ler rapidamente quão conectada está a experiência.", profileAge: "Perfis por categoria", profileAgeDesc: "Coortes por categoria para entender se a experiência atual se concentra em algum trecho específico.", profileRecency: "Recência de perfis", profileRecencyDesc: "Última sessão por perfil para ver rapidamente quem vem ativo e quem ficou mais quieto.", resources: "Recursos principais", resourcesDesc: "Equilíbrio simples entre pessoas e dispositivos associados à conta.", userRecency: "Recência de usuários", userRecencyDesc: "Leitura suave de acessos recentes para detectar se o ambiente vem ativo ou com sinais mais frios.", summary: "Resumo rápido", summaryDesc: "Leitura amigável das três frentes mais importantes da sua conta." },
+    error: (message) => `Não consegui carregar parte do dashboard family: ${message}`,
+  },
+};
+
 function normalizeLabel(value?: string | null) {
   return (value || "sin dato").replace(/[|]/g, " / ").replace(/[-_]/g, " ").trim().toLowerCase();
 }
@@ -50,11 +77,11 @@ function matchesRecencyLabel(label: string, value?: string | null) {
   const diffDays = getRelativeDays(value);
   const normalized = normalizeLabel(label);
 
-  if (diffDays == null) return normalized.includes("sin");
-  if (normalized.includes("7 días")) return diffDays <= 7;
-  if (normalized.includes("8 30 días") || normalized.includes("8/30 días")) return diffDays > 7 && diffDays <= 30;
-  if (normalized.includes("31 90 días") || normalized.includes("31/90 días")) return diffDays > 30 && diffDays <= 90;
-  if (normalized.includes("> 90 días")) return diffDays > 90;
+  if (diffDays == null) return normalized.includes("sin") || normalized.includes("without") || normalized.includes("sem");
+  if (normalized.includes("7 días") || normalized.includes("7 days") || normalized.includes("7 dias")) return diffDays <= 7;
+  if (normalized.includes("8 30 días") || normalized.includes("8/30 días") || normalized.includes("8 30 days") || normalized.includes("8/30 days") || normalized.includes("8 30 dias") || normalized.includes("8/30 dias")) return diffDays > 7 && diffDays <= 30;
+  if (normalized.includes("31 90 días") || normalized.includes("31/90 días") || normalized.includes("31 90 days") || normalized.includes("31/90 days") || normalized.includes("31 90 dias") || normalized.includes("31/90 dias")) return diffDays > 30 && diffDays <= 90;
+  if (normalized.includes("> 90 días") || normalized.includes("> 90 days") || normalized.includes("> 90 dias")) return diffDays > 90;
   return false;
 }
 
@@ -63,6 +90,226 @@ function getDashboardDateValue(...values: Array<string | null | undefined>) {
 }
 
 export function FamilyDashboard() {
+  const { language } = useLanguage();
+  const t = familyDashboardMessages[language];
+  const localText = language === "en"
+    ? {
+        recentActivity: "Recent activity",
+        linkedPeople: "Linked people",
+        linkedDevices: "Linked devices",
+        usableCapture: "Usable capture",
+        game: "Game",
+        user: "User",
+        device: "Device",
+        profile: "Profile",
+        turns: (count: number) => `${count} turns`,
+        dateDuration: (date: string, duration: string) => `Date ${date} · duration ${duration}`,
+        noRole: "No role",
+        noEmail: "No recorded email",
+        login: (value: string) => `Login ${value}`,
+        noLogin: "No login",
+        noStatus: "No status",
+        homeUse: "Home use",
+        institutionalUse: "Institutional use",
+        noAssignment: "unassigned",
+        sessions: (count: number) => `${count} sessions`,
+        bindingsAge: (bindings: number, age: string) => `${bindings} active bindings · ${age}`,
+        active: "Active",
+        inactive: "Inactive",
+        raws: (count: number) => `${count} raws`,
+        noSource: "No source recorded",
+        gameDetail: "Game detail",
+        gameDetailDesc: "Recent activity for the family group.",
+        turnsDetail: "Turn detail",
+        turnsDetailDesc: "Interactions recorded in the games.",
+        successDetail: "Success detail",
+        successDetailDesc: "Success by game to move from aggregate to the concrete case.",
+        correctTurns: (successes: number, turns: number) => `${successes}/${turns} correct turns`,
+        turnTimeDetail: "Turn time detail",
+        turnTimeDetailDesc: "Average by game to better understand the usage pace.",
+        measuredTurns: (count: number) => `${count} measured turns`,
+        devicesDetail: "Device detail",
+        devicesDetailDesc: "Devices linked to the account.",
+        usersDetail: "User detail",
+        usersDetailDesc: "People linked to family follow-up.",
+        profilesDetail: "Profile detail",
+        profilesDetailDesc: "Profiles already included in family follow-up.",
+        activityOf: (label: string) => `Activity on ${label}`,
+        selectedDateGames: "Games that fall on the selected date.",
+        deckOf: (label: string) => `Deck ${label}`,
+        selectedContentGames: "Games linked to the selected content.",
+        usersWithRole: (label: string) => `Users with role ${label}`,
+        peopleInRole: "People in the selected role.",
+        profileState: (label: string) => `Profile state · ${label}`,
+        profilesByBlock: "Profiles filtered by the selected block.",
+        profilesByCategory: (label: string) => `Profiles by category · ${label}`,
+        profilesInCohort: "Profiles inside the chosen cohort.",
+        profilesRecency: (label: string) => `Profile recency · ${label}`,
+        profilesInPeriod: "Profiles inside the selected period.",
+        resourcesUsers: "Resources · users",
+        resourcesUsersDesc: "People registered in this account.",
+        resourcesDevices: "Resources · devices",
+        resourcesDevicesDesc: "Devices linked to this account.",
+        resourcesProfiles: "Resources · profiles",
+        resourcesProfilesDesc: "Profiles registered in this account.",
+        usersRecency: (label: string) => `User recency · ${label}`,
+        usersInPeriod: "Users inside the selected period.",
+        syncsWithEvidence: "Syncs with evidence",
+        syncsWithEvidenceDesc: "Sync sessions that bring usable capture.",
+        devices: "Devices",
+        familyDevicesDesc: "Devices linked to the family group.",
+        users: "Users",
+        familyUsersDesc: "People linked to the family group.",
+        games: "Games",
+        familyGamesDesc: "Recorded activity for the family group.",
+        noDeck: "No deck",
+        noCategory: "uncategorized",
+      }
+    : language === "pt"
+      ? {
+          recentActivity: "Atividade recente",
+          linkedPeople: "Pessoas vinculadas",
+          linkedDevices: "Equipamentos associados",
+          usableCapture: "Captura utilizável",
+          game: "Partida",
+          user: "Usuário",
+          device: "Dispositivo",
+          profile: "Perfil",
+          turns: (count: number) => `${count} turnos`,
+          dateDuration: (date: string, duration: string) => `Data ${date} · duração ${duration}`,
+          noRole: "Sem papel",
+          noEmail: "Sem email registrado",
+          login: (value: string) => `Login ${value}`,
+          noLogin: "Sem login",
+          noStatus: "Sem status",
+          homeUse: "Uso em casa",
+          institutionalUse: "Uso institucional",
+          noAssignment: "sem atribuição",
+          sessions: (count: number) => `${count} sessões`,
+          bindingsAge: (bindings: number, age: string) => `${bindings} bindings ativos · ${age}`,
+          active: "Ativo",
+          inactive: "Inativo",
+          raws: (count: number) => `${count} raws`,
+          noSource: "Sem fonte registrada",
+          gameDetail: "Detalhe de partidas",
+          gameDetailDesc: "Atividade recente do grupo familiar.",
+          turnsDetail: "Detalhe de turnos",
+          turnsDetailDesc: "Interações registradas nas partidas.",
+          successDetail: "Detalhe de acerto",
+          successDetailDesc: "Acerto por partida para passar do agregado ao caso concreto.",
+          correctTurns: (successes: number, turns: number) => `${successes}/${turns} turnos corretos`,
+          turnTimeDetail: "Detalhe de tempo por turno",
+          turnTimeDetailDesc: "Média por partida para entender melhor o ritmo de uso.",
+          measuredTurns: (count: number) => `${count} turnos medidos`,
+          devicesDetail: "Detalhe de dispositivos",
+          devicesDetailDesc: "Equipamentos associados à conta.",
+          usersDetail: "Detalhe de usuários",
+          usersDetailDesc: "Pessoas associadas ao acompanhamento familiar.",
+          profilesDetail: "Detalhe de perfis",
+          profilesDetailDesc: "Perfis já incorporados ao acompanhamento familiar.",
+          activityOf: (label: string) => `Atividade de ${label}`,
+          selectedDateGames: "Partidas que caem na data selecionada.",
+          deckOf: (label: string) => `Baralho ${label}`,
+          selectedContentGames: "Partidas associadas ao conteúdo selecionado.",
+          usersWithRole: (label: string) => `Usuários com papel ${label}`,
+          peopleInRole: "Pessoas do papel escolhido.",
+          profileState: (label: string) => `Estado dos perfis · ${label}`,
+          profilesByBlock: "Perfis filtrados pelo bloco escolhido.",
+          profilesByCategory: (label: string) => `Perfis por categoria · ${label}`,
+          profilesInCohort: "Perfis dentro da coorte escolhida.",
+          profilesRecency: (label: string) => `Recência de perfis · ${label}`,
+          profilesInPeriod: "Perfis dentro do período selecionado.",
+          resourcesUsers: "Recursos · usuários",
+          resourcesUsersDesc: "Pessoas registradas nesta conta.",
+          resourcesDevices: "Recursos · dispositivos",
+          resourcesDevicesDesc: "Equipamentos associados a esta conta.",
+          resourcesProfiles: "Recursos · perfis",
+          resourcesProfilesDesc: "Perfis registrados nesta conta.",
+          usersRecency: (label: string) => `Recência de usuários · ${label}`,
+          usersInPeriod: "Usuários dentro do período selecionado.",
+          syncsWithEvidence: "Syncs com evidência",
+          syncsWithEvidenceDesc: "Sincronizações que trazem captura utilizável.",
+          devices: "Dispositivos",
+          familyDevicesDesc: "Equipamentos associados ao grupo familiar.",
+          users: "Usuários",
+          familyUsersDesc: "Pessoas associadas ao grupo familiar.",
+          games: "Partidas",
+          familyGamesDesc: "Atividade registrada do grupo familiar.",
+          noDeck: "Sem baralho",
+          noCategory: "sem categoria",
+        }
+      : {
+          recentActivity: "Actividad reciente",
+          linkedPeople: "Personas vinculadas",
+          linkedDevices: "Equipos asociados",
+          usableCapture: "Captura utilizable",
+          game: "Partida",
+          user: "Usuario",
+          device: "Dispositivo",
+          profile: "Perfil",
+          turns: (count: number) => `${count} turnos`,
+          dateDuration: (date: string, duration: string) => `Fecha ${date} · duración ${duration}`,
+          noRole: "Sin rol",
+          noEmail: "Sin email registrado",
+          login: (value: string) => `Login ${value}`,
+          noLogin: "Sin login",
+          noStatus: "Sin status",
+          homeUse: "Uso en casa",
+          institutionalUse: "Uso institucional",
+          noAssignment: "sin asignación",
+          sessions: (count: number) => `${count} sesiones`,
+          bindingsAge: (bindings: number, age: string) => `${bindings} bindings activos · ${age}`,
+          active: "Activo",
+          inactive: "Inactivo",
+          raws: (count: number) => `${count} raws`,
+          noSource: "Sin fuente registrada",
+          gameDetail: "Detalle de partidas",
+          gameDetailDesc: "Actividad reciente del grupo familiar.",
+          turnsDetail: "Detalle de turnos",
+          turnsDetailDesc: "Interacciones registradas en las partidas.",
+          successDetail: "Detalle de acierto",
+          successDetailDesc: "Acierto por partida para pasar del agregado al caso concreto.",
+          correctTurns: (successes: number, turns: number) => `${successes}/${turns} turnos correctos`,
+          turnTimeDetail: "Detalle de tiempo por turno",
+          turnTimeDetailDesc: "Promedio por partida para entender mejor el ritmo de uso.",
+          measuredTurns: (count: number) => `${count} turnos medidos`,
+          devicesDetail: "Detalle de dispositivos",
+          devicesDetailDesc: "Equipos asociados a la cuenta.",
+          usersDetail: "Detalle de usuarios",
+          usersDetailDesc: "Personas asociadas al seguimiento familiar.",
+          profilesDetail: "Detalle de perfiles",
+          profilesDetailDesc: "Perfiles ya incorporados al seguimiento familiar.",
+          activityOf: (label: string) => `Actividad del ${label}`,
+          selectedDateGames: "Partidas que caen en la fecha seleccionada.",
+          deckOf: (label: string) => `Mazo ${label}`,
+          selectedContentGames: "Partidas asociadas al contenido seleccionado.",
+          usersWithRole: (label: string) => `Usuarios con rol ${label}`,
+          peopleInRole: "Personas del rol elegido.",
+          profileState: (label: string) => `Estado de perfiles · ${label}`,
+          profilesByBlock: "Perfiles filtrados por el bloque elegido.",
+          profilesByCategory: (label: string) => `Perfiles por categoría · ${label}`,
+          profilesInCohort: "Perfiles dentro de la cohorte elegida.",
+          profilesRecency: (label: string) => `Recencia de perfiles · ${label}`,
+          profilesInPeriod: "Perfiles dentro del período seleccionado.",
+          resourcesUsers: "Recursos · usuarios",
+          resourcesUsersDesc: "Personas registradas en esta cuenta.",
+          resourcesDevices: "Recursos · dispositivos",
+          resourcesDevicesDesc: "Equipos asociados a esta cuenta.",
+          resourcesProfiles: "Recursos · perfiles",
+          resourcesProfilesDesc: "Perfiles registrados en esta cuenta.",
+          usersRecency: (label: string) => `Recencia de usuarios · ${label}`,
+          usersInPeriod: "Usuarios dentro del período seleccionado.",
+          syncsWithEvidence: "Syncs con evidencia",
+          syncsWithEvidenceDesc: "Sincronizaciones que sí traen captura utilizable.",
+          devices: "Dispositivos",
+          familyDevicesDesc: "Equipos asociados al grupo familiar.",
+          users: "Usuarios",
+          familyUsersDesc: "Personas asociadas al grupo familiar.",
+          games: "Partidas",
+          familyGamesDesc: "Actividad registrada del grupo familiar.",
+          noDeck: "Sin mazo",
+          noCategory: "sin categoría",
+        };
   const { tokens, user } = useAuth();
   const [selectedDetail, setSelectedDetail] = useState<{ kind: string; label: string } | null>(null);
   const { getRange: getModuleRange, setRange: setModuleRange } = useDashboardModuleControls();
@@ -148,24 +395,24 @@ export function FamilyDashboard() {
   });
   const gentleSignals = [
     {
-      label: "Partidas",
+      label: t.metrics.games,
       value: String(gamesQuery.data?.total || games.length),
-      badge: "Actividad reciente",
+      badge: localText.recentActivity,
     },
     {
-      label: "Usuarios",
+      label: t.metrics.users,
       value: String(usersQuery.data?.total || users.length),
-      badge: "Personas vinculadas",
+      badge: localText.linkedPeople,
     },
     {
-      label: "Dispositivos",
+      label: t.metrics.devices,
       value: String(devicesQuery.data?.total || devices.length),
-      badge: "Equipos asociados",
+      badge: localText.linkedDevices,
     },
     {
-      label: "Syncs con evidencia",
+      label: localText.syncsWithEvidence,
       value: String(syncs.filter((sync) => (sync.rawRecordCount || sync.rawRecordIds.length || 0) > 0).length),
-      badge: "Captura utilizable",
+      badge: localText.usableCapture,
     },
   ];
 
@@ -174,36 +421,36 @@ export function FamilyDashboard() {
 
     const gameRows = (items = games): DashboardDetailRow[] =>
       items.map((game) => ({
-        label: game.deckName || `Partida ${game.id}`,
-        value: `${game.turns.length} turnos`,
-        hint: `Fecha ${getDateBucketLabel(game.startDate || game.createdAt || game.updatedAt)} · duración ${formatDurationSeconds(game.turns.reduce((sum, turn) => sum + (turn.playTimeSeconds || 0), 0))}`,
+        label: game.deckName || `${localText.game} ${game.id}`,
+        value: localText.turns(game.turns.length),
+        hint: localText.dateDuration(getDateBucketLabel(game.startDate || game.createdAt || game.updatedAt), formatDurationSeconds(game.turns.reduce((sum, turn) => sum + (turn.playTimeSeconds || 0), 0))),
       }));
 
     const userRows: DashboardDetailRow[] = users.map((entry) => ({
-      label: entry.fullName || entry.email || `Usuario ${entry.id}`,
-      value: entry.roles?.join(", ") || "Sin rol",
-      hint: entry.email || "Sin email registrado",
-      badge: entry.lastLoginAt ? `Login ${getDateBucketLabel(entry.lastLoginAt)}` : "Sin login",
+      label: entry.fullName || entry.email || `${localText.user} ${entry.id}`,
+      value: entry.roles?.join(", ") || localText.noRole,
+      hint: entry.email || localText.noEmail,
+      badge: entry.lastLoginAt ? localText.login(getDateBucketLabel(entry.lastLoginAt)) : localText.noLogin,
     }));
 
     const deviceRows: DashboardDetailRow[] = devices.map((device) => ({
-      label: device.name || device.deviceId || `Dispositivo ${device.id}`,
-      value: device.status || "Sin status",
-      hint: device.assignmentScope === "home" ? "Uso en casa" : "Uso institucional",
-      badge: device.assignmentScope || "sin asignación",
+      label: device.name || device.deviceId || `${localText.device} ${device.id}`,
+      value: device.status || localText.noStatus,
+      hint: device.assignmentScope === "home" ? localText.homeUse : localText.institutionalUse,
+      badge: device.assignmentScope || localText.noAssignment,
     }));
 
     const profileRows: DashboardDetailRow[] = profiles.map((profile) => ({
-      label: profile.displayName || `Perfil ${profile.id}`,
-      value: `${profile.sessionCount} sesiones`,
-      hint: `${profile.activeBindingCount} bindings activos · ${profile.ageCategory || "sin categoría"}`,
-      badge: profile.isActive ? "Activo" : "Inactivo",
+      label: profile.displayName || `${localText.profile} ${profile.id}`,
+      value: localText.sessions(profile.sessionCount),
+      hint: localText.bindingsAge(profile.activeBindingCount, profile.ageCategory || localText.noCategory),
+      badge: profile.isActive ? localText.active : localText.inactive,
     }));
 
     const syncRows: DashboardDetailRow[] = syncs.map((sync) => ({
       label: sync.deckName || `Sync ${sync.id}`,
-      value: `${sync.rawRecordCount || sync.rawRecordIds.length || 0} raws`,
-      hint: sync.source || sync.sourceType || "Sin fuente registrada",
+      value: localText.raws(sync.rawRecordCount || sync.rawRecordIds.length || 0),
+      hint: sync.source || sync.sourceType || localText.noSource,
     }));
 
     switch (selectedDetail.kind) {
@@ -252,10 +499,10 @@ export function FamilyDashboard() {
           description: "Perfiles filtrados por el bloque elegido.",
           filterLabel: selectedDetail.label,
           rows: profileCoverageProfiles.map((profile) => ({
-            label: profile.displayName || `Perfil ${profile.id}`,
-            value: `${profile.sessionCount} sesiones`,
-            hint: `${profile.activeBindingCount} bindings activos · ${profile.ageCategory || "sin categoría"}`,
-            badge: profile.isActive ? "Activo" : "Inactivo",
+            label: profile.displayName || `${localText.profile} ${profile.id}`,
+            value: localText.sessions(profile.sessionCount),
+            hint: localText.bindingsAge(profile.activeBindingCount, profile.ageCategory || localText.noCategory),
+            badge: profile.isActive ? localText.active : localText.inactive,
           })).filter((row, index) => {
             const profile = profileCoverageProfiles[index];
             if (normalized.includes("activos")) return profile.isActive;
@@ -267,23 +514,23 @@ export function FamilyDashboard() {
         };
       }
       case "profile-age":
-        return { title: `Perfiles por categoría · ${selectedDetail.label}`, description: "Perfiles dentro de la cohorte elegida.", filterLabel: selectedDetail.label, rows: profileAgeProfiles.map((profile) => ({ label: profile.displayName || `Perfil ${profile.id}`, value: `${profile.sessionCount} sesiones`, hint: `${profile.activeBindingCount} bindings activos · ${profile.ageCategory || "sin categoría"}`, badge: profile.isActive ? "Activo" : "Inactivo" })).filter((row, index) => normalizeLabel(profileAgeProfiles[index]?.ageCategory || "Sin categoría") === normalizeLabel(selectedDetail.label)) };
+        return { title: localText.profilesByCategory(selectedDetail.label), description: localText.profilesInCohort, filterLabel: selectedDetail.label, rows: profileAgeProfiles.map((profile) => ({ label: profile.displayName || `${localText.profile} ${profile.id}`, value: localText.sessions(profile.sessionCount), hint: localText.bindingsAge(profile.activeBindingCount, profile.ageCategory || localText.noCategory), badge: profile.isActive ? localText.active : localText.inactive })).filter((row, index) => normalizeLabel(profileAgeProfiles[index]?.ageCategory || localText.noCategory) === normalizeLabel(selectedDetail.label)) };
       case "profile-recency":
-        return { title: `Recencia de perfiles · ${selectedDetail.label}`, description: "Perfiles dentro del período seleccionado.", filterLabel: selectedDetail.label, rows: profileRecencyProfiles.map((profile) => ({ label: profile.displayName || `Perfil ${profile.id}`, value: `${profile.sessionCount} sesiones`, hint: `${profile.activeBindingCount} bindings activos · ${profile.ageCategory || "sin categoría"}`, badge: profile.isActive ? "Activo" : "Inactivo" })).filter((row, index) => matchesRecencyLabel(selectedDetail.label, profileRecencyProfiles[index]?.lastSessionAt)) };
+        return { title: localText.profilesRecency(selectedDetail.label), description: localText.profilesInPeriod, filterLabel: selectedDetail.label, rows: profileRecencyProfiles.map((profile) => ({ label: profile.displayName || `${localText.profile} ${profile.id}`, value: localText.sessions(profile.sessionCount), hint: localText.bindingsAge(profile.activeBindingCount, profile.ageCategory || localText.noCategory), badge: profile.isActive ? localText.active : localText.inactive })).filter((row, index) => matchesRecencyLabel(selectedDetail.label, profileRecencyProfiles[index]?.lastSessionAt)) };
       case "resource": {
         const normalized = normalizeLabel(selectedDetail.label);
-        if (normalized.includes("usuario")) return { title: "Recursos · usuarios", description: "Personas registradas en esta cuenta.", filterLabel: selectedDetail.label, rows: userRows };
-        if (normalized.includes("dispositivo")) return { title: "Recursos · dispositivos", description: "Equipos asociados a esta cuenta.", filterLabel: selectedDetail.label, rows: deviceRows };
-        return { title: "Recursos · perfiles", description: "Perfiles registrados en esta cuenta.", filterLabel: selectedDetail.label, rows: profileRows };
+        if (normalized.includes("usuario") || normalized.includes("user") || normalized.includes("usuário")) return { title: localText.resourcesUsers, description: localText.resourcesUsersDesc, filterLabel: selectedDetail.label, rows: userRows };
+        if (normalized.includes("dispositivo") || normalized.includes("device")) return { title: localText.resourcesDevices, description: localText.resourcesDevicesDesc, filterLabel: selectedDetail.label, rows: deviceRows };
+        return { title: localText.resourcesProfiles, description: localText.resourcesProfilesDesc, filterLabel: selectedDetail.label, rows: profileRows };
       }
       case "user-recency":
-        return { title: `Recencia de usuarios · ${selectedDetail.label}`, description: "Usuarios dentro del período seleccionado.", filterLabel: selectedDetail.label, rows: userRecencyUsers.map((entry) => ({ label: entry.fullName || entry.email || `Usuario ${entry.id}`, value: entry.roles?.join(", ") || "Sin rol", hint: entry.email || "Sin email registrado", badge: entry.lastLoginAt ? `Login ${getDateBucketLabel(entry.lastLoginAt)}` : "Sin login" })).filter((row, index) => matchesRecencyLabel(selectedDetail.label, userRecencyUsers[index]?.lastLoginAt)) };
+        return { title: localText.usersRecency(selectedDetail.label), description: localText.usersInPeriod, filterLabel: selectedDetail.label, rows: userRecencyUsers.map((entry) => ({ label: entry.fullName || entry.email || `${localText.user} ${entry.id}`, value: entry.roles?.join(", ") || localText.noRole, hint: entry.email || localText.noEmail, badge: entry.lastLoginAt ? localText.login(getDateBucketLabel(entry.lastLoginAt)) : localText.noLogin })).filter((row, index) => matchesRecencyLabel(selectedDetail.label, userRecencyUsers[index]?.lastLoginAt)) };
       case "signal": {
         const normalized = normalizeLabel(selectedDetail.label);
-        if (normalized.includes("syncs con evidencia")) return { title: "Syncs con evidencia", description: "Sincronizaciones que sí traen captura utilizable.", filterLabel: selectedDetail.label, rows: syncRows.filter((row, index) => (syncs[index]?.rawRecordCount || syncs[index]?.rawRecordIds.length || 0) > 0) };
-        if (normalized.includes("dispositivos")) return { title: "Dispositivos", description: "Equipos asociados al grupo familiar.", filterLabel: selectedDetail.label, rows: deviceRows };
-        if (normalized.includes("usuarios")) return { title: "Usuarios", description: "Personas asociadas al grupo familiar.", filterLabel: selectedDetail.label, rows: userRows };
-        return { title: "Partidas", description: "Actividad registrada del grupo familiar.", filterLabel: selectedDetail.label, rows: gameRows() };
+        if (normalized.includes("syncs con evidencia") || normalized.includes("syncs with evidence") || normalized.includes("syncs com evidência")) return { title: localText.syncsWithEvidence, description: localText.syncsWithEvidenceDesc, filterLabel: selectedDetail.label, rows: syncRows.filter((row, index) => (syncs[index]?.rawRecordCount || syncs[index]?.rawRecordIds.length || 0) > 0) };
+        if (normalized.includes("dispositivos") || normalized.includes("devices")) return { title: localText.devices, description: localText.familyDevicesDesc, filterLabel: selectedDetail.label, rows: deviceRows };
+        if (normalized.includes("usuarios") || normalized.includes("users") || normalized.includes("usuários")) return { title: localText.users, description: localText.familyUsersDesc, filterLabel: selectedDetail.label, rows: userRows };
+        return { title: localText.games, description: localText.familyGamesDesc, filterLabel: selectedDetail.label, rows: gameRows() };
       }
       default:
         return null;
@@ -293,9 +540,9 @@ export function FamilyDashboard() {
   return (
     <div className="space-y-8">
       <SectionHeader
-        eyebrow="Familia"
-        title={`Dashboard de seguimiento para ${user?.fullName || "familia"}`}
-        description="Esta home mantiene una lectura analítica y simple: actividad, recursos, tiempos y contenidos usados, sin ruido técnico."
+        eyebrow={t.header.eyebrow}
+        title={t.header.title(user?.fullName || (language === "en" ? "family" : language === "pt" ? "família" : "familia"))}
+        description={t.header.description}
       />
 
       {detailPanel ? (
@@ -309,27 +556,27 @@ export function FamilyDashboard() {
       ) : null}
 
       <div className="grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(220px,1fr))]">
-        <DashboardMetricCard label="Partidas" value={String(gamesQuery.data?.total || games.length)} hint="Actividad reciente del grupo familiar." icon={BookHeart} isLoading={isLoading} onSelect={() => setSelectedDetail({ kind: "metric-games", label: "Partidas" })} isActive={selectedDetail?.kind === "metric-games"} />
-        <DashboardMetricCard label="Turnos" value={String(totalTurns)} hint="Interacciones registradas dentro de esas partidas." icon={Layers3} isLoading={isLoading} onSelect={() => setSelectedDetail({ kind: "metric-turns", label: "Turnos" })} isActive={selectedDetail?.kind === "metric-turns"} />
-        <DashboardMetricCard label="Acierto general" value={`${successRate}%`} hint="Porcentaje agregado de respuestas correctas en la actividad registrada." icon={Database} isLoading={isLoading} onSelect={() => setSelectedDetail({ kind: "metric-success", label: "Acierto general" })} isActive={selectedDetail?.kind === "metric-success"} />
-        <DashboardMetricCard label="Tiempo por turno" value={formatDurationSeconds(averageTurnTime)} hint="Ritmo promedio de juego en la actividad registrada." icon={TimerReset} isLoading={isLoading} onSelect={() => setSelectedDetail({ kind: "metric-turn-time", label: "Tiempo por turno" })} isActive={selectedDetail?.kind === "metric-turn-time"} />
-        <DashboardMetricCard label="Dispositivos" value={String(devicesQuery.data?.total || devices.length)} hint="Equipos asociados a la cuenta." icon={Smartphone} isLoading={isLoading} onSelect={() => setSelectedDetail({ kind: "metric-devices", label: "Dispositivos" })} isActive={selectedDetail?.kind === "metric-devices"} />
-        <DashboardMetricCard label="Usuarios" value={String(usersQuery.data?.total || users.length)} hint="Personas asociadas a la cuenta." icon={Users2} isLoading={isLoading} onSelect={() => setSelectedDetail({ kind: "metric-users", label: "Usuarios" })} isActive={selectedDetail?.kind === "metric-users"} />
-        <DashboardMetricCard label="Perfiles" value={String(profiles.length)} hint="Perfiles incorporados al seguimiento familiar." icon={BookHeart} isLoading={isLoading} onSelect={() => setSelectedDetail({ kind: "metric-profiles", label: "Perfiles" })} isActive={selectedDetail?.kind === "metric-profiles"} />
+        <DashboardMetricCard label={t.metrics.games} value={String(gamesQuery.data?.total || games.length)} hint={t.metrics.gamesHint} icon={BookHeart} isLoading={isLoading} onSelect={() => setSelectedDetail({ kind: "metric-games", label: t.metrics.games })} isActive={selectedDetail?.kind === "metric-games"} />
+        <DashboardMetricCard label={t.metrics.turns} value={String(totalTurns)} hint={t.metrics.turnsHint} icon={Layers3} isLoading={isLoading} onSelect={() => setSelectedDetail({ kind: "metric-turns", label: t.metrics.turns })} isActive={selectedDetail?.kind === "metric-turns"} />
+        <DashboardMetricCard label={t.metrics.success} value={`${successRate}%`} hint={t.metrics.successHint} icon={Database} isLoading={isLoading} onSelect={() => setSelectedDetail({ kind: "metric-success", label: t.metrics.success })} isActive={selectedDetail?.kind === "metric-success"} />
+        <DashboardMetricCard label={t.metrics.turnTime} value={formatDurationSeconds(averageTurnTime)} hint={t.metrics.turnTimeHint} icon={TimerReset} isLoading={isLoading} onSelect={() => setSelectedDetail({ kind: "metric-turn-time", label: t.metrics.turnTime })} isActive={selectedDetail?.kind === "metric-turn-time"} />
+        <DashboardMetricCard label={t.metrics.devices} value={String(devicesQuery.data?.total || devices.length)} hint={t.metrics.devicesHint} icon={Smartphone} isLoading={isLoading} onSelect={() => setSelectedDetail({ kind: "metric-devices", label: t.metrics.devices })} isActive={selectedDetail?.kind === "metric-devices"} />
+        <DashboardMetricCard label={t.metrics.users} value={String(usersQuery.data?.total || users.length)} hint={t.metrics.usersHint} icon={Users2} isLoading={isLoading} onSelect={() => setSelectedDetail({ kind: "metric-users", label: t.metrics.users })} isActive={selectedDetail?.kind === "metric-users"} />
+        <DashboardMetricCard label={t.metrics.profiles} value={String(profiles.length)} hint={t.metrics.profilesHint} icon={BookHeart} isLoading={isLoading} onSelect={() => setSelectedDetail({ kind: "metric-profiles", label: t.metrics.profiles })} isActive={selectedDetail?.kind === "metric-profiles"} />
       </div>
 
       {error ? (
         <Card className="border-destructive/20 bg-white/85">
           <CardContent className="p-6 text-sm text-destructive">
-            No pude cargar una parte del dashboard family: {getErrorMessage(error)}
+            {t.error(getErrorMessage(error))}
           </CardContent>
         </Card>
       ) : null}
 
       <div className="grid gap-6 xl:grid-cols-2">
         <DashboardLineChartCard
-          title="Actividad reciente"
-          description="Partidas y turnos por fecha para ver si hubo movimiento reciente o días más tranquilos."
+          title={t.charts.activity}
+          description={t.charts.activityDesc}
           data={activitySeries}
           range={activityRange}
           onRangeChange={(range) => setModuleRange("family-activity", range)}
@@ -338,8 +585,8 @@ export function FamilyDashboard() {
           activeDatumLabel={selectedDetail?.kind === "activity-date" ? selectedDetail.label : null}
         />
         <DashboardBarChartCard
-          title="Mazos usados"
-          description="Qué tipos de contenido aparecen más en la actividad registrada."
+          title={t.charts.decks}
+          description={t.charts.decksDesc}
           data={deckUsage}
           range={deckRange}
           onRangeChange={(range) => setModuleRange("family-deck", range)}
@@ -351,8 +598,8 @@ export function FamilyDashboard() {
 
       <div className="grid gap-6 xl:grid-cols-2">
         <DashboardBarChartCard
-          title="Usuarios por rol"
-          description="Distribución simple de las personas asociadas al grupo familiar."
+          title={t.charts.usersByRole}
+          description={t.charts.usersByRoleDesc}
           data={userRoleSeries}
           range={userRoleRange}
           onRangeChange={(range) => setModuleRange("family-user-role", range)}
@@ -361,8 +608,8 @@ export function FamilyDashboard() {
           activeDatumLabel={selectedDetail?.kind === "user-role" ? selectedDetail.label : null}
         />
         <DashboardBarChartCard
-          title="Estado de perfiles"
-          description="Perfiles activos, con binding y con sesiones para leer rápidamente qué tan conectada está la experiencia."
+          title={t.charts.profileState}
+          description={t.charts.profileStateDesc}
           data={profileCoverageSeries}
           range={profileCoverageRange}
           onRangeChange={(range) => setModuleRange("family-profile-coverage", range)}
@@ -374,8 +621,8 @@ export function FamilyDashboard() {
 
       <div className="grid gap-6 xl:grid-cols-2">
         <DashboardBarChartCard
-          title="Perfiles por categoría"
-          description="Cohortes por categoría para entender si la experiencia actual se concentra en algún tramo específico."
+          title={t.charts.profileAge}
+          description={t.charts.profileAgeDesc}
           data={profileAgeSeries}
           range={profileAgeRange}
           onRangeChange={(range) => setModuleRange("family-profile-age", range)}
@@ -384,8 +631,8 @@ export function FamilyDashboard() {
           activeDatumLabel={selectedDetail?.kind === "profile-age" ? selectedDetail.label : null}
         />
         <DashboardBarChartCard
-          title="Recencia de perfiles"
-          description="Última sesión por perfil para ver rápidamente quién viene activo y quién quedó más quieto."
+          title={t.charts.profileRecency}
+          description={t.charts.profileRecencyDesc}
           data={profileRecencySeries}
           range={profileRecencyRange}
           onRangeChange={(range) => setModuleRange("family-profile-recency", range)}
@@ -397,8 +644,8 @@ export function FamilyDashboard() {
 
       <div className="grid gap-6 xl:grid-cols-2">
         <DashboardBarChartCard
-          title="Recursos principales"
-          description="Balance simple entre personas y dispositivos asociados a la cuenta."
+          title={t.charts.resources}
+          description={t.charts.resourcesDesc}
           data={visibleResources}
           range={resourceRange}
           onRangeChange={(range) => setModuleRange("family-resource-balance", range)}
@@ -407,8 +654,8 @@ export function FamilyDashboard() {
           activeDatumLabel={selectedDetail?.kind === "resource" ? selectedDetail.label : null}
         />
         <DashboardBarChartCard
-          title="Recencia de usuarios"
-          description="Lectura suave de accesos recientes para detectar si el entorno viene activo o con señales más frías."
+          title={t.charts.userRecency}
+          description={t.charts.userRecencyDesc}
           data={userRecencySeries}
           range={userRecencyRange}
           onRangeChange={(range) => setModuleRange("family-user-recency", range)}
@@ -420,8 +667,8 @@ export function FamilyDashboard() {
 
       <div className="grid gap-6 xl:grid-cols-2">
         <DashboardTopListCard
-          title="Resumen rápido"
-          description="Lectura amable de los tres frentes más importantes de tu cuenta."
+          title={t.charts.summary}
+          description={t.charts.summaryDesc}
           items={gentleSignals}
           onItemSelect={(label) => setSelectedDetail({ kind: "signal", label })}
           activeItemLabel={selectedDetail?.kind === "signal" ? selectedDetail.label : null}

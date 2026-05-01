@@ -15,8 +15,226 @@ import { useDevices } from "@/features/devices/api";
 import { useGames } from "@/features/games/api";
 import { buildGameDetailHref, type GameAccessFilter, type GamePlayerModeFilter } from "@/features/games/game-route";
 import { buildGameRows } from "@/features/games/game-view";
+import { useLanguage, type AppLanguage } from "@/features/i18n/i18n-context";
 import { useInstitutions } from "@/features/institutions/api";
 import { cn, formatDateTime, getErrorMessage } from "@/lib/utils";
+
+const gamesMessages: Record<AppLanguage, {
+  eyebrow: {
+    default: string;
+    teacher: string;
+    director: string;
+    family: string;
+    researcher: string;
+    institutionAdmin: string;
+  };
+  title: string;
+  description: {
+    default: string;
+    teacher: string;
+    director: (institutionName: string) => string;
+    family: string;
+    researcher: string;
+    institutionAdmin: (institutionName: string) => string;
+  };
+  searchPlaceholder: string;
+  allInstitutions: string;
+  playerModes: {
+    all: string;
+    registered: string;
+    manual: string;
+    mixed: string;
+  };
+  accessOptions: {
+    all: string;
+    owned: string;
+    institution: string;
+    shared: string;
+    unresolved: string;
+  };
+  clearCrossFilter: string;
+  activeInstitution: (name: string) => string;
+  filteredUser: (name: string) => string;
+  filteredDevice: (name: string) => string;
+  researcherCards: {
+    sample: { title: string; description: string };
+    associations: { title: string; description: string };
+    turns: { title: string; description: string };
+  };
+  accessAvailable: string;
+  accessHint: string;
+  results: string;
+  allView: string;
+  clear: string;
+  resultsSummary: (filtered: number, total: number) => string;
+  listTitles: {
+    default: string;
+    teacher: string;
+    director: string;
+    family: string;
+    researcher: string;
+  };
+  listDescriptions: {
+    default: string;
+    teacher: string;
+    director: string;
+    family: string;
+    researcher: string;
+  };
+  table: {
+    deck: string;
+    institution: string;
+    device: string;
+    access: string;
+    players: string;
+    turns: string;
+    start: string;
+    empty: string;
+  };
+  summaryLabels: {
+    games: string;
+    sample: string;
+    players: string;
+    turns: string;
+    decks: string;
+    mixedSample: string;
+    mixedGames: string;
+    successRate: string;
+    unresolved: string;
+  };
+  actionLabels: {
+    focus: string;
+    active: string;
+    seeAll: string;
+  };
+}> = {
+  es: {
+    eyebrow: { default: "Juego", teacher: "Teacher", director: "Director", family: "Family", researcher: "Researcher", institutionAdmin: "Institution admin" },
+    title: "Partidas",
+    description: {
+      default: "Vista de partidas con contexto de institución, dispositivo, jugadores y desempeño, para seguir el recorrido de sync a partida con una lectura clara.",
+      teacher: "Vista de aula para el docente, priorizando qué se jugó, con quién y desde qué dispositivo para conectar rápido actividad y contexto.",
+      director: (institutionName) => `Vista de seguimiento institucional de partidas para ${institutionName}, enfocada en volumen, mezcla de participantes y señales generales sin ruido técnico.`,
+      family: "Vista simple para entender sesiones, participantes y ritmo general sin entrar en detalle técnico innecesario.",
+      researcher: "Vista de muestra de partidas para leer composición, asociaciones y densidad de turnos sin mezclarlo con operación de aula.",
+      institutionAdmin: (institutionName) => `Vista de partidas para ${institutionName}, alineada al acceso institucional disponible.`,
+    },
+    searchPlaceholder: "Filtrar por mazo, gameId, institución, dispositivo o jugador",
+    allInstitutions: "Todas las instituciones",
+    playerModes: { all: "Todos los modos", registered: "Solo registrados", manual: "Solo manuales", mixed: "Mixtos" },
+    accessOptions: { all: "Todos los accesos", owned: "Mis dispositivos", institution: "Institución visible", shared: "Compartidas", unresolved: "Sin asociación resuelta" },
+    clearCrossFilter: "Quitar filtro cruzado",
+    activeInstitution: (name) => `Institución activa: ${name}`,
+    filteredUser: (name) => `Usuario filtrado: ${name}`,
+    filteredDevice: (name) => `Dispositivo filtrado: ${name}`,
+    researcherCards: {
+      sample: { title: "Composición de muestra", description: "Leé rápido cuántas sesiones combinan manuales y registrados, y cómo queda representada la muestra disponible." },
+      associations: { title: "Asociaciones clave", description: "La relación entre partida, dispositivo y responsable queda clara para interpretar cada caso sin ambigüedades." },
+      turns: { title: "Turnos observables", description: "La muestra destaca densidad de turnos, tasa de éxito y contexto de jugador con una lectura directa." },
+    },
+    accessAvailable: "Acceso disponible",
+    accessHint: "Recortá la muestra por tipo de acceso antes de abrir una partida.",
+    results: "Resultados",
+    allView: "Vista general",
+    clear: "Limpiar",
+    resultsSummary: (filtered, total) => `${filtered} de ${total} partidas con el recorte actual.`,
+    listTitles: { default: "Listado de partidas", teacher: "Partidas para aula", director: "Partidas para seguimiento", family: "Actividad reciente", researcher: "Muestra de partidas" },
+    listDescriptions: {
+      default: "Abrí una partida para entrar a su detalle dedicado sin perder el contexto del recorte actual.",
+      teacher: "Abrí una partida para entrar a su pantalla dedicada con contexto del dispositivo, participantes y desempeño.",
+      director: "Abrí una partida para revisar contexto institucional, navegación relacionada y desempeño turno a turno.",
+      family: "Abrí una partida para ver su detalle dedicado con participantes, turnos y ritmo general.",
+      researcher: "Abrí una partida para revisar composición, turnos, navegación relacionada y gráfico de resultados por turno.",
+    },
+    table: { deck: "Mazo", institution: "Institución", device: "Dispositivo", access: "Acceso", players: "Jugadores", turns: "Turnos", start: "Inicio", empty: "No hay partidas para mostrar." },
+    summaryLabels: { games: "Partidas", sample: "Muestra", players: "Jugadores", turns: "Turnos", decks: "Mazos", mixedSample: "Muestra mixta", mixedGames: "Mixtas", successRate: "Tasa de aciertos", unresolved: "Sin asociación" },
+    actionLabels: { focus: "Ver foco", active: "Foco activo", seeAll: "Ver todas" },
+  },
+  en: {
+    eyebrow: { default: "Games", teacher: "Teacher", director: "Director", family: "Family", researcher: "Researcher", institutionAdmin: "Institution admin" },
+    title: "Games",
+    description: {
+      default: "Game view with institution, device, player and performance context to follow the path from sync to game with a clear reading.",
+      teacher: "Classroom view for teachers, prioritizing what was played, with whom, and from which device so activity and context connect quickly.",
+      director: (institutionName) => `Institution-level games view for ${institutionName}, focused on volume, participant mix, and broad signals without technical noise.`,
+      family: "Simple view to understand sessions, participants, and overall pace without unnecessary technical detail.",
+      researcher: "Sample-oriented game view to read composition, associations, and turn density without mixing in classroom operations.",
+      institutionAdmin: (institutionName) => `Games view for ${institutionName}, aligned with the available institutional access.`,
+    },
+    searchPlaceholder: "Filter by deck, gameId, institution, device, or player",
+    allInstitutions: "All institutions",
+    playerModes: { all: "All modes", registered: "Registered only", manual: "Manual only", mixed: "Mixed" },
+    accessOptions: { all: "All access", owned: "My devices", institution: "Institution-visible", shared: "Shared", unresolved: "Unresolved association" },
+    clearCrossFilter: "Clear linked filter",
+    activeInstitution: (name) => `Active institution: ${name}`,
+    filteredUser: (name) => `Filtered user: ${name}`,
+    filteredDevice: (name) => `Filtered device: ${name}`,
+    researcherCards: {
+      sample: { title: "Sample composition", description: "Quickly read how many sessions combine manual and registered players and how the available sample is represented." },
+      associations: { title: "Key associations", description: "The relationship between game, device, and responsible person stays clear so each case is easy to interpret." },
+      turns: { title: "Observable turns", description: "The sample highlights turn density, success rate, and player context with a direct reading." },
+    },
+    accessAvailable: "Available access",
+    accessHint: "Trim the sample by access type before opening a game.",
+    results: "Results",
+    allView: "Overview",
+    clear: "Clear",
+    resultsSummary: (filtered, total) => `${filtered} of ${total} games match the current view.`,
+    listTitles: { default: "Games list", teacher: "Games for classroom", director: "Games for follow-up", family: "Recent activity", researcher: "Game sample" },
+    listDescriptions: {
+      default: "Open a game to enter its dedicated detail without losing the current filter context.",
+      teacher: "Open a game to enter its dedicated screen with device, participant, and performance context.",
+      director: "Open a game to review institution context, related navigation, and turn-by-turn performance.",
+      family: "Open a game to see its dedicated detail with participants, turns, and overall pace.",
+      researcher: "Open a game to review composition, turns, related navigation, and turn-result chart.",
+    },
+    table: { deck: "Deck", institution: "Institution", device: "Device", access: "Access", players: "Players", turns: "Turns", start: "Start", empty: "No games to show." },
+    summaryLabels: { games: "Games", sample: "Sample", players: "Players", turns: "Turns", decks: "Decks", mixedSample: "Mixed sample", mixedGames: "Mixed", successRate: "Success rate", unresolved: "Unresolved" },
+    actionLabels: { focus: "View focus", active: "Active focus", seeAll: "View all" },
+  },
+  pt: {
+    eyebrow: { default: "Partidas", teacher: "Teacher", director: "Director", family: "Family", researcher: "Researcher", institutionAdmin: "Institution admin" },
+    title: "Partidas",
+    description: {
+      default: "Visão de partidas com contexto de instituição, dispositivo, jogadores e desempenho para seguir o percurso de sync até a partida com leitura clara.",
+      teacher: "Visão de sala para docentes, priorizando o que foi jogado, com quem e em qual dispositivo para conectar rapidamente atividade e contexto.",
+      director: (institutionName) => `Visão institucional de partidas para ${institutionName}, focada em volume, mistura de participantes e sinais gerais sem ruído técnico.`,
+      family: "Visão simples para entender sessões, participantes e ritmo geral sem detalhe técnico desnecessário.",
+      researcher: "Visão de amostra de partidas para ler composição, associações e densidade de turnos sem misturar operação de sala.",
+      institutionAdmin: (institutionName) => `Visão de partidas para ${institutionName}, alinhada ao acesso institucional disponível.`,
+    },
+    searchPlaceholder: "Filtrar por baralho, gameId, instituição, dispositivo ou jogador",
+    allInstitutions: "Todas as instituições",
+    playerModes: { all: "Todos os modos", registered: "Só registrados", manual: "Só manuais", mixed: "Mistos" },
+    accessOptions: { all: "Todos os acessos", owned: "Meus dispositivos", institution: "Instituição visível", shared: "Compartilhadas", unresolved: "Sem associação resolvida" },
+    clearCrossFilter: "Remover filtro cruzado",
+    activeInstitution: (name) => `Instituição ativa: ${name}`,
+    filteredUser: (name) => `Usuário filtrado: ${name}`,
+    filteredDevice: (name) => `Dispositivo filtrado: ${name}`,
+    researcherCards: {
+      sample: { title: "Composição da amostra", description: "Veja rapidamente quantas sessões combinam manuais e registrados e como a amostra disponível está representada." },
+      associations: { title: "Associações-chave", description: "A relação entre partida, dispositivo e responsável fica clara para interpretar cada caso sem ambiguidade." },
+      turns: { title: "Turnos observáveis", description: "A amostra destaca densidade de turnos, taxa de acerto e contexto do jogador com leitura direta." },
+    },
+    accessAvailable: "Acesso disponível",
+    accessHint: "Recorte a amostra por tipo de acesso antes de abrir uma partida.",
+    results: "Resultados",
+    allView: "Visão geral",
+    clear: "Limpar",
+    resultsSummary: (filtered, total) => `${filtered} de ${total} partidas com o recorte atual.`,
+    listTitles: { default: "Lista de partidas", teacher: "Partidas para sala", director: "Partidas para acompanhamento", family: "Atividade recente", researcher: "Amostra de partidas" },
+    listDescriptions: {
+      default: "Abra uma partida para entrar em seu detalhe dedicado sem perder o contexto do recorte atual.",
+      teacher: "Abra uma partida para entrar em sua tela dedicada com contexto de dispositivo, participantes e desempenho.",
+      director: "Abra uma partida para revisar contexto institucional, navegação relacionada e desempenho turno a turno.",
+      family: "Abra uma partida para ver seu detalhe dedicado com participantes, turnos e ritmo geral.",
+      researcher: "Abra uma partida para revisar composição, turnos, navegação relacionada e gráfico de resultados por turno.",
+    },
+    table: { deck: "Baralho", institution: "Instituição", device: "Dispositivo", access: "Acesso", players: "Jogadores", turns: "Turnos", start: "Início", empty: "Não há partidas para mostrar." },
+    summaryLabels: { games: "Partidas", sample: "Amostra", players: "Jogadores", turns: "Turnos", decks: "Baralhos", mixedSample: "Amostra mista", mixedGames: "Mistas", successRate: "Taxa de acertos", unresolved: "Sem associação" },
+    actionLabels: { focus: "Ver foco", active: "Foco ativo", seeAll: "Ver todas" },
+  },
+};
 
 function SummaryCard({
   label,
@@ -25,7 +243,8 @@ function SummaryCard({
   icon: Icon,
   onSelect,
   isActive = false,
-  actionLabel = "Ver foco",
+  actionLabel,
+  activeLabel,
 }: {
   label: string;
   value: string;
@@ -33,7 +252,8 @@ function SummaryCard({
   icon: ComponentType<{ className?: string }>;
   onSelect?: () => void;
   isActive?: boolean;
-  actionLabel?: string;
+  actionLabel: string;
+  activeLabel: string;
 }) {
   return (
     <Card className={cn("border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]", isActive && "ring-2 ring-primary/20")}>
@@ -60,7 +280,7 @@ function SummaryCard({
                 : "border-border/70 bg-white/80 text-foreground hover:border-primary/30 hover:bg-primary/5",
             )}
           >
-            {isActive ? "Foco activo" : actionLabel}
+            {isActive ? activeLabel : actionLabel}
           </button>
         ) : null}
       </CardContent>
@@ -79,6 +299,8 @@ function getDeckInitials(deckName?: string | null) {
 }
 
 export function GamesTable() {
+  const { language } = useLanguage();
+  const t = gamesMessages[language];
   const { tokens, user: currentUser } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
@@ -234,20 +456,20 @@ export function GamesTable() {
   return (
     <div className="space-y-6">
       <SectionHeader
-        eyebrow={isFamilyView ? "Family" : isResearcherView ? "Researcher" : isTeacherView ? "Teacher" : isDirectorView ? "Director" : isInstitutionScopedView ? "Institution admin" : "Juego"}
-        title="Partidas"
+        eyebrow={isFamilyView ? t.eyebrow.family : isResearcherView ? t.eyebrow.researcher : isTeacherView ? t.eyebrow.teacher : isDirectorView ? t.eyebrow.director : isInstitutionScopedView ? t.eyebrow.institutionAdmin : t.eyebrow.default}
+        title={t.title}
         description={
           isFamilyView
-            ? "Vista simple para entender sesiones, participantes y ritmo general sin entrar en detalle técnico innecesario."
+            ? t.description.family
             : isResearcherView
-            ? "Vista de muestra de partidas para leer composición, asociaciones y densidad de turnos sin mezclarlo con operación de aula."
+            ? t.description.researcher
             : isTeacherView
-            ? "Vista de aula para el docente, priorizando qué se jugó, con quién y desde qué dispositivo para conectar rápido actividad y contexto."
+            ? t.description.teacher
             : isDirectorView
-            ? `Vista de seguimiento institucional de partidas para ${scopedInstitutionName || "la institución"}, enfocada en volumen, mezcla de participantes y señales generales sin ruido técnico.`
+            ? t.description.director(scopedInstitutionName || (language === "en" ? "the institution" : language === "pt" ? "a instituição" : "la institución"))
             : isInstitutionScopedView
-            ? `Vista de partidas para ${scopedInstitutionName}, alineada al acceso institucional disponible.`
-            : "Vista de partidas con contexto de institución, dispositivo, jugadores y desempeño, para seguir el recorrido de sync a partida con una lectura clara."
+            ? t.description.institutionAdmin(scopedInstitutionName || (language === "en" ? "the institution" : language === "pt" ? "a instituição" : "la institución"))
+            : t.description.default
         }
         actions={
           <div className="grid w-full gap-3 md:grid-cols-2 2xl:grid-cols-[minmax(0,1.45fr)_minmax(220px,0.8fr)_minmax(210px,0.7fr)_minmax(220px,0.8fr)]">
@@ -256,7 +478,7 @@ export function GamesTable() {
               <Input
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
-                placeholder="Filtrar por mazo, gameId, institución, dispositivo o jugador"
+                placeholder={t.searchPlaceholder}
                 className="w-full pl-9"
               />
             </div>
@@ -268,7 +490,7 @@ export function GamesTable() {
                   className="h-10 min-w-0 w-full rounded-md border border-input bg-background px-3 text-sm"
                   disabled={Boolean(scopedInstitutionId)}
                 >
-                  <option value="">Todas las instituciones</option>
+                  <option value="">{t.allInstitutions}</option>
                   {institutions.map((institution) => (
                     <option key={institution.id} value={institution.id}>
                       {institution.name}
@@ -280,21 +502,21 @@ export function GamesTable() {
                   onChange={(event) => setPlayerModeFilter(event.target.value as "all" | "manual" | "mixed" | "registered")}
                   className="h-10 min-w-0 w-full rounded-md border border-input bg-background px-3 text-sm"
                 >
-                  <option value="all">Todos los modos</option>
-                  <option value="registered">Solo registrados</option>
-                  <option value="manual">Solo manuales</option>
-                  <option value="mixed">Mixtos</option>
+                  <option value="all">{t.playerModes.all}</option>
+                  <option value="registered">{t.playerModes.registered}</option>
+                  <option value="manual">{t.playerModes.manual}</option>
+                  <option value="mixed">{t.playerModes.mixed}</option>
                 </select>
                 <select
                   value={accessFilter}
                   onChange={(event) => setAccessFilter(event.target.value as "all" | "owned" | "institution" | "shared" | "unresolved")}
                   className="h-10 min-w-0 w-full rounded-md border border-input bg-background px-3 text-sm"
                 >
-                  <option value="all">Todos los accesos</option>
-                  <option value="owned">Mis dispositivos</option>
-                  <option value="institution">Institución visible</option>
-                  <option value="shared">Compartidas</option>
-                  <option value="unresolved">Sin asociación resuelta</option>
+                  <option value="all">{t.accessOptions.all}</option>
+                  <option value="owned">{t.accessOptions.owned}</option>
+                  <option value="institution">{t.accessOptions.institution}</option>
+                  <option value="shared">{t.accessOptions.shared}</option>
+                  <option value="unresolved">{t.accessOptions.unresolved}</option>
                 </select>
                 {linkedOwnerUserId || linkedBleDeviceId || linkedDeviceId ? (
                   <button
@@ -302,7 +524,7 @@ export function GamesTable() {
                     onClick={() => router.push(pathname)}
                     className="inline-flex h-10 min-w-0 items-center justify-center rounded-md border border-primary/20 bg-primary/5 px-3 text-sm font-medium text-primary transition hover:bg-primary/10"
                   >
-                    Quitar filtro cruzado
+                    {t.clearCrossFilter}
                   </button>
                 ) : null}
               </>
@@ -313,9 +535,9 @@ export function GamesTable() {
 
       {(scopedInstitutionName || linkedOwnerUserId || linkedBleDeviceId || linkedDeviceId) ? (
         <div className="flex flex-wrap gap-2">
-          {scopedInstitutionName ? <Badge variant="outline">Institución activa: {scopedInstitutionName}</Badge> : null}
-          {linkedOwnerUserId ? <Badge variant="outline">Usuario filtrado: {linkedOwnerUserName || linkedOwnerUserId}</Badge> : null}
-          {linkedBleDeviceId || linkedDeviceId ? <Badge variant="outline">Dispositivo filtrado: {linkedDeviceName || linkedDeviceId || linkedBleDeviceId}</Badge> : null}
+          {scopedInstitutionName ? <Badge variant="outline">{t.activeInstitution(scopedInstitutionName)}</Badge> : null}
+          {linkedOwnerUserId ? <Badge variant="outline">{t.filteredUser(linkedOwnerUserName || linkedOwnerUserId)}</Badge> : null}
+          {linkedBleDeviceId || linkedDeviceId ? <Badge variant="outline">{t.filteredDevice(linkedDeviceName || linkedDeviceId || linkedBleDeviceId)}</Badge> : null}
         </div>
       ) : null}
 
@@ -323,16 +545,16 @@ export function GamesTable() {
         <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
           <CardContent className="grid gap-3 p-5 md:grid-cols-3">
             <div className="rounded-2xl bg-background/70 p-4">
-              <p className="text-sm font-medium text-foreground">Composición de muestra</p>
-              <p className="mt-2 text-sm leading-6 text-muted-foreground">Leé rápido cuántas sesiones combinan manuales y registrados, y cómo queda representada la muestra disponible.</p>
+              <p className="text-sm font-medium text-foreground">{t.researcherCards.sample.title}</p>
+              <p className="mt-2 text-sm leading-6 text-muted-foreground">{t.researcherCards.sample.description}</p>
             </div>
             <div className="rounded-2xl bg-background/70 p-4">
-              <p className="text-sm font-medium text-foreground">Asociaciones clave</p>
-              <p className="mt-2 text-sm leading-6 text-muted-foreground">La relación entre partida, dispositivo y responsable queda clara para interpretar cada caso sin ambigüedades.</p>
+              <p className="text-sm font-medium text-foreground">{t.researcherCards.associations.title}</p>
+              <p className="mt-2 text-sm leading-6 text-muted-foreground">{t.researcherCards.associations.description}</p>
             </div>
             <div className="rounded-2xl bg-background/70 p-4">
-              <p className="text-sm font-medium text-foreground">Turnos observables</p>
-              <p className="mt-2 text-sm leading-6 text-muted-foreground">La muestra destaca densidad de turnos, tasa de éxito y contexto de jugador con una lectura directa.</p>
+              <p className="text-sm font-medium text-foreground">{t.researcherCards.turns.title}</p>
+              <p className="mt-2 text-sm leading-6 text-muted-foreground">{t.researcherCards.turns.description}</p>
             </div>
           </CardContent>
         </Card>
@@ -343,8 +565,8 @@ export function GamesTable() {
           <CardContent className="p-5">
             <div className="mb-3 flex items-center justify-between gap-3">
               <div>
-                <p className="text-sm font-semibold text-foreground">Acceso disponible</p>
-                <p className="text-sm text-muted-foreground">Recortá la muestra por tipo de acceso antes de abrir una partida.</p>
+                <p className="text-sm font-semibold text-foreground">{t.accessAvailable}</p>
+                <p className="text-sm text-muted-foreground">{t.accessHint}</p>
               </div>
               <Badge variant="outline">{filtered.length} resultados</Badge>
             </div>
@@ -377,11 +599,11 @@ export function GamesTable() {
           Array.from({ length: 5 }).map((_, index) => <Skeleton key={index} className="h-32 rounded-2xl" />)
         ) : (
           <>
-            <SummaryCard label={isFamilyView ? "Partidas" : isResearcherView ? "Muestra" : "Partidas"} value={String(metrics.totalGames)} icon={Gamepad2} onSelect={resetFilters} isActive={!query.trim() && !institutionFilter && playerModeFilter === "all" && accessFilter === "all" && !linkedOwnerUserId && !linkedBleDeviceId && !linkedDeviceId} actionLabel="Ver todas" />
-            <SummaryCard label={isResearcherView ? "Participantes" : "Jugadores"} value={String(metrics.totalPlayers)} icon={Users} />
-            <SummaryCard label="Turnos" value={String(metrics.totalTurns)} icon={TimerReset} />
-            <SummaryCard label={isFamilyView ? "Mazos" : isResearcherView ? "Muestra mixta" : "Mixtas"} value={String(isFamilyView ? new Set(games.map((game) => game.deckName).filter(Boolean)).size : metrics.mixedGames)} icon={BookOpen} onSelect={isFamilyView ? undefined : () => setPlayerModeFilter("mixed")} isActive={playerModeFilter === "mixed"} />
-            <SummaryCard label={isFamilyView ? "Tasa de aciertos" : isResearcherView ? "Sin asociación" : "Sin asociación"} value={isFamilyView ? `${metrics.successRate}%` : String(metrics.unresolvedAssociations)} icon={isFamilyView ? Trophy : Gamepad2} onSelect={isFamilyView ? undefined : () => setAccessFilter("unresolved")} isActive={accessFilter === "unresolved"} />
+            <SummaryCard label={isResearcherView ? t.summaryLabels.sample : t.summaryLabels.games} value={String(metrics.totalGames)} icon={Gamepad2} onSelect={resetFilters} isActive={!query.trim() && !institutionFilter && playerModeFilter === "all" && accessFilter === "all" && !linkedOwnerUserId && !linkedBleDeviceId && !linkedDeviceId} actionLabel={t.actionLabels.seeAll} activeLabel={t.actionLabels.active} />
+            <SummaryCard label={t.summaryLabels.players} value={String(metrics.totalPlayers)} icon={Users} actionLabel={t.actionLabels.focus} activeLabel={t.actionLabels.active} />
+            <SummaryCard label={t.summaryLabels.turns} value={String(metrics.totalTurns)} icon={TimerReset} actionLabel={t.actionLabels.focus} activeLabel={t.actionLabels.active} />
+            <SummaryCard label={isFamilyView ? t.summaryLabels.decks : isResearcherView ? t.summaryLabels.mixedSample : t.summaryLabels.mixedGames} value={String(isFamilyView ? new Set(games.map((game) => game.deckName).filter(Boolean)).size : metrics.mixedGames)} icon={BookOpen} onSelect={isFamilyView ? undefined : () => setPlayerModeFilter("mixed")} isActive={playerModeFilter === "mixed"} actionLabel={t.actionLabels.focus} activeLabel={t.actionLabels.active} />
+            <SummaryCard label={isFamilyView ? t.summaryLabels.successRate : t.summaryLabels.unresolved} value={isFamilyView ? `${metrics.successRate}%` : String(metrics.unresolvedAssociations)} icon={isFamilyView ? Trophy : Gamepad2} onSelect={isFamilyView ? undefined : () => setAccessFilter("unresolved")} isActive={accessFilter === "unresolved"} actionLabel={t.actionLabels.focus} activeLabel={t.actionLabels.active} />
           </>
         )}
       </div>
@@ -389,12 +611,12 @@ export function GamesTable() {
       <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
         <CardContent className="flex flex-wrap items-center justify-between gap-4 p-5">
           <div>
-            <p className="text-sm font-medium text-foreground">Resultados</p>
-            <p className="mt-1 text-sm text-muted-foreground">{filtered.length} de {metrics.totalGames} partidas con el recorte actual.</p>
+            <p className="text-sm font-medium text-foreground">{t.results}</p>
+            <p className="mt-1 text-sm text-muted-foreground">{t.resultsSummary(filtered.length, metrics.totalGames)}</p>
           </div>
           <div className="flex flex-wrap items-center justify-end gap-2">
-            {activeFilterChips.length > 0 ? activeFilterChips.map((chip) => <Badge key={chip} variant="outline">{chip}</Badge>) : <Badge variant="outline">Vista general</Badge>}
-            {activeFilterChips.length > 0 ? <button type="button" onClick={resetFilters} className="inline-flex h-9 items-center justify-center rounded-md border border-input bg-background px-3 text-sm font-medium text-foreground transition hover:bg-accent">Limpiar</button> : null}
+            {activeFilterChips.length > 0 ? activeFilterChips.map((chip) => <Badge key={chip} variant="outline">{chip}</Badge>) : <Badge variant="outline">{t.allView}</Badge>}
+            {activeFilterChips.length > 0 ? <button type="button" onClick={resetFilters} className="inline-flex h-9 items-center justify-center rounded-md border border-input bg-background px-3 text-sm font-medium text-foreground transition hover:bg-accent">{t.clear}</button> : null}
           </div>
         </CardContent>
       </Card>
@@ -403,17 +625,17 @@ export function GamesTable() {
         <CardHeader>
           <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
             <div>
-              <CardTitle>{isFamilyView ? "Actividad reciente" : isResearcherView ? "Muestra de partidas" : isTeacherView ? "Partidas para aula" : isDirectorView ? "Partidas para seguimiento" : "Listado de partidas"}</CardTitle>
+              <CardTitle>{isFamilyView ? t.listTitles.family : isResearcherView ? t.listTitles.researcher : isTeacherView ? t.listTitles.teacher : isDirectorView ? t.listTitles.director : t.listTitles.default}</CardTitle>
               <CardDescription>
                 {isFamilyView
-                  ? "Abrí una partida para ver su detalle dedicado con participantes, turnos y ritmo general."
+                  ? t.listDescriptions.family
                   : isResearcherView
-                  ? "Abrí una partida para revisar composición, turnos, navegación relacionada y gráfico de resultados por turno."
+                  ? t.listDescriptions.researcher
                   : isTeacherView
-                  ? "Abrí una partida para entrar a su pantalla dedicada con contexto del dispositivo, participantes y desempeño."
+                  ? t.listDescriptions.teacher
                   : isDirectorView
-                  ? "Abrí una partida para revisar contexto institucional, navegación relacionada y desempeño turno a turno."
-                  : "Abrí una partida para entrar a su detalle dedicado sin perder el contexto del recorte actual."}
+                  ? t.listDescriptions.director
+                  : t.listDescriptions.default}
               </CardDescription>
             </div>
             <ListPaginationControls
@@ -441,20 +663,20 @@ export function GamesTable() {
               <TableHeader className="sticky top-0 z-10 bg-white/95 backdrop-blur-sm">
                 <TableRow>
                   <TableHead>Game ID</TableHead>
-                  <TableHead>Mazo</TableHead>
-                  {isFamilyView ? null : <TableHead>Institución</TableHead>}
-                  {isFamilyView ? null : <TableHead>Dispositivo</TableHead>}
-                  {isFamilyView ? null : <TableHead>Acceso</TableHead>}
-                  <TableHead>Jugadores</TableHead>
-                  <TableHead>Turnos</TableHead>
-                  <TableHead>Inicio</TableHead>
+                  <TableHead>{t.table.deck}</TableHead>
+                  {isFamilyView ? null : <TableHead>{t.table.institution}</TableHead>}
+                  {isFamilyView ? null : <TableHead>{t.table.device}</TableHead>}
+                  {isFamilyView ? null : <TableHead>{t.table.access}</TableHead>}
+                  <TableHead>{t.table.players}</TableHead>
+                  <TableHead>{t.table.turns}</TableHead>
+                  <TableHead>{t.table.start}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filtered.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={isFamilyView ? 5 : 8} className="py-10 text-center text-sm text-muted-foreground">
-                      No hay partidas para mostrar.
+                      {t.table.empty}
                     </TableCell>
                   </TableRow>
                 ) : (

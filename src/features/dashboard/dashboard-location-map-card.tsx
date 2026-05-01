@@ -5,6 +5,61 @@ import { MapPinned, MapPinHouse, Smartphone } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useLanguage, type AppLanguage } from "@/features/i18n/i18n-context";
+
+const locationMapMessages: Record<AppLanguage, {
+  title: string;
+  description: string;
+  candidateLocations: (count: number) => string;
+  mappedLocations: (count: number) => string;
+  representedDevices: (count: number) => string;
+  empty: string;
+  resolving: string;
+  unresolvedMap: string;
+  institution: string;
+  homeOwner: string;
+  unresolvedCount: (count: number) => string;
+}> = {
+  es: {
+    title: "Mapa de instituciones y dispositivos",
+    description: "Ubicación aproximada según la dirección de las instituciones y la dirección registrada en owners de dispositivos home.",
+    candidateLocations: (count) => `${count} ubicaciones candidatas`,
+    mappedLocations: (count) => `${count} ubicadas en mapa`,
+    representedDevices: (count) => `${count} dispositivos representados`,
+    empty: "Todavía no hay direcciones suficientes para dibujar el mapa. Cuando las instituciones o los owners tengan dirección cargada, aparecerán acá.",
+    resolving: "Ubicando direcciones en el mapa...",
+    unresolvedMap: "Encontré direcciones candidatas, pero no pude convertirlas en coordenadas todavía. Igual te dejo el resumen de ubicaciones al costado para verificar qué falta completar.",
+    institution: "Institución",
+    homeOwner: "Owner home",
+    unresolvedCount: (count) => `${count} ubicaciones siguen sin coordenadas. Normalmente se resuelve completando calle, ciudad y país en institución u owner.`,
+  },
+  en: {
+    title: "Institution and device map",
+    description: "Approximate location based on institution addresses and the address recorded for home-device owners.",
+    candidateLocations: (count) => `${count} candidate locations`,
+    mappedLocations: (count) => `${count} mapped locations`,
+    representedDevices: (count) => `${count} represented devices`,
+    empty: "There are not enough addresses yet to draw the map. Once institutions or owners have saved addresses, they will appear here.",
+    resolving: "Resolving addresses on the map...",
+    unresolvedMap: "I found candidate addresses, but I couldn't turn them into coordinates yet. I still left the location summary on the side so you can verify what is missing.",
+    institution: "Institution",
+    homeOwner: "Home owner",
+    unresolvedCount: (count) => `${count} locations still have no coordinates. This is usually solved by completing street, city, and country on the institution or owner.`,
+  },
+  pt: {
+    title: "Mapa de instituições e dispositivos",
+    description: "Localização aproximada com base no endereço das instituições e no endereço registrado nos owners de dispositivos home.",
+    candidateLocations: (count) => `${count} localizações candidatas`,
+    mappedLocations: (count) => `${count} localizações no mapa`,
+    representedDevices: (count) => `${count} dispositivos representados`,
+    empty: "Ainda não há endereços suficientes para desenhar o mapa. Quando as instituições ou os owners tiverem endereço cadastrado, eles aparecerão aqui.",
+    resolving: "Localizando endereços no mapa...",
+    unresolvedMap: "Encontrei endereços candidatos, mas ainda não consegui convertê-los em coordenadas. Mesmo assim, deixei o resumo das localizações ao lado para verificar o que falta completar.",
+    institution: "Instituição",
+    homeOwner: "Owner home",
+    unresolvedCount: (count) => `${count} localizações seguem sem coordenadas. Normalmente isso se resolve completando rua, cidade e país na instituição ou no owner.`,
+  },
+};
 
 export type DashboardLocationSeed = {
   key: string;
@@ -36,8 +91,8 @@ function projectLatitude(lat: number) {
 }
 
 export function DashboardLocationMapCard({
-  title = "Mapa de instituciones y dispositivos",
-  description = "Ubicación aproximada según la dirección de las instituciones y la dirección registrada en owners de dispositivos home.",
+  title,
+  description,
   locations,
   isLoading = false,
 }: {
@@ -46,6 +101,8 @@ export function DashboardLocationMapCard({
   locations: DashboardLocationSeed[];
   isLoading?: boolean;
 }) {
+  const { language } = useLanguage();
+  const t = locationMapMessages[language];
   const [results, setResults] = useState<Record<string, GeocodedLocation>>({});
   const [isResolving, setIsResolving] = useState(false);
 
@@ -119,21 +176,21 @@ export function DashboardLocationMapCard({
   return (
     <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
       <CardHeader>
-        <CardTitle>{title}</CardTitle>
-        <CardDescription>{description}</CardDescription>
+        <CardTitle>{title || t.title}</CardTitle>
+        <CardDescription>{description || t.description}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="flex flex-wrap gap-2">
-          <Badge variant="outline">{locations.length} ubicaciones candidatas</Badge>
-          <Badge variant="outline">{geocodedLocations.length} ubicadas en mapa</Badge>
-          <Badge variant="outline">{locations.reduce((sum, location) => sum + location.deviceCount, 0)} dispositivos representados</Badge>
+          <Badge variant="outline">{t.candidateLocations(locations.length)}</Badge>
+          <Badge variant="outline">{t.mappedLocations(geocodedLocations.length)}</Badge>
+          <Badge variant="outline">{t.representedDevices(locations.reduce((sum, location) => sum + location.deviceCount, 0))}</Badge>
         </div>
 
         {isLoading ? (
           <Skeleton className="h-[380px] rounded-3xl" />
         ) : locations.length === 0 ? (
           <div className="rounded-3xl border border-dashed border-border/70 bg-muted/20 p-8 text-sm text-muted-foreground">
-            Todavía no hay direcciones suficientes para dibujar el mapa. Cuando las instituciones o los owners tengan dirección cargada, aparecerán acá.
+            {t.empty}
           </div>
         ) : (
           <div className="grid gap-4 xl:grid-cols-[1.25fr_0.75fr]">
@@ -173,13 +230,13 @@ export function DashboardLocationMapCard({
 
               {isResolving ? (
                 <div className="pointer-events-none absolute inset-x-6 top-6 rounded-2xl bg-white/90 px-4 py-2 text-sm text-muted-foreground shadow-sm backdrop-blur-sm">
-                  Ubicando direcciones en el mapa...
+                  {t.resolving}
                 </div>
               ) : null}
 
               {geocodedLocations.length === 0 ? (
                 <div className="absolute inset-6 flex items-center justify-center rounded-[24px] border border-dashed border-border/70 bg-white/75 p-6 text-center text-sm text-muted-foreground backdrop-blur-sm">
-                  Encontré direcciones candidatas, pero no pude convertirlas en coordenadas todavía. Igual te dejo el resumen de ubicaciones al costado para verificar qué falta completar.
+                  {t.unresolvedMap}
                 </div>
               ) : null}
             </div>
@@ -201,7 +258,7 @@ export function DashboardLocationMapCard({
                           <p className="mt-2 text-xs leading-5 text-foreground/70">{location.query}</p>
                         </div>
                         <div className="flex shrink-0 flex-col items-end gap-2">
-                          <Badge variant="outline">{isInstitution ? "Institución" : "Owner home"}</Badge>
+                          <Badge variant="outline">{isInstitution ? t.institution : t.homeOwner}</Badge>
                           <Badge variant="outline" className="inline-flex items-center gap-1">
                             <Smartphone className="size-3.5" />
                             {location.deviceCount}
@@ -215,7 +272,7 @@ export function DashboardLocationMapCard({
 
               {unresolvedLocations.length > 0 ? (
                 <div className="rounded-2xl border border-dashed border-border/70 bg-muted/20 p-4 text-xs text-muted-foreground">
-                  {unresolvedLocations.length} ubicaciones siguen sin coordenadas. Normalmente se resuelve completando calle, ciudad y país en institución u owner.
+                  {t.unresolvedCount(unresolvedLocations.length)}
                 </div>
               ) : null}
             </div>

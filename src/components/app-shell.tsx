@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import type { ComponentType, ReactNode } from "react";
 import { useMemo, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import {
@@ -25,6 +26,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/features/auth/auth-context";
 import { canAccessPermissionsModule } from "@/features/auth/permission-contract";
+import { useLanguage } from "@/features/i18n/i18n-context";
+import { LanguageSwitcher } from "@/features/i18n/language-switcher";
 import type { AppRole } from "@/features/auth/types";
 import { completeTutorial, hasCompletedTutorial } from "@/features/tutorial/storage";
 import { WebOnboardingTour } from "@/features/tutorial/web-onboarding-tour";
@@ -32,202 +35,143 @@ import { appConfig } from "@/lib/api/config";
 import { cn } from "@/lib/utils";
 
 type NavigationRole = AppRole;
-type NavigationSection = "Resumen" | "Operación" | "Gobernanza" | "Técnico";
+type NavigationSection = "summary" | "operation" | "governance" | "technical";
 
 type NavigationItem = {
   href: string;
   label: string;
   summary: string;
   section: NavigationSection;
-  icon: React.ComponentType<{ className?: string }>;
+  icon: ComponentType<{ className?: string }>;
   roles: NavigationRole[];
   isVisible?: (user: { roles?: string[]; permissions?: string[] } | null | undefined) => boolean;
 };
 
-const navigationSections: NavigationSection[] = ["Resumen", "Operación", "Gobernanza", "Técnico"];
+const navigationSections: NavigationSection[] = ["summary", "operation", "governance", "technical"];
 
-function formatRoleLabel(role: string) {
-  switch (role) {
-    case "teacher":
-      return "docente";
-    case "director":
-      return "director";
-    case "researcher":
-      return "researcher";
-    case "family":
-      return "familia";
-    case "institution-admin":
-      return "institution admin";
-    case "government-viewer":
-      return "gobierno";
-    case "admin":
-      return "admin";
-    default:
-      return role;
-  }
+function getExperienceMeta(
+  user: { roles?: string[]; permissions?: string[] } | null | undefined,
+  experienceMeta: ReturnType<typeof useLanguage>["t"]["appShell"]["experienceMeta"],
+) {
+  if (user?.roles?.includes("government-viewer")) return experienceMeta.government;
+  if (user?.roles?.includes("researcher")) return experienceMeta.researcher;
+  if (user?.roles?.includes("family")) return experienceMeta.family;
+  if (user?.roles?.includes("teacher")) return experienceMeta.teacher;
+  if (user?.roles?.includes("institution-admin") || user?.roles?.includes("director")) return experienceMeta.institution;
+  if (user?.roles?.includes("admin")) return experienceMeta.platform;
+  return experienceMeta.fallback;
 }
 
-function getExperienceMeta(user: { roles?: string[]; permissions?: string[] } | null | undefined) {
-  if (user?.roles?.includes("government-viewer")) {
-    return {
-      title: "Vista gobierno",
-      description:
-        "Seguimiento territorial, alertas ejecutivas y lectura agregada sin mezclar capas técnicas que no aportan a este perfil.",
-    };
-  }
-
-  if (user?.roles?.includes("researcher")) {
-    return {
-      title: "Vista investigación",
-      description:
-        "Evidencia capturada, consistencia entre sync y partida, y lectura de muestra con menos ruido técnico.",
-    };
-  }
-
-  if (user?.roles?.includes("family")) {
-    return {
-      title: "Vista familia",
-      description:
-        "Seguimiento simple y claro de la actividad, sin fricción técnica ni administrativa.",
-    };
-  }
-
-  if (user?.roles?.includes("teacher")) {
-    return {
-      title: "Vista docente",
-      description:
-        "Juego, dispositivos y sincronizaciones a mano para operar el aula con rapidez.",
-    };
-  }
-
-  if (user?.roles?.includes("institution-admin") || user?.roles?.includes("director")) {
-    return {
-      title: "Vista institucional",
-      description:
-        "Seguimiento institucional, gobernanza cotidiana y foco en lo que requiere acción hoy.",
-    };
-  }
-
-  if (user?.roles?.includes("admin")) {
-    return {
-      title: "Vista plataforma",
-      description:
-        "Visión global, módulos técnicos y superficies transversales para operar toda la plataforma.",
-    };
-  }
-
-  return {
-    title: "Vista institucional",
-    description: "Seguimiento pedagógico claro, cálido y accionable.",
-  };
-}
-
-const navigation: NavigationItem[] = [
+function buildNavigation(t: ReturnType<typeof useLanguage>["t"]): NavigationItem[] {
+  return [
   {
     href: "/dashboard",
-    label: "Dashboard",
-    summary: "Estado general, alertas y próximos focos del rol actual.",
-    section: "Resumen",
+    label: t.appShell.navigation.dashboard.label,
+    summary: t.appShell.navigation.dashboard.summary,
+    section: "summary",
     icon: BarChart3,
     roles: ["teacher", "director", "researcher", "family", "admin", "institution-admin", "government-viewer"] satisfies NavigationRole[],
   },
   {
     href: "/territorial-alerts",
-    label: "Alertas territoriales",
-    summary: "Incidentes y territorios que necesitan revisión rápida.",
-    section: "Resumen",
+    label: t.appShell.navigation.territorialAlerts.label,
+    summary: t.appShell.navigation.territorialAlerts.summary,
+    section: "summary",
     icon: ShieldAlert,
     roles: ["government-viewer"] satisfies NavigationRole[],
   },
   {
     href: "/territorial-overview",
-    label: "Territorios e instituciones",
-    summary: "Drilldown territorial con foco en cohortes e instituciones.",
-    section: "Resumen",
+    label: t.appShell.navigation.territorialOverview.label,
+    summary: t.appShell.navigation.territorialOverview.summary,
+    section: "summary",
     icon: Building2,
     roles: ["government-viewer"] satisfies NavigationRole[],
   },
   {
     href: "/devices",
-    label: "Dispositivos",
-    summary: "Parque, ownership y estado de los dispositivos.",
-    section: "Operación",
+    label: t.appShell.navigation.devices.label,
+    summary: t.appShell.navigation.devices.summary,
+    section: "operation",
     icon: Smartphone,
     roles: ["teacher", "director", "admin", "institution-admin", "family"] satisfies NavigationRole[],
   },
   {
     href: "/games",
-    label: "Partidas",
-    summary: "Sesiones, jugadores, turnos y uso reciente con contexto real.",
-    section: "Operación",
+    label: t.appShell.navigation.games.label,
+    summary: t.appShell.navigation.games.summary,
+    section: "operation",
     icon: Database,
     roles: ["teacher", "director", "researcher", "family", "admin", "institution-admin"] satisfies NavigationRole[],
   },
   {
     href: "/syncs",
-    label: "Sincronizaciones",
-    summary: "Trazabilidad reciente, captura y consistencia de sincronizaciones.",
-    section: "Operación",
+    label: t.appShell.navigation.syncs.label,
+    summary: t.appShell.navigation.syncs.summary,
+    section: "operation",
     icon: Cable,
     roles: ["teacher", "director", "researcher", "family", "admin", "institution-admin"] satisfies NavigationRole[],
   },
   {
     href: "/users",
-    label: "Usuarios",
-    summary: "Padrón, roles y contexto de usuarios.",
-    section: "Gobernanza",
+    label: t.appShell.navigation.users.label,
+    summary: t.appShell.navigation.users.summary,
+    section: "governance",
     icon: Users,
     roles: ["admin", "institution-admin", "family"] satisfies NavigationRole[],
   },
   {
     href: "/institutions",
-    label: "Instituciones",
-    summary: "Seguimiento institucional con foco en observaciones y cobertura.",
-    section: "Gobernanza",
+    label: t.appShell.navigation.institutions.label,
+    summary: t.appShell.navigation.institutions.summary,
+    section: "governance",
     icon: Building2,
     roles: ["admin", "institution-admin", "director"] satisfies NavigationRole[],
   },
   {
     href: "/profiles",
-    label: "Perfiles",
-    summary: "Bindings, sesiones y trazabilidad entre personas y uso.",
-    section: "Gobernanza",
+    label: t.appShell.navigation.profiles.label,
+    summary: t.appShell.navigation.profiles.summary,
+    section: "governance",
     icon: UserRound,
     roles: ["admin", "institution-admin", "director"] satisfies NavigationRole[],
   },
   {
     href: "/permissions",
-    label: "Permisos",
-    summary: "Contrato ACL, bundles y consistencia de permisos efectivos.",
-    section: "Gobernanza",
+    label: t.appShell.navigation.permissions.label,
+    summary: t.appShell.navigation.permissions.summary,
+    section: "governance",
     icon: KeyRound,
     roles: ["admin", "institution-admin"] satisfies NavigationRole[],
     isVisible: (user) => canAccessPermissionsModule(user),
   },
   {
     href: "/health",
-    label: "Salud",
-    summary: "Checks técnicos, readiness y señales del backend real.",
-    section: "Técnico",
+    label: t.appShell.navigation.health.label,
+    summary: t.appShell.navigation.health.summary,
+    section: "technical",
     icon: Activity,
     roles: ["admin"] satisfies NavigationRole[],
   },
   {
     href: "/settings",
-    label: "Configuración",
-    summary: "Runtime efectivo, catálogos y configuración del sistema.",
-    section: "Técnico",
+    label: t.appShell.navigation.settings.label,
+    summary: t.appShell.navigation.settings.summary,
+    section: "technical",
     icon: Settings,
     roles: ["admin"] satisfies NavigationRole[],
   },
-];
+  ];
+}
 
-export function AppShell({ children }: { children: React.ReactNode }) {
+export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const { user, logout } = useAuth();
+  const { t } = useLanguage();
   const [isTutorialOpen, setIsTutorialOpen] = useState(false);
-  const experienceMeta = getExperienceMeta(user);
+  const experienceMeta = getExperienceMeta(user, t.appShell.experienceMeta);
+  const navigation = useMemo(() => buildNavigation(t), [t]);
   const hasTutorialPending = Boolean(user?.id && !hasCompletedTutorial(user.id));
   const tutorialVisible = isTutorialOpen;
 
@@ -238,7 +182,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         if (!allowedByRole) return false;
         return item.isVisible ? item.isVisible(user) : true;
       }),
-    [user],
+    [navigation, user],
   );
 
   const groupedNavigation = useMemo(
@@ -277,8 +221,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   <BrandLogo variant="icon" className="w-14 shrink-0" />
                   <div className="min-w-0">
                     <p className="text-[11px] font-semibold uppercase tracking-[0.26em] text-primary">MagicBox</p>
-                    <p className="mt-1 text-xl font-semibold tracking-[-0.03em] text-foreground">Web Dashboard</p>
-                    <p className="mt-3 text-sm leading-6 text-muted-foreground">Navegación desktop más clara para recorrer rápido cada superficie.</p>
+                    <p className="mt-1 text-xl font-semibold tracking-[-0.03em] text-foreground">{t.appShell.desktopTitle}</p>
+                    <p className="mt-3 text-sm leading-6 text-muted-foreground">{t.appShell.desktopDescription}</p>
                   </div>
                 </div>
 
@@ -294,19 +238,19 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   <div className="mt-4 rounded-[22px] border border-primary/14 bg-primary/7 p-4">
                     <div className="flex items-center justify-between gap-3">
                       <div>
-                        <p className="text-sm font-semibold text-foreground">Recorrido guiado disponible</p>
-                        <p className="mt-1 text-sm leading-6 text-muted-foreground">Lo dejé fuera del arranque para no tapar la pantalla.</p>
+                        <p className="text-sm font-semibold text-foreground">{t.appShell.tutorialAvailable}</p>
+                        <p className="mt-1 text-sm leading-6 text-muted-foreground">{t.appShell.tutorialDeferred}</p>
                       </div>
-                      <Badge>Nuevo</Badge>
+                      <Badge>{t.appShell.newBadge}</Badge>
                     </div>
                     <Button type="button" variant="outline" size="sm" className="mt-4 w-full" onClick={() => setIsTutorialOpen(true)}>
-                      Ver tutorial
+                      {t.appShell.viewTutorial}
                     </Button>
                   </div>
                 ) : (
                   <Button type="button" variant="ghost" size="sm" className="mt-4 w-full justify-start" onClick={() => setIsTutorialOpen(true)}>
                     <Sparkles className="size-4 text-primary" />
-                    Reabrir tutorial
+                    {t.appShell.reopenTutorial}
                   </Button>
                 )}
               </div>
@@ -314,7 +258,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <nav className="mt-6 flex-1 space-y-5">
                 {groupedNavigation.map((group) => (
                   <div key={group.section}>
-                    <p className="px-3 text-[11px] font-semibold uppercase tracking-[0.22em] text-foreground/45">{group.section}</p>
+                    <p className="px-3 text-[11px] font-semibold uppercase tracking-[0.22em] text-foreground/45">{t.appShell.sections[group.section]}</p>
                     <div className="mt-2 space-y-1.5">
                       {group.items.map((item) => {
                         const Icon = item.icon;
@@ -356,7 +300,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               </nav>
 
               <div className="mt-6 rounded-[24px] border border-border/80 bg-white/90 px-4 py-4 text-xs text-muted-foreground shadow-[0_12px_28px_rgba(33,59,87,0.05)]">
-                <p className="font-semibold uppercase tracking-[0.18em] text-foreground/60">API base</p>
+                <p className="font-semibold uppercase tracking-[0.18em] text-foreground/60">{t.appShell.apiBase}</p>
                 <p className="mt-2 break-all leading-5 text-foreground">{appConfig.apiBaseUrl}</p>
               </div>
             </div>
@@ -371,7 +315,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     {currentItem ? (
                       <>
                         <ChevronRight className="size-3" />
-                        <span>{currentItem.section}</span>
+                        <span>{t.appShell.sections[currentItem.section]}</span>
                       </>
                     ) : null}
                   </div>
@@ -379,7 +323,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     <h1 className="text-2xl font-semibold tracking-[-0.04em] text-foreground lg:text-[2rem]">
                       {currentItem?.label || user?.fullName || "MagicBox"}
                     </h1>
-                    {currentItem ? <Badge variant="outline">Pantalla activa</Badge> : null}
+                    {currentItem ? <Badge variant="outline">{t.appShell.activeScreen}</Badge> : null}
                   </div>
                   <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground lg:text-[15px]">
                     {currentItem?.summary || experienceMeta.description}
@@ -388,9 +332,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
                 <div className="flex min-w-0 flex-col gap-3 lg:items-end">
                   <div className="flex flex-wrap items-center gap-2">
+                    <LanguageSwitcher className="rounded-full border border-border/80 bg-white/95 px-3 py-2 shadow-[0_10px_24px_rgba(33,59,87,0.08)]" />
                     {user?.roles?.map((role) => (
                       <Badge key={role} variant="secondary" className="bg-white">
-                        {formatRoleLabel(role)}
+                        {t.appShell.roleLabels[role] ?? role}
                       </Badge>
                     ))}
                     {user?.email ? <Badge variant="outline" className="max-w-full truncate">{user.email}</Badge> : null}
@@ -398,7 +343,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   <div className="flex flex-wrap items-center gap-3">
                     <Button type="button" variant="outline" onClick={() => setIsTutorialOpen(true)}>
                       <Sparkles className="size-4 text-primary" />
-                      Tutorial
+                      {t.appShell.tutorial}
                     </Button>
                     <Button
                       variant="outline"
@@ -409,7 +354,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                       }}
                     >
                       <LogOut className="size-4" />
-                      Salir
+                      {t.appShell.logout}
                     </Button>
                   </div>
                 </div>
