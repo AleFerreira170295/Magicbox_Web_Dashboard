@@ -49,6 +49,12 @@ const institutionStudentMessages: Record<AppLanguage, {
     institution: string;
     acl: string;
   };
+  identity: {
+    secondName: string;
+    secondLastName: string;
+    birthDate: string;
+    notProvided: string;
+  };
   sections: {
     analytics: string;
     context: string;
@@ -59,16 +65,19 @@ const institutionStudentMessages: Record<AppLanguage, {
   es: {
     header: { eyebrow: "Institutions · detalle interno", fallbackTitle: "Detalle por estudiante", descriptionDefault: "Entrá a un estudiante desde Institutions para revisar su información y comportamiento de juego en una pantalla dedicada.", descriptionSelected: (group) => `Vista interna del alumno dentro de ${group}, con analítica temporal, métricas y partidas registradas.`, deleteStudent: "Eliminar estudiante", back: "Volver a Institutions" },
     states: { missingContext: "Falta contexto para abrir este detalle. Volvé a Institutions y entrá nuevamente desde la fila del estudiante.", fatalError: (message) => `No pude preparar la vista del estudiante. ${message}`, notFound: "No encontré el estudiante solicitado dentro del grupo actual. Puede haber cambiado el grupo, el filtro base o la carga de datos.", deleteError: (message) => `No pude eliminar el estudiante. ${message}`, withActivity: "Con actividad", withoutGames: "Sin partidas registradas", playerProfile: "Perfil de jugador", noParticipation: "Todavía sin participación registrada", noAddress: "Sin dirección cargada", created: "Creado", updated: "Actualizado", institution: "Institución", acl: "Permisos ACL" },
+    identity: { secondName: "Segundo nombre", secondLastName: "Segundo apellido", birthDate: "Fecha de nacimiento", notProvided: "No cargado" },
     sections: { analytics: "Analítica temporal", context: "Contexto y navegación", turnsByDate: "Turnos por fecha", participatedGames: "Partidas en las que participó" },
   },
   en: {
     header: { eyebrow: "Institutions · internal detail", fallbackTitle: "Student detail", descriptionDefault: "Open a student from Institutions to review their information and gameplay behavior on a dedicated screen.", descriptionSelected: (group) => `Internal student view inside ${group}, with time analytics, metrics, and recorded games.`, deleteStudent: "Delete student", back: "Back to Institutions" },
     states: { missingContext: "Missing context to open this detail. Go back to Institutions and enter again from the student row.", fatalError: (message) => `Couldn't prepare the student view. ${message}`, notFound: "I couldn't find the requested student inside the current group. The group, base filter, or loaded data may have changed.", deleteError: (message) => `Couldn't delete the student. ${message}`, withActivity: "With activity", withoutGames: "Without recorded games", playerProfile: "Player profile", noParticipation: "No recorded participation yet", noAddress: "No address loaded", created: "Created", updated: "Updated", institution: "Institution", acl: "ACL permissions" },
+    identity: { secondName: "Second name", secondLastName: "Second last name", birthDate: "Birth date", notProvided: "Not provided" },
     sections: { analytics: "Time analytics", context: "Context and navigation", turnsByDate: "Turns by date", participatedGames: "Games they joined" },
   },
   pt: {
     header: { eyebrow: "Institutions · detalhe interno", fallbackTitle: "Detalhe por estudante", descriptionDefault: "Entre em um estudante a partir de Institutions para revisar suas informações e comportamento de jogo em uma tela dedicada.", descriptionSelected: (group) => `Visão interna do aluno dentro de ${group}, com analítica temporal, métricas e partidas registradas.`, deleteStudent: "Excluir estudante", back: "Voltar para Institutions" },
     states: { missingContext: "Falta contexto para abrir este detalhe. Volte a Institutions e entre novamente pela linha do estudante.", fatalError: (message) => `Não consegui preparar a visão do estudante. ${message}`, notFound: "Não encontrei o estudante solicitado dentro do grupo atual. O grupo, o filtro base ou a carga de dados podem ter mudado.", deleteError: (message) => `Não consegui excluir o estudante. ${message}`, withActivity: "Com atividade", withoutGames: "Sem partidas registradas", playerProfile: "Perfil de jogador", noParticipation: "Ainda sem participação registrada", noAddress: "Sem endereço carregado", created: "Criado", updated: "Atualizado", institution: "Instituição", acl: "Permissões ACL" },
+    identity: { secondName: "Segundo nome", secondLastName: "Segundo sobrenome", birthDate: "Data de nascimento", notProvided: "Não informado" },
     sections: { analytics: "Analítica temporal", context: "Contexto e navegação", turnsByDate: "Turnos por data", participatedGames: "Partidas das quais participou" },
   },
 };
@@ -94,6 +103,19 @@ function getDateBucketLabel(value?: string | null) {
   return new Intl.DateTimeFormat("es-UY", {
     day: "2-digit",
     month: "2-digit",
+  }).format(date);
+}
+
+function formatBirthDate(value?: string | null, language: AppLanguage = "es") {
+  if (!value) return "-";
+  const date = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return value;
+
+  const locale = language === "en" ? "en-US" : language === "pt" ? "pt-BR" : "es-UY";
+  return new Intl.DateTimeFormat(locale, {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
   }).format(date);
 }
 
@@ -367,6 +389,7 @@ export function InstitutionStudentProfilePage({
                     </div>
                     <div className="mt-3 flex flex-wrap gap-2">
                       <Badge variant="outline">Documento / ID: {selectedStudent.fileNumber || "-"}</Badge>
+                      {selectedStudent.birthDate ? <Badge variant="outline">{t.identity.birthDate}: {formatBirthDate(selectedStudent.birthDate, language)}</Badge> : null}
                       {selectedGroup ? <Badge variant="outline"><GraduationCap className="mr-1 size-3" />{selectedGroup.name}</Badge> : null}
                       {selectedInstitution ? <Badge variant="outline"><Building2 className="mr-1 size-3" />{selectedInstitution.name}</Badge> : null}
                       {selectedStudent.updatedAt ? <Badge variant="outline">act. {formatDateTime(selectedStudent.updatedAt)}</Badge> : null}
@@ -397,6 +420,21 @@ export function InstitutionStudentProfilePage({
                   <div className="rounded-2xl bg-background/70 p-3">
                     <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Última participación</p>
                     <p className="mt-2 text-sm font-semibold text-foreground">{selectedStudentLastParticipationLabel}</p>
+                  </div>
+                </div>
+
+                <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                  <div className="rounded-2xl bg-background/70 p-3">
+                    <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">{t.identity.secondName}</p>
+                    <p className="mt-2 text-sm font-semibold text-foreground">{selectedStudent.secondName || t.identity.notProvided}</p>
+                  </div>
+                  <div className="rounded-2xl bg-background/70 p-3">
+                    <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">{t.identity.secondLastName}</p>
+                    <p className="mt-2 text-sm font-semibold text-foreground">{selectedStudent.secondLastName || t.identity.notProvided}</p>
+                  </div>
+                  <div className="rounded-2xl bg-background/70 p-3">
+                    <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">{t.identity.birthDate}</p>
+                    <p className="mt-2 text-sm font-semibold text-foreground">{selectedStudent.birthDate ? formatBirthDate(selectedStudent.birthDate, language) : t.identity.notProvided}</p>
                   </div>
                 </div>
               </CardContent>

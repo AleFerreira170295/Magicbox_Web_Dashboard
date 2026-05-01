@@ -50,6 +50,9 @@ type RelevantEntity = {
   updatedAt?: string | null;
   deletedAt?: string | null;
   fileNumber?: string | null;
+  secondName?: string | null;
+  secondLastName?: string | null;
+  birthDate?: string | null;
   classGroupId?: string | null;
   classGroupName?: string | null;
 };
@@ -241,6 +244,9 @@ export function RelevantProfiles() {
         updatedAt: student.updatedAt,
         deletedAt: student.deletedAt,
         fileNumber: student.fileNumber,
+        secondName: student.secondName,
+        secondLastName: student.secondLastName,
+        birthDate: student.birthDate,
         classGroupId: student.classGroupId,
         classGroupName: classGroup?.name || null,
       };
@@ -272,6 +278,9 @@ export function RelevantProfiles() {
       updatedAt: profile.updatedAt,
       deletedAt: profile.deletedAt,
       fileNumber: null,
+      secondName: null,
+      secondLastName: null,
+      birthDate: null,
       classGroupId: null,
       classGroupName: null,
     }));
@@ -313,6 +322,9 @@ export function RelevantProfiles() {
         entity.userEmail,
         entity.educationalCenterName,
         entity.fileNumber,
+        entity.secondName,
+        entity.secondLastName,
+        entity.birthDate,
         entity.classGroupName,
         ...entity.cardUids,
         ...entity.boundDevices.map((device) => device.name || device.deviceId || device.id),

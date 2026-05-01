@@ -49,6 +49,9 @@ type RelevantEntity = {
   updatedAt?: string | null;
   deletedAt?: string | null;
   fileNumber?: string | null;
+  secondName?: string | null;
+  secondLastName?: string | null;
+  birthDate?: string | null;
   classGroupId?: string | null;
   classGroupName?: string | null;
 };
@@ -63,6 +66,18 @@ function getProfileInitials(displayName: string) {
       .map((part) => part.slice(0, 1).toUpperCase())
       .join("") || "PR"
   );
+}
+
+function formatBirthDate(value?: string | null) {
+  if (!value) return "-";
+  const date = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return value;
+
+  return new Intl.DateTimeFormat("es-UY", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  }).format(date);
 }
 
 export function ProfileDetailPage({
@@ -160,6 +175,9 @@ export function ProfileDetailPage({
       updatedAt: profile.updatedAt,
       deletedAt: profile.deletedAt,
       fileNumber: null,
+      secondName: null,
+      secondLastName: null,
+      birthDate: null,
       classGroupId: null,
       classGroupName: null,
     }));
@@ -193,6 +211,9 @@ export function ProfileDetailPage({
         updatedAt: student.updatedAt,
         deletedAt: student.deletedAt,
         fileNumber: student.fileNumber,
+        secondName: student.secondName,
+        secondLastName: student.secondLastName,
+        birthDate: student.birthDate,
         classGroupId: student.classGroupId,
         classGroupName: classGroup?.name || null,
       };
@@ -347,6 +368,7 @@ export function ProfileDetailPage({
                       {selectedEntity.kind === "student" ? (
                         <>
                           <Badge variant="outline">Documento / ID: {selectedEntity.fileNumber || "-"}</Badge>
+                          {selectedEntity.birthDate ? <Badge variant="outline">Nacimiento: {formatBirthDate(selectedEntity.birthDate)}</Badge> : null}
                           <Badge variant="outline"><GraduationCap className="mr-1 size-3" />{selectedEntity.classGroupName || "sin grupo visible"}</Badge>
                         </>
                       ) : (
@@ -492,6 +514,9 @@ export function ProfileDetailPage({
                   <p>Institución: {selectedEntity.educationalCenterName || selectedEntity.educationalCenterId || "-"}</p>
                   <p>{selectedEntity.kind === "student" ? `Grupo: ${selectedEntity.classGroupName || "-"}` : `Owner: ${selectedEntity.userName || selectedEntity.userEmail || "sin owner"}`}</p>
                   <p>{selectedEntity.kind === "student" ? `Documento / ID: ${selectedEntity.fileNumber || "-"}` : `Categoría: ${selectedEntity.ageCategory || "sin categoría"}`}</p>
+                  {selectedEntity.kind === "student" ? <p>Segundo nombre: {selectedEntity.secondName || "no cargado"}</p> : null}
+                  {selectedEntity.kind === "student" ? <p>Segundo apellido: {selectedEntity.secondLastName || "no cargado"}</p> : null}
+                  {selectedEntity.kind === "student" ? <p>Fecha de nacimiento: {selectedEntity.birthDate ? formatBirthDate(selectedEntity.birthDate) : "no cargada"}</p> : null}
                 </div>
               </div>
 

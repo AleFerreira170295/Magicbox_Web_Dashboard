@@ -130,9 +130,12 @@ describe("InstitutionStudentProfilePage", () => {
             id: "student-1",
             classGroupId: "group-1",
             firstName: "Luna",
+            secondName: "María",
             lastName: "Pérez",
+            secondLastName: "Gómez",
             fullName: "Luna Pérez",
             fileNumber: "luna_001",
+            birthDate: "2016-04-09",
             imageUrl: null,
             updatedAt: null,
           },
@@ -273,6 +276,9 @@ describe("InstitutionStudentProfilePage", () => {
 
     expect(screen.getByRole("heading", { name: "Luna Pérez", level: 1 })).toBeInTheDocument();
     expect(screen.getAllByText(/Documento \/ ID: luna_001/).length).toBeGreaterThan(0);
+    expect(screen.getByText("María")).toBeInTheDocument();
+    expect(screen.getByText("Gómez")).toBeInTheDocument();
+    expect(screen.getAllByText(/09\/04\/2016/).length).toBeGreaterThan(0);
     expect(screen.getByText("Analítica temporal")).toBeInTheDocument();
     expect(screen.getByText("Contexto y navegación")).toBeInTheDocument();
     expect(screen.getByText("Con actividad")).toBeInTheDocument();

@@ -17,19 +17,32 @@ function readString(record: JsonObject, ...keys: string[]) {
   return "";
 }
 
+function composeStudentFullName(parts: Array<string | null | undefined>) {
+  return parts
+    .map((value) => (typeof value === "string" ? value.trim() : ""))
+    .filter(Boolean)
+    .join(" ")
+    .trim();
+}
+
 function normalizeStudent(input: unknown): StudentRecord {
   const record = asRecord(input);
   const firstName = readString(record, "first_name", "firstName") || "Sin nombre";
+  const secondName = readString(record, "second_name", "secondName") || null;
   const lastName = readString(record, "last_name", "lastName") || "";
-  const fullName = [firstName, lastName].filter(Boolean).join(" ").trim() || "Sin nombre";
+  const secondLastName = readString(record, "second_last_name", "secondLastName") || null;
+  const fullName = composeStudentFullName([firstName, secondName, lastName, secondLastName]) || "Sin nombre";
 
   return {
     id: readString(record, "id") || "sin-id",
     classGroupId: readString(record, "class_group_id", "classGroupId"),
     firstName,
+    secondName,
     lastName,
+    secondLastName,
     fullName,
     fileNumber: readString(record, "file_number", "fileNumber") || "sin-legajo",
+    birthDate: readString(record, "birth_date", "birthDate") || null,
     imageUrl: normalizeImageUrl(readString(record, "image_url", "imageUrl")),
     createdAt: readString(record, "created_at", "createdAt") || null,
     updatedAt: readString(record, "updated_at", "updatedAt") || null,

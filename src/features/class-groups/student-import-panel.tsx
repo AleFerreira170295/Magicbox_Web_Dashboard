@@ -277,7 +277,7 @@ function StudentImportPanelContent({
                     onChange={(event) => setSelectedFile(event.target.files?.[0] ?? null)}
                   />
                   <p className="text-xs text-muted-foreground">
-                    Encabezados esperados: <code>first_name</code>, <code>last_name</code>, <code>file_number</code>. También acepto <code>nombre</code>, <code>apellido</code> y <code>legajo</code>.
+                    Encabezados esperados: <code>first_name</code>, <code>last_name</code>, <code>file_number</code>. Opcionales: <code>second_name</code>, <code>second_last_name</code>, <code>birth_date</code>. También acepto <code>nombre</code>, <code>apellido</code>, <code>legajo</code>, <code>segundo_nombre</code>, <code>segundo_apellido</code> y <code>fecha_nacimiento</code>.
                   </p>
                 </div>
 
@@ -301,6 +301,7 @@ function StudentImportPanelContent({
             <p className="text-sm font-medium text-foreground">Reglas de correspondencia</p>
             <div className="mt-3 grid gap-2 text-sm text-muted-foreground">
               <p>• Cada fila crea o actualiza un estudiante dentro del grupo seleccionado.</p>
+              <p>• Segundo nombre, segundo apellido y fecha de nacimiento son opcionales; si vienen en el Excel se guardan en la ficha del jugador.</p>
               <p>• El grupo define la institución; no se puede mover un legajo a otra institución desde esta carga.</p>
               <p>• Si el legajo ya existe en otro grupo, la fila queda observada para evitar cruces de visibilidad.</p>
               <p>• Los datos quedan sujetos al scope del grupo y de la institución que ya expone el backend.</p>

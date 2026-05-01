@@ -2,9 +2,12 @@ export interface StudentRecord {
   id: string;
   classGroupId: string;
   firstName: string;
+  secondName?: string | null;
   lastName: string;
+  secondLastName?: string | null;
   fullName: string;
   fileNumber: string;
+  birthDate?: string | null;
   imageUrl?: string | null;
   createdAt?: string | null;
   updatedAt?: string | null;

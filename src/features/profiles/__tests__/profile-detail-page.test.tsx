@@ -153,7 +153,7 @@ describe("ProfileDetailPage", () => {
     useStudentsMock.mockReturnValue(
       okQuery({
         data: [
-          { id: "student-1", classGroupId: "group-1", firstName: "Luna", lastName: "Pérez", fullName: "Luna Pérez", fileNumber: "luna_001", imageUrl: null, createdAt: null, updatedAt: null, deletedAt: null },
+          { id: "student-1", classGroupId: "group-1", firstName: "Luna", secondName: "María", lastName: "Pérez", secondLastName: "Gómez", fullName: "Luna Pérez", fileNumber: "luna_001", birthDate: "2016-04-09", imageUrl: null, createdAt: null, updatedAt: null, deletedAt: null },
           { id: "student-2", classGroupId: "group-1", firstName: "Mateo", lastName: "Ruiz", fullName: "Mateo Ruiz", fileNumber: "mateo_002", imageUrl: null, createdAt: null, updatedAt: null, deletedAt: null },
           { id: "student-3", classGroupId: "group-1", firstName: "Julia", lastName: "Sosa", fullName: "Julia Sosa", fileNumber: "julia_003", imageUrl: null, createdAt: null, updatedAt: null, deletedAt: null },
           { id: "student-4", classGroupId: "group-2", firstName: "Pedro", lastName: "López", fullName: "Pedro López", fileNumber: "pedro_004", imageUrl: null, createdAt: null, updatedAt: null, deletedAt: null },
@@ -213,6 +213,9 @@ describe("ProfileDetailPage", () => {
     expect(screen.getAllByText(/Documento \/ ID: luna_001/i).length).toBeGreaterThan(0);
     expect(screen.getByText(/Estudiante institucional/i)).toBeInTheDocument();
     expect(screen.getByText(/Grupo: Quinto A/i)).toBeInTheDocument();
+    expect(screen.getByText(/Segundo nombre: María/i)).toBeInTheDocument();
+    expect(screen.getByText(/Segundo apellido: Gómez/i)).toBeInTheDocument();
+    expect(screen.getByText(/Fecha de nacimiento: 09\/04\/2016/i)).toBeInTheDocument();
     expect(screen.getByText(/Los estudiantes no exponen cards propias en este registro/i)).toBeInTheDocument();
     expect(screen.getAllByText(/Mismo grupo/i).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/Misma institución/i).length).toBeGreaterThan(0);
