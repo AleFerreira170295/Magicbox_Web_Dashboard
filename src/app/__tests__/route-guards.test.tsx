@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import DashboardPage from "@/app/(app)/dashboard/page";
 import DevicesPage from "@/app/(app)/devices/page";
 import GamesPage from "@/app/(app)/games/page";
+import GamesDetailPage from "@/app/(app)/games/detail/page";
 import HealthPage from "@/app/(app)/health/page";
 import InstitutionsPage from "@/app/(app)/institutions/page";
 import InstitutionStudentPage from "@/app/(app)/institutions/student/page";
@@ -31,6 +32,10 @@ vi.mock("@/features/devices/devices-table", () => ({
 
 vi.mock("@/features/games/games-table", () => ({
   GamesTable: () => <div>games-table</div>,
+}));
+
+vi.mock("@/features/games/game-detail-page", () => ({
+  GameDetailPage: () => <div>game-detail-page</div>,
 }));
 
 vi.mock("@/features/health/system-health-dashboard", () => ({
@@ -85,6 +90,7 @@ const allModules = [
   "dashboard-home",
   "devices-table",
   "games-table",
+  "game-detail-page",
   "system-health-dashboard",
   "institutions-overview",
   "institution-student-profile-page",
@@ -104,6 +110,7 @@ function renderProtectedPages() {
       <DashboardPage />
       <DevicesPage />
       <GamesPage />
+      <GamesDetailPage />
       <HealthPage />
       <InstitutionsPage />
       <InstitutionStudentPage />
@@ -139,6 +146,7 @@ describe("operational route guards", () => {
         "dashboard-home",
         "devices-table",
         "games-table",
+        "game-detail-page",
         "system-health-dashboard",
         "institutions-overview",
         "institution-student-profile-page",
@@ -156,6 +164,7 @@ describe("operational route guards", () => {
         "dashboard-home",
         "devices-table",
         "games-table",
+        "game-detail-page",
         "institutions-overview",
         "institution-student-profile-page",
         "permissions-center",
@@ -171,6 +180,7 @@ describe("operational route guards", () => {
         "dashboard-home",
         "devices-table",
         "games-table",
+        "game-detail-page",
         "institutions-overview",
         "institution-student-profile-page",
         "relevant-profiles",
@@ -180,15 +190,15 @@ describe("operational route guards", () => {
     },
     {
       role: "teacher",
-      visible: ["dashboard-home", "devices-table", "games-table", "syncs-table"],
+      visible: ["dashboard-home", "devices-table", "games-table", "game-detail-page", "syncs-table"],
     },
     {
       role: "researcher",
-      visible: ["dashboard-home", "games-table", "syncs-table"],
+      visible: ["dashboard-home", "games-table", "game-detail-page", "syncs-table"],
     },
     {
       role: "family",
-      visible: ["dashboard-home", "devices-table", "games-table", "syncs-table", "users-table"],
+      visible: ["dashboard-home", "devices-table", "games-table", "game-detail-page", "syncs-table", "users-table"],
     },
     {
       role: "government-viewer",

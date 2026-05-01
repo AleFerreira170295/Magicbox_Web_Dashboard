@@ -8,10 +8,11 @@ const useGamesMock = vi.fn();
 const useDevicesMock = vi.fn();
 const useInstitutionsMock = vi.fn();
 const routerPushMock = vi.fn();
+const routerReplaceMock = vi.fn();
 let currentSearch = "";
 
 vi.mock("next/navigation", () => ({
-  useRouter: () => ({ push: routerPushMock }),
+  useRouter: () => ({ push: routerPushMock, replace: routerReplaceMock }),
   usePathname: () => "/games",
   useSearchParams: () => new URLSearchParams(currentSearch),
 }));
@@ -183,18 +184,12 @@ describe("GamesTable", () => {
     expect(screen.getAllByRole("combobox")[0]).toBeDisabled();
   });
 
-  it("shows access association context and expanded game detail", () => {
+  it("opens the dedicated game detail page when a row is clicked", () => {
     renderGamesTable();
 
-    fireEvent.click(screen.getByText("101"));
+    fireEvent.click(screen.getAllByText("101")[0]!);
 
-    expect(screen.queryAllByText(/mis dispositivos/i).length).toBeGreaterThan(0);
-    expect(screen.getByText(/Owner del dispositivo: Ines Admin/i)).toBeInTheDocument();
-    expect(screen.getByText("Jugadores y asociaciones")).toBeInTheDocument();
-    expect(screen.queryAllByText("Luna").length).toBeGreaterThan(0);
-    expect(screen.queryAllByText(/medium/i).length).toBeGreaterThan(0);
-    expect(screen.getByRole("link", { name: /Ver syncs del dispositivo/i })).toHaveAttribute("href", "/syncs?bleDeviceId=device-1&deviceId=mb-1&deviceName=MagicBox+Aula+1");
-    expect(screen.getByRole("button", { name: /Quitar selección/i })).toBeInTheDocument();
+    expect(routerPushMock).toHaveBeenCalledWith("/games/detail?gameRecordId=game-1");
   });
 
   it("can open the games view already filtered by user from the roster link", () => {
@@ -398,6 +393,18 @@ describe("GamesTable", () => {
     expect(screen.getByRole("button", { name: /Foco activo para Sin asociación/i })).toBeInTheDocument();
   });
 
+  it("preserves the current overview context when opening the detail page", () => {
+    currentSearch = "q=animal&page=2&pageSize=20&ownerUserId=user-1&ownerUserName=Ines%20Admin";
+
+    renderGamesTable();
+
+    fireEvent.click(screen.getAllByText("101")[0]!);
+
+    expect(routerPushMock).toHaveBeenCalledWith(
+      "/games/detail?gameRecordId=game-1&q=animal&ownerUserId=user-1&ownerUserName=Ines+Admin&pageSize=20",
+    );
+  });
+
   it("adapts copy for researcher sessions without changing the evidence detail", () => {
     useAuthMock.mockReturnValue({
       tokens: { accessToken: "token", refreshToken: "refresh" },
@@ -419,11 +426,6 @@ describe("GamesTable", () => {
     expect(screen.getByText("Researcher")).toBeInTheDocument();
     expect(screen.getByText(/vista de muestra de partidas para leer composición/i)).toBeInTheDocument();
 
-    fireEvent.click(screen.getByText("101"));
-
-    expect(screen.getByText("Detalle de evidencia")).toBeInTheDocument();
-    expect(screen.getByText("Participantes y asociaciones visibles")).toBeInTheDocument();
-    expect(screen.queryAllByText("Turnos observables").length).toBeGreaterThan(0);
   });
 
   it("adapts the games view to a teacher-oriented classroom reading", () => {
@@ -447,11 +449,6 @@ describe("GamesTable", () => {
     expect(screen.getByText("Teacher")).toBeInTheDocument();
     expect(screen.getByText(/priorizando qué se jugó, con quién y desde qué dispositivo/i)).toBeInTheDocument();
 
-    fireEvent.click(screen.getByText("101"));
-
-    expect(screen.getByText(/Detalle para aula/i)).toBeInTheDocument();
-    expect(screen.getByText(/Participantes y contexto de aula/i)).toBeInTheDocument();
-    expect(screen.getAllByText(/Ritmo visible/i).length).toBeGreaterThan(0);
   });
 
   it("adapts the games view to a simplified family reading", () => {
@@ -476,10 +473,5 @@ describe("GamesTable", () => {
     expect(screen.getByText(/para entender sesiones, participantes y ritmo general/i)).toBeInTheDocument();
     expect(screen.queryByText("Todos los accesos")).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByText("101"));
-
-    expect(screen.getByText("Resumen de partida")).toBeInTheDocument();
-    expect(screen.getByText("Participantes visibles")).toBeInTheDocument();
-    expect(screen.getByText("Momentos recientes")).toBeInTheDocument();
   });
 });

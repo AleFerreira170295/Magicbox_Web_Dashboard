@@ -5,9 +5,9 @@ import { Button } from "@/components/ui/button";
 
 export type PaginationPageSize = 10 | 20 | 50;
 
-export function useListPagination<T>(items: T[], initialPageSize: PaginationPageSize = 10) {
+export function useListPagination<T>(items: T[], initialPageSize: PaginationPageSize = 10, initialPage = 1) {
   const [pageSize, setPageSize] = useState<PaginationPageSize>(initialPageSize);
-  const [requestedPage, setRequestedPage] = useState(1);
+  const [requestedPage, setRequestedPage] = useState(initialPage);
 
   const totalItems = items.length;
   const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
