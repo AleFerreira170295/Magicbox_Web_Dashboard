@@ -375,8 +375,22 @@ describe("SyncsTable", () => {
     expect(screen.queryAllByText(/mis dispositivos/i).length).toBeGreaterThan(0);
     expect(screen.getByText(/Partida correlacionada: Animales/i)).toBeInTheDocument();
     expect(screen.getByText("Participantes y asociaciones")).toBeInTheDocument();
+    expect(screen.getByText("Cruces rápidos")).toBeInTheDocument();
     expect(screen.queryAllByText("Luna").length).toBeGreaterThan(0);
     expect(screen.getByText(/match con partida:/i)).toBeInTheDocument();
+
+    expect(screen.getByRole("link", { name: /Abrir partida correlacionada/i })).toHaveAttribute(
+      "href",
+      "/games/detail?gameRecordId=game-1&ownerUserId=user-1&ownerUserName=Teo+Teacher&bleDeviceId=device-1&deviceId=mb-1&deviceName=MagicBox+Aula+1",
+    );
+    expect(screen.getByRole("link", { name: /Ver partidas del dispositivo/i })).toHaveAttribute(
+      "href",
+      "/games?ownerUserId=user-1&ownerUserName=Teo+Teacher&bleDeviceId=device-1&deviceId=mb-1&deviceName=MagicBox+Aula+1",
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /Quitar selección/i }));
+
+    expect(screen.getByText(/Elegí una sincronización para revisar su detalle./i)).toBeInTheDocument();
   });
 
   it("adapts copy for researcher sessions while preserving evidence detail", () => {
@@ -452,7 +466,7 @@ describe("SyncsTable", () => {
     fireEvent.click(screen.getByText("mb-sync-1"));
 
     expect(screen.getByText("Detalle de evidencia")).toBeInTheDocument();
-    expect(screen.getByText("Participantes y asociaciones visibles")).toBeInTheDocument();
+    expect(screen.getByText("Participantes y asociaciones clave")).toBeInTheDocument();
     expect(screen.getByText("Señales de evidencia")).toBeInTheDocument();
   });
 
@@ -524,13 +538,13 @@ describe("SyncsTable", () => {
     renderSyncsTable();
 
     expect(screen.getByText("Family")).toBeInTheDocument();
-    expect(screen.getByText(/seguir la actividad de sincronización visible/i)).toBeInTheDocument();
+    expect(screen.getByText(/seguir la actividad de sincronización reciente/i)).toBeInTheDocument();
     expect(screen.queryByText("Todos los accesos")).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByText("mb-sync-1"));
 
     expect(screen.getByText("Resumen de sincronización")).toBeInTheDocument();
-    expect(screen.getByText("Participantes visibles")).toBeInTheDocument();
+    expect(screen.getAllByText("Participantes").length).toBeGreaterThan(0);
     expect(screen.getByText("Señales de sincronización")).toBeInTheDocument();
   });
 

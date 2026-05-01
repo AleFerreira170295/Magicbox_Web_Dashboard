@@ -285,7 +285,7 @@ describe("InstitutionsOverview", () => {
   it("shows institution-admin scoped read-only mode for institutions without forcing active selections", () => {
     renderInstitutionsOverview();
 
-    expect(screen.getByText("Instituciones")).toBeInTheDocument();
+    expect(screen.getAllByText("Instituciones").length).toBeGreaterThan(0);
     expect(screen.getAllByText(/Colegio Norte/).length).toBeGreaterThan(0);
     expect(screen.getAllByRole("button", { name: "Alta no disponible" })[0]).toBeDisabled();
     expect(screen.getByTestId("student-import-panel")).toBeInTheDocument();
@@ -334,7 +334,7 @@ describe("InstitutionsOverview", () => {
 
     fireEvent.click(screen.getAllByText("Colegio Norte")[0]);
 
-    expect(screen.getByText(/Instituciones visibles para seguimiento/i)).toBeInTheDocument();
+    expect(screen.getByText(/Instituciones para seguimiento/i)).toBeInTheDocument();
     expect(screen.getByText(/Detalle de seguimiento/i)).toBeInTheDocument();
   });
 

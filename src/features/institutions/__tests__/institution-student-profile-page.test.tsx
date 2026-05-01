@@ -293,7 +293,7 @@ describe("InstitutionStudentProfilePage", () => {
       "/institutions/student?institutionId=ec-1&groupId=group-1&studentId=student-10",
     );
     expect(screen.getByTestId("institution-student-navigation-list")).toHaveClass("max-h-[min(70vh,640px)]", "overflow-y-auto", "overscroll-contain");
-    expect(screen.getByText(/Mostrando 1 partidas visibles para este estudiante./i)).toBeInTheDocument();
+    expect(screen.getByText(/Mostrando 1 partidas registradas para este estudiante./i)).toBeInTheDocument();
   });
 
   it("permite cambiar el alcance de la analítica", () => {
@@ -303,6 +303,6 @@ describe("InstitutionStudentProfilePage", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Ver grupo" }));
 
-    expect(screen.getByText(/Quinto A: La lectura temporal consolida las partidas y turnos visibles de todo el grupo./i)).toBeInTheDocument();
+    expect(screen.getByText(/Quinto A: La lectura temporal consolida las partidas y turnos de todo el grupo./i)).toBeInTheDocument();
   });
 });

@@ -167,7 +167,7 @@ export function InstitutionStudentProfilePage({
 
   const analyticsDescription = analyticsScope === "student"
     ? "La lectura temporal usa solo las partidas y turnos del estudiante activo."
-    : "La lectura temporal consolida las partidas y turnos visibles de todo el grupo.";
+    : "La lectura temporal consolida las partidas y turnos de todo el grupo.";
 
   const selectedStudentGameRows = useMemo(
     () => (selectedStudentPerformance?.games ?? []).map((game) => {
@@ -202,7 +202,7 @@ export function InstitutionStudentProfilePage({
     const otherEntries = studentPerformanceRows.filter((entry) => entry.student.id !== selectedStudent?.id);
     return currentEntry ? [currentEntry, ...otherEntries] : otherEntries;
   }, [selectedStudent?.id, studentPerformanceRows]);
-  const selectedStudentStatus = (selectedStudentPerformance?.gamesCount ?? 0) > 0 ? "Con actividad" : "Sin partidas visibles";
+  const selectedStudentStatus = (selectedStudentPerformance?.gamesCount ?? 0) > 0 ? "Con actividad" : "Sin partidas registradas";
   const selectedStudentStatusVariant = (selectedStudentPerformance?.gamesCount ?? 0) > 0 ? "success" : "outline";
   const selectedStudentLastParticipationLabel = selectedStudentPerformance?.lastParticipation
     ? formatDateTime(selectedStudentPerformance.lastParticipation)
@@ -241,7 +241,7 @@ export function InstitutionStudentProfilePage({
         eyebrow="Institutions · detalle interno"
         title={selectedStudent ? selectedStudent.fullName : "Detalle por estudiante"}
         description={selectedStudent
-          ? `Vista interna del alumno dentro de ${selectedGroup?.name || "su grupo"}, con analítica temporal, métricas y partidas visibles.`
+          ? `Vista interna del alumno dentro de ${selectedGroup?.name || "su grupo"}, con analítica temporal, métricas y partidas registradas.`
           : "Entrá a un estudiante desde Institutions para revisar su información y comportamiento de juego en una pantalla dedicada."}
         actions={
           <div className="flex flex-wrap items-center gap-2">
@@ -284,7 +284,7 @@ export function InstitutionStudentProfilePage({
       ) : !selectedStudent ? (
         <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
           <CardContent className="p-6 text-sm text-muted-foreground">
-            No encontré el estudiante solicitado dentro del grupo visible. Puede haber cambiado el grupo, el filtro base o la carga de datos.
+            No encontré el estudiante solicitado dentro del grupo actual. Puede haber cambiado el grupo, el filtro base o la carga de datos.
           </CardContent>
         </Card>
       ) : (
@@ -358,7 +358,7 @@ export function InstitutionStudentProfilePage({
                   Contexto y navegación
                 </CardTitle>
                 <CardDescription>
-                  Ves todos los perfiles visibles del grupo en un único bloque con scroll, y podés saltar entre ellos sin volver a la pantalla principal.
+                  Ves todos los perfiles del grupo en un único bloque con scroll, y podés saltar entre ellos sin volver a la pantalla principal.
                 </CardDescription>
               </CardHeader>
               <CardContent
@@ -369,7 +369,7 @@ export function InstitutionStudentProfilePage({
                   <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Grupo activo</p>
                   <p className="mt-2 text-base font-semibold text-foreground">{selectedGroup?.name || "Grupo sin nombre"}</p>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    {students.length} perfiles visibles · {selectedInstitution?.name || "Institución sin identificar"}
+                    {students.length} perfiles en el grupo · {selectedInstitution?.name || "Institución sin identificar"}
                   </p>
                 </div>
 
@@ -419,7 +419,7 @@ export function InstitutionStudentProfilePage({
                   );
                 }) : (
                   <div className="rounded-2xl border border-dashed border-border/80 bg-muted/20 p-4 text-sm text-muted-foreground">
-                    No hay estudiantes visibles en este grupo por ahora.
+                    No hay estudiantes cargados en este grupo por ahora.
                   </div>
                 )}
               </CardContent>
@@ -448,7 +448,7 @@ export function InstitutionStudentProfilePage({
             <CardContent className="grid gap-4 xl:grid-cols-3">
               <div className="rounded-2xl bg-background/70 p-4">
                 <p className="text-sm font-medium text-foreground">Turnos por fecha</p>
-                <p className="mt-1 text-sm text-muted-foreground">Cantidad de turnos visibles a lo largo del tiempo.</p>
+                <p className="mt-1 text-sm text-muted-foreground">Cantidad de turnos registrados a lo largo del tiempo.</p>
                 <div className="mt-4 h-60">
                   {analyticsSeries.length > 0 ? (
                     <ResponsiveContainer width="100%" height="100%">
@@ -462,7 +462,7 @@ export function InstitutionStudentProfilePage({
                     </ResponsiveContainer>
                   ) : (
                     <div className="flex h-full items-center justify-center rounded-2xl border border-dashed border-border text-sm text-muted-foreground">
-                      Todavía no hay turnos visibles para graficar.
+                      Todavía no hay turnos cargados para graficar.
                     </div>
                   )}
                 </div>
@@ -484,7 +484,7 @@ export function InstitutionStudentProfilePage({
                     </ResponsiveContainer>
                   ) : (
                     <div className="flex h-full items-center justify-center rounded-2xl border border-dashed border-border text-sm text-muted-foreground">
-                      Todavía no hay partidas visibles para graficar.
+                      Todavía no hay partidas cargadas para graficar.
                     </div>
                   )}
                 </div>
@@ -524,14 +524,14 @@ export function InstitutionStudentProfilePage({
             <CardContent>
               <div className="grid gap-3 sm:grid-cols-3">
                 <div className="rounded-2xl bg-background/70 p-4">
-                  <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Partidas visibles</p>
+                  <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Partidas registradas</p>
                   <p className="mt-2 text-2xl font-semibold text-foreground">{filteredSelectedStudentGameRows.length}</p>
                   <p className="mt-1 text-sm text-muted-foreground">Sobre {selectedStudentGameRows.length} partidas asociadas al estudiante.</p>
                 </div>
                 <div className="rounded-2xl bg-background/70 p-4">
                   <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Turnos acumulados</p>
                   <p className="mt-2 text-2xl font-semibold text-foreground">{selectedStudentVisibleTurns}</p>
-                  <p className="mt-1 text-sm text-muted-foreground">Suma de turnos visibles en las partidas listadas.</p>
+                  <p className="mt-1 text-sm text-muted-foreground">Suma de turnos registrados en las partidas listadas.</p>
                 </div>
                 <div className="rounded-2xl bg-background/70 p-4">
                   <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Última participación</p>
@@ -556,8 +556,8 @@ export function InstitutionStudentProfilePage({
                 {selectedStudentGameRows.length > 0 ? (
                   <p className="text-sm text-muted-foreground">
                     {filteredSelectedStudentGameRows.length === selectedStudentGameRows.length
-                      ? `Mostrando ${selectedStudentGameRows.length} partidas visibles para este estudiante.`
-                      : `Mostrando ${filteredSelectedStudentGameRows.length} de ${selectedStudentGameRows.length} partidas visibles para este estudiante.`}
+                      ? `Mostrando ${selectedStudentGameRows.length} partidas registradas para este estudiante.`
+                      : `Mostrando ${filteredSelectedStudentGameRows.length} de ${selectedStudentGameRows.length} partidas registradas para este estudiante.`}
                   </p>
                 ) : null}
                 {filteredSelectedStudentGameRows.length > 0 ? (
@@ -580,7 +580,7 @@ export function InstitutionStudentProfilePage({
                   </div>
                 ) : (
                   <div className="rounded-2xl border border-dashed border-border/80 bg-muted/20 p-4 text-sm text-muted-foreground">
-                    Este estudiante todavía no registra partidas visibles en `game-data` para esta institución. Cuando aparezcan nuevos registros, esta pantalla va a consolidarlos automáticamente.
+                    Este estudiante todavía no registra partidas en `game-data` para esta institución. Cuando aparezcan nuevos registros, esta pantalla va a consolidarlos automáticamente.
                   </div>
                 )}
               </div>

@@ -327,8 +327,8 @@ export function GamesTable() {
               <p className="mt-2 text-sm leading-6 text-muted-foreground">Leé rápido cuántas sesiones combinan manuales y registrados, y cómo queda representada la muestra disponible.</p>
             </div>
             <div className="rounded-2xl bg-background/70 p-4">
-              <p className="text-sm font-medium text-foreground">Asociaciones visibles</p>
-              <p className="mt-2 text-sm leading-6 text-muted-foreground">La relación entre partida, dispositivo y owner queda expuesta para evitar lecturas ambiguas del alcance.</p>
+              <p className="text-sm font-medium text-foreground">Asociaciones clave</p>
+              <p className="mt-2 text-sm leading-6 text-muted-foreground">La relación entre partida, dispositivo y responsable queda clara para interpretar cada caso sin ambigüedades.</p>
             </div>
             <div className="rounded-2xl bg-background/70 p-4">
               <p className="text-sm font-medium text-foreground">Turnos observables</p>
@@ -343,10 +343,10 @@ export function GamesTable() {
           <CardContent className="p-5">
             <div className="mb-3 flex items-center justify-between gap-3">
               <div>
-                <p className="text-sm font-semibold text-foreground">Acceso visible</p>
+                <p className="text-sm font-semibold text-foreground">Acceso disponible</p>
                 <p className="text-sm text-muted-foreground">Recortá la muestra por tipo de acceso antes de abrir una partida.</p>
               </div>
-              <Badge variant="outline">{filtered.length} visibles</Badge>
+              <Badge variant="outline">{filtered.length} resultados</Badge>
             </div>
             <div className="flex flex-wrap gap-2">
             {accessSegments.map((segment) => (
@@ -381,7 +381,7 @@ export function GamesTable() {
             <SummaryCard label={isResearcherView ? "Participantes" : "Jugadores"} value={String(metrics.totalPlayers)} icon={Users} />
             <SummaryCard label="Turnos" value={String(metrics.totalTurns)} icon={TimerReset} />
             <SummaryCard label={isFamilyView ? "Mazos" : isResearcherView ? "Muestra mixta" : "Mixtas"} value={String(isFamilyView ? new Set(games.map((game) => game.deckName).filter(Boolean)).size : metrics.mixedGames)} icon={BookOpen} onSelect={isFamilyView ? undefined : () => setPlayerModeFilter("mixed")} isActive={playerModeFilter === "mixed"} />
-            <SummaryCard label={isFamilyView ? "Éxito visible" : isResearcherView ? "Sin asociación" : "Sin asociación"} value={isFamilyView ? `${metrics.successRate}%` : String(metrics.unresolvedAssociations)} icon={isFamilyView ? Trophy : Gamepad2} onSelect={isFamilyView ? undefined : () => setAccessFilter("unresolved")} isActive={accessFilter === "unresolved"} />
+            <SummaryCard label={isFamilyView ? "Tasa de aciertos" : isResearcherView ? "Sin asociación" : "Sin asociación"} value={isFamilyView ? `${metrics.successRate}%` : String(metrics.unresolvedAssociations)} icon={isFamilyView ? Trophy : Gamepad2} onSelect={isFamilyView ? undefined : () => setAccessFilter("unresolved")} isActive={accessFilter === "unresolved"} />
           </>
         )}
       </div>
@@ -389,7 +389,7 @@ export function GamesTable() {
       <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
         <CardContent className="flex flex-wrap items-center justify-between gap-4 p-5">
           <div>
-            <p className="text-sm font-medium text-foreground">Resultados visibles</p>
+            <p className="text-sm font-medium text-foreground">Resultados</p>
             <p className="mt-1 text-sm text-muted-foreground">{filtered.length} de {metrics.totalGames} partidas con el recorte actual.</p>
           </div>
           <div className="flex flex-wrap items-center justify-end gap-2">

@@ -707,7 +707,7 @@ export function InstitutionsOverview() {
                 ? "Alta conectada al endpoint real de instituciones, ahora en el cuerpo central del módulo."
                 : "Tu perfil actual no expone alta de instituciones."
               : isDirectorView
-                ? "Resumen de contacto, cobertura visible y señales básicas para seguimiento institucional."
+                ? "Resumen de contacto, cobertura actual y señales básicas para seguimiento institucional."
                 : canUpdateInstitutions
                   ? "Datos base del cliente, contacto y localización operativa, sin sacar la edición del cuerpo principal."
                   : "Vista de solo lectura para los datos base de la institución."}
@@ -868,8 +868,8 @@ export function InstitutionsOverview() {
         description={
           isInstitutionScopedView
             ? isDirectorView
-              ? `Vista institucional sobre ${scopedInstitutionName}, pensada para seguimiento general de operación, contacto y cobertura visible.`
-              : `Vista operativa sobre ${scopedInstitutionName}. Ya cruza instituciones con usuarios y dispositivos reales.`
+              ? `Vista institucional sobre ${scopedInstitutionName}, pensada para seguimiento general, contacto y cobertura actual.`
+              : `Vista central sobre ${scopedInstitutionName}. Ya cruza instituciones con usuarios y dispositivos reales.`
             : "La vista ahora conecta instituciones reales del backend con impacto operativo en usuarios y dispositivos."
         }
         actions={
@@ -907,7 +907,7 @@ export function InstitutionsOverview() {
         ) : (
           <>
             <SummaryCard
-              label="Instituciones visibles"
+              label="Instituciones"
               value={String(metrics.totalInstitutions)}
               icon={Building2}
             />
@@ -950,9 +950,9 @@ export function InstitutionsOverview() {
           <div className="mb-3 flex items-center justify-between gap-3">
             <div>
               <p className="text-sm font-semibold text-foreground">Enfocar listado</p>
-              <p className="text-sm text-muted-foreground">Priorizá instituciones con huecos de operación antes de editar datos base.</p>
+              <p className="text-sm text-muted-foreground">Priorizá instituciones con datos pendientes o señales de seguimiento antes de editar datos base.</p>
             </div>
-            <Badge variant="outline">{filtered.length} visibles</Badge>
+            <Badge variant="outline">{filtered.length} resultados</Badge>
           </div>
           <div className="flex flex-wrap gap-2">
           {focusSegments.map((segment) => (
@@ -989,10 +989,10 @@ export function InstitutionsOverview() {
           <CardHeader>
             <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
               <div>
-                <CardTitle>{isDirectorView ? "Instituciones visibles para seguimiento" : "Mapa institucional"}</CardTitle>
+                <CardTitle>{isDirectorView ? "Instituciones para seguimiento" : "Mapa institucional"}</CardTitle>
                 <CardDescription>
                   {isDirectorView
-                    ? "Seleccioná una institución para revisar contacto, cobertura visible y señales generales de operación."
+                    ? "Seleccioná una institución para revisar contacto, cobertura actual y señales generales de seguimiento."
                     : "Seleccioná una institución para trabajar desde el cuerpo central: ver detalle, editar y operar sin saltar a barras laterales."}
                 </CardDescription>
               </div>
@@ -1254,7 +1254,7 @@ export function InstitutionsOverview() {
         <CardHeader>
           <CardTitle>Instituciones que conviene revisar</CardTitle>
           <CardDescription>
-            Señales rápidas para completar contacto, dirección o presencia web antes de seguir escalando operación.
+            Señales rápidas para completar contacto, dirección o presencia web antes de seguir escalando el despliegue.
           </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-3 md:grid-cols-2 2xl:grid-cols-3">
@@ -1298,7 +1298,7 @@ export function InstitutionsOverview() {
             Grupos y perfiles de jugadores
           </CardTitle>
           <CardDescription>
-            Sin cambiar la base ni los contratos actuales: esta vista toma los grupos visibles y te deja ver los estudiantes/perfiles que quedaron dentro de cada uno.
+            Sin cambiar la base ni los contratos actuales: esta vista toma los grupos cargados y te deja ver los estudiantes y perfiles que quedaron dentro de cada uno.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-5">
@@ -1311,7 +1311,7 @@ export function InstitutionsOverview() {
               <div className="rounded-[26px] border border-border/70 bg-background/65 p-4">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
-                    <p className="text-sm font-medium text-foreground">Grupos visibles</p>
+                    <p className="text-sm font-medium text-foreground">Grupos cargados</p>
                     <p className="mt-1 text-sm text-muted-foreground">
                       Podés seleccionar un grupo o dejar todo sin selección hasta decidir a qué detalle querés entrar.
                     </p>
@@ -1364,7 +1364,7 @@ export function InstitutionsOverview() {
                     })
                   ) : (
                     <div className="rounded-2xl border border-dashed border-border/80 bg-muted/20 p-4 text-sm text-muted-foreground">
-                      Esta institución todavía no tiene grupos visibles. Podés crearlos abajo desde la carga por Excel.
+                      Esta institución todavía no tiene grupos cargados. Podés crearlos abajo desde la carga por Excel.
                     </div>
                   )}
                 </div>
@@ -1380,7 +1380,7 @@ export function InstitutionsOverview() {
                           : "Podés dejar el grupo sin selección o elegir uno para ver los perfiles cargados."}
                       </p>
                     </div>
-                    {selectedGroup ? <Badge variant="secondary">{filteredStudentPerformanceRows.length} visibles</Badge> : null}
+                    {selectedGroup ? <Badge variant="secondary">{filteredStudentPerformanceRows.length} resultados</Badge> : null}
                   </div>
 
                   {selectedGroup ? (
@@ -1530,7 +1530,7 @@ export function InstitutionsOverview() {
         isPending={deleteClassGroupMutation.isPending}
         title={selectedGroup ? `Eliminar grupo ${selectedGroup.name}` : "Eliminar grupo"}
         description={selectedGroup
-          ? "El grupo seleccionado se quitará del detalle institucional y dejará de aparecer en el flujo visible. Confirmá solo si querés ejecutar la eliminación real."
+          ? "El grupo seleccionado se quitará del detalle institucional y dejará de aparecer en este flujo. Confirmá solo si querés ejecutar la eliminación real."
           : "Confirmá la eliminación del grupo seleccionado."}
         confirmLabel="Sí, eliminar grupo"
       />

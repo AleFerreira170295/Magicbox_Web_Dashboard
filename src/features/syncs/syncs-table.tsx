@@ -1,10 +1,12 @@
 "use client";
 
+import Link from "next/link";
 import { type ComponentType, useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Activity, Cpu, HardDriveDownload, Search, Users, Waves } from "lucide-react";
 import { SectionHeader } from "@/components/section-header";
 import { Badge } from "@/components/ui/badge";
+import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { ListPaginationControls, useListPagination } from "@/components/ui/list-pagination-controls";
@@ -13,6 +15,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { useAuth } from "@/features/auth/auth-context";
 import { useDevices } from "@/features/devices/api";
 import { useGames } from "@/features/games/api";
+import { buildGameDetailHref, buildGamesOverviewHref } from "@/features/games/game-route";
 import type { GameRecord } from "@/features/games/types";
 import { useSyncSessions } from "@/features/syncs/api";
 import { useUsers } from "@/features/users/api";
@@ -55,6 +58,21 @@ function getSyncInitials(source?: string | null, deckName?: string | null) {
     .slice(0, 2)
     .map((part) => part.slice(0, 1).toUpperCase())
     .join("") || "SY";
+}
+
+function buildSyncGamesHref(sync: {
+  bleDeviceId?: string | null;
+  deviceId?: string | null;
+  device?: { name?: string | null } | null;
+  user?: { id?: string | null; fullName?: string | null; email?: string | null } | null;
+}) {
+  return buildGamesOverviewHref({
+    bleDeviceId: sync.bleDeviceId || null,
+    deviceId: sync.deviceId || null,
+    deviceName: sync.device?.name || null,
+    ownerUserId: sync.user?.id || null,
+    ownerUserName: sync.user?.fullName || sync.user?.email || null,
+  });
 }
 
 export function SyncsTable() {
@@ -237,15 +255,15 @@ export function SyncsTable() {
         title="Sincronizaciones"
         description={
           isFamilyView
-            ? "Vista simple para seguir la actividad de sincronización visible, con foco en si hubo captura, participantes y relación básica con las partidas."
+            ? "Vista simple para seguir la actividad de sincronización reciente, con foco en si hubo captura, participantes y relación básica con las partidas."
             : isResearcherView
-            ? "Vista de evidencia sobre `/sync-sessions`, pensada para leer cobertura de captura, correlación con partidas y asociaciones visibles sin quedarse solo en el payload raw."
+            ? "Vista de evidencia sobre `/sync-sessions`, pensada para leer cobertura de captura, correlación con partidas y asociaciones clave sin quedarse solo en el payload raw."
             : canReadOperationalSyncs
             ? isTeacherView
-              ? "Vista docente de sincronizaciones visibles, pensada para conectar captura, participantes y dispositivo sin convertir la lectura en una consola técnica."
+              ? "Vista docente de sincronizaciones, pensada para conectar captura, participantes y dispositivo sin convertir la lectura en una consola técnica."
               : isDirectorView
-              ? "Vista directoral de sincronizaciones visibles, útil para seguir captura, correlación con partidas y señales generales de trazabilidad a nivel institución."
-              : "La vista usa `/sync-sessions` como superficie operativa real del parque visible por ACL BLE, no solo como historial personal del usuario autenticado."
+              ? "Vista directoral de sincronizaciones, útil para seguir captura, correlación con partidas y señales generales de trazabilidad a nivel institución."
+              : "La vista usa `/sync-sessions` como superficie operativa real del parque disponible por ACL BLE, no solo como historial personal del usuario autenticado."
             : "Sin permiso BLE operativo, `/sync-sessions` vuelve a comportarse como historial personal del usuario autenticado."
         }
         actions={
@@ -306,7 +324,7 @@ export function SyncsTable() {
         <CardContent className="flex flex-wrap items-center justify-between gap-4 p-5">
           <div>
             <div className="flex flex-wrap items-center gap-2">
-              <p className="text-sm font-medium text-foreground">Alcance visible</p>
+              <p className="text-sm font-medium text-foreground">Acceso disponible</p>
               <Badge variant={isFamilyView || isResearcherView || canReadOperationalSyncs ? "secondary" : "outline"}>
                 {isFamilyView ? "family" : isResearcherView ? "researcher" : canReadOperationalSyncs ? "operativo por ACL BLE" : "historial personal"}
               </Badge>
@@ -316,12 +334,12 @@ export function SyncsTable() {
             </div>
             <p className="mt-2 text-sm text-muted-foreground">
               {isFamilyView
-                ? "La vista simplifica la lectura y deja visibles solo las relaciones más importantes, sincronización, participantes, dispositivo y vínculo con una partida cuando existe."
+                ? "La vista simplifica la lectura y deja a mano solo las relaciones más importantes: sincronización, participantes, dispositivo y vínculo con una partida cuando existe."
                 : isResearcherView
                 ? "La vista mantiene el recorte real disponible y deja explícita la relación entre sync, dispositivo, usuario y partida correlacionada para revisar evidencia de captura sin bajar directo al raw completo."
                 : canReadOperationalSyncs
                 ? isTeacherView
-                  ? "La lectura docente deja explícito por qué la sync entra en tu alcance, qué dispositivo la originó y si ya se puede conectar con participantes o una partida visible."
+                  ? "La lectura docente deja explícito por qué la sync entra en tu acceso, qué dispositivo la originó y si ya se puede conectar con participantes o una partida asociada."
                   : isDirectorView
                   ? "La lectura directoral deja en primer plano cobertura, correlación con partidas y señales generales de trazabilidad para seguimiento institucional."
                   : "Los resultados se abren al parque de dispositivos permitido por ACL. Si tu acceso queda limitado a una institución, vas a ver solo syncs de esa institución."
@@ -336,14 +354,14 @@ export function SyncsTable() {
           <CardContent className="grid gap-3 p-5 md:grid-cols-3">
             <div className="rounded-2xl bg-background/70 p-4">
               <p className="text-sm font-medium text-foreground">Cobertura de captura</p>
-              <p className="mt-2 text-sm leading-6 text-muted-foreground">Se hace explícito qué parte de la muestra tiene raw visible y qué parte todavía queda incompleta.</p>
+              <p className="mt-2 text-sm leading-6 text-muted-foreground">Se hace explícito qué parte de la muestra tiene raw disponible y qué parte todavía queda incompleta.</p>
             </div>
             <div className="rounded-2xl bg-background/70 p-4">
               <p className="text-sm font-medium text-foreground">Correlación con partida</p>
-              <p className="mt-2 text-sm leading-6 text-muted-foreground">La relación entre sync y game visible ayuda a leer continuidad sin saltar entre pantallas para cada caso.</p>
+              <p className="mt-2 text-sm leading-6 text-muted-foreground">La relación entre sync y partida asociada ayuda a leer continuidad sin saltar entre pantallas para cada caso.</p>
             </div>
             <div className="rounded-2xl bg-background/70 p-4">
-              <p className="text-sm font-medium text-foreground">Asociaciones visibles</p>
+              <p className="text-sm font-medium text-foreground">Asociaciones clave</p>
               <p className="mt-2 text-sm leading-6 text-muted-foreground">Dispositivo, usuario y participantes quedan resumidos con lenguaje de evidencia y no solo de operación.</p>
             </div>
           </CardContent>
@@ -354,7 +372,7 @@ export function SyncsTable() {
         <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
           <CardContent className="grid gap-3 p-5 md:grid-cols-3">
             <div className="rounded-2xl bg-background/70 p-4">
-              <p className="text-sm font-medium text-foreground">Actividad visible</p>
+              <p className="text-sm font-medium text-foreground">Actividad reciente</p>
               <p className="mt-2 text-sm leading-6 text-muted-foreground">La pantalla muestra si hubo sincronizaciones recientes y qué parte de la experiencia quedó capturada.</p>
             </div>
             <div className="rounded-2xl bg-background/70 p-4">
@@ -363,7 +381,7 @@ export function SyncsTable() {
             </div>
             <div className="rounded-2xl bg-background/70 p-4">
               <p className="text-sm font-medium text-foreground">Relación con partidas</p>
-              <p className="mt-2 text-sm leading-6 text-muted-foreground">Si una sync puede vincularse con una partida visible, la conexión queda resumida sin meterse en detalles técnicos.</p>
+              <p className="mt-2 text-sm leading-6 text-muted-foreground">Si una sync puede vincularse con una partida asociada, la conexión queda resumida sin meterse en detalles técnicos.</p>
             </div>
           </CardContent>
         </Card>
@@ -374,10 +392,10 @@ export function SyncsTable() {
           <CardContent className="p-5">
             <div className="mb-3 flex items-center justify-between gap-3">
               <div>
-                <p className="text-sm font-semibold text-foreground">Acceso visible</p>
-                <p className="text-sm text-muted-foreground">Priorizá el recorte por alcance antes de leer trazabilidad fina.</p>
+                <p className="text-sm font-semibold text-foreground">Acceso disponible</p>
+                <p className="text-sm text-muted-foreground">Priorizá el recorte por tipo de acceso antes de leer trazabilidad fina.</p>
               </div>
-              <Badge variant="outline">{filtered.length} visibles</Badge>
+              <Badge variant="outline">{filtered.length} resultados</Badge>
             </div>
             <div className="flex flex-wrap gap-2">
             {accessSegments.map((segment) => (
@@ -422,16 +440,16 @@ export function SyncsTable() {
           <CardHeader>
             <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
               <div>
-                <CardTitle>{isFamilyView ? "Actividad de sincronización" : isResearcherView ? "Muestra visible de sincronizaciones" : isTeacherView ? "Sincronizaciones visibles para aula" : isDirectorView ? "Sincronizaciones visibles para seguimiento" : "Sesiones sincronizadas"}</CardTitle>
+                <CardTitle>{isFamilyView ? "Actividad de sincronización" : isResearcherView ? "Muestra de sincronizaciones" : isTeacherView ? "Sincronizaciones para aula" : isDirectorView ? "Sincronizaciones para seguimiento" : "Sesiones sincronizadas"}</CardTitle>
                 <CardDescription>
                   {isFamilyView
                     ? "Seleccioná una sincronización para ver un resumen simple de participantes, dispositivo y relación con la partida cuando exista."
                     : isResearcherView
-                    ? "Seleccioná una sesión para inspeccionar contexto visible, participantes proyectados y correlación con partida sin salir del dashboard."
+                    ? "Seleccioná una sesión para inspeccionar contexto disponible, participantes proyectados y correlación con partida sin salir del dashboard."
                     : isTeacherView
                     ? "Seleccioná una sincronización para entender rápido dispositivo, participantes y vínculo con partida desde una lectura docente."
                     : isDirectorView
-                    ? "Seleccioná una sincronización para revisar trazabilidad general, correlación con partida y contexto institucional visible."
+                    ? "Seleccioná una sincronización para revisar trazabilidad general, correlación con partida y contexto institucional disponible."
                     : "Seleccioná una sesión para inspeccionar contexto de dispositivo, usuario, participantes y payload raw más reciente."}
                 </CardDescription>
               </div>
@@ -498,7 +516,7 @@ export function SyncsTable() {
                           <TableCell>
                             <div className="space-y-1">
                               <Badge variant="secondary">{sync.source || sync.sourceType || "desconocido"}</Badge>
-                              {sync.matchedGame ? <Badge variant="outline">partida visible</Badge> : null}
+                              {sync.matchedGame ? <Badge variant="outline">partida asociada</Badge> : null}
                             </div>
                           </TableCell>
                           <TableCell>{sync.device?.name || sync.deviceId || sync.bleDeviceId || "-"}</TableCell>
@@ -538,11 +556,11 @@ export function SyncsTable() {
               {isFamilyView
                 ? "Resumen simple para entender qué se sincronizó, quiénes aparecen y si hay evidencia asociada."
                 : isResearcherView
-                ? "Panel para revisar rápidamente relaciones visibles entre sync, usuario, dispositivo, participantes y evidencia cruda asociada."
+                ? "Panel para revisar rápidamente relaciones clave entre sync, usuario, dispositivo, participantes y evidencia cruda asociada."
                 : isTeacherView
-                ? "Panel docente para revisar rápido quién sincronizó, con qué dispositivo y si ya hay participantes o partida visible asociada."
+                ? "Panel docente para revisar rápido quién sincronizó, con qué dispositivo y si ya hay participantes o partida asociada."
                 : isDirectorView
-                ? "Panel de seguimiento para revisar correlación visible entre sync, dispositivo, participantes y evidencia cruda sin entrar en lectura excesivamente técnica."
+                ? "Panel de seguimiento para revisar correlación entre sync, dispositivo, participantes y evidencia cruda sin entrar en lectura excesivamente técnica."
                 : "Panel operativo para revisar rápidamente quién sincronizó, con qué dispositivo y qué evidencia raw quedó asociada."}
             </CardDescription>
           </CardHeader>
@@ -566,7 +584,7 @@ export function SyncsTable() {
                     </div>
                     <div className="flex flex-wrap gap-2">
                       <Badge variant="secondary">{selectedSync.source || selectedSync.sourceType || "desconocido"}</Badge>
-                      <Badge variant={selectedSync.hasUnresolvedAssociation ? "warning" : "outline"}>{selectedSync.hasUnresolvedAssociation ? "revisar asociación" : "asociación visible"}</Badge>
+                      <Badge variant={selectedSync.hasUnresolvedAssociation ? "warning" : "outline"}>{selectedSync.hasUnresolvedAssociation ? "revisar asociación" : "asociación resuelta"}</Badge>
                       <Badge variant={selectedRawKeys.length > 0 || (selectedSync.rawRecordCount || 0) > 0 ? "success" : "outline"}>
                         raw {(selectedSync.rawRecordCount || selectedSync.rawRecordIds.length || 0) > 0 ? "disponible" : "pendiente"}
                       </Badge>
@@ -576,7 +594,7 @@ export function SyncsTable() {
                     {isFamilyView ? null : <p>Usuario: {selectedUser?.fullName || selectedUser?.email || selectedSync.userId || "-"}</p>}
                     <p>Dispositivo: {selectedDevice?.name || selectedSync.deviceId || selectedSync.bleDeviceId || "-"}</p>
                     {isFamilyView ? null : <p>Relación de acceso: {selectedSync.accessRelation}</p>}
-                    <p>Partida correlacionada: {selectedSync.matchedGame?.deckName || selectedSync.gameId || "sin match visible"}</p>
+                    <p>Partida correlacionada: {selectedSync.matchedGame?.deckName || selectedSync.gameId || "sin partida asociada"}</p>
                     <p>Firmware: {selectedSync.firmwareVersion || "sin firmware"}</p>
                     <p>App: {selectedSync.appVersion || "sin versión"}</p>
                     <p>Participantes: {selectedSync.participants.length || selectedSync.totalPlayers || 0}</p>
@@ -585,9 +603,45 @@ export function SyncsTable() {
                   </div>
                 </div>
 
+                <div className="rounded-2xl border border-border/70 bg-white/80 p-4">
+                  <p className="text-sm font-medium text-foreground">Cruces rápidos</p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Saltá a la partida relacionada o al listado ya filtrado por este dispositivo sin rehacer la búsqueda.
+                  </p>
+                  <div className="mt-3 flex flex-wrap gap-3">
+                    {selectedSync.matchedGame ? (
+                      <Link
+                        href={buildGameDetailHref({
+                          gameRecordId: selectedSync.matchedGame.id,
+                          bleDeviceId: selectedSync.bleDeviceId || null,
+                          deviceId: selectedSync.deviceId || null,
+                          deviceName: selectedDevice?.name || null,
+                          ownerUserId: selectedUser?.id || null,
+                          ownerUserName: selectedUser?.fullName || selectedUser?.email || null,
+                        })}
+                        className={buttonVariants({ variant: "outline", size: "sm" })}
+                      >
+                        Abrir partida correlacionada
+                      </Link>
+                    ) : null}
+                    {selectedSync.bleDeviceId || selectedSync.deviceId ? (
+                      <Link href={buildSyncGamesHref(selectedSync)} className={buttonVariants({ variant: "outline", size: "sm" })}>
+                        Ver partidas del dispositivo
+                      </Link>
+                    ) : null}
+                    <button
+                      type="button"
+                      onClick={() => setSelectedSyncId(null)}
+                      className={buttonVariants({ variant: "ghost", size: "sm" })}
+                    >
+                      Quitar selección
+                    </button>
+                  </div>
+                </div>
+
                 <div>
-                  <p className="text-sm font-medium text-foreground">{isFamilyView ? "Participantes visibles" : isResearcherView ? "Participantes y asociaciones visibles" : isTeacherView ? "Participantes y contexto de aula" : isDirectorView ? "Participantes y contexto institucional" : "Participantes y asociaciones"}</p>
-                  <div className="mt-3 space-y-3">
+                  <p className="text-sm font-medium text-foreground">{isFamilyView ? "Participantes" : isResearcherView ? "Participantes y asociaciones clave" : isTeacherView ? "Participantes y contexto de aula" : isDirectorView ? "Participantes y contexto institucional" : "Participantes y asociaciones"}</p>
+                  <div className="mt-3 max-h-[320px] space-y-3 overflow-y-auto pr-1">
                     {selectedSync.participants.length === 0 ? (
                       <div className="rounded-2xl bg-background/70 p-3 text-sm text-muted-foreground">Sin participantes proyectados.</div>
                     ) : (
@@ -621,9 +675,9 @@ export function SyncsTable() {
                 </div>
 
                 <div>
-                  <p className="text-sm font-medium text-foreground">{isFamilyView ? "Detalle visible" : isResearcherView ? "Payload raw visible" : "Payload raw más reciente"}</p>
-                  <div className="mt-3 rounded-2xl bg-slate-950 p-4 text-xs text-slate-100">
-                    <pre className="overflow-x-auto whitespace-pre-wrap">{JSON.stringify(selectedSync.rawPayload || {}, null, 2)}</pre>
+                  <p className="text-sm font-medium text-foreground">{isFamilyView ? "Detalle disponible" : isResearcherView ? "Payload raw disponible" : "Payload raw más reciente"}</p>
+                  <div className="mt-3 max-h-[360px] overflow-auto rounded-2xl bg-slate-950 p-4 text-xs text-slate-100">
+                    <pre className="whitespace-pre-wrap">{JSON.stringify(selectedSync.rawPayload || {}, null, 2)}</pre>
                   </div>
                 </div>
               </>

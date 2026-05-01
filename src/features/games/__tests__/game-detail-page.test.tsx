@@ -266,6 +266,10 @@ describe("GameDetailPage", () => {
     expect(screen.getAllByText("Mateo").length).toBeGreaterThan(0);
     expect(screen.getByText(/6 turnos registrados/i)).toBeInTheDocument();
     expect(screen.getByText(/5 turnos registrados/i)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Ver partidas del dispositivo/i })).toHaveAttribute(
+      "href",
+      "/games?ownerUserId=user-1&ownerUserName=Ines+Admin&bleDeviceId=device-1&deviceId=mb-1&deviceName=MagicBox+Aula+1",
+    );
     expect(screen.getByRole("link", { name: /Ver syncs del dispositivo/i })).toHaveAttribute(
       "href",
       "/syncs?bleDeviceId=device-1&deviceId=mb-1&deviceName=MagicBox+Aula+1",

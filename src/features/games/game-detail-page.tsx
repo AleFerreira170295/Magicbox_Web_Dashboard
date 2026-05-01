@@ -141,7 +141,7 @@ export function GameDetailPage({
       ) : !selectedGame ? (
         <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
           <CardContent className="p-6 text-sm text-muted-foreground">
-            No encontré la partida solicitada dentro del alcance visible actual.
+            No encontré la partida solicitada con los filtros o permisos actuales.
           </CardContent>
         </Card>
       ) : (
@@ -218,7 +218,20 @@ export function GameDetailPage({
               <CardContent className="space-y-4">
                 <div className="rounded-2xl bg-background/70 p-4">
                   <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Cruces rápidos</p>
+                  <p className="mt-1 text-sm text-muted-foreground">Abrí el resto de la actividad del mismo dispositivo sin perder el contexto de esta partida.</p>
                   <div className="mt-3 flex flex-wrap gap-2">
+                    <Link
+                      href={buildGamesOverviewHref({
+                        bleDeviceId: selectedGame.bleDeviceId || null,
+                        deviceId: selectedGame.device?.deviceId || null,
+                        deviceName: selectedGame.device?.name || null,
+                        ownerUserId: selectedGame.device?.ownerUserId || null,
+                        ownerUserName: selectedGame.device?.ownerUserName || selectedGame.device?.ownerUserEmail || null,
+                      })}
+                      className={buttonVariants({ variant: "outline", size: "sm" })}
+                    >
+                      Ver partidas del dispositivo
+                    </Link>
                     <Link href={buildSyncRelationHref(selectedGame)} className={buttonVariants({ variant: "outline", size: "sm" })}>
                       Ver syncs del dispositivo
                     </Link>
@@ -229,7 +242,7 @@ export function GameDetailPage({
                   <div className="flex items-center justify-between gap-3">
                     <div>
                       <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Mismo dispositivo</p>
-                      <p className="mt-1 text-sm text-muted-foreground">Partidas visibles que salieron del mismo equipo.</p>
+                      <p className="mt-1 text-sm text-muted-foreground">Partidas del mismo equipo para seguir el historial reciente sin salir del contexto actual.</p>
                     </div>
                     <ListPaginationControls
                       pageSize={sameDevicePagination.pageSize}
@@ -245,7 +258,7 @@ export function GameDetailPage({
                   </div>
                   <div className="max-h-[260px] space-y-3 overflow-y-auto pr-1">
                     {sameDevicePagination.totalItems === 0 ? (
-                      <div className="rounded-2xl border border-dashed border-border/80 bg-muted/20 p-4 text-sm text-muted-foreground">No hay otras partidas visibles desde este dispositivo.</div>
+                      <div className="rounded-2xl border border-dashed border-border/80 bg-muted/20 p-4 text-sm text-muted-foreground">No hay otras partidas cargadas desde este dispositivo por ahora.</div>
                     ) : (
                       sameDevicePagination.paginatedItems.map((game) => (
                         <Link key={game.id} href={buildGameDetailHref({ gameRecordId: game.id, ...overviewState })} className="block rounded-2xl border border-border/70 bg-white/85 px-4 py-3 transition hover:border-primary/30 hover:bg-primary/5">
@@ -266,7 +279,7 @@ export function GameDetailPage({
                   <div className="flex items-center justify-between gap-3">
                     <div>
                       <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Misma institución</p>
-                      <p className="mt-1 text-sm text-muted-foreground">Otras partidas visibles dentro del mismo centro.</p>
+                      <p className="mt-1 text-sm text-muted-foreground">Otras partidas del mismo centro para comparar actividad sin volver al listado general.</p>
                     </div>
                     <ListPaginationControls
                       pageSize={institutionPagination.pageSize}
@@ -282,7 +295,7 @@ export function GameDetailPage({
                   </div>
                   <div className="max-h-[260px] space-y-3 overflow-y-auto pr-1">
                     {institutionPagination.totalItems === 0 ? (
-                      <div className="rounded-2xl border border-dashed border-border/80 bg-muted/20 p-4 text-sm text-muted-foreground">No hay otras partidas visibles dentro de esta institución.</div>
+                      <div className="rounded-2xl border border-dashed border-border/80 bg-muted/20 p-4 text-sm text-muted-foreground">No hay otras partidas cargadas para esta institución por ahora.</div>
                     ) : (
                       institutionPagination.paginatedItems.map((game) => (
                         <Link key={game.id} href={buildGameDetailHref({ gameRecordId: game.id, ...overviewState })} className="block rounded-2xl border border-border/70 bg-white/85 px-4 py-3 transition hover:border-primary/30 hover:bg-primary/5">
@@ -375,7 +388,7 @@ export function GameDetailPage({
                       goToNextPage={participantsPagination.goToNextPage}
                     />
                   </div>
-                  <div className="space-y-3">
+                  <div className="max-h-[260px] space-y-3 overflow-y-auto pr-1">
                     {participantsPagination.totalItems === 0 ? (
                       <div className="rounded-2xl bg-background/70 p-3 text-sm text-muted-foreground">Sin jugadores cargados.</div>
                     ) : (
@@ -413,7 +426,7 @@ export function GameDetailPage({
                       goToNextPage={turnsPagination.goToNextPage}
                     />
                   </div>
-                  <div className="space-y-2">
+                  <div className="max-h-[360px] space-y-2 overflow-y-auto pr-1">
                     {turnsPagination.totalItems === 0 ? (
                       <div className="rounded-2xl bg-background/70 p-3 text-sm text-muted-foreground">Sin turnos persistidos.</div>
                     ) : (
