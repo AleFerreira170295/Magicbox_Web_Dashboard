@@ -84,15 +84,11 @@ describe("StudentImportPanel", () => {
     });
   });
 
-  it("imports an excel into the selected class group and shows the summary", async () => {
+  it("imports an excel into the default visible class group and shows the summary", async () => {
     renderPanel();
 
     expect(screen.getByText(/primer nombre/i)).toBeInTheDocument();
     expect(screen.getByText(/n° de legajo/i)).toBeInTheDocument();
-
-    fireEvent.change(screen.getByLabelText("Grupo destino"), {
-      target: { value: "cg-1" },
-    });
 
     const file = new File(["excel"], "students.xlsx", {
       type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",

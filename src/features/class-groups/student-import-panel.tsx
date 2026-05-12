@@ -285,7 +285,7 @@ function StudentImportPanelContent({
                   <Button
                     type="button"
                     onClick={() => importMutation.mutate()}
-                    disabled={!importEnabled || !selectedGroupId || !selectedFile || importMutation.isPending}
+                    disabled={!importEnabled || !effectiveSelectedGroupId || !selectedFile || importMutation.isPending}
                   >
                     <Upload className="mr-2 size-4" />
                     {importMutation.isPending ? "Importando..." : "Subir archivo"}
