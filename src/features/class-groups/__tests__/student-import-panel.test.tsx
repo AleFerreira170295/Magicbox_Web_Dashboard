@@ -87,8 +87,8 @@ describe("StudentImportPanel", () => {
   it("imports an excel into the selected class group and shows the summary", async () => {
     renderPanel();
 
-    expect(screen.getByText(/second_name/i)).toBeInTheDocument();
-    expect(screen.getByText(/fecha_nacimiento/i)).toBeInTheDocument();
+    expect(screen.getByText(/primer nombre/i)).toBeInTheDocument();
+    expect(screen.getByText(/n° de legajo/i)).toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText("Grupo destino"), {
       target: { value: "cg-1" },
@@ -98,11 +98,11 @@ describe("StudentImportPanel", () => {
       type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     });
 
-    fireEvent.change(screen.getByLabelText("Excel .xlsx"), {
+    fireEvent.change(screen.getByLabelText("Excel .xlsx o CSV"), {
       target: { files: [file] },
     });
 
-    fireEvent.click(screen.getByRole("button", { name: "Subir Excel" }));
+    fireEvent.click(screen.getAllByRole("button", { name: "Subir archivo" })[0]);
 
     await waitFor(() => {
       expect(importClassGroupStudentsMock).toHaveBeenCalledWith("token", "cg-1", file);
@@ -111,6 +111,28 @@ describe("StudentImportPanel", () => {
     expect(await screen.findByText(/Importación terminada para Quinto A/)).toBeInTheDocument();
     expect(screen.getByText("2")).toBeInTheDocument();
     expect(screen.getByText("1")).toBeInTheDocument();
+  });
+
+  it("accepts csv files in the same import flow", async () => {
+    renderPanel();
+
+    fireEvent.change(screen.getByLabelText("Grupo destino"), {
+      target: { value: "cg-1" },
+    });
+
+    const file = new File(["nombre,apellido,legajo"], "students.csv", {
+      type: "text/csv",
+    });
+
+    fireEvent.change(screen.getByLabelText("Excel .xlsx o CSV"), {
+      target: { files: [file] },
+    });
+
+    fireEvent.click(screen.getAllByRole("button", { name: "Subir archivo" })[0]);
+
+    await waitFor(() => {
+      expect(importClassGroupStudentsMock).toHaveBeenCalledWith("token", "cg-1", file);
+    });
   });
 
   it("creates a class group from the same panel", async () => {

@@ -124,7 +124,7 @@ function StudentImportPanelContent({
     mutationFn: async () => {
       if (!token) throw new Error("La sesión no tiene token activo.");
       if (!effectiveSelectedGroupId) throw new Error("Seleccioná primero el grupo destino.");
-      if (!selectedFile) throw new Error("Elegí un archivo Excel .xlsx para continuar.");
+      if (!selectedFile) throw new Error("Elegí un archivo Excel .xlsx o CSV para continuar.");
       return importClassGroupStudents(token, effectiveSelectedGroupId, selectedFile);
     },
     onSuccess: async (result) => {
@@ -150,10 +150,10 @@ function StudentImportPanelContent({
           <div>
             <CardTitle className="flex items-center gap-2">
               <FileSpreadsheet className="size-5 text-primary" />
-              Carga masiva de estudiantes por Excel
+              Carga masiva de estudiantes por Excel / CSV
             </CardTitle>
             <CardDescription>
-              Todo queda en el cuerpo principal: primero definís o elegís el grupo y después subís el archivo Excel sobre ese destino puntual.
+              Todo queda en el cuerpo principal: primero definís o elegís el grupo y después subís el archivo Excel o CSV sobre ese destino puntual.
             </CardDescription>
           </div>
           {institutionName ? <Badge variant="outline">{institutionName}</Badge> : null}
@@ -265,19 +265,19 @@ function StudentImportPanelContent({
             </div>
 
             <div className="rounded-[26px] border border-border/70 bg-background/65 p-4">
-              <p className="text-sm font-medium text-foreground">2. Subir Excel al grupo elegido</p>
+              <p className="text-sm font-medium text-foreground">2. Subir archivo al grupo elegido</p>
               <div className="mt-4 grid gap-3">
                 <div className="grid gap-2">
-                  <Label htmlFor="student-import-file">Excel .xlsx</Label>
+                  <Label htmlFor="student-import-file">Excel .xlsx o CSV</Label>
                   <Input
                     id="student-import-file"
                     type="file"
-                    accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                    accept=".xlsx,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv"
                     disabled={!importEnabled || importMutation.isPending}
                     onChange={(event) => setSelectedFile(event.target.files?.[0] ?? null)}
                   />
                   <p className="text-xs text-muted-foreground">
-                    Encabezados esperados: <code>first_name</code>, <code>last_name</code>, <code>file_number</code>. Opcionales: <code>second_name</code>, <code>second_last_name</code>, <code>birth_date</code>. También acepto <code>nombre</code>, <code>apellido</code>, <code>legajo</code>, <code>segundo_nombre</code>, <code>segundo_apellido</code> y <code>fecha_nacimiento</code>.
+                    Encabezados esperados: <code>first_name</code>, <code>last_name</code>, <code>file_number</code>. Opcionales: <code>second_name</code>, <code>second_last_name</code>, <code>birth_date</code>. También acepto variantes como <code>nombre</code>, <code>primer nombre</code>, <code>apellido</code>, <code>apellido paterno</code>, <code>legajo</code>, <code>n° de legajo</code>, <code>segundo_nombre</code>, <code>segundo_apellido</code> y <code>fecha_nacimiento</code>. Si el archivo trae una fila de título antes de los encabezados, el importador intenta detectarlos igual.
                   </p>
                 </div>
 
@@ -288,7 +288,7 @@ function StudentImportPanelContent({
                     disabled={!importEnabled || !selectedGroupId || !selectedFile || importMutation.isPending}
                   >
                     <Upload className="mr-2 size-4" />
-                    {importMutation.isPending ? "Importando..." : "Subir Excel"}
+                    {importMutation.isPending ? "Importando..." : "Subir archivo"}
                   </Button>
                   {selectedGroup ? <Badge variant="secondary">Grupo: {selectedGroup.name}</Badge> : null}
                   {selectedFile ? <Badge variant="outline">{selectedFile.name}</Badge> : null}
