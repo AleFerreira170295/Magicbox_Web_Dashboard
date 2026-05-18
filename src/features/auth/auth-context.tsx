@@ -5,6 +5,7 @@ import {
   useContext,
   useEffect,
   useReducer,
+  useRef,
 } from "react";
 import { clearStoredSession, readStoredSession, writeStoredSession } from "@/features/auth/storage";
 import { AUTH_SESSION_EXPIRED_EVENT } from "@/lib/api/fetcher";
@@ -12,6 +13,7 @@ import {
   getMe,
   login as loginRequest,
   logout as logoutRequest,
+  refreshAuthTokens,
 } from "@/features/auth/auth-api";
 import type { AuthTokens, AuthUser, LoginPayload } from "@/features/auth/types";
 
@@ -83,6 +85,7 @@ function authReducer(state: AuthState, action: AuthAction): AuthState {
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(authReducer, initialState);
+  const refreshInFlight = useRef<Promise<void> | null>(null);
 
   useEffect(() => {
     dispatch({ type: "restore", payload: readStoredSession() });
@@ -92,13 +95,43 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (typeof window === "undefined") return undefined;
 
     const handleExpiredSession = () => {
-      clearStoredSession();
-      dispatch({ type: "clear-session" });
+      const currentTokens = state.tokens;
+      const currentUser = state.user;
+
+      if (!currentTokens?.refreshToken || !currentUser) {
+        clearStoredSession();
+        dispatch({ type: "clear-session" });
+        return;
+      }
+
+      if (refreshInFlight.current) return;
+
+      refreshInFlight.current = (async () => {
+        try {
+          const nextTokens = await refreshAuthTokens(currentTokens.refreshToken);
+          if (!nextTokens.accessToken) throw new Error("No access token returned");
+
+          let nextUser = currentUser;
+          try {
+            const profile = await getMe(nextTokens.accessToken);
+            if (profile) nextUser = profile;
+          } catch {
+            // La renovación de tokens es suficiente para mantener la sesión; el perfil se puede refrescar luego.
+          }
+
+          persist(nextTokens, nextUser);
+        } catch {
+          clearStoredSession();
+          dispatch({ type: "clear-session" });
+        } finally {
+          refreshInFlight.current = null;
+        }
+      })();
     };
 
     window.addEventListener(AUTH_SESSION_EXPIRED_EVENT, handleExpiredSession);
     return () => window.removeEventListener(AUTH_SESSION_EXPIRED_EVENT, handleExpiredSession);
-  }, []);
+  }, [state.tokens, state.user]);
 
   function persist(nextTokens: AuthTokens, nextUser: AuthUser) {
     writeStoredSession({ tokens: nextTokens, user: nextUser });

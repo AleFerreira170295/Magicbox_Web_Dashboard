@@ -253,6 +253,8 @@ export function SystemSettingsCenter() {
     otaReleasesQuery.data,
     readinessQuery.data,
     releases.length,
+    t.summaries.no,
+    t.summaries.yes,
     user?.permissions.length,
     user?.roles.length,
   ]);

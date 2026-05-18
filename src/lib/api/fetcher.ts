@@ -27,6 +27,7 @@ interface ApiRequestOptions {
   headers?: HeadersInit;
   searchParams?: QueryParams;
   signal?: AbortSignal;
+  suppressAuthExpiredEvent?: boolean;
 }
 
 export const AUTH_SESSION_EXPIRED_EVENT = "magicbox:auth-session-expired";
@@ -147,7 +148,9 @@ export async function apiRequest<T>(
   const payload = isJson ? ((await response.json()) as ApiErrorPayload) : undefined;
 
   if (!response.ok) {
-    notifyExpiredSession(response.status);
+    if (!options.suppressAuthExpiredEvent) {
+      notifyExpiredSession(response.status);
+    }
     const message = payload?.error?.message || `Request failed with status ${response.status}`;
     throw new ApiError(message, response.status, payload);
   }

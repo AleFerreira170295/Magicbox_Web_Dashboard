@@ -21,7 +21,6 @@ import { useGames } from "@/features/games/api";
 import { useLanguage, type AppLanguage } from "@/features/i18n/i18n-context";
 import { useInstitutions } from "@/features/institutions/api";
 import { useSyncSessions } from "@/features/syncs/api";
-import { useUsers } from "@/features/users/api";
 import { cn, formatDateTime, getErrorMessage } from "@/lib/utils";
 
 export const devicesMessages: Record<AppLanguage, {
@@ -619,13 +618,11 @@ export function DevicesTable() {
 
   const devicesQuery = useDevices(tokens?.accessToken);
   const institutionsQuery = useInstitutions(tokens?.accessToken);
-  const usersQuery = useUsers(tokens?.accessToken);
   const gamesQuery = useGames(tokens?.accessToken);
   const syncsQuery = useSyncSessions(tokens?.accessToken);
 
   const devices = useMemo(() => devicesQuery.data?.data || [], [devicesQuery.data]);
   const institutions = useMemo(() => institutionsQuery.data?.data || [], [institutionsQuery.data]);
-  const users = useMemo(() => usersQuery.data?.data || [], [usersQuery.data]);
   const games = useMemo(() => gamesQuery.data?.data || [], [gamesQuery.data]);
   const syncs = useMemo(() => syncsQuery.data?.data || [], [syncsQuery.data]);
 
@@ -862,7 +859,7 @@ export function DevicesTable() {
       focusFilter !== "all" ? `${language === "en" ? "Focus" : language === "pt" ? "Foco" : "Enfoque"} · ${focusSegments.find((segment) => segment.key === focusFilter)?.label || focusFilter}` : null,
       linkedOwnerUserId ? `${language === "en" ? "User" : language === "pt" ? "Usuário" : "Usuario"} · ${linkedOwnerUserName || linkedOwnerUserId}` : null,
     ].filter((value): value is string => Boolean(value)),
-    [accessFilter, accessSegments, focusFilter, focusSegments, institutionFilter, institutions, linkedOwnerUserId, linkedOwnerUserName, query, scopeFilter],
+    [accessFilter, accessSegments, focusFilter, focusSegments, institutionFilter, institutions, language, linkedOwnerUserId, linkedOwnerUserName, query, scopeFilter, t.editor.homeLocation, t.editor.institution, t.editor.scope, t.table.access],
   );
 
   const institutionFilterDisabled = Boolean(scopedInstitutionId) || scopeFilter === "home";

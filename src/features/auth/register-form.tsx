@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -72,7 +72,7 @@ export function RegisterForm() {
     },
   });
 
-  const selectedCountryCode = form.watch("countryCode");
+  const selectedCountryCode = useWatch({ control: form.control, name: "countryCode" });
   const selectedCountry = phoneCountries.find((country) => country.isoCode === selectedCountryCode) ?? phoneCountries[0];
 
   async function onSubmit(values: RegisterFormValues) {

@@ -21,7 +21,9 @@ function renderPanel() {
     },
   });
 
-  return render(
+  return {
+    queryClient,
+    ...render(
     <QueryClientProvider client={queryClient}>
       <StudentImportPanel
         token="token"
@@ -40,7 +42,8 @@ function renderPanel() {
         }}
       />
     </QueryClientProvider>,
-  );
+    ),
+  };
 }
 
 describe("StudentImportPanel", () => {
@@ -85,7 +88,8 @@ describe("StudentImportPanel", () => {
   });
 
   it("imports an excel into the default visible class group and shows the summary", async () => {
-    renderPanel();
+    const { queryClient } = renderPanel();
+    const invalidateQueriesSpy = vi.spyOn(queryClient, "invalidateQueries");
 
     expect(screen.getByText(/primer nombre/i)).toBeInTheDocument();
     expect(screen.getByText(/n° de legajo/i)).toBeInTheDocument();
@@ -107,6 +111,7 @@ describe("StudentImportPanel", () => {
     expect(await screen.findByText(/Importación terminada para Quinto A/)).toBeInTheDocument();
     expect(screen.getByText("2")).toBeInTheDocument();
     expect(screen.getByText("1")).toBeInTheDocument();
+    expect(invalidateQueriesSpy).toHaveBeenCalledWith({ queryKey: ["students"] });
   });
 
   it("accepts csv files in the same import flow", async () => {
@@ -129,6 +134,21 @@ describe("StudentImportPanel", () => {
     await waitFor(() => {
       expect(importClassGroupStudentsMock).toHaveBeenCalledWith("token", "cg-1", file);
     });
+  });
+
+  it("rejects unsupported file types before calling the import endpoint", async () => {
+    renderPanel();
+
+    const file = new File(["not-a-spreadsheet"], "students.pdf", {
+      type: "application/pdf",
+    });
+
+    fireEvent.change(screen.getByLabelText("Excel .xlsx o CSV"), {
+      target: { files: [file] },
+    });
+
+    expect(await screen.findByText("El archivo debe ser .xlsx o .csv.")).toBeInTheDocument();
+    expect(importClassGroupStudentsMock).not.toHaveBeenCalled();
   });
 
   it("creates a class group from the same panel", async () => {

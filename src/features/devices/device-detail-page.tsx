@@ -131,7 +131,7 @@ export function DeviceDetailPage({
         isReadyForClassroom: Boolean(device.status && !hasUnresolvedAssociation && hasOperationalActivity),
       };
     });
-  }, [currentUser?.educationalCenterId, currentUser?.id, currentUserEmail, devices, games, language, syncs, t.detail.noVisibleSync, t.filters.accessInstitution, t.filters.accessOwned, t.filters.accessShared, t.filters.accessUnresolved]);
+  }, [currentUser, currentUserEmail, devices, games, language, syncs, t.detail.noVisibleSync, t.filters.accessInstitution, t.filters.accessOwned, t.filters.accessShared, t.filters.accessUnresolved]);
 
   const selectedDevice = useMemo(() => {
     if (!deviceRecordId) return null;

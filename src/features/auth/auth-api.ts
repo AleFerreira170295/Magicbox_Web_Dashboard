@@ -138,12 +138,13 @@ export async function refreshAuthTokens(refreshToken: string) {
   const raw = await apiRequest<Record<string, unknown>>(apiEndpoints.identity.refresh, {
     method: "POST",
     body: { refresh_token: refreshToken },
+    suppressAuthExpiredEvent: true,
   });
 
   const data = (raw?.data && typeof raw.data === "object") ? (raw.data as Record<string, unknown>) : raw;
   return {
     accessToken: String(data.access_token || data.accessToken || ""),
-    refreshToken: String(data.refresh_token || data.refreshToken || ""),
+    refreshToken: String(data.refresh_token || data.refreshToken || refreshToken),
   } as AuthTokens;
 }
 
@@ -151,6 +152,7 @@ export async function logout(refreshToken: string) {
   await apiRequest(apiEndpoints.identity.logout, {
     method: "POST",
     body: { refresh_token: refreshToken },
+    suppressAuthExpiredEvent: true,
   });
 }
 

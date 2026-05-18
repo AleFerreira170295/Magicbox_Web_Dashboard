@@ -619,11 +619,7 @@ const LanguageContext = createContext<LanguageContextValue>({
 });
 
 export function LanguageProvider({ children }: { children: ReactNode }) {
-  const [language, setLanguage] = useState<AppLanguage>("es");
-
-  useEffect(() => {
-    setLanguage(detectInitialLanguage());
-  }, []);
+  const [language, setLanguage] = useState<AppLanguage>(() => detectInitialLanguage());
 
   useEffect(() => {
     window.localStorage.setItem(STORAGE_KEY, language);

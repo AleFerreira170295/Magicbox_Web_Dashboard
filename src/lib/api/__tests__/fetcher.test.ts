@@ -40,4 +40,19 @@ describe("apiRequest", () => {
 
     window.removeEventListener(AUTH_SESSION_EXPIRED_EVENT, listener);
   });
+
+  it("permite suprimir el evento de sesión expirada en flujos internos de auth", async () => {
+    const listener = vi.fn();
+    window.addEventListener(AUTH_SESSION_EXPIRED_EVENT, listener);
+
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({ error: { message: "Refresh token expired" } }), {
+      status: 401,
+      headers: { "content-type": "application/json" },
+    }));
+
+    await expect(apiRequest("/auth/refresh", { suppressAuthExpiredEvent: true })).rejects.toThrow("Refresh token expired");
+    expect(listener).not.toHaveBeenCalled();
+
+    window.removeEventListener(AUTH_SESSION_EXPIRED_EVENT, listener);
+  });
 });

@@ -20,6 +20,8 @@ type FeedbackState =
 
 type InlineMessage = { type: "success" | "error"; message: string } | null;
 
+const SUPPORTED_IMPORT_EXTENSIONS = new Set([".xlsx", ".csv"]);
+
 function hasPermission(user: AuthUser | null | undefined, permission: string, legacyPermission: string) {
   if (!user) return false;
   if (user.roles.includes("admin")) return true;
@@ -43,6 +45,15 @@ function slugifyGroupCode(value: string) {
     .replace(/[^a-z0-9]+/g, "_")
     .replace(/^_+|_+$/g, "")
     .slice(0, 50);
+}
+
+function getFileExtension(fileName: string) {
+  const lastDotIndex = fileName.lastIndexOf(".");
+  return lastDotIndex >= 0 ? fileName.slice(lastDotIndex).toLowerCase() : "";
+}
+
+function isSupportedImportFile(file: File) {
+  return SUPPORTED_IMPORT_EXTENSIONS.has(getFileExtension(file.name));
 }
 
 export function StudentImportPanel({
@@ -79,6 +90,7 @@ function StudentImportPanelContent({
   const [groupCode, setGroupCode] = useState("");
   const [feedback, setFeedback] = useState<FeedbackState>(null);
   const [groupFeedback, setGroupFeedback] = useState<InlineMessage>(null);
+  const [fileInputKey, setFileInputKey] = useState(0);
 
   const classGroupsQuery = useClassGroups(token, institutionId);
   const classGroups = useMemo(() => classGroupsQuery.data?.data ?? [], [classGroupsQuery.data?.data]);
@@ -134,14 +146,34 @@ function StudentImportPanelContent({
         result,
       });
       setSelectedFile(null);
+      setFileInputKey((current) => current + 1);
       await queryClient.invalidateQueries({ queryKey: ["institutions"] });
       await queryClient.invalidateQueries({ queryKey: ["institutions", "detail"] });
       await queryClient.invalidateQueries({ queryKey: ["class-groups"] });
+      await queryClient.invalidateQueries({ queryKey: ["students"] });
     },
     onError: (error) => {
       setFeedback({ type: "error", message: getErrorMessage(error) });
     },
   });
+
+  const handleFileChange = (file: File | null) => {
+    setFeedback(null);
+
+    if (!file) {
+      setSelectedFile(null);
+      return;
+    }
+
+    if (!isSupportedImportFile(file)) {
+      setSelectedFile(null);
+      setFileInputKey((current) => current + 1);
+      setFeedback({ type: "error", message: "El archivo debe ser .xlsx o .csv." });
+      return;
+    }
+
+    setSelectedFile(file);
+  };
 
   return (
     <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
@@ -270,11 +302,12 @@ function StudentImportPanelContent({
                 <div className="grid gap-2">
                   <Label htmlFor="student-import-file">Excel .xlsx o CSV</Label>
                   <Input
+                    key={fileInputKey}
                     id="student-import-file"
                     type="file"
                     accept=".xlsx,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv"
                     disabled={!importEnabled || importMutation.isPending}
-                    onChange={(event) => setSelectedFile(event.target.files?.[0] ?? null)}
+                    onChange={(event) => handleFileChange(event.target.files?.[0] ?? null)}
                   />
                   <p className="text-xs text-muted-foreground">
                     Encabezados esperados: <code>first_name</code>, <code>last_name</code>, <code>file_number</code>. Opcionales: <code>second_name</code>, <code>second_last_name</code>, <code>birth_date</code>. También acepto variantes como <code>nombre</code>, <code>primer nombre</code>, <code>apellido</code>, <code>apellido paterno</code>, <code>legajo</code>, <code>n° de legajo</code>, <code>segundo_nombre</code>, <code>segundo_apellido</code> y <code>fecha_nacimiento</code>. Si el archivo trae una fila de título antes de los encabezados, el importador intenta detectarlos igual.
@@ -303,7 +336,7 @@ function StudentImportPanelContent({
               <p>• Cada fila crea o actualiza un estudiante dentro del grupo seleccionado.</p>
               <p>• Segundo nombre, segundo apellido y fecha de nacimiento son opcionales; si vienen en el Excel se guardan en la ficha del jugador.</p>
               <p>• El grupo define la institución; no se puede mover un legajo a otra institución desde esta carga.</p>
-              <p>• Si el legajo ya existe en otro grupo, la fila queda observada para evitar cruces de visibilidad.</p>
+              <p>• El legajo es único en la base: si ya existe en otro grupo, la fila queda observada para evitar cruces de visibilidad.</p>
               <p>• Los datos quedan sujetos al scope del grupo y de la institución que ya expone el backend.</p>
             </div>
           </div>
