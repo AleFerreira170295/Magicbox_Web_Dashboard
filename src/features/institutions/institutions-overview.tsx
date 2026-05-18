@@ -50,7 +50,6 @@ const institutionsOverviewMessages: Record<AppLanguage, {
     descriptionDefault: string;
     descriptionScoped: (name: string) => string;
     descriptionDirector: (name: string) => string;
-    searchPlaceholder: string;
     newInstitution: string;
     creationUnavailable: string;
     activeInstitution: (name: string) => string;
@@ -75,6 +74,7 @@ const institutionsOverviewMessages: Record<AppLanguage, {
     titleDirector: string;
     descriptionDefault: string;
     descriptionDirector: string;
+    searchPlaceholder: string;
     editSelected: string;
     clearSelection: string;
     empty: string;
@@ -139,32 +139,31 @@ const institutionsOverviewMessages: Record<AppLanguage, {
       descriptionDefault: "La vista ahora conecta instituciones reales del backend con impacto operativo en usuarios y dispositivos.",
       descriptionScoped: (name) => `Vista central sobre ${name}. Ya cruza instituciones con usuarios y dispositivos reales.`,
       descriptionDirector: (name) => `Vista institucional sobre ${name}, pensada para seguimiento general, contacto y cobertura actual.`,
-      searchPlaceholder: "Buscar institución por nombre",
       newInstitution: "Nueva institución",
       creationUnavailable: "Alta no disponible",
       activeInstitution: (name) => `Institución activa: ${name}`,
     },
     summaries: { institutions: "Instituciones", linkedUsers: "Usuarios vinculados", linkedDevices: "Dispositivos vinculados", linkedGroups: "Grupos vinculados", linkedStudents: "Estudiantes vinculados", needReview: "Necesitan revisión", withLogo: "Con logo cargado" },
     focus: { title: "Enfocar listado", hint: "Priorizá instituciones con datos pendientes o señales de seguimiento antes de editar datos base.", results: (count) => `${count} resultados`, clear: "Limpiar foco" },
-    map: { titleDefault: "Mapa institucional", titleDirector: "Instituciones para seguimiento", descriptionDefault: "Seleccioná una institución para trabajar desde el cuerpo central: ver detalle, editar y operar sin saltar a barras laterales.", descriptionDirector: "Seleccioná una institución para revisar contacto, cobertura actual y señales generales de seguimiento.", editSelected: "Editar seleccionada", clearSelection: "Deseleccionar institución", empty: "No hay instituciones para mostrar con los filtros actuales.", contact: "Contacto", users: "Usuarios", devices: "Dispositivos", state: "Estado", updated: "Actualizado", noLocation: "Sin ubicación", active: "activa", deleted: "eliminada", logo: "logo", noLogo: "sin logo", review: "revisar" },
+    map: { titleDefault: "Mapa institucional", titleDirector: "Instituciones para seguimiento", descriptionDefault: "Seleccioná una institución para trabajar desde el cuerpo central: ver detalle, editar y operar sin saltar a barras laterales.", descriptionDirector: "Seleccioná una institución para revisar contacto, cobertura actual y señales generales de seguimiento.", searchPlaceholder: "Buscar institución por nombre", editSelected: "Editar seleccionada", clearSelection: "Deseleccionar institución", empty: "No hay instituciones para mostrar con los filtros actuales.", contact: "Contacto", users: "Usuarios", devices: "Dispositivos", state: "Estado", updated: "Actualizado", noLocation: "Sin ubicación", active: "activa", deleted: "eliminada", logo: "logo", noLogo: "sin logo", review: "revisar" },
     impact: { title: "Impacto operativo", description: "Cruce rápido entre la institución seleccionada, las personas vinculadas y el parque de dispositivos asociado.", empty: "Seleccioná una institución para revisar sus vínculos operativos.", noAddress: "Sin dirección cargada", loadedLogo: "logo institucional cargado", pendingLogo: "logo pendiente", linkedUsers: "Usuarios vinculados", linkedDevices: "Dispositivos vinculados", linkedGroups: "Grupos vinculados", noLinkedUsers: "sin usuarios vinculados", noLinkedDevices: "sin dispositivos vinculados", noLinkedGroups: "sin grupos vinculados", updatedPrefix: "act.", students: "estudiantes", groups: "grupos", backendCount: "Conteo expuesto por el backend compartido.", institutionWeight: "Sirve para entender el peso real de la institución." },
     review: { title: "Instituciones que conviene revisar", description: "Señales rápidas para completar contacto, dirección o presencia web antes de seguir escalando el despliegue.", count: (count) => `${count} resultados`, showOnly: "Ver solo observaciones", empty: "No aparecen instituciones con observaciones básicas. Buen momento para avanzar a salud o syncs por cliente.", noPhone: "sin teléfono", noUrl: "sin URL", noAddress: "sin dirección", noLogo: "sin logo", users: (count) => `${count} usuarios`, devices: (count) => `${count} dispositivos` },
     groups: { title: "Grupos y perfiles de jugadores", description: "Sin cambiar la base ni los contratos actuales: esta vista toma los grupos cargados y te deja ver los estudiantes y perfiles que quedaron dentro de cada uno.", empty: "Seleccioná una institución para ver sus grupos y los perfiles/jugadores asociados.", loadedGroups: "Grupos cargados", loadedGroupsHint: "Podés seleccionar un grupo o dejar todo sin selección hasta decidir a qué detalle querés entrar.", deleteGroup: "Eliminar grupo", clearGroup: "Deseleccionar grupo" },
   },
   en: {
-    header: { eyebrow: { superadmin: "Superadmin", institutionAdmin: "Institution admin", director: "Director" }, title: "Institutions", descriptionDefault: "This view now connects real backend institutions with operational impact across users and devices.", descriptionScoped: (name) => `Central view over ${name}. It already crosses institutions with real users and devices.`, descriptionDirector: (name) => `Institution view for ${name}, designed for general follow-up, contact, and current coverage.`, searchPlaceholder: "Search institution by name", newInstitution: "New institution", creationUnavailable: "Creation unavailable", activeInstitution: (name) => `Active institution: ${name}` },
+    header: { eyebrow: { superadmin: "Superadmin", institutionAdmin: "Institution admin", director: "Director" }, title: "Institutions", descriptionDefault: "This view now connects real backend institutions with operational impact across users and devices.", descriptionScoped: (name) => `Central view over ${name}. It already crosses institutions with real users and devices.`, descriptionDirector: (name) => `Institution view for ${name}, designed for general follow-up, contact, and current coverage.`, newInstitution: "New institution", creationUnavailable: "Creation unavailable", activeInstitution: (name) => `Active institution: ${name}` },
     summaries: { institutions: "Institutions", linkedUsers: "Linked users", linkedDevices: "Linked devices", linkedGroups: "Linked groups", linkedStudents: "Linked students", needReview: "Need review", withLogo: "With logo" },
     focus: { title: "Focus list", hint: "Prioritize institutions with pending data or follow-up signals before editing base data.", results: (count) => `${count} results`, clear: "Clear focus" },
-    map: { titleDefault: "Institution map", titleDirector: "Institutions to follow up", descriptionDefault: "Select an institution to work from the central body: review details, edit, and operate without sidebars.", descriptionDirector: "Select an institution to review contact, current coverage, and general follow-up signals.", editSelected: "Edit selected", clearSelection: "Clear institution", empty: "No institutions to show with the current filters.", contact: "Contact", users: "Users", devices: "Devices", state: "State", updated: "Updated", noLocation: "No location", active: "active", deleted: "deleted", logo: "logo", noLogo: "no logo", review: "review" },
+    map: { titleDefault: "Institution map", titleDirector: "Institutions to follow up", descriptionDefault: "Select an institution to work from the central body: review details, edit, and operate without sidebars.", descriptionDirector: "Select an institution to review contact, current coverage, and general follow-up signals.", searchPlaceholder: "Search institution by name", editSelected: "Edit selected", clearSelection: "Clear institution", empty: "No institutions to show with the current filters.", contact: "Contact", users: "Users", devices: "Devices", state: "State", updated: "Updated", noLocation: "No location", active: "active", deleted: "deleted", logo: "logo", noLogo: "no logo", review: "review" },
     impact: { title: "Operational impact", description: "Quick cross-check between the selected institution, linked people, and its associated device fleet.", empty: "Select an institution to review its operational links.", noAddress: "No address loaded", loadedLogo: "institution logo loaded", pendingLogo: "logo pending", linkedUsers: "Linked users", linkedDevices: "Linked devices", linkedGroups: "Linked groups", noLinkedUsers: "no linked users", noLinkedDevices: "no linked devices", noLinkedGroups: "no linked groups", updatedPrefix: "upd.", students: "students", groups: "groups", backendCount: "Count exposed by the shared backend.", institutionWeight: "Useful to understand the institution's real weight." },
     review: { title: "Institutions worth reviewing", description: "Quick signals to complete contact, address, or web presence before scaling further.", count: (count) => `${count} results`, showOnly: "Show only observations", empty: "No institutions with basic issues appear in the current view. Good moment to move on to health or client syncs.", noPhone: "no phone", noUrl: "no URL", noAddress: "no address", noLogo: "no logo", users: (count) => `${count} users`, devices: (count) => `${count} devices` },
     groups: { title: "Groups and player profiles", description: "Without changing the current base or contracts: this view takes loaded groups and lets you inspect the students and profiles inside each one.", empty: "Select an institution to see its groups and linked player profiles.", loadedGroups: "Loaded groups", loadedGroupsHint: "You can select a group or leave everything unselected until deciding which detail to open.", deleteGroup: "Delete group", clearGroup: "Clear group" },
   },
   pt: {
-    header: { eyebrow: { superadmin: "Superadmin", institutionAdmin: "Institution admin", director: "Director" }, title: "Instituições", descriptionDefault: "A visão agora conecta instituições reais do backend com impacto operacional em usuários e dispositivos.", descriptionScoped: (name) => `Visão central sobre ${name}. Ela já cruza instituições com usuários e dispositivos reais.`, descriptionDirector: (name) => `Visão institucional sobre ${name}, pensada para acompanhamento geral, contato e cobertura atual.`, searchPlaceholder: "Buscar instituição por nome", newInstitution: "Nova instituição", creationUnavailable: "Cadastro indisponível", activeInstitution: (name) => `Instituição ativa: ${name}` },
+    header: { eyebrow: { superadmin: "Superadmin", institutionAdmin: "Institution admin", director: "Director" }, title: "Instituições", descriptionDefault: "A visão agora conecta instituições reais do backend com impacto operacional em usuários e dispositivos.", descriptionScoped: (name) => `Visão central sobre ${name}. Ela já cruza instituições com usuários e dispositivos reais.`, descriptionDirector: (name) => `Visão institucional sobre ${name}, pensada para acompanhamento geral, contato e cobertura atual.`, newInstitution: "Nova instituição", creationUnavailable: "Cadastro indisponível", activeInstitution: (name) => `Instituição ativa: ${name}` },
     summaries: { institutions: "Instituições", linkedUsers: "Usuários vinculados", linkedDevices: "Dispositivos vinculados", linkedGroups: "Grupos vinculados", linkedStudents: "Estudantes vinculados", needReview: "Precisam de revisão", withLogo: "Com logo carregado" },
     focus: { title: "Focar lista", hint: "Priorize instituições com dados pendentes ou sinais de acompanhamento antes de editar os dados base.", results: (count) => `${count} resultados`, clear: "Limpar foco" },
-    map: { titleDefault: "Mapa institucional", titleDirector: "Instituições para acompanhamento", descriptionDefault: "Selecione uma instituição para trabalhar do corpo central: ver detalhe, editar e operar sem barras laterais.", descriptionDirector: "Selecione uma instituição para revisar contato, cobertura atual e sinais gerais de acompanhamento.", editSelected: "Editar selecionada", clearSelection: "Deselecionar instituição", empty: "Não há instituições para mostrar com os filtros atuais.", contact: "Contato", users: "Usuários", devices: "Dispositivos", state: "Estado", updated: "Atualizado", noLocation: "Sem localização", active: "ativa", deleted: "excluída", logo: "logo", noLogo: "sem logo", review: "revisar" },
+    map: { titleDefault: "Mapa institucional", titleDirector: "Instituições para acompanhamento", descriptionDefault: "Selecione uma instituição para trabalhar do corpo central: ver detalhe, editar e operar sem barras laterais.", descriptionDirector: "Selecione uma instituição para revisar contato, cobertura atual e sinais gerais de acompanhamento.", searchPlaceholder: "Buscar instituição por nome", editSelected: "Editar selecionada", clearSelection: "Deselecionar instituição", empty: "Não há instituições para mostrar com os filtros atuais.", contact: "Contato", users: "Usuários", devices: "Dispositivos", state: "Estado", updated: "Atualizado", noLocation: "Sem localização", active: "ativa", deleted: "excluída", logo: "logo", noLogo: "sem logo", review: "revisar" },
     impact: { title: "Impacto operacional", description: "Cruzamento rápido entre a instituição selecionada, as pessoas vinculadas e o parque de dispositivos associado.", empty: "Selecione uma instituição para revisar seus vínculos operacionais.", noAddress: "Sem endereço carregado", loadedLogo: "logo institucional carregado", pendingLogo: "logo pendente", linkedUsers: "Usuários vinculados", linkedDevices: "Dispositivos vinculados", linkedGroups: "Grupos vinculados", noLinkedUsers: "sem usuários vinculados", noLinkedDevices: "sem dispositivos vinculados", noLinkedGroups: "sem grupos vinculados", updatedPrefix: "att.", students: "estudantes", groups: "grupos", backendCount: "Contagem exposta pelo backend compartilhado.", institutionWeight: "Serve para entender o peso real da instituição." },
     review: { title: "Instituições que convém revisar", description: "Sinais rápidos para completar contato, endereço ou presença web antes de seguir escalando a operação.", count: (count) => `${count} resultados`, showOnly: "Ver só observações", empty: "Não aparecem instituições com observações básicas. Bom momento para avançar para saúde ou syncs por cliente.", noPhone: "sem telefone", noUrl: "sem URL", noAddress: "sem endereço", noLogo: "sem logo", users: (count) => `${count} usuários`, devices: (count) => `${count} dispositivos` },
     groups: { title: "Grupos e perfis de jogadores", description: "Sem mudar a base nem os contratos atuais: esta visão usa os grupos carregados e permite ver os estudantes e perfis que ficaram dentro de cada um.", empty: "Selecione uma instituição para ver seus grupos e perfis/jogadores associados.", loadedGroups: "Grupos carregados", loadedGroupsHint: "Você pode selecionar um grupo ou deixar tudo sem seleção até decidir em qual detalhe quer entrar.", deleteGroup: "Excluir grupo", clearGroup: "Deselecionar grupo" },
@@ -993,27 +992,6 @@ export function InstitutionsOverview() {
               : t.header.descriptionScoped(scopedInstitutionName || (language === "en" ? "the institution" : language === "pt" ? "a instituição" : "la institución"))
             : t.header.descriptionDefault
         }
-        actions={
-          <div className="flex flex-col items-stretch gap-3 md:flex-row md:items-center">
-            <div className="relative min-w-64">
-              <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                placeholder={t.header.searchPlaceholder}
-                className="pl-9"
-              />
-            </div>
-            <Button
-              type="button"
-              disabled={!canCreateInstitutions}
-              onClick={openCreateInstitutionForm}
-            >
-              <UserPlus className="size-4" />
-              {canCreateInstitutions ? t.header.newInstitution : t.header.creationUnavailable}
-            </Button>
-          </div>
-        }
       />
 
       {scopedInstitutionName ? (
@@ -1118,6 +1096,15 @@ export function InstitutionsOverview() {
                 </CardDescription>
               </div>
               <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
+                <div className="relative min-w-64 sm:flex-1 lg:min-w-72 lg:flex-none">
+                  <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    value={query}
+                    onChange={(event) => setQuery(event.target.value)}
+                    placeholder={t.map.searchPlaceholder}
+                    className="pl-9"
+                  />
+                </div>
                 <div className="flex flex-wrap gap-3">
                   <Button type="button" onClick={openCreateInstitutionForm} disabled={!canCreateInstitutions}>
                     <UserPlus className="size-4" />
