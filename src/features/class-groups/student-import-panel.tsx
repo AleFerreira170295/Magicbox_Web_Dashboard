@@ -93,7 +93,10 @@ function StudentImportPanelContent({
   const [fileInputKey, setFileInputKey] = useState(0);
 
   const classGroupsQuery = useClassGroups(token, institutionId);
-  const classGroups = useMemo(() => classGroupsQuery.data?.data ?? [], [classGroupsQuery.data?.data]);
+  const classGroups = useMemo(
+    () => (classGroupsQuery.data?.data ?? []).filter((group) => group.educationalCenterId === institutionId),
+    [classGroupsQuery.data?.data, institutionId],
+  );
   const importEnabled = canImportStudents(user);
   const createEnabled = canCreateGroups(user);
   const effectiveSelectedGroupId = selectedGroupId || classGroups[0]?.id || "";

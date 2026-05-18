@@ -136,6 +136,35 @@ describe("StudentImportPanel", () => {
     });
   });
 
+  it("does not offer groups from another institution as import targets", async () => {
+    useClassGroupsMock.mockReturnValue({
+      data: {
+        data: [
+          {
+            id: "cg-other",
+            educationalCenterId: "ec-other",
+            userId: null,
+            name: "Otro colegio",
+            code: "otro_colegio",
+          },
+          {
+            id: "cg-1",
+            educationalCenterId: "ec-1",
+            userId: null,
+            name: "Quinto A",
+            code: "quinto_a",
+          },
+        ],
+      },
+      isLoading: false,
+    });
+
+    renderPanel();
+
+    expect(screen.queryByRole("option", { name: /Otro colegio/i })).not.toBeInTheDocument();
+    expect(screen.getAllByRole("option", { name: /Quinto A/i }).length).toBeGreaterThan(0);
+  });
+
   it("rejects unsupported file types before calling the import endpoint", async () => {
     renderPanel();
 
