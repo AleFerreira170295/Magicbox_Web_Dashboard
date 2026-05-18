@@ -335,8 +335,8 @@ function StudentImportPanelContent({
             <div className="mt-3 grid gap-2 text-sm text-muted-foreground">
               <p>• Cada fila crea o actualiza un estudiante dentro del grupo seleccionado.</p>
               <p>• Segundo nombre, segundo apellido y fecha de nacimiento son opcionales; si vienen en el Excel se guardan en la ficha del jugador.</p>
-              <p>• El grupo define la institución; no se puede mover un legajo a otra institución desde esta carga.</p>
-              <p>• El legajo es único en la base: si ya existe en otro grupo, la fila queda observada para evitar cruces de visibilidad.</p>
+              <p>• Si el legajo ya existe en otro grupo de la misma institución, se reasigna al grupo elegido y se actualiza la ficha.</p>
+              <p>• Si el legajo pertenece a otra institución, la fila queda observada para evitar cruces de visibilidad.</p>
               <p>• Los datos quedan sujetos al scope del grupo y de la institución que ya expone el backend.</p>
             </div>
           </div>
