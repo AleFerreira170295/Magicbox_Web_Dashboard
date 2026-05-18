@@ -422,6 +422,90 @@ describe("InstitutionsOverview", () => {
     expect(screen.queryAllByText("Colegio Norte")).toHaveLength(0);
   });
 
+  it("permite buscar instituciones por nombre", () => {
+    useInstitutionsMock.mockReturnValue(
+      okQuery({
+        data: [
+          {
+            id: "ec-1",
+            name: "Colegio Norte",
+            email: "colegio@example.com",
+            phoneNumber: "+598111111",
+            url: "https://colegio.example.com",
+            address: {
+              addressFirstLine: "Calle 123",
+              addressSecondLine: null,
+              countryCode: "UY",
+              city: "Montevideo",
+              state: "Montevideo",
+              postalCode: "11000",
+            },
+            city: "Montevideo",
+            country: "UY",
+            contactName: null,
+            contactEmail: null,
+            code: null,
+            status: null,
+            createdAt: null,
+            updatedAt: null,
+            raw: {},
+            operationalSummary: {
+              userCount: 3,
+              deviceCount: 2,
+              classGroupCount: 1,
+              studentCount: 20,
+              needsReview: false,
+            },
+          },
+          {
+            id: "ec-2",
+            name: "Escuela Sur",
+            email: "sur@example.com",
+            phoneNumber: "+598222222",
+            url: "https://sur.example.com",
+            address: {
+              addressFirstLine: "Calle 999",
+              addressSecondLine: null,
+              countryCode: "UY",
+              city: "Canelones",
+              state: "Canelones",
+              postalCode: "90000",
+            },
+            city: "Canelones",
+            country: "UY",
+            contactName: null,
+            contactEmail: null,
+            code: null,
+            status: null,
+            createdAt: null,
+            updatedAt: null,
+            raw: {},
+            operationalSummary: {
+              userCount: 0,
+              deviceCount: 0,
+              classGroupCount: 0,
+              studentCount: 0,
+              needsReview: false,
+            },
+          },
+        ],
+        page: 1,
+        limit: 2,
+        total: 2,
+        total_pages: 1,
+      }),
+    );
+
+    renderInstitutionsOverview();
+
+    fireEvent.change(screen.getByPlaceholderText("Buscar institución por nombre"), {
+      target: { value: "sur" },
+    });
+
+    expect(screen.queryAllByText("Escuela Sur").length).toBeGreaterThan(0);
+    expect(screen.queryAllByText("Colegio Norte")).toHaveLength(0);
+  });
+
   it("permite buscar y filtrar estudiantes dentro del grupo seleccionado", () => {
     renderInstitutionsOverview();
 

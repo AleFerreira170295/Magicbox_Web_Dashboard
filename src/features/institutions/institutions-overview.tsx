@@ -4,7 +4,7 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Building2, Globe, GraduationCap, Mail, MapPin, Phone, Search, ShieldCheck, Smartphone, Trash2, UserPlus, Users } from "lucide-react";
 import { SectionHeader } from "@/components/section-header";
@@ -139,7 +139,7 @@ const institutionsOverviewMessages: Record<AppLanguage, {
       descriptionDefault: "La vista ahora conecta instituciones reales del backend con impacto operativo en usuarios y dispositivos.",
       descriptionScoped: (name) => `Vista central sobre ${name}. Ya cruza instituciones con usuarios y dispositivos reales.`,
       descriptionDirector: (name) => `Vista institucional sobre ${name}, pensada para seguimiento general, contacto y cobertura actual.`,
-      searchPlaceholder: "Buscar por institución, email, usuario o dispositivo",
+      searchPlaceholder: "Buscar institución por nombre",
       newInstitution: "Nueva institución",
       creationUnavailable: "Alta no disponible",
       activeInstitution: (name) => `Institución activa: ${name}`,
@@ -152,7 +152,7 @@ const institutionsOverviewMessages: Record<AppLanguage, {
     groups: { title: "Grupos y perfiles de jugadores", description: "Sin cambiar la base ni los contratos actuales: esta vista toma los grupos cargados y te deja ver los estudiantes y perfiles que quedaron dentro de cada uno.", empty: "Seleccioná una institución para ver sus grupos y los perfiles/jugadores asociados.", loadedGroups: "Grupos cargados", loadedGroupsHint: "Podés seleccionar un grupo o dejar todo sin selección hasta decidir a qué detalle querés entrar.", deleteGroup: "Eliminar grupo", clearGroup: "Deseleccionar grupo" },
   },
   en: {
-    header: { eyebrow: { superadmin: "Superadmin", institutionAdmin: "Institution admin", director: "Director" }, title: "Institutions", descriptionDefault: "This view now connects real backend institutions with operational impact across users and devices.", descriptionScoped: (name) => `Central view over ${name}. It already crosses institutions with real users and devices.`, descriptionDirector: (name) => `Institution view for ${name}, designed for general follow-up, contact, and current coverage.`, searchPlaceholder: "Search by institution, email, user, or device", newInstitution: "New institution", creationUnavailable: "Creation unavailable", activeInstitution: (name) => `Active institution: ${name}` },
+    header: { eyebrow: { superadmin: "Superadmin", institutionAdmin: "Institution admin", director: "Director" }, title: "Institutions", descriptionDefault: "This view now connects real backend institutions with operational impact across users and devices.", descriptionScoped: (name) => `Central view over ${name}. It already crosses institutions with real users and devices.`, descriptionDirector: (name) => `Institution view for ${name}, designed for general follow-up, contact, and current coverage.`, searchPlaceholder: "Search institution by name", newInstitution: "New institution", creationUnavailable: "Creation unavailable", activeInstitution: (name) => `Active institution: ${name}` },
     summaries: { institutions: "Institutions", linkedUsers: "Linked users", linkedDevices: "Linked devices", linkedGroups: "Linked groups", linkedStudents: "Linked students", needReview: "Need review", withLogo: "With logo" },
     focus: { title: "Focus list", hint: "Prioritize institutions with pending data or follow-up signals before editing base data.", results: (count) => `${count} results`, clear: "Clear focus" },
     map: { titleDefault: "Institution map", titleDirector: "Institutions to follow up", descriptionDefault: "Select an institution to work from the central body: review details, edit, and operate without sidebars.", descriptionDirector: "Select an institution to review contact, current coverage, and general follow-up signals.", editSelected: "Edit selected", clearSelection: "Clear institution", empty: "No institutions to show with the current filters.", contact: "Contact", users: "Users", devices: "Devices", state: "State", updated: "Updated", noLocation: "No location", active: "active", deleted: "deleted", logo: "logo", noLogo: "no logo", review: "review" },
@@ -161,7 +161,7 @@ const institutionsOverviewMessages: Record<AppLanguage, {
     groups: { title: "Groups and player profiles", description: "Without changing the current base or contracts: this view takes loaded groups and lets you inspect the students and profiles inside each one.", empty: "Select an institution to see its groups and linked player profiles.", loadedGroups: "Loaded groups", loadedGroupsHint: "You can select a group or leave everything unselected until deciding which detail to open.", deleteGroup: "Delete group", clearGroup: "Clear group" },
   },
   pt: {
-    header: { eyebrow: { superadmin: "Superadmin", institutionAdmin: "Institution admin", director: "Director" }, title: "Instituições", descriptionDefault: "A visão agora conecta instituições reais do backend com impacto operacional em usuários e dispositivos.", descriptionScoped: (name) => `Visão central sobre ${name}. Ela já cruza instituições com usuários e dispositivos reais.`, descriptionDirector: (name) => `Visão institucional sobre ${name}, pensada para acompanhamento geral, contato e cobertura atual.`, searchPlaceholder: "Buscar por instituição, email, usuário ou dispositivo", newInstitution: "Nova instituição", creationUnavailable: "Cadastro indisponível", activeInstitution: (name) => `Instituição ativa: ${name}` },
+    header: { eyebrow: { superadmin: "Superadmin", institutionAdmin: "Institution admin", director: "Director" }, title: "Instituições", descriptionDefault: "A visão agora conecta instituições reais do backend com impacto operacional em usuários e dispositivos.", descriptionScoped: (name) => `Visão central sobre ${name}. Ela já cruza instituições com usuários e dispositivos reais.`, descriptionDirector: (name) => `Visão institucional sobre ${name}, pensada para acompanhamento geral, contato e cobertura atual.`, searchPlaceholder: "Buscar instituição por nome", newInstitution: "Nova instituição", creationUnavailable: "Cadastro indisponível", activeInstitution: (name) => `Instituição ativa: ${name}` },
     summaries: { institutions: "Instituições", linkedUsers: "Usuários vinculados", linkedDevices: "Dispositivos vinculados", linkedGroups: "Grupos vinculados", linkedStudents: "Estudantes vinculados", needReview: "Precisam de revisão", withLogo: "Com logo carregado" },
     focus: { title: "Focar lista", hint: "Priorize instituições com dados pendentes ou sinais de acompanhamento antes de editar os dados base.", results: (count) => `${count} resultados`, clear: "Limpar foco" },
     map: { titleDefault: "Mapa institucional", titleDirector: "Instituições para acompanhamento", descriptionDefault: "Selecione uma instituição para trabalhar do corpo central: ver detalhe, editar e operar sem barras laterais.", descriptionDirector: "Selecione uma instituição para revisar contato, cobertura atual e sinais gerais de acompanhamento.", editSelected: "Editar selecionada", clearSelection: "Deselecionar instituição", empty: "Não há instituições para mostrar com os filtros atuais.", contact: "Contato", users: "Usuários", devices: "Dispositivos", state: "Estado", updated: "Atualizado", noLocation: "Sem localização", active: "ativa", deleted: "excluída", logo: "logo", noLogo: "sem logo", review: "revisar" },
@@ -345,6 +345,7 @@ export function InstitutionsOverview() {
   const searchParams = useSearchParams();
 
   const [query, setQuery] = useState("");
+  const deferredInstitutionNameQuery = useDeferredValue(query.trim());
   const [focusFilter, setFocusFilter] = useState<InstitutionFocusFilter>("all");
   const [mode, setMode] = useState<FormMode>("edit");
   const [selectedInstitutionId, setSelectedInstitutionId] = useState<string | null>(null);
@@ -358,7 +359,7 @@ export function InstitutionsOverview() {
   const [isDeleteInstitutionDialogOpen, setIsDeleteInstitutionDialogOpen] = useState(false);
   const [isDeleteGroupDialogOpen, setIsDeleteGroupDialogOpen] = useState(false);
 
-  const institutionsQuery = useInstitutions(tokens?.accessToken);
+  const institutionsQuery = useInstitutions(tokens?.accessToken, { name: deferredInstitutionNameQuery });
   const usersQuery = useUsers(tokens?.accessToken);
   const devicesQuery = useDevices(tokens?.accessToken);
 
@@ -674,18 +675,7 @@ export function InstitutionsOverview() {
       if (!matchesFocus) return false;
       if (!normalized) return true;
 
-      return [
-        item.name,
-        item.email,
-        item.phoneNumber,
-        item.city,
-        item.country,
-        item.url,
-        ...item.linkedUserNames,
-        ...item.linkedDeviceNames,
-      ]
-        .filter(Boolean)
-        .some((value) => String(value).toLowerCase().includes(normalized));
+      return item.name.toLowerCase().includes(normalized);
     });
   }, [focusFilter, institutionRows, query]);
 

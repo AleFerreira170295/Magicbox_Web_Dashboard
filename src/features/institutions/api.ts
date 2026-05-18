@@ -190,10 +190,21 @@ function normalizeResponse(response: unknown): PaginatedResponse<InstitutionReco
   };
 }
 
-export async function listInstitutions(token: string) {
+export type ListInstitutionsParams = {
+  name?: string | null;
+};
+
+export async function listInstitutions(token: string, params: ListInstitutionsParams = {}) {
+  const name = params.name?.trim();
   const response = await apiRequest<unknown>(apiEndpoints.institutions.list, {
     token,
-    searchParams: { page: 1, limit: 100, sort_by: "created_at", order: "desc" },
+    searchParams: {
+      page: 1,
+      limit: 100,
+      sort_by: "created_at",
+      order: "desc",
+      name__contains: name || undefined,
+    },
   });
 
   return normalizeResponse(response);
@@ -286,10 +297,12 @@ export function useInstitutionById(token?: string, institutionId?: string | null
   });
 }
 
-export function useInstitutions(token?: string) {
+export function useInstitutions(token?: string, params: ListInstitutionsParams = {}) {
+  const name = params.name?.trim() || "";
+
   return useQuery({
-    queryKey: ["institutions", token],
-    queryFn: () => listInstitutions(token as string),
+    queryKey: ["institutions", token, { name }],
+    queryFn: () => listInstitutions(token as string, { name }),
     enabled: Boolean(token),
   });
 }
