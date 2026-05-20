@@ -467,6 +467,8 @@ describe("SuperadminDashboard", () => {
   });
 
   it("opens executive detail filters from cards and charts", () => {
+    const trendDate = new Date().toISOString().slice(0, 10);
+
     useAuthMock.mockReturnValue({
       tokens: { accessToken: "token", refreshToken: "refresh" },
       user: {
@@ -511,9 +513,7 @@ describe("SuperadminDashboard", () => {
           profiles_with_bindings: 3,
           profiles_with_sessions: 2,
         },
-        trends: [
-          { date: "2026-04-20", syncs: 1, games: 2, turns: 3, successful_turns: 2, success_rate: 66.7 },
-        ],
+        trends: [{ date: trendDate, syncs: 1, games: 2, turns: 3, successful_turns: 2, success_rate: 66.7 }],
         comparisons: { window_label: "30d", current_start: "2026-03-20T00:00:00Z", current_end: "2026-04-20T00:00:00Z", previous_start: "2026-02-18T00:00:00Z", previous_end: "2026-03-20T00:00:00Z", metrics: [] },
         alerts: [],
         segments: {
@@ -533,8 +533,8 @@ describe("SuperadminDashboard", () => {
     fireEvent.click(screen.getByRole("button", { name: /Ver detalle Usuarios/i }));
     expect(screen.getByText(/Detalle de usuarios/i)).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: /Filtrar Mini tendencias por 2026-04-20/i }));
-    expect(screen.getByText(/Mini tendencias · 2026-04-20/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: new RegExp(`Filtrar Mini tendencias por ${trendDate}`, "i") }));
+    expect(screen.getByText(new RegExp(`Mini tendencias · ${trendDate}`, "i"))).toBeInTheDocument();
 
     expect(screen.queryByText(/Balance operativo del alcance/i)).not.toBeInTheDocument();
   });

@@ -52,6 +52,11 @@ export const apiEndpoints = {
     list: "/game-data/",
     byId: (id: string) => `/game-data/${id}`,
   },
+  evaluations: {
+    list: "/evaluation/",
+    byId: (id: string) => `/evaluation/${id}`,
+    results: (id: string) => `/evaluation/${id}/results`,
+  },
   profiles: {
     overview: "/home/profiles/overview",
     byId: (id: string) => `/home/profiles/${id}`,

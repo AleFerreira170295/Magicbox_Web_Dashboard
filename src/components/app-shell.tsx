@@ -10,6 +10,7 @@ import {
   Building2,
   Cable,
   ChevronRight,
+  ClipboardCheck,
   Database,
   KeyRound,
   LogOut,
@@ -103,6 +104,14 @@ function buildNavigation(t: ReturnType<typeof useLanguage>["t"]): NavigationItem
     section: "operation",
     icon: Database,
     roles: ["teacher", "director", "researcher", "family", "admin", "institution-admin"] satisfies NavigationRole[],
+  },
+  {
+    href: "/evaluations",
+    label: t.appShell.navigation.evaluations.label,
+    summary: t.appShell.navigation.evaluations.summary,
+    section: "operation",
+    icon: ClipboardCheck,
+    roles: ["teacher", "director", "researcher", "admin", "institution-admin"] satisfies NavigationRole[],
   },
   {
     href: "/syncs",
