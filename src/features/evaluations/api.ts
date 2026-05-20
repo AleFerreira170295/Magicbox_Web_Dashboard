@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiEndpoints } from "@/lib/api/endpoints";
 import { apiRequest } from "@/lib/api/fetcher";
 import type { JsonObject, PaginatedResponse } from "@/lib/api/types";
@@ -131,28 +131,45 @@ export async function listClassGroups(token: string, educationalCenterId?: strin
   const response = await apiRequest<unknown>(apiEndpoints.classGroups.list, {
     token,
     searchParams: {
-      page: 1,
-      limit: 200,
+      all: true,
+      institution_id: educationalCenterId || undefined,
       sort_by: "name",
       order: "asc",
-      educational_center_id: educationalCenterId || undefined,
     },
   });
   return normalizePage(response, normalizeClassGroup);
 }
 
 export async function listStudents(token: string, classGroupId?: string | null) {
-  const response = await apiRequest<unknown>(apiEndpoints.students.list, {
+  const firstPage = await apiRequest<unknown>(apiEndpoints.students.list, {
     token,
     searchParams: {
       page: 1,
-      limit: 300,
+      limit: 100,
       sort_by: "last_name",
       order: "asc",
       class_group_id: classGroupId || undefined,
     },
   });
-  return normalizePage(response, normalizeStudent);
+  const normalized = normalizePage(firstPage, normalizeStudent);
+  if ((normalized.total_pages || 1) <= 1) return normalized;
+
+  const remainingPages = await Promise.all(
+    Array.from({ length: Math.max(0, (normalized.total_pages || 1) - 1) }, (_, index) =>
+      apiRequest<unknown>(apiEndpoints.students.list, {
+        token,
+        searchParams: {
+          page: index + 2,
+          limit: 100,
+          sort_by: "last_name",
+          order: "asc",
+          class_group_id: classGroupId || undefined,
+        },
+      }),
+    ),
+  );
+  const data = [normalized, ...remainingPages.map((page) => normalizePage(page, normalizeStudent))].flatMap((page) => page.data);
+  return { ...normalized, data, page: 1, limit: 100, total: normalized.total || data.length };
 }
 
 export async function listEvaluations(token: string, params: { educationalCenterId?: string | null; classGroupId?: string | null } = {}) {
@@ -214,6 +231,16 @@ export function useEvaluation(token?: string, id?: string | null) {
   });
 }
 
+export function useEvaluationDetails(token?: string, ids: string[] = []) {
+  return useQueries({
+    queries: ids.map((id) => ({
+      queryKey: ["evaluation", token, id],
+      queryFn: () => getEvaluation(token as string, id),
+      enabled: Boolean(token && id),
+    })),
+  });
+}
+
 export function useCreateEvaluation(token?: string) {
   const queryClient = useQueryClient();
   return useMutation({
@@ -223,4 +250,3 @@ export function useCreateEvaluation(token?: string) {
     },
   });
 }
-
