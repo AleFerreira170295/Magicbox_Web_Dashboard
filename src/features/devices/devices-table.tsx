@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { ListPaginationControls, useListPagination } from "@/components/ui/list-pagination-controls";
+import { useNotifications } from "@/components/ui/notifications";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useAuth } from "@/features/auth/auth-context";
@@ -386,9 +387,18 @@ export function DeviceEditorPanel({
 }) {
   const { language } = useLanguage();
   const t = devicesMessages[language];
+  const { notify } = useNotifications();
   const queryClient = useQueryClient();
   const [formState, setFormState] = useState<DeviceFormState>(() => buildFormState(selectedDevice, scopedInstitutionId));
   const [feedback, setFeedback] = useState<{ tone: "error" | "success"; text: string } | null>(null);
+
+  function showFeedback(nextFeedback: { tone: "error" | "success"; text: string }) {
+    setFeedback(nextFeedback);
+    notify({
+      tone: nextFeedback.tone,
+      message: nextFeedback.text,
+    });
+  }
 
   const assignmentLockedToInstitution = Boolean(scopedInstitutionId);
   const deviceContextBadges = [
@@ -410,7 +420,7 @@ export function DeviceEditorPanel({
       return updateDevice(token, selectedDevice.id, payload);
     },
     onSuccess: async (updatedDevice) => {
-      setFeedback({ tone: "success", text: t.editor.updated });
+      showFeedback({ tone: "success", text: t.editor.updated });
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["devices"] }),
         queryClient.invalidateQueries({ queryKey: ["institutions"] }),
@@ -418,7 +428,7 @@ export function DeviceEditorPanel({
       onUpdated(updatedDevice.id);
     },
     onError: (error) => {
-      setFeedback({ tone: "error", text: getErrorMessage(error) });
+      showFeedback({ tone: "error", text: getErrorMessage(error) });
     },
   });
 
@@ -428,22 +438,22 @@ export function DeviceEditorPanel({
 
   const handleSubmit = async () => {
     if (!selectedDevice) {
-      setFeedback({ tone: "error", text: t.editor.noSelectedDeviceError });
+      showFeedback({ tone: "error", text: t.editor.noSelectedDeviceError });
       return;
     }
 
     if (!canUpdateDevices) {
-      setFeedback({ tone: "error", text: t.editor.noPermission });
+      showFeedback({ tone: "error", text: t.editor.noPermission });
       return;
     }
 
     if (!formState.name.trim()) {
-      setFeedback({ tone: "error", text: t.editor.nameRequired });
+      showFeedback({ tone: "error", text: t.editor.nameRequired });
       return;
     }
 
     if (formState.assignmentScope === "institution" && !formState.educationalCenterId) {
-      setFeedback({ tone: "error", text: t.editor.institutionRequired });
+      showFeedback({ tone: "error", text: t.editor.institutionRequired });
       return;
     }
 
@@ -878,68 +888,6 @@ export function DevicesTable() {
             ? t.description.institutionAdmin(scopedInstitutionName || (language === "en" ? "the institution" : language === "pt" ? "a instituição" : "la institución"))
             : t.description.default
         }
-        actions={
-          <div className="flex flex-col items-stretch gap-3 md:flex-row md:items-center md:flex-wrap">
-            <div className="relative min-w-64">
-              <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                placeholder={t.filters.searchPlaceholder}
-                className="pl-9"
-              />
-            </div>
-            <select
-              value={scopeFilter}
-              onChange={(event) => setScopeFilter(event.target.value as "all" | "home" | "institution")}
-              className="h-10 min-w-44 rounded-md border border-input bg-background px-3 text-sm"
-            >
-              <option value="all">{t.filters.scopeAll}</option>
-              <option value="home">{t.filters.scopeHome}</option>
-              <option value="institution">{t.filters.scopeInstitution}</option>
-            </select>
-            <select
-              value={institutionFilter}
-              onChange={(event) => setInstitutionFilter(event.target.value)}
-              className="h-10 min-w-56 rounded-md border border-input bg-background px-3 text-sm"
-              disabled={institutionFilterDisabled}
-            >
-              <option value="all">{t.filters.allInstitutions}</option>
-              {institutions.map((institution) => (
-                <option key={institution.id} value={institution.id}>
-                  {institution.name}
-                </option>
-              ))}
-            </select>
-            <select
-              value={accessFilter}
-              onChange={(event) => setAccessFilter(event.target.value as "all" | "owned" | "institution" | "shared" | "unresolved")}
-              className="h-10 min-w-56 rounded-md border border-input bg-background px-3 text-sm"
-            >
-              <option value="all">{t.filters.accessAll}</option>
-              <option value="owned">{t.filters.accessOwned}</option>
-              <option value="institution">{t.filters.accessInstitution}</option>
-              <option value="shared">{t.filters.accessShared}</option>
-              <option value="unresolved">{t.filters.accessUnresolved}</option>
-            </select>
-            <button
-              type="button"
-              onClick={resetFilters}
-              className="inline-flex h-10 items-center justify-center rounded-md border border-input bg-background px-4 text-sm font-medium text-foreground transition hover:bg-accent"
-            >
-              {t.filters.clearFilters}
-            </button>
-            {linkedOwnerUserId ? (
-              <button
-                type="button"
-                onClick={() => router.push(pathname)}
-                className="inline-flex h-10 items-center justify-center rounded-md border border-primary/20 bg-primary/5 px-4 text-sm font-medium text-primary transition hover:bg-primary/10"
-              >
-                {t.filters.clearUserFilter}
-              </button>
-            ) : null}
-          </div>
-        }
       />
 
       {(scopedInstitutionName || linkedOwnerUserId) ? (
@@ -948,38 +896,6 @@ export function DevicesTable() {
           {linkedOwnerUserId ? <Badge variant="outline">{t.chips.filteredUser(linkedOwnerUserName || linkedOwnerUserId)}</Badge> : null}
         </div>
       ) : null}
-
-      <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
-        <CardContent className="p-5">
-          <div className="mb-3 flex items-center justify-between gap-3">
-            <div>
-              <p className="text-sm font-semibold text-foreground">{t.accessPanel.title}</p>
-              <p className="text-sm text-muted-foreground">{t.accessPanel.hint}</p>
-            </div>
-            <Badge variant="outline">{t.accessPanel.results(filtered.length)}</Badge>
-          </div>
-          <div className="flex flex-wrap gap-2">
-          {accessSegments.map((segment) => (
-            <button
-              key={segment.key}
-              type="button"
-              onClick={() => setAccessFilter(segment.key)}
-              className={cn(
-                "inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-medium transition",
-                accessFilter === segment.key
-                  ? "border-primary bg-primary text-primary-foreground"
-                  : "border-border bg-background text-foreground hover:bg-accent",
-              )}
-            >
-              <span>{segment.label}</span>
-              <Badge variant={accessFilter === segment.key ? "secondary" : "outline"} className={accessFilter === segment.key ? "bg-white/90 text-foreground" : ""}>
-                {segment.count}
-              </Badge>
-            </button>
-          ))}
-          </div>
-        </CardContent>
-      </Card>
 
       <div className="grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(220px,1fr))]">
         {devicesQuery.isLoading ? (
@@ -1028,42 +944,8 @@ export function DevicesTable() {
         </CardContent>
       </Card>
 
-      <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
-        <CardContent className="p-5">
-          <div className="mb-3 flex items-center justify-between gap-3">
-            <div>
-              <p className="text-sm font-semibold text-foreground">{t.focus.title}</p>
-              <p className="text-sm text-muted-foreground">{t.focus.hint}</p>
-            </div>
-            <Button type="button" size="sm" variant="ghost" onClick={() => setFocusFilter("all")}>
-              {t.focus.clear}
-            </Button>
-          </div>
-          <div className="flex flex-wrap gap-2">
-          {focusSegments.map((segment) => (
-            <button
-              key={segment.key}
-              type="button"
-              onClick={() => setFocusFilter(segment.key)}
-              className={cn(
-                "inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-medium transition",
-                focusFilter === segment.key
-                  ? "border-primary bg-primary text-primary-foreground"
-                  : "border-border bg-background text-foreground hover:bg-accent",
-              )}
-            >
-              <span>{segment.label}</span>
-              <Badge variant={focusFilter === segment.key ? "secondary" : "outline"} className={focusFilter === segment.key ? "bg-white/90 text-foreground" : ""}>
-                {segment.count}
-              </Badge>
-            </button>
-          ))}
-          </div>
-        </CardContent>
-      </Card>
-
       <div className="grid gap-6 2xl:grid-cols-[minmax(0,1.35fr)_420px]">
-        <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
+        <Card className="self-start border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
           <CardHeader>
             <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
               <div>
@@ -1089,7 +971,7 @@ export function DevicesTable() {
               />
             </div>
           </CardHeader>
-          <CardContent className="max-h-[720px] overflow-auto p-0">
+          <CardContent className="overflow-x-auto p-0">
             {devicesQuery.isLoading ? (
               <div className="p-6">
                 <Skeleton className="h-72 w-full rounded-none" />
@@ -1161,40 +1043,130 @@ export function DevicesTable() {
 
         <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)] 2xl:sticky 2xl:top-6 2xl:self-start">
           <CardHeader>
-            <CardTitle>{language === "en" ? "Dedicated device detail" : language === "pt" ? "Detalhe dedicado do dispositivo" : "Detalle dedicado del dispositivo"}</CardTitle>
-            <CardDescription>
-              {language === "en"
-                ? "Selecting a row now opens a full page, so editing, context, and related navigation stay visible without scrolling inside the fleet screen."
-                : language === "pt"
-                  ? "Selecionar uma linha agora abre uma página completa, então edição, contexto e navegação relacionada ficam visíveis sem rolar dentro da tela do parque."
-                  : "Seleccionar una fila ahora abre una página completa, así la edición, el contexto y la navegación relacionada quedan visibles sin scrollear dentro de la pantalla del parque."}
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-5">
-            <div className="rounded-2xl bg-background/70 p-4 text-sm text-muted-foreground">
-              {language === "en"
-                ? "Open any device from the table to land on its dedicated page. From there you can edit operational data and jump to games, syncs, or related devices with preserved context."
-                : language === "pt"
-                  ? "Abra qualquer dispositivo da tabela para entrar em sua página dedicada. Dali você pode editar dados operacionais e saltar para games, syncs ou dispositivos relacionados preservando o contexto."
-                  : "Abrí cualquier dispositivo desde la tabla para entrar en su página dedicada. Desde ahí podés editar datos operativos y saltar a games, syncs o dispositivos relacionados preservando el contexto."}
-            </div>
-            <div className="rounded-2xl border border-border/70 bg-white/80 p-4">
-              <p className="text-sm font-medium text-foreground">{language === "en" ? "What changes now" : language === "pt" ? "O que muda agora" : "Qué cambia ahora"}</p>
-              <ul className="mt-3 space-y-2 text-sm text-muted-foreground">
-                <li>• {language === "en" ? "The fleet stays focused on search, filters, and list review." : language === "pt" ? "O parque fica focado em busca, filtros e revisão da lista." : "El parque queda enfocado en búsqueda, filtros y revisión del listado."}</li>
-                <li>• {language === "en" ? "Device editing moves to a dedicated screen with contextual navigation." : language === "pt" ? "A edição do dispositivo passa para uma tela dedicada com navegação contextual." : "La edición del dispositivo pasa a una pantalla dedicada con navegación contextual."}</li>
-                <li>• {language === "en" ? "Quick links and nearby devices remain one click away." : language === "pt" ? "Os links rápidos e dispositivos cercanos ficam a um clique." : "Los cruces rápidos y dispositivos cercanos quedan a un clic."}</li>
-              </ul>
-            </div>
-            {canUpdateDevices ? (
-              <div className="rounded-2xl border border-dashed border-primary/20 bg-primary/5 p-4 text-sm text-primary">
-                {language === "en"
-                  ? "Editing is still available, but now from the dedicated device page."
-                  : language === "pt"
-                    ? "A edição continua disponível, mas agora na página dedicada do dispositivo."
-                    : "La edición sigue disponible, pero ahora desde la página dedicada del dispositivo."}
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <CardTitle>{language === "en" ? "Filters" : language === "pt" ? "Filtros" : "Filtros"}</CardTitle>
+                <CardDescription>{language === "en" ? "Search, access, and review focus." : language === "pt" ? "Busca, acesso e foco de revisão." : "Búsqueda, acceso y foco de revisión."}</CardDescription>
               </div>
-            ) : null}
+              <Badge variant="outline">{t.accessPanel.results(filtered.length)}</Badge>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="space-y-3">
+              <div className="relative">
+                <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                  placeholder={t.filters.searchPlaceholder}
+                  className="pl-9"
+                />
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2 2xl:grid-cols-1">
+                <select
+                  value={scopeFilter}
+                  onChange={(event) => setScopeFilter(event.target.value as "all" | "home" | "institution")}
+                  className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                >
+                  <option value="all">{t.filters.scopeAll}</option>
+                  <option value="home">{t.filters.scopeHome}</option>
+                  <option value="institution">{t.filters.scopeInstitution}</option>
+                </select>
+                <select
+                  value={institutionFilter}
+                  onChange={(event) => setInstitutionFilter(event.target.value)}
+                  className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                  disabled={institutionFilterDisabled}
+                >
+                  <option value="all">{t.filters.allInstitutions}</option>
+                  {institutions.map((institution) => (
+                    <option key={institution.id} value={institution.id}>
+                      {institution.name}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  value={accessFilter}
+                  onChange={(event) => setAccessFilter(event.target.value as "all" | "owned" | "institution" | "shared" | "unresolved")}
+                  className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm sm:col-span-2 2xl:col-span-1"
+                >
+                  <option value="all">{t.filters.accessAll}</option>
+                  <option value="owned">{t.filters.accessOwned}</option>
+                  <option value="institution">{t.filters.accessInstitution}</option>
+                  <option value="shared">{t.filters.accessShared}</option>
+                  <option value="unresolved">{t.filters.accessUnresolved}</option>
+                </select>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button type="button" variant="outline" size="sm" onClick={resetFilters}>
+                  {t.filters.clearFilters}
+                </Button>
+                {linkedOwnerUserId ? (
+                  <Button type="button" variant="outline" size="sm" onClick={() => router.push(pathname)}>
+                    {t.filters.clearUserFilter}
+                  </Button>
+                ) : null}
+              </div>
+            </div>
+
+            <div className="space-y-3 border-t border-border/70 pt-5">
+              <div>
+                <p className="text-sm font-semibold text-foreground">{t.accessPanel.title}</p>
+                <p className="text-sm text-muted-foreground">{t.accessPanel.hint}</p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {accessSegments.map((segment) => (
+                  <button
+                    key={segment.key}
+                    type="button"
+                    onClick={() => setAccessFilter(segment.key)}
+                    className={cn(
+                      "inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-medium transition",
+                      accessFilter === segment.key
+                        ? "border-primary bg-primary text-primary-foreground"
+                        : "border-border bg-background text-foreground hover:bg-accent",
+                    )}
+                  >
+                    <span>{segment.label}</span>
+                    <Badge variant={accessFilter === segment.key ? "secondary" : "outline"} className={accessFilter === segment.key ? "bg-white/90 text-foreground" : ""}>
+                      {segment.count}
+                    </Badge>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-3 border-t border-border/70 pt-5">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold text-foreground">{t.focus.title}</p>
+                  <p className="text-sm text-muted-foreground">{t.focus.hint}</p>
+                </div>
+                <Button type="button" size="sm" variant="ghost" onClick={() => setFocusFilter("all")}>
+                  {t.focus.clear}
+                </Button>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {focusSegments.map((segment) => (
+                  <button
+                    key={segment.key}
+                    type="button"
+                    onClick={() => setFocusFilter(segment.key)}
+                    className={cn(
+                      "inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-medium transition",
+                      focusFilter === segment.key
+                        ? "border-primary bg-primary text-primary-foreground"
+                        : "border-border bg-background text-foreground hover:bg-accent",
+                    )}
+                  >
+                    <span>{segment.label}</span>
+                    <Badge variant={focusFilter === segment.key ? "secondary" : "outline"} className={focusFilter === segment.key ? "bg-white/90 text-foreground" : ""}>
+                      {segment.count}
+                    </Badge>
+                  </button>
+                ))}
+              </div>
+            </div>
           </CardContent>
         </Card>
       </div>

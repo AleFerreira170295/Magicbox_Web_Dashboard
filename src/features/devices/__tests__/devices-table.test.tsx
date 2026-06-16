@@ -175,7 +175,6 @@ describe("DevicesTable", () => {
     fireEvent.click(screen.getByText("MagicBox Aula 1"));
 
     expect(routerPushMock).toHaveBeenCalledWith("/devices/detail?deviceRecordId=device-1&institutionId=ec-1");
-    expect(screen.getByText(/Detalle dedicado del dispositivo/i)).toBeInTheDocument();
   });
 
   it("filters devices through the operational focus segments", () => {

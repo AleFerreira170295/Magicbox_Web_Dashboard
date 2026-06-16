@@ -243,7 +243,7 @@ describe("SuperadminDashboard", () => {
 
     renderDashboard();
 
-    expect(screen.getByText(/Mapa de instituciones y dispositivos/i)).toBeInTheDocument();
+    expect(screen.getByText(/Mapa de centros con dispositivos/i)).toBeInTheDocument();
     expect(screen.getByText(/Qué mirar primero/i)).toBeInTheDocument();
     expect(screen.getByText("Mini tendencias")).toBeInTheDocument();
     expect(screen.getByText("Comparativa entre períodos")).toBeInTheDocument();

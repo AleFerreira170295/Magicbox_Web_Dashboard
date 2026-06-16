@@ -6,6 +6,7 @@ import { useState } from "react";
 import { makeQueryClient } from "@/lib/query-client";
 import { AuthProvider } from "@/features/auth/auth-context";
 import { LanguageProvider } from "@/features/i18n/i18n-context";
+import { NotificationsProvider } from "@/components/ui/notifications";
 
 export function Providers({ children }: { children: ReactNode }) {
   const [queryClient] = useState(makeQueryClient);
@@ -13,7 +14,9 @@ export function Providers({ children }: { children: ReactNode }) {
   return (
     <QueryClientProvider client={queryClient}>
       <LanguageProvider>
-        <AuthProvider>{children}</AuthProvider>
+        <NotificationsProvider>
+          <AuthProvider>{children}</AuthProvider>
+        </NotificationsProvider>
       </LanguageProvider>
     </QueryClientProvider>
   );

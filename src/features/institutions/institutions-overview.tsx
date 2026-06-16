@@ -16,6 +16,7 @@ import { ImageUploadField } from "@/components/ui/image-upload-field";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ListPaginationControls, useListPagination } from "@/components/ui/list-pagination-controls";
+import { useNotifications } from "@/components/ui/notifications";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useAuth } from "@/features/auth/auth-context";
@@ -339,6 +340,7 @@ function InstitutionAvatar({
 export function InstitutionsOverview() {
   const { language } = useLanguage();
   const t = institutionsOverviewMessages[language];
+  const { notify } = useNotifications();
   const { tokens, user: currentUser } = useAuth();
   const queryClient = useQueryClient();
   const searchParams = useSearchParams();
@@ -357,6 +359,15 @@ export function InstitutionsOverview() {
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [isDeleteInstitutionDialogOpen, setIsDeleteInstitutionDialogOpen] = useState(false);
   const [isDeleteGroupDialogOpen, setIsDeleteGroupDialogOpen] = useState(false);
+
+  function showFeedback(nextFeedback: FeedbackState) {
+    setFeedback(nextFeedback);
+    if (!nextFeedback) return;
+    notify({
+      tone: nextFeedback.type,
+      message: nextFeedback.message,
+    });
+  }
 
   const institutionsQuery = useInstitutions(tokens?.accessToken, { name: deferredInstitutionNameQuery });
   const usersQuery = useUsers(tokens?.accessToken);
@@ -416,9 +427,9 @@ export function InstitutionsOverview() {
       setSelectedInstitutionId(created.id);
       setForm(formFromInstitution(created));
       setImageFile(null);
-      setFeedback({ type: "success", message: `Institución ${created.name} creada.` });
+      showFeedback({ type: "success", message: `Institución ${created.name} creada.` });
     },
-    onError: (error) => setFeedback({ type: "error", message: getErrorMessage(error) }),
+    onError: (error) => showFeedback({ type: "error", message: getErrorMessage(error) }),
   });
 
   const updateInstitutionMutation = useMutation({
@@ -438,9 +449,9 @@ export function InstitutionsOverview() {
       setSelectedInstitutionId(updated.id);
       setForm(formFromInstitution(updated));
       setImageFile(null);
-      setFeedback({ type: "success", message: `Institución ${updated.name} actualizada.` });
+      showFeedback({ type: "success", message: `Institución ${updated.name} actualizada.` });
     },
-    onError: (error) => setFeedback({ type: "error", message: getErrorMessage(error) }),
+    onError: (error) => showFeedback({ type: "error", message: getErrorMessage(error) }),
   });
 
   const deleteInstitutionMutation = useMutation({
@@ -452,9 +463,9 @@ export function InstitutionsOverview() {
       setSelectedInstitutionId(null);
       setForm(emptyFormState());
       setImageFile(null);
-      setFeedback({ type: "success", message: "Institución eliminada." });
+      showFeedback({ type: "success", message: "Institución eliminada." });
     },
-    onError: (error) => setFeedback({ type: "error", message: getErrorMessage(error) }),
+    onError: (error) => showFeedback({ type: "error", message: getErrorMessage(error) }),
   });
 
   const deleteClassGroupMutation = useMutation({
@@ -466,9 +477,9 @@ export function InstitutionsOverview() {
       setStudentSearchQuery("");
       setStudentVisibilityFilter(null);
       setStudentSort(null);
-      setFeedback({ type: "success", message: "Grupo eliminado correctamente." });
+      showFeedback({ type: "success", message: "Grupo eliminado correctamente." });
     },
-    onError: (error) => setFeedback({ type: "error", message: getErrorMessage(error) }),
+    onError: (error) => showFeedback({ type: "error", message: getErrorMessage(error) }),
   });
 
   const usersByInstitutionId = useMemo(() => {
@@ -761,7 +772,7 @@ export function InstitutionsOverview() {
     setFeedback(null);
 
     if (!canSubmitForm) {
-      setFeedback({
+      showFeedback({
         type: "error",
         message: mode === "create" ? "Tu acceso actual no permite crear instituciones." : "Tu acceso actual no permite editar instituciones.",
       });
@@ -770,7 +781,7 @@ export function InstitutionsOverview() {
 
     const result = buildPayload(form);
     if (!result.payload) {
-      setFeedback({ type: "error", message: result.error || "No se pudo preparar el payload." });
+      showFeedback({ type: "error", message: result.error || "No se pudo preparar el payload." });
       return;
     }
 
@@ -783,7 +794,7 @@ export function InstitutionsOverview() {
     }
 
     if (!selectedInstitutionId) {
-      setFeedback({ type: "error", message: "Seleccioná una institución para editar." });
+      showFeedback({ type: "error", message: "Seleccioná una institución para editar." });
       return;
     }
 
@@ -797,7 +808,7 @@ export function InstitutionsOverview() {
   async function handleDelete() {
     if (!selectedInstitutionId || !selectedInstitution) return;
     if (!canDeleteInstitutions) {
-      setFeedback({ type: "error", message: "Tu acceso actual no permite eliminar instituciones." });
+      showFeedback({ type: "error", message: "Tu acceso actual no permite eliminar instituciones." });
       return;
     }
     setFeedback(null);
@@ -808,7 +819,7 @@ export function InstitutionsOverview() {
   async function handleDeleteSelectedGroup() {
     if (!selectedGroup) return;
     if (!canDeleteClassGroups) {
-      setFeedback({ type: "error", message: "Tu acceso actual no permite eliminar grupos." });
+      showFeedback({ type: "error", message: "Tu acceso actual no permite eliminar grupos." });
       return;
     }
     setFeedback(null);

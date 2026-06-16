@@ -120,12 +120,39 @@ function serializeAddress(address?: UserAddress | null) {
 }
 
 export async function listUsers(token: string) {
-  const response = await apiRequest<unknown>(apiEndpoints.users.list, {
+  const limit = 100;
+  const firstResponse = await apiRequest<unknown>(apiEndpoints.users.list, {
     token,
-    searchParams: { page: 1, limit: 100, sort_by: "created_at", order: "desc" },
+    searchParams: { page: 1, limit, sort_by: "created_at", order: "desc", include_deleted: true },
   });
 
-  return normalizeResponse(response);
+  const firstPage = normalizeResponse(firstResponse);
+
+  if (firstPage.total_pages <= 1) {
+    return firstPage;
+  }
+
+  const remainingPages = await Promise.all(
+    Array.from({ length: firstPage.total_pages - 1 }, (_, index) =>
+      apiRequest<unknown>(apiEndpoints.users.list, {
+        token,
+        searchParams: { page: index + 2, limit, sort_by: "created_at", order: "desc", include_deleted: true },
+      }).then(normalizeResponse),
+    ),
+  );
+
+  const data = [
+    ...firstPage.data,
+    ...remainingPages.flatMap((page) => page.data),
+  ];
+
+  return {
+    data,
+    page: 1,
+    limit: data.length,
+    total: firstPage.total,
+    total_pages: firstPage.total_pages,
+  };
 }
 
 export async function createUser(token: string, payload: CreateUserPayload) {

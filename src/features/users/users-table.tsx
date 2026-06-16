@@ -16,6 +16,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ListPaginationControls, useListPagination } from "@/components/ui/list-pagination-controls";
 import { Modal } from "@/components/ui/modal";
+import { useNotifications } from "@/components/ui/notifications";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
@@ -163,6 +164,19 @@ const usersMessages: Record<AppLanguage, {
     userDevices: string;
     uploadedGames: string;
   };
+  editor: {
+    createTitle: string;
+    editTitle: string;
+    modalCreateDescription: string;
+    modalEditDescription: string;
+  };
+  deleteDialog: {
+    title: string;
+    titleWithName: (name: string) => string;
+    description: string;
+    descriptionWithSelection: string;
+    confirm: string;
+  };
 }> = {
   es: {
     header: {
@@ -237,6 +251,19 @@ const usersMessages: Record<AppLanguage, {
       quickLinksHint: (name) => `Abrí dispositivos y partidas ya filtrados por ${name} para seguir actividad y vínculos sin rehacer la búsqueda.`,
       userDevices: "Ver dispositivos del usuario",
       uploadedGames: "Ver partidas subidas",
+    },
+    editor: {
+      createTitle: "Alta de usuario",
+      editTitle: "Editar usuario",
+      modalCreateDescription: "Completá el formulario sin salir del módulo.",
+      modalEditDescription: "Ajustá datos base, vínculo institucional y contexto de acceso.",
+    },
+    deleteDialog: {
+      title: "Eliminar usuario",
+      titleWithName: (name) => `Eliminar a ${name}`,
+      description: "Confirmá la eliminación del usuario seleccionado.",
+      descriptionWithSelection: "Se va a borrar el usuario seleccionado y dejará de estar disponible en el padrón visible. Confirmá solo si querés ejecutar la eliminación real.",
+      confirm: "Sí, eliminar usuario",
     },
   },
   en: {
@@ -313,6 +340,19 @@ const usersMessages: Record<AppLanguage, {
       userDevices: "View user devices",
       uploadedGames: "View uploaded games",
     },
+    editor: {
+      createTitle: "Create user",
+      editTitle: "Edit user",
+      modalCreateDescription: "Complete the form without leaving the module.",
+      modalEditDescription: "Adjust base data, institutional link, and access context.",
+    },
+    deleteDialog: {
+      title: "Delete user",
+      titleWithName: (name) => `Delete ${name}`,
+      description: "Confirm deletion of the selected user.",
+      descriptionWithSelection: "The selected user will be deleted and will no longer be available in the visible roster. Confirm only if you want to execute the real deletion.",
+      confirm: "Yes, delete user",
+    },
   },
   pt: {
     header: {
@@ -387,6 +427,19 @@ const usersMessages: Record<AppLanguage, {
       quickLinksHint: (name) => `Abra dispositivos e partidas já filtrados por ${name} para acompanhar atividade e vínculos sem refazer a busca.`,
       userDevices: "Ver dispositivos do usuário",
       uploadedGames: "Ver partidas enviadas",
+    },
+    editor: {
+      createTitle: "Cadastro de usuário",
+      editTitle: "Editar usuário",
+      modalCreateDescription: "Complete o formulário sem sair do módulo.",
+      modalEditDescription: "Ajuste dados base, vínculo institucional e contexto de acesso.",
+    },
+    deleteDialog: {
+      title: "Excluir usuário",
+      titleWithName: (name) => `Excluir ${name}`,
+      description: "Confirme a exclusão do usuário selecionado.",
+      descriptionWithSelection: "O usuário selecionado será excluído e deixará de estar disponível na lista visível. Confirme apenas se quiser executar a exclusão real.",
+      confirm: "Sim, excluir usuário",
     },
   },
 };
@@ -674,6 +727,7 @@ function SelectField({
 export function UsersTable() {
   const { language } = useLanguage();
   const t = usersMessages[language];
+  const { notify } = useNotifications();
   const { tokens, user: currentUser } = useAuth();
   const queryClient = useQueryClient();
   const usersQuery = useUsers(tokens?.accessToken);
@@ -697,6 +751,15 @@ export function UsersTable() {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
   const auditEventsQuery = useAccessAuditEvents(tokens?.accessToken, selectedUserId || undefined, 20);
+
+  function showFeedback(nextFeedback: FeedbackState) {
+    setFeedback(nextFeedback);
+    if (!nextFeedback) return;
+    notify({
+      tone: nextFeedback.type,
+      message: nextFeedback.message,
+    });
+  }
 
   const rawUsers = useMemo(() => usersQuery.data?.data ?? [], [usersQuery.data?.data]);
   const institutions = useMemo(() => institutionsQuery.data?.data ?? [], [institutionsQuery.data?.data]);
@@ -952,7 +1015,7 @@ export function UsersTable() {
         queryClient.invalidateQueries({ queryKey: ["users"] }),
         queryClient.invalidateQueries({ queryKey: ["access-audit-events"] }),
       ]);
-      setFeedback({ type: "success", message: "Usuario creado correctamente." });
+      showFeedback({ type: "success", message: "Usuario creado correctamente." });
       setMode("edit");
       setSelectedUserId(createdUser.id);
       setForm(formFromUser(createdUser));
@@ -960,7 +1023,7 @@ export function UsersTable() {
       setIsFormModalOpen(false);
     },
     onError: (error) => {
-      setFeedback({ type: "error", message: getErrorMessage(error) });
+      showFeedback({ type: "error", message: getErrorMessage(error) });
     },
   });
 
@@ -980,14 +1043,14 @@ export function UsersTable() {
         queryClient.invalidateQueries({ queryKey: ["users"] }),
         queryClient.invalidateQueries({ queryKey: ["access-audit-events"] }),
       ]);
-      setFeedback({ type: "success", message: "Usuario actualizado correctamente." });
+      showFeedback({ type: "success", message: "Usuario actualizado correctamente." });
       setSelectedUserId(updatedUser.id);
       setForm(formFromUser(updatedUser));
       setImageFile(null);
       setIsFormModalOpen(false);
     },
     onError: (error) => {
-      setFeedback({ type: "error", message: getErrorMessage(error) });
+      showFeedback({ type: "error", message: getErrorMessage(error) });
     },
   });
 
@@ -995,7 +1058,7 @@ export function UsersTable() {
     mutationFn: (userId: string) => deleteUser(tokens?.accessToken as string, userId),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["users"] });
-      setFeedback({ type: "success", message: "Usuario eliminado correctamente." });
+      showFeedback({ type: "success", message: "Usuario eliminado correctamente." });
       setSelectedUserId(null);
       setMode("create");
       setForm(emptyFormState());
@@ -1003,7 +1066,7 @@ export function UsersTable() {
       setIsFormModalOpen(false);
     },
     onError: (error) => {
-      setFeedback({ type: "error", message: getErrorMessage(error) });
+      showFeedback({ type: "error", message: getErrorMessage(error) });
     },
   });
 
@@ -1026,7 +1089,7 @@ export function UsersTable() {
   async function persistUserRoles(user: UserRow, roles: string[]) {
     if (!tokens?.accessToken) return;
     if (!canUpdateUsers) {
-      setFeedback({ type: "error", message: "Tu acceso actual no permite persistir roles de usuario." });
+      showFeedback({ type: "error", message: "Tu acceso actual no permite persistir roles de usuario." });
       return;
     }
 
@@ -1142,14 +1205,14 @@ export function UsersTable() {
   async function togglePermission(user: UserRow, featureCode: string, actionCode: string, scope: string = GLOBAL_SCOPE) {
     if (!tokens?.accessToken) return;
     if (!canManageAcl) {
-      setFeedback({ type: "error", message: "Tu acceso actual no permite editar permisos ACL." });
+      showFeedback({ type: "error", message: "Tu acceso actual no permite editar permisos ACL." });
       return;
     }
 
     const permissionEntries = getPermissionEntries(user, featureCode, actionCode, scope);
     const catalogEntry = catalogByKey.get(`${featureCode}:${actionCode}`);
     if (!catalogEntry) {
-      setFeedback({ type: "error", message: `No encontré el catálogo para ${featureCode}:${actionCode}.` });
+      showFeedback({ type: "error", message: `No encontré el catálogo para ${featureCode}:${actionCode}.` });
       return;
     }
 
@@ -1160,7 +1223,7 @@ export function UsersTable() {
         for (const permission of permissionEntries) {
           await deletePermissionRequest(tokens.accessToken, permission.id);
         }
-        setFeedback({ type: "success", message: `Permiso ${featureCode}:${actionCode} removido.` });
+        showFeedback({ type: "success", message: `Permiso ${featureCode}:${actionCode} removido.` });
       } else {
         await createPermissionRequest(tokens.accessToken, {
           userId: user.id,
@@ -1168,14 +1231,14 @@ export function UsersTable() {
           actionId: catalogEntry.actionId,
           educationalCenterId: scope === GLOBAL_SCOPE ? null : scope,
         });
-        setFeedback({
+        showFeedback({
           type: "success",
           message: `Permiso ${featureCode}:${actionCode} agregado en scope ${resolveScopeLabel(scope === GLOBAL_SCOPE ? null : scope)}.`,
         });
       }
       await refreshAclQueries();
     } catch (error) {
-      setFeedback({ type: "error", message: getErrorMessage(error) });
+      showFeedback({ type: "error", message: getErrorMessage(error) });
     } finally {
       setPermissionBusy(false);
     }
@@ -1184,14 +1247,14 @@ export function UsersTable() {
   async function applyBundle(user: UserRow, bundle: (typeof roleBundles)[number], scope: string = GLOBAL_SCOPE) {
     if (!tokens?.accessToken) return;
     if (!canApplyBundles) {
-      setFeedback({ type: "error", message: "Necesitás permiso para actualizar usuarios y ACL antes de aplicar bundles." });
+      showFeedback({ type: "error", message: "Necesitás permiso para actualizar usuarios y ACL antes de aplicar bundles." });
       return;
     }
 
     const missingKeys = bundle.permissionKeys.filter((key) => !user.explicitPermissionKeys.includes(key));
     const nextRoles = Array.from(new Set([...user.roles, bundle.role])).sort();
     if (missingKeys.length === 0 && user.roles.includes(bundle.role)) {
-      setFeedback({ type: "success", message: `El bundle ${bundle.label} ya está completo.` });
+      showFeedback({ type: "success", message: `El bundle ${bundle.label} ya está completo.` });
       return;
     }
 
@@ -1217,12 +1280,12 @@ export function UsersTable() {
         }
       }
       await refreshAclQueries();
-      setFeedback({
+      showFeedback({
         type: "success",
         message: `Bundle ${bundle.label} aplicado en ${resolveScopeLabel(scope === GLOBAL_SCOPE ? null : scope)}. Se agregaron ${applied} permisos base y se persistió el rol.`,
       });
     } catch (error) {
-      setFeedback({ type: "error", message: getErrorMessage(error) });
+      showFeedback({ type: "error", message: getErrorMessage(error) });
     } finally {
       setPermissionBusy(false);
     }
@@ -1233,7 +1296,7 @@ export function UsersTable() {
     setFeedback(null);
 
     if (!canSubmitForm) {
-      setFeedback({
+      showFeedback({
         type: "error",
         message: mode === "create" ? "Tu acceso actual no permite crear usuarios." : "Tu acceso actual no permite editar usuarios.",
       });
@@ -1242,7 +1305,7 @@ export function UsersTable() {
 
     const result = buildPayload(form, mode);
     if (!result.payload) {
-      setFeedback({ type: "error", message: result.error || "No se pudo preparar el payload." });
+      showFeedback({ type: "error", message: result.error || "No se pudo preparar el payload." });
       return;
     }
 
@@ -1255,7 +1318,7 @@ export function UsersTable() {
     }
 
     if (!selectedUserId) {
-      setFeedback({ type: "error", message: "Seleccioná un usuario para editar." });
+      showFeedback({ type: "error", message: "Seleccioná un usuario para editar." });
       return;
     }
 
@@ -1269,7 +1332,7 @@ export function UsersTable() {
   async function handleDelete() {
     if (!selectedUser) return;
     if (!canDeleteUsers) {
-      setFeedback({ type: "error", message: "Tu acceso actual no permite eliminar usuarios." });
+      showFeedback({ type: "error", message: "Tu acceso actual no permite eliminar usuarios." });
       return;
     }
     setFeedback(null);
@@ -1424,8 +1487,6 @@ export function UsersTable() {
                       setImageFile(null);
                     }}
                     disabled={!canSubmitForm}
-                    label="Imagen de perfil"
-                    description="Podés arrastrar una imagen o buscarla en la computadora. La guardamos al confirmar el alta o la edición del usuario."
                   />
                 </div>
 
@@ -1855,8 +1916,8 @@ export function UsersTable() {
           <Modal
             open={isFormModalOpen}
             onClose={closeUserForm}
-            title={mode === "create" ? "Alta de usuario" : "Editar usuario"}
-            description={mode === "create" ? "Completá el formulario sin salir del módulo." : "Ajustá datos base, vínculo institucional y contexto de acceso."}
+            title={mode === "create" ? t.editor.createTitle : t.editor.editTitle}
+            description={mode === "create" ? t.editor.modalCreateDescription : t.editor.modalEditDescription}
             className="max-w-[1180px]"
             hideHeader
           >
@@ -1868,11 +1929,11 @@ export function UsersTable() {
             onClose={() => setIsDeleteDialogOpen(false)}
             onConfirm={handleDelete}
             isPending={deleteUserMutation.isPending}
-            title={selectedUser ? `Eliminar a ${selectedUser.fullName}` : "Eliminar usuario"}
+            title={selectedUser ? t.deleteDialog.titleWithName(selectedUser.fullName) : t.deleteDialog.title}
             description={selectedUser
-              ? "Se va a borrar el usuario seleccionado y dejará de estar disponible en el padrón visible. Confirmá solo si querés ejecutar la eliminación real."
-              : "Confirmá la eliminación del usuario seleccionado."}
-            confirmLabel="Sí, eliminar usuario"
+              ? t.deleteDialog.descriptionWithSelection
+              : t.deleteDialog.description}
+            confirmLabel={t.deleteDialog.confirm}
           />
 
           <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">

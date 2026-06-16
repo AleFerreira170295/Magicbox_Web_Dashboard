@@ -2,8 +2,39 @@
 
 import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { useLanguage, type AppLanguage } from "@/features/i18n/i18n-context";
 
 export type PaginationPageSize = 10 | 20 | 50;
+
+const paginationMessages: Record<AppLanguage, {
+  visibleRows: string;
+  rowsAria: string;
+  summary: (start: number, end: number, total: number) => string;
+  previous: string;
+  next: string;
+}> = {
+  es: {
+    visibleRows: "Filas visibles",
+    rowsAria: "Filas visibles por página",
+    summary: (start, end, total) => `Mostrando ${start}-${end} de ${total}`,
+    previous: "Anterior",
+    next: "Siguiente",
+  },
+  en: {
+    visibleRows: "Visible rows",
+    rowsAria: "Visible rows per page",
+    summary: (start, end, total) => `Showing ${start}-${end} of ${total}`,
+    previous: "Previous",
+    next: "Next",
+  },
+  pt: {
+    visibleRows: "Linhas visíveis",
+    rowsAria: "Linhas visíveis por página",
+    summary: (start, end, total) => `Mostrando ${start}-${end} de ${total}`,
+    previous: "Anterior",
+    next: "Próxima",
+  },
+};
 
 export function useListPagination<T>(items: T[], initialPageSize: PaginationPageSize = 10, initialPage = 1) {
   const [pageSize, setPageSize] = useState<PaginationPageSize>(initialPageSize);
@@ -64,15 +95,18 @@ export function ListPaginationControls({
   summaryTestId?: string;
   controlsTestId?: string;
 }) {
+  const { language } = useLanguage();
+  const t = paginationMessages[language];
+
   return (
     <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
       <label className="flex items-center gap-2 text-sm text-muted-foreground">
-        Filas visibles
+        {t.visibleRows}
         <select
           value={String(pageSize)}
           onChange={(event) => setPageSize(Number(event.target.value) as PaginationPageSize)}
           className="h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground"
-          aria-label="Filas visibles por página"
+          aria-label={t.rowsAria}
         >
           <option value="10">10</option>
           <option value="20">20</option>
@@ -80,7 +114,7 @@ export function ListPaginationControls({
         </select>
       </label>
       <div className="text-sm text-muted-foreground" data-testid={summaryTestId}>
-        Mostrando {paginationStart}-{paginationEnd} de {totalItems}
+        {t.summary(paginationStart, paginationEnd, totalItems)}
       </div>
       <div className="flex gap-2" data-testid={controlsTestId}>
         <Button
@@ -90,7 +124,7 @@ export function ListPaginationControls({
           onClick={goToPreviousPage}
           disabled={currentPage === 1 || totalItems === 0}
         >
-          Anterior
+          {t.previous}
         </Button>
         <Button
           type="button"
@@ -99,7 +133,7 @@ export function ListPaginationControls({
           onClick={goToNextPage}
           disabled={currentPage === totalPages || totalItems === 0}
         >
-          Siguiente
+          {t.next}
         </Button>
       </div>
     </div>
