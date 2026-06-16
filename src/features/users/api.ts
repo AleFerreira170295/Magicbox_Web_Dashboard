@@ -33,6 +33,16 @@ function readString(record: JsonObject, ...keys: string[]) {
   return "";
 }
 
+function readStringArray(record: JsonObject, ...keys: string[]) {
+  for (const key of keys) {
+    const value = record[key];
+    if (Array.isArray(value)) {
+      return value.filter((item): item is string => typeof item === "string" && item.trim().length > 0);
+    }
+  }
+  return [];
+}
+
 function normalizeAddress(value: unknown): UserAddress | null {
   const record = asRecord(value);
   const addressFirstLine = readString(record, "address_first_line", "addressFirstLine");
@@ -73,6 +83,7 @@ function normalizeUser(input: unknown): UserRecord {
     permissions: resolvePermissions(record),
     userType: readString(record, "user_type", "userType") || null,
     educationalCenterId: readString(record, "educational_center_id", "educationalCenterId") || null,
+    institutionScopeIds: readStringArray(record, "institution_scope_ids", "institutionScopeIds", "admin_institution_ids", "adminInstitutionIds"),
     status: deletedAt ? "deleted" : "active",
     phoneNumber: readString(record, "phone_number", "phoneNumber") || null,
     address: normalizeAddress(record.address),
@@ -120,12 +131,39 @@ function serializeAddress(address?: UserAddress | null) {
 }
 
 export async function listUsers(token: string) {
-  const response = await apiRequest<unknown>(apiEndpoints.users.list, {
+  const limit = 100;
+  const firstResponse = await apiRequest<unknown>(apiEndpoints.users.list, {
     token,
-    searchParams: { page: 1, limit: 100, sort_by: "created_at", order: "desc" },
+    searchParams: { page: 1, limit, sort_by: "created_at", order: "desc", include_deleted: true },
   });
 
-  return normalizeResponse(response);
+  const firstPage = normalizeResponse(firstResponse);
+
+  if (firstPage.total_pages <= 1) {
+    return firstPage;
+  }
+
+  const remainingPages = await Promise.all(
+    Array.from({ length: firstPage.total_pages - 1 }, (_, index) =>
+      apiRequest<unknown>(apiEndpoints.users.list, {
+        token,
+        searchParams: { page: index + 2, limit, sort_by: "created_at", order: "desc", include_deleted: true },
+      }).then(normalizeResponse),
+    ),
+  );
+
+  const data = [
+    ...firstPage.data,
+    ...remainingPages.flatMap((page) => page.data),
+  ];
+
+  return {
+    data,
+    page: 1,
+    limit: data.length,
+    total: firstPage.total,
+    total_pages: firstPage.total_pages,
+  };
 }
 
 export async function createUser(token: string, payload: CreateUserPayload) {
@@ -141,6 +179,7 @@ export async function createUser(token: string, payload: CreateUserPayload) {
       user_type: payload.userType,
       roles: payload.roles,
       educational_center_id: payload.educationalCenterId || null,
+      admin_institution_ids: payload.adminInstitutionIds || [],
       image_url: payload.imageUrl || null,
       address: serializeAddress(payload.address),
     },
@@ -161,6 +200,7 @@ export async function updateUser(token: string, userId: string, payload: UpdateU
       user_type: payload.userType,
       roles: payload.roles,
       educational_center_id: payload.educationalCenterId || null,
+      admin_institution_ids: payload.adminInstitutionIds || [],
       image_url: payload.imageUrl || null,
       address: serializeAddress(payload.address),
     },
