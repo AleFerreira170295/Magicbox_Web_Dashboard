@@ -181,7 +181,7 @@ describe("GamesTable", () => {
 
     expect(screen.getByRole("heading", { name: "Partidas" })).toBeInTheDocument();
     expect(screen.getByText(/Institución activa: Colegio Norte/)).toBeInTheDocument();
-    expect(screen.getAllByRole("combobox")[0]).toBeDisabled();
+    expect(screen.getByLabelText("Institución")).toBeDisabled();
   });
 
   it("opens the dedicated game detail page when a row is clicked", () => {

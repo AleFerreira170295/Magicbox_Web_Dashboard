@@ -2,7 +2,7 @@
 
 import { type ComponentType, useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { BookOpen, Gamepad2, Search, TimerReset, Trophy, Users } from "lucide-react";
+import { BookOpen, CalendarDays, Filter, Gamepad2, Search, TimerReset, Trophy, Users } from "lucide-react";
 import { SectionHeader } from "@/components/section-header";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -39,6 +39,25 @@ const gamesMessages: Record<AppLanguage, {
   };
   searchPlaceholder: string;
   allInstitutions: string;
+  filters: {
+    title: string;
+    institution: string;
+    deck: string;
+    device: string;
+    playerName: string;
+    playerCount: string;
+    dateFrom: string;
+    dateTo: string;
+    playerMode: string;
+    access: string;
+    institutionPlaceholder: string;
+    deckPlaceholder: string;
+    devicePlaceholder: string;
+    playerNamePlaceholder: string;
+    playerCountPlaceholder: string;
+    clear: string;
+    newestFirst: string;
+  };
   playerModes: {
     all: string;
     registered: string;
@@ -121,6 +140,7 @@ const gamesMessages: Record<AppLanguage, {
     },
     searchPlaceholder: "Filtrar por mazo, gameId, institución, dispositivo o jugador",
     allInstitutions: "Todas las instituciones",
+    filters: { title: "Filtros", institution: "Institución", deck: "Mazo", device: "Dispositivo", playerName: "Nombre de jugador", playerCount: "Cantidad de jugadores", dateFrom: "Desde", dateTo: "Hasta", playerMode: "Tipo de jugadores", access: "Acceso", institutionPlaceholder: "Buscar institución", deckPlaceholder: "Buscar mazo", devicePlaceholder: "Buscar dispositivo", playerNamePlaceholder: "Buscar jugador", playerCountPlaceholder: "Ej. 2", clear: "Limpiar filtros", newestFirst: "Más nuevas primero" },
     playerModes: { all: "Todos los modos", registered: "Solo registrados", manual: "Solo manuales", mixed: "Mixtos" },
     accessOptions: { all: "Todos los accesos", owned: "Mis dispositivos", institution: "Institución visible", shared: "Compartidas", unresolved: "Sin asociación resuelta" },
     clearCrossFilter: "Quitar filtro cruzado",
@@ -163,6 +183,7 @@ const gamesMessages: Record<AppLanguage, {
     },
     searchPlaceholder: "Filter by deck, gameId, institution, device, or player",
     allInstitutions: "All institutions",
+    filters: { title: "Filters", institution: "Institution", deck: "Deck", device: "Device", playerName: "Player name", playerCount: "Player count", dateFrom: "From", dateTo: "To", playerMode: "Player type", access: "Access", institutionPlaceholder: "Search institution", deckPlaceholder: "Search deck", devicePlaceholder: "Search device", playerNamePlaceholder: "Search player", playerCountPlaceholder: "E.g. 2", clear: "Clear filters", newestFirst: "Newest first" },
     playerModes: { all: "All modes", registered: "Registered only", manual: "Manual only", mixed: "Mixed" },
     accessOptions: { all: "All access", owned: "My devices", institution: "Institution-visible", shared: "Shared", unresolved: "Unresolved association" },
     clearCrossFilter: "Clear linked filter",
@@ -205,6 +226,7 @@ const gamesMessages: Record<AppLanguage, {
     },
     searchPlaceholder: "Filtrar por baralho, gameId, instituição, dispositivo ou jogador",
     allInstitutions: "Todas as instituições",
+    filters: { title: "Filtros", institution: "Instituição", deck: "Baralho", device: "Dispositivo", playerName: "Nome do jogador", playerCount: "Quantidade de jogadores", dateFrom: "Desde", dateTo: "Até", playerMode: "Tipo de jogadores", access: "Acesso", institutionPlaceholder: "Buscar instituição", deckPlaceholder: "Buscar baralho", devicePlaceholder: "Buscar dispositivo", playerNamePlaceholder: "Buscar jogador", playerCountPlaceholder: "Ex. 2", clear: "Limpar filtros", newestFirst: "Mais novas primeiro" },
     playerModes: { all: "Todos os modos", registered: "Só registrados", manual: "Só manuais", mixed: "Mistos" },
     accessOptions: { all: "Todos os acessos", owned: "Meus dispositivos", institution: "Instituição visível", shared: "Compartilhadas", unresolved: "Sem associação resolvida" },
     clearCrossFilter: "Remover filtro cruzado",
@@ -298,6 +320,16 @@ function getDeckInitials(deckName?: string | null) {
     .join("") || "GM";
 }
 
+function normalizeFilterText(value: string) {
+  return value.trim().toLowerCase();
+}
+
+function getGameSortTime(game: { startDate?: string | null; createdAt?: string | null }) {
+  const value = game.startDate || game.createdAt || "";
+  const time = value ? new Date(value).getTime() : 0;
+  return Number.isFinite(time) ? time : 0;
+}
+
 export function GamesTable() {
   const { language } = useLanguage();
   const t = gamesMessages[language];
@@ -307,6 +339,13 @@ export function GamesTable() {
   const searchParams = useSearchParams();
   const [query, setQuery] = useState(() => searchParams.get("q")?.trim() || "");
   const [institutionFilter, setInstitutionFilter] = useState<string>(() => searchParams.get("institutionId")?.trim() || "");
+  const [institutionQuery, setInstitutionQuery] = useState(() => searchParams.get("institution")?.trim() || "");
+  const [deckQuery, setDeckQuery] = useState(() => searchParams.get("deck")?.trim() || "");
+  const [deviceQuery, setDeviceQuery] = useState(() => searchParams.get("device")?.trim() || "");
+  const [playerNameQuery, setPlayerNameQuery] = useState(() => searchParams.get("playerName")?.trim() || "");
+  const [playerCountFilter, setPlayerCountFilter] = useState(() => searchParams.get("playerCount")?.trim() || "");
+  const [dateFrom, setDateFrom] = useState(() => searchParams.get("dateFrom")?.trim() || "");
+  const [dateTo, setDateTo] = useState(() => searchParams.get("dateTo")?.trim() || "");
   const [playerModeFilter, setPlayerModeFilter] = useState<GamePlayerModeFilter>(() => {
     const value = searchParams.get("playerMode");
     return value === "manual" || value === "mixed" || value === "registered" ? value : "all";
@@ -323,7 +362,7 @@ export function GamesTable() {
   const initialPage = Number(searchParams.get("page") || 1) > 0 ? Number(searchParams.get("page") || 1) : 1;
   const initialPageSize = Number(searchParams.get("pageSize") || 10);
 
-  const gamesQuery = useGames(tokens?.accessToken);
+  const gamesQuery = useGames(tokens?.accessToken, { limit: 100, sortBy: "created_at", order: "desc" });
   const devicesQuery = useDevices(tokens?.accessToken);
   const institutionsQuery = useInstitutions(tokens?.accessToken);
 
@@ -344,7 +383,15 @@ export function GamesTable() {
   const gameRows = useMemo(() => buildGameRows(games, devices, institutions, currentUser), [currentUser, devices, games, institutions]);
 
   const filtered = useMemo(() => {
-    const normalized = query.trim().toLowerCase();
+    const normalized = normalizeFilterText(query);
+    const normalizedInstitution = normalizeFilterText(institutionQuery);
+    const normalizedDeck = normalizeFilterText(deckQuery);
+    const normalizedDevice = normalizeFilterText(deviceQuery);
+    const normalizedPlayerName = normalizeFilterText(playerNameQuery);
+    const expectedPlayerCount = Number(playerCountFilter);
+    const hasPlayerCountFilter = playerCountFilter.trim() !== "" && Number.isFinite(expectedPlayerCount);
+    const fromTime = dateFrom ? new Date(`${dateFrom}T00:00:00`).getTime() : null;
+    const toTime = dateTo ? new Date(`${dateTo}T23:59:59.999`).getTime() : null;
 
     const effectiveInstitutionFilter = institutionFilter || scopedInstitutionId || "";
 
@@ -353,6 +400,24 @@ export function GamesTable() {
       if (linkedBleDeviceId && game.bleDeviceId !== linkedBleDeviceId) return false;
       if (linkedDeviceId && game.device?.deviceId !== linkedDeviceId) return false;
       if (effectiveInstitutionFilter && game.educationalCenterId !== effectiveInstitutionFilter) return false;
+      if (normalizedInstitution && !normalizeFilterText(game.institution?.name || game.educationalCenterId || "").includes(normalizedInstitution)) return false;
+      if (normalizedDeck && !normalizeFilterText(game.deckName || "").includes(normalizedDeck)) return false;
+      if (
+        normalizedDevice &&
+        ![
+          game.bleDeviceId,
+          game.device?.name,
+          game.device?.deviceId,
+        ]
+          .filter(Boolean)
+          .some((value) => normalizeFilterText(String(value)).includes(normalizedDevice))
+      ) return false;
+      if (normalizedPlayerName && !game.players.some((player) => normalizeFilterText(player.playerName || "").includes(normalizedPlayerName))) return false;
+      if (hasPlayerCountFilter && (game.players.length || game.totalPlayers || 0) !== expectedPlayerCount) return false;
+
+      const gameTime = getGameSortTime(game);
+      if (fromTime !== null && gameTime < fromTime) return false;
+      if (toTime !== null && gameTime > toTime) return false;
 
       const manualCount = game.players.filter((player) => player.playerSource === "manual").length;
       const registeredCount = game.players.filter((player) => player.playerSource !== "manual").length;
@@ -381,8 +446,8 @@ export function GamesTable() {
       ]
         .filter(Boolean)
         .some((value) => String(value).toLowerCase().includes(normalized));
-    });
-  }, [accessFilter, gameRows, institutionFilter, linkedBleDeviceId, linkedDeviceId, linkedOwnerUserId, playerModeFilter, query, scopedInstitutionId]);
+    }).sort((a, b) => getGameSortTime(b) - getGameSortTime(a));
+  }, [accessFilter, dateFrom, dateTo, deckQuery, deviceQuery, gameRows, institutionFilter, institutionQuery, linkedBleDeviceId, linkedDeviceId, linkedOwnerUserId, playerCountFilter, playerModeFilter, playerNameQuery, query, scopedInstitutionId]);
 
   const pagination = useListPagination(filtered, initialPageSize === 20 || initialPageSize === 50 ? initialPageSize : 10, initialPage);
 
@@ -419,6 +484,13 @@ export function GamesTable() {
   function resetFilters() {
     setQuery("");
     setInstitutionFilter("");
+    setInstitutionQuery("");
+    setDeckQuery("");
+    setDeviceQuery("");
+    setPlayerNameQuery("");
+    setPlayerCountFilter("");
+    setDateFrom("");
+    setDateTo("");
     setPlayerModeFilter("all");
     setAccessFilter("all");
   }
@@ -426,6 +498,13 @@ export function GamesTable() {
   const activeFilterChips = [
     query.trim() ? `Búsqueda · ${query.trim()}` : null,
     (institutionFilter || scopedInstitutionId) ? `Institución · ${institutionById.get(institutionFilter || scopedInstitutionId || "")?.name || institutionFilter || scopedInstitutionId}` : null,
+    institutionQuery.trim() ? `Institución · ${institutionQuery.trim()}` : null,
+    deckQuery.trim() ? `Mazo · ${deckQuery.trim()}` : null,
+    deviceQuery.trim() ? `Dispositivo · ${deviceQuery.trim()}` : null,
+    playerNameQuery.trim() ? `Jugador · ${playerNameQuery.trim()}` : null,
+    playerCountFilter.trim() ? `Jugadores · ${playerCountFilter.trim()}` : null,
+    dateFrom ? `Desde · ${dateFrom}` : null,
+    dateTo ? `Hasta · ${dateTo}` : null,
     playerModeFilter !== "all" ? `Jugadores · ${playerModeFilter === "mixed" ? "Mixtos" : playerModeFilter === "manual" ? "Solo manuales" : "Solo registrados"}` : null,
     accessFilter !== "all" ? `Acceso · ${accessSegments.find((segment) => segment.key === accessFilter)?.label || accessFilter}` : null,
     linkedOwnerUserId ? `Usuario · ${linkedOwnerUserName || linkedOwnerUserId}` : null,
@@ -436,6 +515,13 @@ export function GamesTable() {
     const params = new URLSearchParams();
     if (query.trim()) params.set("q", query.trim());
     if (institutionFilter) params.set("institutionId", institutionFilter);
+    if (institutionQuery.trim()) params.set("institution", institutionQuery.trim());
+    if (deckQuery.trim()) params.set("deck", deckQuery.trim());
+    if (deviceQuery.trim()) params.set("device", deviceQuery.trim());
+    if (playerNameQuery.trim()) params.set("playerName", playerNameQuery.trim());
+    if (playerCountFilter.trim()) params.set("playerCount", playerCountFilter.trim());
+    if (dateFrom) params.set("dateFrom", dateFrom);
+    if (dateTo) params.set("dateTo", dateTo);
     if (playerModeFilter !== "all") params.set("playerMode", playerModeFilter);
     if (accessFilter !== "all") params.set("access", accessFilter);
     if (linkedOwnerUserId) params.set("ownerUserId", linkedOwnerUserId);
@@ -451,7 +537,7 @@ export function GamesTable() {
     if (nextSearch !== currentSearch) {
       router.replace(nextSearch ? `${pathname}?${nextSearch}` : pathname);
     }
-  }, [accessFilter, institutionFilter, linkedBleDeviceId, linkedDeviceId, linkedDeviceName, linkedOwnerUserId, linkedOwnerUserName, pagination.currentPage, pagination.pageSize, pathname, playerModeFilter, query, router, searchParams]);
+  }, [accessFilter, dateFrom, dateTo, deckQuery, deviceQuery, institutionFilter, institutionQuery, linkedBleDeviceId, linkedDeviceId, linkedDeviceName, linkedOwnerUserId, linkedOwnerUserName, pagination.currentPage, pagination.pageSize, pathname, playerCountFilter, playerModeFilter, playerNameQuery, query, router, searchParams]);
 
   return (
     <div className="space-y-6">
@@ -471,66 +557,6 @@ export function GamesTable() {
             ? t.description.institutionAdmin(scopedInstitutionName || (language === "en" ? "the institution" : language === "pt" ? "a instituição" : "la institución"))
             : t.description.default
         }
-        actions={
-          <div className="grid w-full gap-3 md:grid-cols-2 2xl:grid-cols-[minmax(0,1.45fr)_minmax(220px,0.8fr)_minmax(210px,0.7fr)_minmax(220px,0.8fr)]">
-            <div className="relative min-w-0 md:col-span-2 2xl:col-span-1">
-              <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                placeholder={t.searchPlaceholder}
-                className="w-full pl-9"
-              />
-            </div>
-            {isFamilyView ? null : (
-              <>
-                <select
-                  value={institutionFilter || scopedInstitutionId || ""}
-                  onChange={(event) => setInstitutionFilter(event.target.value)}
-                  className="h-10 min-w-0 w-full rounded-md border border-input bg-background px-3 text-sm"
-                  disabled={Boolean(scopedInstitutionId)}
-                >
-                  <option value="">{t.allInstitutions}</option>
-                  {institutions.map((institution) => (
-                    <option key={institution.id} value={institution.id}>
-                      {institution.name}
-                    </option>
-                  ))}
-                </select>
-                <select
-                  value={playerModeFilter}
-                  onChange={(event) => setPlayerModeFilter(event.target.value as "all" | "manual" | "mixed" | "registered")}
-                  className="h-10 min-w-0 w-full rounded-md border border-input bg-background px-3 text-sm"
-                >
-                  <option value="all">{t.playerModes.all}</option>
-                  <option value="registered">{t.playerModes.registered}</option>
-                  <option value="manual">{t.playerModes.manual}</option>
-                  <option value="mixed">{t.playerModes.mixed}</option>
-                </select>
-                <select
-                  value={accessFilter}
-                  onChange={(event) => setAccessFilter(event.target.value as "all" | "owned" | "institution" | "shared" | "unresolved")}
-                  className="h-10 min-w-0 w-full rounded-md border border-input bg-background px-3 text-sm"
-                >
-                  <option value="all">{t.accessOptions.all}</option>
-                  <option value="owned">{t.accessOptions.owned}</option>
-                  <option value="institution">{t.accessOptions.institution}</option>
-                  <option value="shared">{t.accessOptions.shared}</option>
-                  <option value="unresolved">{t.accessOptions.unresolved}</option>
-                </select>
-                {linkedOwnerUserId || linkedBleDeviceId || linkedDeviceId ? (
-                  <button
-                    type="button"
-                    onClick={() => router.push(pathname)}
-                    className="inline-flex h-10 min-w-0 items-center justify-center rounded-md border border-primary/20 bg-primary/5 px-3 text-sm font-medium text-primary transition hover:bg-primary/10"
-                  >
-                    {t.clearCrossFilter}
-                  </button>
-                ) : null}
-              </>
-            )}
-          </div>
-        }
       />
 
       {(scopedInstitutionName || linkedOwnerUserId || linkedBleDeviceId || linkedDeviceId) ? (
@@ -541,6 +567,8 @@ export function GamesTable() {
         </div>
       ) : null}
 
+      <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
+        <div className="min-w-0 space-y-6">
       {isResearcherView ? (
         <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
           <CardContent className="grid gap-3 p-5 md:grid-cols-3">
@@ -757,6 +785,133 @@ export function GamesTable() {
           )}
         </CardContent>
       </Card>
+        </div>
+
+        <aside className="xl:sticky xl:top-28">
+          <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Filter className="size-4 text-primary" />
+                {t.filters.title}
+              </CardTitle>
+              <CardDescription className="flex items-center gap-2 text-xs">
+                <CalendarDays className="size-3.5" />
+                {t.filters.newestFirst}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="relative">
+                <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+                <Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t.searchPlaceholder} className="pl-9" />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <label className="space-y-1.5 text-xs font-medium text-muted-foreground">
+                  {t.filters.dateFrom}
+                  <Input type="date" value={dateFrom} onChange={(event) => setDateFrom(event.target.value)} className="text-sm" />
+                </label>
+                <label className="space-y-1.5 text-xs font-medium text-muted-foreground">
+                  {t.filters.dateTo}
+                  <Input type="date" value={dateTo} onChange={(event) => setDateTo(event.target.value)} className="text-sm" />
+                </label>
+              </div>
+
+              {isFamilyView ? null : (
+                <>
+                  <label className="space-y-1.5 text-xs font-medium text-muted-foreground">
+                    {t.filters.institution}
+                    <select
+                      value={institutionFilter || scopedInstitutionId || ""}
+                      onChange={(event) => setInstitutionFilter(event.target.value)}
+                      className="h-10 min-w-0 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground"
+                      disabled={Boolean(scopedInstitutionId)}
+                    >
+                      <option value="">{t.allInstitutions}</option>
+                      {institutions.map((institution) => (
+                        <option key={institution.id} value={institution.id}>
+                          {institution.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <Input value={institutionQuery} onChange={(event) => setInstitutionQuery(event.target.value)} placeholder={t.filters.institutionPlaceholder} />
+                </>
+              )}
+
+              <label className="space-y-1.5 text-xs font-medium text-muted-foreground">
+                {t.filters.deck}
+                <Input value={deckQuery} onChange={(event) => setDeckQuery(event.target.value)} placeholder={t.filters.deckPlaceholder} />
+              </label>
+
+              <label className="space-y-1.5 text-xs font-medium text-muted-foreground">
+                {t.filters.device}
+                <Input value={deviceQuery} onChange={(event) => setDeviceQuery(event.target.value)} placeholder={t.filters.devicePlaceholder} />
+              </label>
+
+              <div className="grid grid-cols-2 gap-3">
+                <label className="space-y-1.5 text-xs font-medium text-muted-foreground">
+                  {t.filters.playerName}
+                  <Input value={playerNameQuery} onChange={(event) => setPlayerNameQuery(event.target.value)} placeholder={t.filters.playerNamePlaceholder} />
+                </label>
+                <label className="space-y-1.5 text-xs font-medium text-muted-foreground">
+                  {t.filters.playerCount}
+                  <Input inputMode="numeric" min={0} type="number" value={playerCountFilter} onChange={(event) => setPlayerCountFilter(event.target.value)} placeholder={t.filters.playerCountPlaceholder} />
+                </label>
+              </div>
+
+              {isFamilyView ? null : (
+                <>
+                  <label className="space-y-1.5 text-xs font-medium text-muted-foreground">
+                    {t.filters.playerMode}
+                    <select
+                      value={playerModeFilter}
+                      onChange={(event) => setPlayerModeFilter(event.target.value as "all" | "manual" | "mixed" | "registered")}
+                      className="h-10 min-w-0 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground"
+                    >
+                      <option value="all">{t.playerModes.all}</option>
+                      <option value="registered">{t.playerModes.registered}</option>
+                      <option value="manual">{t.playerModes.manual}</option>
+                      <option value="mixed">{t.playerModes.mixed}</option>
+                    </select>
+                  </label>
+                  <label className="space-y-1.5 text-xs font-medium text-muted-foreground">
+                    {t.filters.access}
+                    <select
+                      value={accessFilter}
+                      onChange={(event) => setAccessFilter(event.target.value as "all" | "owned" | "institution" | "shared" | "unresolved")}
+                      className="h-10 min-w-0 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground"
+                    >
+                      <option value="all">{t.accessOptions.all}</option>
+                      <option value="owned">{t.accessOptions.owned}</option>
+                      <option value="institution">{t.accessOptions.institution}</option>
+                      <option value="shared">{t.accessOptions.shared}</option>
+                      <option value="unresolved">{t.accessOptions.unresolved}</option>
+                    </select>
+                  </label>
+                </>
+              )}
+
+              {linkedOwnerUserId || linkedBleDeviceId || linkedDeviceId ? (
+                <button
+                  type="button"
+                  onClick={() => router.push(pathname)}
+                  className="inline-flex h-10 w-full items-center justify-center rounded-md border border-primary/20 bg-primary/5 px-3 text-sm font-medium text-primary transition hover:bg-primary/10"
+                >
+                  {t.clearCrossFilter}
+                </button>
+              ) : null}
+
+              <button
+                type="button"
+                onClick={resetFilters}
+                className="inline-flex h-10 w-full items-center justify-center rounded-md border border-input bg-background px-3 text-sm font-medium text-foreground transition hover:bg-accent"
+              >
+                {t.filters.clear}
+              </button>
+            </CardContent>
+          </Card>
+        </aside>
+      </div>
     </div>
   );
 }
