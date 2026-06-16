@@ -7,7 +7,7 @@ import { Activity, Cpu, HardDriveDownload, Search, Users, Waves } from "lucide-r
 import { SectionHeader } from "@/components/section-header";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { ListPaginationControls, useListPagination } from "@/components/ui/list-pagination-controls";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -440,19 +440,6 @@ export function SyncsTable() {
       <SectionHeader
         eyebrow={isFamilyView ? t.eyebrow.family : isResearcherView ? t.eyebrow.researcher : canReadOperationalSyncs ? (isTeacherView ? t.eyebrow.teacher : isDirectorView ? t.eyebrow.director : isInstitutionAdminView ? t.eyebrow.institutionAdmin : t.eyebrow.default) : isTeacherView ? t.eyebrow.teacher : t.eyebrow.personal}
         title={t.title}
-        description={
-          isFamilyView
-            ? t.description.family
-            : isResearcherView
-            ? t.description.researcher
-            : canReadOperationalSyncs
-            ? isTeacherView
-              ? t.description.teacher
-              : isDirectorView
-              ? t.description.director
-              : t.description.operational
-            : t.description.personal
-        }
         actions={
           <div className="grid w-full gap-3 md:grid-cols-2 2xl:grid-cols-[minmax(0,1.45fr)_minmax(220px,0.8fr)_minmax(220px,0.8fr)]">
             <div className="relative min-w-0 md:col-span-2 2xl:col-span-1">
@@ -507,35 +494,6 @@ export function SyncsTable() {
         </div>
       ) : null}
 
-      <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
-        <CardContent className="flex flex-wrap items-center justify-between gap-4 p-5">
-          <div>
-            <div className="flex flex-wrap items-center gap-2">
-              <p className="text-sm font-medium text-foreground">{t.accessAvailable}</p>
-              <Badge variant={isFamilyView || isResearcherView || canReadOperationalSyncs ? "secondary" : "outline"}>
-                {isFamilyView ? t.accessState.family : isResearcherView ? t.accessState.researcher : canReadOperationalSyncs ? t.accessState.operational : t.accessState.personal}
-              </Badge>
-              {isTeacherView && canReadOperationalSyncs ? <Badge variant="outline">{t.accessState.teacher}</Badge> : null}
-              {isDirectorView && canReadOperationalSyncs ? <Badge variant="outline">{t.accessState.director}</Badge> : null}
-              {isInstitutionAdminView ? <Badge variant="outline">{t.accessState.institutionAdmin}</Badge> : null}
-            </div>
-            <p className="mt-2 text-sm text-muted-foreground">
-              {isFamilyView
-                ? t.accessDetail.family
-                : isResearcherView
-                ? t.accessDetail.researcher
-                : canReadOperationalSyncs
-                ? isTeacherView
-                  ? t.accessDetail.teacher
-                  : isDirectorView
-                  ? t.accessDetail.director
-                  : t.accessDetail.operational
-                : t.accessDetail.personal}
-            </p>
-          </div>
-        </CardContent>
-      </Card>
-
       {isResearcherView ? (
         <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
           <CardContent className="grid gap-3 p-5 md:grid-cols-3">
@@ -580,7 +538,6 @@ export function SyncsTable() {
             <div className="mb-3 flex items-center justify-between gap-3">
               <div>
                 <p className="text-sm font-semibold text-foreground">{t.accessAvailable}</p>
-                <p className="text-sm text-muted-foreground">{t.accessHint}</p>
               </div>
               <Badge variant="outline">{filtered.length} resultados</Badge>
             </div>
@@ -628,17 +585,6 @@ export function SyncsTable() {
             <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
               <div>
                 <CardTitle>{isFamilyView ? t.listTitles.family : isResearcherView ? t.listTitles.researcher : isTeacherView ? t.listTitles.teacher : isDirectorView ? t.listTitles.director : t.listTitles.default}</CardTitle>
-                <CardDescription>
-                  {isFamilyView
-                    ? t.listDescriptions.family
-                    : isResearcherView
-                    ? t.listDescriptions.researcher
-                    : isTeacherView
-                    ? t.listDescriptions.teacher
-                    : isDirectorView
-                    ? t.listDescriptions.director
-                    : t.listDescriptions.default}
-                </CardDescription>
               </div>
               <ListPaginationControls
                 pageSize={pagination.pageSize}
@@ -739,17 +685,6 @@ export function SyncsTable() {
         <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
           <CardHeader>
             <CardTitle>{isFamilyView ? "Resumen de sincronización" : isResearcherView ? "Detalle de evidencia" : isTeacherView ? "Detalle para aula" : isDirectorView ? "Detalle de seguimiento" : "Detalle de sync"}</CardTitle>
-            <CardDescription>
-              {isFamilyView
-                ? "Resumen simple para entender qué se sincronizó, quiénes aparecen y si hay evidencia asociada."
-                : isResearcherView
-                ? "Panel para revisar rápidamente relaciones clave entre sync, usuario, dispositivo, participantes y evidencia cruda asociada."
-                : isTeacherView
-                ? "Panel docente para revisar rápido quién sincronizó, con qué dispositivo y si ya hay participantes o partida asociada."
-                : isDirectorView
-                ? "Panel de seguimiento para revisar correlación entre sync, dispositivo, participantes y evidencia cruda sin entrar en lectura excesivamente técnica."
-                : "Panel operativo para revisar rápidamente quién sincronizó, con qué dispositivo y qué evidencia raw quedó asociada."}
-            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-5">
             {!selectedSync ? (
