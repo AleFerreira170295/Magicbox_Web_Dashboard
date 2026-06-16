@@ -567,8 +567,6 @@ export function GamesTable() {
         </div>
       ) : null}
 
-      <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
-        <div className="min-w-0 space-y-6">
       {isResearcherView ? (
         <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
           <CardContent className="grid gap-3 p-5 md:grid-cols-3">
@@ -649,6 +647,8 @@ export function GamesTable() {
         </CardContent>
       </Card>
 
+      <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
+        <div className="min-w-0">
       <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
         <CardHeader>
           <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
