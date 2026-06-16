@@ -33,6 +33,16 @@ function readString(record: JsonObject, ...keys: string[]) {
   return "";
 }
 
+function readStringArray(record: JsonObject, ...keys: string[]) {
+  for (const key of keys) {
+    const value = record[key];
+    if (Array.isArray(value)) {
+      return value.filter((item): item is string => typeof item === "string" && item.trim().length > 0);
+    }
+  }
+  return [];
+}
+
 function normalizeAddress(value: unknown): UserAddress | null {
   const record = asRecord(value);
   const addressFirstLine = readString(record, "address_first_line", "addressFirstLine");
@@ -73,6 +83,7 @@ function normalizeUser(input: unknown): UserRecord {
     permissions: resolvePermissions(record),
     userType: readString(record, "user_type", "userType") || null,
     educationalCenterId: readString(record, "educational_center_id", "educationalCenterId") || null,
+    institutionScopeIds: readStringArray(record, "institution_scope_ids", "institutionScopeIds", "admin_institution_ids", "adminInstitutionIds"),
     status: deletedAt ? "deleted" : "active",
     phoneNumber: readString(record, "phone_number", "phoneNumber") || null,
     address: normalizeAddress(record.address),
@@ -168,6 +179,7 @@ export async function createUser(token: string, payload: CreateUserPayload) {
       user_type: payload.userType,
       roles: payload.roles,
       educational_center_id: payload.educationalCenterId || null,
+      admin_institution_ids: payload.adminInstitutionIds || [],
       image_url: payload.imageUrl || null,
       address: serializeAddress(payload.address),
     },
@@ -188,6 +200,7 @@ export async function updateUser(token: string, userId: string, payload: UpdateU
       user_type: payload.userType,
       roles: payload.roles,
       educational_center_id: payload.educationalCenterId || null,
+      admin_institution_ids: payload.adminInstitutionIds || [],
       image_url: payload.imageUrl || null,
       address: serializeAddress(payload.address),
     },

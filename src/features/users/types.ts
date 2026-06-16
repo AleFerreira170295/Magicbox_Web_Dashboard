@@ -20,6 +20,7 @@ export interface UserRecord {
   permissions: string[];
   userType?: string | null;
   educationalCenterId?: string | null;
+  institutionScopeIds?: string[];
   status?: string | null;
   phoneNumber?: string | null;
   address?: UserAddress | null;
@@ -39,6 +40,7 @@ export interface UserMutationPayload {
   userType: "web" | "mobile" | "web|mobile";
   roles: string[];
   educationalCenterId?: string | null;
+  adminInstitutionIds?: string[];
   imageUrl?: string | null;
   address?: UserAddress | null;
 }

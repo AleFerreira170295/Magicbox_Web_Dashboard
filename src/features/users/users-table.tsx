@@ -461,6 +461,7 @@ type UserFormState = {
   userType: CreateUserPayload["userType"];
   roles: string[];
   educationalCenterId: string;
+  adminInstitutionIds: string[];
   imageUrl: string;
   addressFirstLine: string;
   addressSecondLine: string;
@@ -495,6 +496,7 @@ function emptyFormState(): UserFormState {
     userType: "web",
     roles: [],
     educationalCenterId: "",
+    adminInstitutionIds: [],
     imageUrl: "",
     addressFirstLine: "",
     addressSecondLine: "",
@@ -515,6 +517,7 @@ function formFromUser(user: UserRecord): UserFormState {
     userType: user.userType === "mobile" || user.userType === "web|mobile" ? user.userType : "web",
     roles: user.roles || [],
     educationalCenterId: user.educationalCenterId || "",
+    adminInstitutionIds: user.institutionScopeIds || [],
     imageUrl: user.imageUrl || "",
     addressFirstLine: user.address?.addressFirstLine || "",
     addressSecondLine: user.address?.addressSecondLine || "",
@@ -547,14 +550,21 @@ function buildPayload(form: UserFormState, mode: FormMode) {
     return { error: "Si cargás dirección, completá al menos calle, ciudad y país." };
   }
 
+  const roles = Array.from(new Set(form.roles)).sort();
+  const adminInstitutionIds = Array.from(new Set(form.adminInstitutionIds.filter(Boolean))).sort();
+  if (!roles.includes("admin") && adminInstitutionIds.length > 0) {
+    return { error: "Solo los usuarios con rol admin pueden tener varias instituciones asignadas." };
+  }
+
   const payload: UserMutationPayload = {
     firstName: form.firstName.trim(),
     lastName: form.lastName.trim(),
     email: form.email.trim().toLowerCase(),
     phoneNumber: form.phoneNumber.trim(),
     userType: form.userType,
-    roles: Array.from(new Set(form.roles)).sort(),
+    roles,
     educationalCenterId: form.educationalCenterId.trim() || null,
+    adminInstitutionIds: roles.includes("admin") ? adminInstitutionIds : [],
     imageUrl: form.imageUrl.trim() || null,
     address: addressTouched
       ? {
@@ -848,7 +858,9 @@ export function UsersTable() {
       const explicitPermissions = permissionsByUserId.get(user.id) || [];
       const explicitPermissionKeys = Array.from(new Set(explicitPermissions.map((item) => item.key)));
       const inferredRoles = inferRoles(user, explicitPermissionKeys);
-      const needsReview = !user.educationalCenterId || !user.phoneNumber || !user.address;
+      const institutionScopeIds = user.institutionScopeIds || [];
+      const hasInstitutionAccess = Boolean(user.educationalCenterId || institutionScopeIds.length > 0);
+      const needsReview = !hasInstitutionAccess || !user.phoneNumber || !user.address;
 
       return {
         ...user,
@@ -896,13 +908,14 @@ export function UsersTable() {
           item.userType,
           item.educationalCenterId,
           institutionsById.get(item.educationalCenterId || ""),
+          (item.institutionScopeIds || []).map((scopeId) => institutionsById.get(scopeId) || scopeId).join(", "),
           item.inferredRoles.join(", "),
           item.explicitPermissionKeys.join(", "),
         ]
           .filter(Boolean)
           .some((value) => String(value).toLowerCase().includes(normalized));
 
-      const matchesInstitution = !institutionFilter || item.educationalCenterId === institutionFilter;
+      const matchesInstitution = !institutionFilter || item.educationalCenterId === institutionFilter || (item.institutionScopeIds || []).includes(institutionFilter);
       const matchesRole = !roleFilter || item.inferredRoles.includes(roleFilter);
       const matchesFocus = (() => {
         switch (focusFilter) {
@@ -1083,6 +1096,7 @@ export function UsersTable() {
       roles: current.roles.includes(role)
         ? current.roles.filter((item) => item !== role)
         : [...current.roles, role].sort(),
+      adminInstitutionIds: role === "admin" && current.roles.includes(role) ? [] : current.adminInstitutionIds,
     }));
   }
 
@@ -1103,6 +1117,7 @@ export function UsersTable() {
         userType: user.userType === "mobile" || user.userType === "web|mobile" ? user.userType : "web",
         roles,
         educationalCenterId: user.educationalCenterId || null,
+        adminInstitutionIds: user.institutionScopeIds || [],
         imageUrl: user.imageUrl || null,
         address: user.address || null,
       },
@@ -1110,8 +1125,19 @@ export function UsersTable() {
   }
 
   function resolveInstitutionLabel(user: UserRecord) {
-    if (!user.educationalCenterId) return language === "en" ? "No institution" : language === "pt" ? "Sem instituição" : "Sin institución";
-    return institutionsById.get(user.educationalCenterId) || user.educationalCenterId;
+    const labels = Array.from(new Set([user.educationalCenterId, ...(user.institutionScopeIds || [])].filter(Boolean) as string[]))
+      .map((institutionId) => institutionsById.get(institutionId) || institutionId);
+    if (labels.length === 0) return language === "en" ? "No institution" : language === "pt" ? "Sem instituição" : "Sin institución";
+    return labels.join(", ");
+  }
+
+  function toggleAdminInstitution(institutionId: string) {
+    setForm((current) => {
+      const selected = current.adminInstitutionIds.includes(institutionId)
+        ? current.adminInstitutionIds.filter((item) => item !== institutionId)
+        : [...current.adminInstitutionIds, institutionId].sort();
+      return { ...current, adminInstitutionIds: selected };
+    });
   }
 
   function resolveScopeLabel(educationalCenterId?: string | null) {
@@ -1251,7 +1277,12 @@ export function UsersTable() {
       return;
     }
 
-    const missingKeys = bundle.permissionKeys.filter((key) => !user.explicitPermissionKeys.includes(key));
+    const scopedKeys = new Set(
+      user.explicitPermissions
+        .filter((item) => (scope === GLOBAL_SCOPE ? !item.educationalCenterId : item.educationalCenterId === scope))
+        .map((item) => item.key),
+    );
+    const missingKeys = bundle.permissionKeys.filter((key) => !scopedKeys.has(key));
     const nextRoles = Array.from(new Set([...user.roles, bundle.role])).sort();
     if (missingKeys.length === 0 && user.roles.includes(bundle.role)) {
       showFeedback({ type: "success", message: `El bundle ${bundle.label} ya está completo.` });
@@ -1478,6 +1509,30 @@ export function UsersTable() {
                         : "Podés dejar el usuario sin institución o asignarlo explícitamente."}
                     </p>
                   </div>
+                  {form.roles.includes("admin") ? (
+                    <div className="space-y-2 md:col-span-2">
+                      <Label>Instituciones asignadas al admin</Label>
+                      <div className="grid max-h-48 gap-2 overflow-auto rounded-2xl border border-border bg-background/70 p-3 md:grid-cols-2">
+                        {institutions.map((institution) => {
+                          const checked = form.adminInstitutionIds.includes(institution.id);
+                          return (
+                            <label key={institution.id} className="flex items-center gap-2 text-sm text-foreground">
+                              <input
+                                type="checkbox"
+                                checked={checked}
+                                disabled={!canSubmitForm || Boolean(scopedInstitutionId)}
+                                onChange={() => toggleAdminInstitution(institution.id)}
+                              />
+                              <span>{institution.name}</span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Si no seleccionás instituciones, el admin conserva alcance global de superadmin. Si seleccionás una o más, solo verá esas instituciones.
+                      </p>
+                    </div>
+                  ) : null}
                   <ImageUploadField
                     value={form.imageUrl}
                     file={imageFile}
