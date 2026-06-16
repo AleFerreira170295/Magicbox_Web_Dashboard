@@ -5,7 +5,9 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { type ComponentType, useMemo, useState } from "react";
-import { BadgeCheck, CreditCard, GraduationCap, Search, UserRound, Users, Waves } from "lucide-react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { BadgeCheck, CreditCard, GraduationCap, Search, Trash2, UserRound, Users, Waves } from "lucide-react";
+import { DeleteRecordDialog } from "@/components/delete-record-dialog";
 import { SectionHeader } from "@/components/section-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -15,12 +17,13 @@ import { ListPaginationControls, useListPagination } from "@/components/ui/list-
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useAuth } from "@/features/auth/auth-context";
+import { hasAnyUserPermission, isAdminSession } from "@/features/auth/permission-contract";
 import { useClassGroups } from "@/features/class-groups/api";
 import { useGames } from "@/features/games/api";
 import { useInstitutions } from "@/features/institutions/api";
-import { useProfilesOverview } from "@/features/profiles/api";
+import { deleteHomeProfile, useProfilesOverview } from "@/features/profiles/api";
 import { buildProfileDetailHref } from "@/features/profiles/profile-route";
-import { useStudents } from "@/features/students/api";
+import { deleteStudent, useStudents } from "@/features/students/api";
 import { cn, formatDateTime, getErrorMessage } from "@/lib/utils";
 
 type ProfilesFocusFilter = "all" | "no_avatar" | "no_cards" | "no_sessions" | "no_owner" | "institution_linked";
@@ -125,6 +128,9 @@ export function RelevantProfiles() {
   const [institutionFilter, setInstitutionFilter] = useState<string | null>(null);
   const [activityFilter, setActivityFilter] = useState<"all" | "active" | "inactive">("all");
   const [focusFilter, setFocusFilter] = useState<ProfilesFocusFilter>("all");
+  const [selectedEntityIds, setSelectedEntityIds] = useState<Set<string>>(new Set());
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const queryClient = useQueryClient();
 
   const profilesQuery = useProfilesOverview(tokens?.accessToken);
   const institutionsQuery = useInstitutions(tokens?.accessToken);
@@ -336,6 +342,26 @@ export function RelevantProfiles() {
 
   const pagination = useListPagination(filtered);
   const paginatedFiltered = pagination.paginatedItems;
+  const visibleSelectableIds = useMemo(() => paginatedFiltered.map((entity) => entity.id), [paginatedFiltered]);
+  const selectedEntities = useMemo(
+    () => entities.filter((entity) => selectedEntityIds.has(entity.id)),
+    [entities, selectedEntityIds],
+  );
+  const selectedDeletableEntities = useMemo(() => {
+    return selectedEntities.filter((entity) => {
+      if (entity.kind === "student") {
+        return isAdminSession(currentUser) || hasAnyUserPermission(currentUser, "student:delete");
+      }
+
+      return (
+        isAdminSession(currentUser) ||
+        hasAnyUserPermission(currentUser, "profile:delete", "home_profile:delete") ||
+        Boolean(entity.userId && entity.userId === currentUser?.id)
+      );
+    });
+  }, [currentUser, selectedEntities]);
+  const allVisibleSelected = visibleSelectableIds.length > 0 && visibleSelectableIds.every((id) => selectedEntityIds.has(id));
+  const someVisibleSelected = visibleSelectableIds.some((id) => selectedEntityIds.has(id));
 
   const metrics = useMemo(() => {
     const activeProfiles = entities.filter((profile) => profile.isActive).length;
@@ -375,6 +401,56 @@ export function RelevantProfiles() {
 
   const hasAnyError = profilesQuery.error || institutionsQuery.error || classGroupsQuery.error || studentsQuery.error || gamesQuery.error;
   const isLoading = profilesQuery.isLoading || institutionsQuery.isLoading || classGroupsQuery.isLoading || studentsQuery.isLoading || gamesQuery.isLoading;
+  const deleteSelectedMutation = useMutation({
+    mutationFn: async () => {
+      if (!tokens?.accessToken) throw new Error("No hay sesión activa.");
+      if (selectedDeletableEntities.length === 0) throw new Error("No hay registros seleccionados con permiso de borrado.");
+
+      for (const entity of selectedDeletableEntities) {
+        if (entity.kind === "student") {
+          await deleteStudent(tokens.accessToken, entity.entityId);
+        } else {
+          await deleteHomeProfile(tokens.accessToken, entity.entityId);
+        }
+      }
+    },
+    onSuccess: async () => {
+      setSelectedEntityIds(new Set());
+      setIsDeleteDialogOpen(false);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["profiles-overview"] }),
+        queryClient.invalidateQueries({ queryKey: ["students"] }),
+      ]);
+    },
+  });
+
+  function toggleEntitySelection(entityId: string) {
+    setSelectedEntityIds((current) => {
+      const next = new Set(current);
+      if (next.has(entityId)) {
+        next.delete(entityId);
+      } else {
+        next.add(entityId);
+      }
+      return next;
+    });
+  }
+
+  function toggleVisibleSelection() {
+    setSelectedEntityIds((current) => {
+      const next = new Set(current);
+      if (allVisibleSelected) {
+        for (const id of visibleSelectableIds) next.delete(id);
+      } else {
+        for (const id of visibleSelectableIds) next.add(id);
+      }
+      return next;
+    });
+  }
+
+  async function confirmDeleteSelected() {
+    await deleteSelectedMutation.mutateAsync();
+  }
 
   return (
     <div className="space-y-6">
@@ -424,28 +500,6 @@ export function RelevantProfiles() {
           </div>
         }
       />
-
-      <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
-        <CardContent className="flex flex-wrap items-center justify-between gap-4 p-5">
-          <div>
-            <div className="flex flex-wrap items-center gap-2">
-              <p className="text-sm font-medium text-foreground">Contexto de vista</p>
-              <Badge variant={isInstitutionScopedView ? "secondary" : "outline"}>
-                {isInstitutionScopedView ? (isDirectorView ? "director" : "institution-admin") : "multi-institución / global"}
-              </Badge>
-              <Badge variant="outline">profiles + estudiantes</Badge>
-            </div>
-            <p className="mt-2 text-sm text-muted-foreground">
-              {isInstitutionScopedView
-                ? isDirectorView
-                  ? "La lectura directoral mantiene el foco institucional e incorpora estudiantes de la misma institución."
-                  : "La tabla queda anclada a la institución asignada y suma estudiantes además de perfiles Home."
-                : "La vista reúne perfiles Home y estudiantes según los permisos del usuario."}
-            </p>
-          </div>
-          {scopedInstitutionName ? <Badge variant="outline">Institución activa: {scopedInstitutionName}</Badge> : null}
-        </CardContent>
-      </Card>
 
       <div className="grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(220px,1fr))]">
         {isLoading ? (
@@ -519,6 +573,32 @@ export function RelevantProfiles() {
                 controlsTestId="profiles-pagination-controls"
               />
             </div>
+            <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border/70 bg-background/70 p-4">
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge variant={selectedEntityIds.size > 0 ? "secondary" : "outline"}>
+                  {selectedEntityIds.size} seleccionados
+                </Badge>
+                {someVisibleSelected ? <Badge variant="outline">selección visible activa</Badge> : null}
+                {selectedEntityIds.size > selectedDeletableEntities.length ? (
+                  <Badge variant="outline">{selectedEntityIds.size - selectedDeletableEntities.length} sin permiso de borrado</Badge>
+                ) : null}
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button type="button" variant="outline" size="sm" onClick={toggleVisibleSelection} disabled={visibleSelectableIds.length === 0}>
+                  {allVisibleSelected ? "Quitar selección visible" : "Seleccionar lista visible"}
+                </Button>
+                <Button
+                  type="button"
+                  variant="destructive"
+                  size="sm"
+                  disabled={selectedDeletableEntities.length === 0 || deleteSelectedMutation.isPending}
+                  onClick={() => setIsDeleteDialogOpen(true)}
+                >
+                  <Trash2 className="size-4" />
+                  Borrar seleccionados
+                </Button>
+              </div>
+            </div>
           </CardHeader>
           <CardContent className="overflow-x-auto p-0">
             {isLoading ? (
@@ -531,6 +611,17 @@ export function RelevantProfiles() {
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead className="w-12">
+                      <input
+                        type="checkbox"
+                        aria-label="Seleccionar lista visible"
+                        checked={allVisibleSelected}
+                        ref={(input) => {
+                          if (input) input.indeterminate = someVisibleSelected && !allVisibleSelected;
+                        }}
+                        onChange={toggleVisibleSelection}
+                      />
+                    </TableHead>
                     <TableHead>Perfil</TableHead>
                     <TableHead>Tipo / contexto</TableHead>
                     <TableHead>Institución</TableHead>
@@ -542,7 +633,7 @@ export function RelevantProfiles() {
                 <TableBody>
                   {filtered.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={6} className="py-10 text-center text-sm text-muted-foreground">
+                      <TableCell colSpan={7} className="py-10 text-center text-sm text-muted-foreground">
                         {isInstitutionScopedView
                           ? "No hay perfiles ni estudiantes dentro de la institución actual."
                           : "No hay perfiles ni estudiantes para mostrar."}
@@ -563,6 +654,14 @@ export function RelevantProfiles() {
                         className="cursor-pointer transition hover:bg-muted/40"
                         onClick={() => router.push(detailHref)}
                       >
+                        <TableCell onClick={(event) => event.stopPropagation()}>
+                          <input
+                            type="checkbox"
+                            aria-label={`Seleccionar ${profile.displayName}`}
+                            checked={selectedEntityIds.has(profile.id)}
+                            onChange={() => toggleEntitySelection(profile.id)}
+                          />
+                        </TableCell>
                         <TableCell>
                           <div className="flex min-w-0 items-center gap-3">
                             <ProfileAvatar profile={profile} className="size-10 text-[11px]" />
@@ -631,6 +730,16 @@ export function RelevantProfiles() {
           </p>
         </CardContent>
       </Card>
+
+      <DeleteRecordDialog
+        open={isDeleteDialogOpen}
+        onClose={() => setIsDeleteDialogOpen(false)}
+        onConfirm={confirmDeleteSelected}
+        isPending={deleteSelectedMutation.isPending}
+        title={`Eliminar ${selectedDeletableEntities.length} registro${selectedDeletableEntities.length === 1 ? "" : "s"}`}
+        description="Se van a borrar los perfiles y estudiantes seleccionados para los que tu usuario tiene permiso. Esta acción impacta directamente en el listado visible."
+        confirmLabel="Sí, borrar seleccionados"
+      />
     </div>
   );
 }
