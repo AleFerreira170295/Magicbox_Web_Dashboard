@@ -66,6 +66,14 @@ function getExperienceMeta(
 function buildNavigation(t: ReturnType<typeof useLanguage>["t"]): NavigationItem[] {
   return [
   {
+    href: "/profile",
+    label: t.appShell.navigation.profile.label,
+    summary: t.appShell.navigation.profile.summary,
+    section: "summary",
+    icon: UserRound,
+    roles: ["teacher", "director", "researcher", "family", "admin", "institution-admin", "government-viewer"] satisfies NavigationRole[],
+  },
+  {
     href: "/dashboard",
     label: t.appShell.navigation.dashboard.label,
     summary: t.appShell.navigation.dashboard.summary,
