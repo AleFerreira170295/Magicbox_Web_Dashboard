@@ -244,7 +244,7 @@ describe("SuperadminDashboard", () => {
     renderDashboard();
 
     expect(screen.getByText(/Mapa de centros con dispositivos/i)).toBeInTheDocument();
-    expect(screen.getByText(/Qué mirar primero/i)).toBeInTheDocument();
+    expect(screen.queryByText(/Qué mirar primero/i)).not.toBeInTheDocument();
     expect(screen.getByText("Mini tendencias")).toBeInTheDocument();
     expect(screen.getByText("Comparativa entre períodos")).toBeInTheDocument();
     expect(screen.getByText("Semáforos de seguimiento")).toBeInTheDocument();
