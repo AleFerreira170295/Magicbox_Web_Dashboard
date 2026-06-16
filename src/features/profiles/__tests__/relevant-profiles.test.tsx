@@ -17,6 +17,7 @@ vi.mock("@/features/auth/auth-context", () => ({
 
 vi.mock("@/features/profiles/api", () => ({
   useProfilesOverview: (...args: unknown[]) => useProfilesOverviewMock(...args),
+  deleteHomeProfile: vi.fn(),
 }));
 
 vi.mock("@/features/institutions/api", () => ({
@@ -29,6 +30,7 @@ vi.mock("@/features/class-groups/api", () => ({
 
 vi.mock("@/features/students/api", () => ({
   useStudents: (...args: unknown[]) => useStudentsMock(...args),
+  deleteStudent: vi.fn(),
 }));
 
 vi.mock("@/features/games/api", () => ({
@@ -211,8 +213,8 @@ describe("RelevantProfiles", () => {
     renderProfiles();
 
     expect(screen.getAllByText("Institution admin")[0]).toBeInTheDocument();
-    expect(screen.getByText(/Institución activa: Colegio Norte/)).toBeInTheDocument();
-    expect(screen.getByText(/la tabla queda anclada a la institución asignada y suma estudiantes además de perfiles Home/i)).toBeInTheDocument();
+    expect(screen.getByText(/Vista institucional para Colegio Norte/i)).toBeInTheDocument();
+    expect(screen.queryByText(/Contexto de vista/i)).not.toBeInTheDocument();
     expect(screen.getAllByRole("combobox")[0]).toBeDisabled();
     expect(screen.getByRole("link", { name: "Luna Pérez" })).toHaveAttribute(
       "href",
@@ -266,7 +268,8 @@ describe("RelevantProfiles", () => {
     renderProfiles();
 
     expect(screen.getAllByText("Institution admin")[0]).toBeInTheDocument();
-    expect(screen.getByText(/la tabla queda anclada a la institución asignada y suma estudiantes además de perfiles Home/i)).toBeInTheDocument();
+    expect(screen.getByText(/Vista institucional para Colegio Norte/i)).toBeInTheDocument();
+    expect(screen.queryByText(/Contexto de vista/i)).not.toBeInTheDocument();
     expect(screen.getByText(/No hay perfiles ni estudiantes dentro de la institución actual/i)).toBeInTheDocument();
     expect(screen.getAllByRole("combobox")[0]).toBeDisabled();
   });
