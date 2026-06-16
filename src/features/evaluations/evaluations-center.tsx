@@ -39,7 +39,7 @@ const evaluationMessages: Record<AppLanguage, {
   header: { eyebrow: string; title: string; description: string; search: string };
   metrics: { evaluations: string; evaluationsHint: string; results: string; resultsHint: string; groups: string; groupsHint: string; average: string; averageHint: string };
   charts: { groupTitle: string; groupDesc: string; groupEmpty: string; studentTitle: string; studentDesc: string; student: string; selectGroup: string; studentEmpty: string; result: string };
-  filters: { title: string; desc: string; institution: string; allVisible: string; group: string; allGroups: string };
+  filters: { title: string; desc: string; search: string; dateFrom: string; dateTo: string; institution: string; allVisible: string; group: string; allGroups: string };
   form: { title: string; desc: string; titleLabel: string; titlePlaceholder: string; subject: string; subjectFallback: string; date: string; type: string; scale: string; max: string; notes: string; notesPlaceholder: string; importTitle: string; importDesc: string; file: string; groupResults: string; students: (count: number) => string; score: string; level: string; state: string; observation: string; noGroup: string; none: string; save: string };
   list: { title: string; desc: string; empty: string; resultsCount: (count: number) => string };
   detail: { title: string; desc: string; empty: string; student: string; result: string; level: string; observation: string; noResults: string };
@@ -61,7 +61,7 @@ const evaluationMessages: Record<AppLanguage, {
     header: { eyebrow: "Evaluaciones", title: "Pruebas realizadas por estudiantes", description: "Carga y consulta de evaluaciones pedagógicas por grupo, con resultados individuales y alcance institucional.", search: "Buscar evaluación, área o grupo" },
     metrics: { evaluations: "Evaluaciones", evaluationsHint: "Pruebas cargadas en el alcance actual.", results: "Resultados", resultsHint: "Registros individuales asociados a estudiantes.", groups: "Grupos", groupsHint: "Grupos con evaluaciones registradas.", average: "Promedio", averageHint: "Promedio agregado cuando existe porcentaje." },
     charts: { groupTitle: "Resultados por grupo", groupDesc: "Promedio porcentual de cada grupo visible a lo largo del tiempo.", groupEmpty: "Todavía no hay promedios suficientes para graficar grupos.", studentTitle: "Resultados por estudiante", studentDesc: "Evolución porcentual del estudiante seleccionado dentro del grupo activo.", student: "Estudiante", selectGroup: "Seleccioná un grupo", studentEmpty: "Seleccioná un grupo con evaluaciones y resultados para graficar estudiantes.", result: "Resultado" },
-    filters: { title: "Filtros de alcance", desc: "Los grupos se consultan como entidades reales del backend y se filtran por institución cuando corresponde.", institution: "Institución", allVisible: "Todas las visibles", group: "Grupo", allGroups: "Todos los grupos" },
+    filters: { title: "Filtros", desc: "Ajustá la lectura de resultados por grupo, estudiante y evaluaciones cargadas.", search: "Buscar evaluación, área o grupo", dateFrom: "Desde", dateTo: "Hasta", institution: "Institución", allVisible: "Todas las visibles", group: "Grupo", allGroups: "Todos los grupos" },
     form: { title: "Nueva evaluación", desc: "Cargá resultados manualmente o importalos desde CSV/XLSX usando legajo, id o nombre del estudiante.", titleLabel: "Título", titlePlaceholder: "Diagnóstico inicial", subject: "Área", subjectFallback: "Sin área", date: "Fecha", type: "Tipo", scale: "Escala", max: "Máximo", notes: "Notas", notesPlaceholder: "Observaciones generales", importTitle: "Importar resultados", importDesc: "Columnas aceptadas: legajo/id, estudiante/nombre, puntaje/nota, máximo, nivel, aprobado y observaciones.", file: "CSV o Excel", groupResults: "Resultados del grupo", students: (count) => `${count} estudiantes`, score: "Puntaje", level: "Nivel", state: "Estado", observation: "Observación", noGroup: "Seleccioná un grupo para cargar resultados.", none: "-", save: "Guardar evaluación" },
     list: { title: "Evaluaciones cargadas", desc: "Listado operativo del alcance actual, con acceso al detalle y resultados asociados.", empty: "No hay evaluaciones para los filtros actuales.", resultsCount: (count) => `${count} resultados` },
     detail: { title: "Detalle", desc: "Resultados individuales de la evaluación seleccionada.", empty: "Seleccioná una evaluación para ver sus resultados.", student: "Estudiante", result: "Resultado", level: "Nivel", observation: "Observación", noResults: "Esta evaluación todavía no tiene resultados cargados." },
@@ -83,7 +83,7 @@ const evaluationMessages: Record<AppLanguage, {
     header: { eyebrow: "Evaluations", title: "Student assessments", description: "Load and review pedagogical evaluations by group, with individual results and institutional scope.", search: "Search evaluation, subject, or group" },
     metrics: { evaluations: "Evaluations", evaluationsHint: "Assessments loaded in the current scope.", results: "Results", resultsHint: "Individual records linked to students.", groups: "Groups", groupsHint: "Groups with registered evaluations.", average: "Average", averageHint: "Aggregated average when a percentage exists." },
     charts: { groupTitle: "Results by group", groupDesc: "Percentage average for each visible group over time.", groupEmpty: "There are not enough averages yet to chart groups.", studentTitle: "Results by student", studentDesc: "Percentage trend for the selected student in the active group.", student: "Student", selectGroup: "Select a group", studentEmpty: "Select a group with evaluations and results to chart students.", result: "Result" },
-    filters: { title: "Scope filters", desc: "Groups are queried as real backend entities and filtered by institution when needed.", institution: "Institution", allVisible: "All visible", group: "Group", allGroups: "All groups" },
+    filters: { title: "Filters", desc: "Adjust the group, student, and loaded evaluation results view.", search: "Search evaluation, subject, or group", dateFrom: "From", dateTo: "To", institution: "Institution", allVisible: "All visible", group: "Group", allGroups: "All groups" },
     form: { title: "New evaluation", desc: "Load results manually or import them from CSV/XLSX using student file number, id, or name.", titleLabel: "Title", titlePlaceholder: "Initial diagnostic", subject: "Subject", subjectFallback: "No subject", date: "Date", type: "Type", scale: "Scale", max: "Maximum", notes: "Notes", notesPlaceholder: "General observations", importTitle: "Import results", importDesc: "Accepted columns: file number/id, student/name, score/grade, maximum, level, passed, and observations.", file: "CSV or Excel", groupResults: "Group results", students: (count) => `${count} students`, score: "Score", level: "Level", state: "Status", observation: "Observation", noGroup: "Select a group to load results.", none: "-", save: "Save evaluation" },
     list: { title: "Loaded evaluations", desc: "Operational list for the current scope, with access to details and linked results.", empty: "There are no evaluations for the current filters.", resultsCount: (count) => `${count} results` },
     detail: { title: "Detail", desc: "Individual results for the selected evaluation.", empty: "Select an evaluation to see its results.", student: "Student", result: "Result", level: "Level", observation: "Observation", noResults: "This evaluation does not have loaded results yet." },
@@ -105,7 +105,7 @@ const evaluationMessages: Record<AppLanguage, {
     header: { eyebrow: "Avaliações", title: "Avaliações realizadas por estudantes", description: "Carregue e consulte avaliações pedagógicas por grupo, com resultados individuais e escopo institucional.", search: "Buscar avaliação, área ou grupo" },
     metrics: { evaluations: "Avaliações", evaluationsHint: "Avaliações carregadas no escopo atual.", results: "Resultados", resultsHint: "Registros individuais associados a estudantes.", groups: "Grupos", groupsHint: "Grupos com avaliações registradas.", average: "Média", averageHint: "Média agregada quando existe percentual." },
     charts: { groupTitle: "Resultados por grupo", groupDesc: "Média percentual de cada grupo visível ao longo do tempo.", groupEmpty: "Ainda não há médias suficientes para graficar grupos.", studentTitle: "Resultados por estudante", studentDesc: "Evolução percentual do estudante selecionado no grupo ativo.", student: "Estudante", selectGroup: "Selecione um grupo", studentEmpty: "Selecione um grupo com avaliações e resultados para graficar estudantes.", result: "Resultado" },
-    filters: { title: "Filtros de escopo", desc: "Os grupos são consultados como entidades reais do backend e filtrados por instituição quando necessário.", institution: "Instituição", allVisible: "Todas visíveis", group: "Grupo", allGroups: "Todos os grupos" },
+    filters: { title: "Filtros", desc: "Ajuste a leitura de resultados por grupo, estudante e avaliações carregadas.", search: "Buscar avaliação, área ou grupo", dateFrom: "Desde", dateTo: "Até", institution: "Instituição", allVisible: "Todas visíveis", group: "Grupo", allGroups: "Todos os grupos" },
     form: { title: "Nova avaliação", desc: "Carregue resultados manualmente ou importe de CSV/XLSX usando matrícula, id ou nome do estudante.", titleLabel: "Título", titlePlaceholder: "Diagnóstico inicial", subject: "Área", subjectFallback: "Sem área", date: "Data", type: "Tipo", scale: "Escala", max: "Máximo", notes: "Notas", notesPlaceholder: "Observações gerais", importTitle: "Importar resultados", importDesc: "Colunas aceitas: matrícula/id, estudante/nome, pontuação/nota, máximo, nível, aprovado e observações.", file: "CSV ou Excel", groupResults: "Resultados do grupo", students: (count) => `${count} estudantes`, score: "Pontuação", level: "Nível", state: "Estado", observation: "Observação", noGroup: "Selecione um grupo para carregar resultados.", none: "-", save: "Salvar avaliação" },
     list: { title: "Avaliações carregadas", desc: "Lista operacional do escopo atual, com acesso ao detalhe e resultados associados.", empty: "Não há avaliações para os filtros atuais.", resultsCount: (count) => `${count} resultados` },
     detail: { title: "Detalhe", desc: "Resultados individuais da avaliação selecionada.", empty: "Selecione uma avaliação para ver seus resultados.", student: "Estudante", result: "Resultado", level: "Nível", observation: "Observação", noResults: "Esta avaliação ainda não tem resultados carregados." },
@@ -267,6 +267,8 @@ export function EvaluationsCenter() {
   const [institutionId, setInstitutionId] = useState(user?.educationalCenterId || "");
   const [classGroupId, setClassGroupId] = useState("");
   const [query, setQuery] = useState("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   const [selectedEvaluationId, setSelectedEvaluationId] = useState<string | null>(null);
   const [selectedStudentId, setSelectedStudentId] = useState("");
   const [title, setTitle] = useState("");
@@ -318,40 +320,47 @@ export function EvaluationsCenter() {
   const effectiveStudentId = selectedStudentId || students[0]?.id || "";
 
   const filteredEvaluations = useMemo(() => {
-    const normalized = query.trim().toLowerCase();
-    if (!normalized) return evaluations;
+    const normalized = normalizeText(query);
+    const fromTime = dateFrom ? new Date(`${dateFrom}T00:00:00`).getTime() : null;
+    const toTime = dateTo ? new Date(`${dateTo}T23:59:59.999`).getTime() : null;
     return evaluations.filter((evaluation) =>
-      [evaluation.title, evaluation.subject, displayType(evaluation.evaluationType, language), classGroupById.get(evaluation.classGroupId)?.name]
+      {
+        const evaluationTime = evaluation.evaluationDate ? new Date(`${evaluation.evaluationDate}T12:00:00`).getTime() : 0;
+        if (fromTime !== null && evaluationTime < fromTime) return false;
+        if (toTime !== null && evaluationTime > toTime) return false;
+        if (!normalized) return true;
+        return [evaluation.title, evaluation.subject, displayType(evaluation.evaluationType, language), classGroupById.get(evaluation.classGroupId)?.name]
         .filter(Boolean)
-        .some((value) => String(value).toLowerCase().includes(normalized)),
+          .some((value) => normalizeText(value).includes(normalized));
+      },
     );
-  }, [classGroupById, evaluations, language, query]);
+  }, [classGroupById, dateFrom, dateTo, evaluations, language, query]);
 
   const metrics = useMemo(() => {
-    const resultsCount = evaluations.reduce((acc, evaluation) => acc + evaluation.resultsCount, 0);
-    const averageValues = evaluations.map((evaluation) => evaluation.averagePercentage).filter((value): value is number => typeof value === "number" && !Number.isNaN(value));
+    const resultsCount = filteredEvaluations.reduce((acc, evaluation) => acc + evaluation.resultsCount, 0);
+    const averageValues = filteredEvaluations.map((evaluation) => evaluation.averagePercentage).filter((value): value is number => typeof value === "number" && !Number.isNaN(value));
     return {
-      evaluations: evaluations.length,
+      evaluations: filteredEvaluations.length,
       resultsCount,
-      classGroups: new Set(evaluations.map((evaluation) => evaluation.classGroupId)).size,
+      classGroups: new Set(filteredEvaluations.map((evaluation) => evaluation.classGroupId)).size,
       average: averageValues.length ? Math.round(averageValues.reduce((acc, value) => acc + value, 0) / averageValues.length) : null,
     };
-  }, [evaluations]);
+  }, [filteredEvaluations]);
 
   const groupTrend = useMemo(() => {
-    const groupIds = Array.from(new Set(evaluations.map((evaluation) => evaluation.classGroupId).filter(Boolean))).slice(0, chartColors.length);
+    const groupIds = Array.from(new Set(filteredEvaluations.map((evaluation) => evaluation.classGroupId).filter(Boolean))).slice(0, chartColors.length);
     const series = groupIds.map((groupId, index) => ({
       key: `group_${index}`,
       label: classGroupById.get(groupId)?.name || t.groupFallback(index + 1),
       color: chartColors[index],
       groupId,
     }));
-    const rows = Array.from(new Set(evaluations.map((evaluation) => evaluation.evaluationDate).filter(Boolean)))
+    const rows = Array.from(new Set(filteredEvaluations.map((evaluation) => evaluation.evaluationDate).filter(Boolean)))
       .sort()
       .map<TrendDatum>((date) => {
         const row: TrendDatum = { date };
         for (const item of series) {
-          const values = evaluations
+          const values = filteredEvaluations
             .filter((evaluation) => evaluation.evaluationDate === date && evaluation.classGroupId === item.groupId)
             .map((evaluation) => evaluation.averagePercentage)
             .filter((value): value is number => typeof value === "number" && !Number.isNaN(value));
@@ -360,11 +369,13 @@ export function EvaluationsCenter() {
         return row;
       });
     return { rows, series };
-  }, [classGroupById, evaluations, t]);
+  }, [classGroupById, filteredEvaluations, t]);
 
   const studentTrend = useMemo(() => {
     if (!effectiveStudentId) return [] as TrendDatum[];
+    const filteredIds = new Set(filteredEvaluations.map((evaluation) => evaluation.id));
     return detailedEvaluations
+      .filter((evaluation) => filteredIds.has(evaluation.id))
       .map<TrendDatum | null>((evaluation) => {
         const result = evaluation.results.find((item) => item.studentId === effectiveStudentId);
         const percentage = result ? resultPercentage(result) : null;
@@ -372,7 +383,7 @@ export function EvaluationsCenter() {
       })
       .filter((entry): entry is TrendDatum => Boolean(entry))
       .sort((a, b) => a.date.localeCompare(b.date));
-  }, [detailedEvaluations, effectiveStudentId, t.resultKey]);
+  }, [detailedEvaluations, effectiveStudentId, filteredEvaluations, t.resultKey]);
 
   function updateDraft(studentId: string, patch: Partial<ResultDraft>) {
     setResultDrafts((current) => ({
@@ -481,12 +492,6 @@ export function EvaluationsCenter() {
         eyebrow={t.header.eyebrow}
         title={t.header.title}
         description={t.header.description}
-        actions={
-          <div className="relative min-w-72">
-            <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
-            <Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t.header.search} className="pl-9" />
-          </div>
-        }
       />
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -501,6 +506,41 @@ export function EvaluationsCenter() {
           </>
         )}
       </div>
+
+      <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
+        <CardHeader>
+          <CardTitle>{t.filters.title}</CardTitle>
+          <CardDescription>{t.filters.desc}</CardDescription>
+        </CardHeader>
+        <CardContent className="grid gap-4 md:grid-cols-2 xl:grid-cols-[minmax(260px,1.4fr)_minmax(170px,0.7fr)_minmax(170px,0.7fr)_minmax(220px,1fr)_minmax(220px,1fr)]">
+          <div className="relative min-w-0">
+            <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t.filters.search} className="pl-9" />
+          </div>
+          <div className="space-y-1.5">
+            <Label>{t.filters.dateFrom}</Label>
+            <Input type="date" value={dateFrom} onChange={(event) => setDateFrom(event.target.value)} />
+          </div>
+          <div className="space-y-1.5">
+            <Label>{t.filters.dateTo}</Label>
+            <Input type="date" value={dateTo} onChange={(event) => setDateTo(event.target.value)} />
+          </div>
+          <div className="space-y-1.5">
+            <Label>{t.filters.institution}</Label>
+            <select value={institutionId} onChange={(event) => { setInstitutionId(event.target.value); setClassGroupId(""); setSelectedStudentId(""); }} className="h-11 w-full rounded-md border border-input bg-background px-3 text-sm">
+              <option value="">{t.filters.allVisible}</option>
+              {institutions.map((institution) => <option key={institution.id} value={institution.id}>{institution.name}</option>)}
+            </select>
+          </div>
+          <div className="space-y-1.5">
+            <Label>{t.filters.group}</Label>
+            <select value={classGroupId} onChange={(event) => { setClassGroupId(event.target.value); setSelectedStudentId(""); }} className="h-11 w-full rounded-md border border-input bg-background px-3 text-sm">
+              <option value="">{t.filters.allGroups}</option>
+              {classGroups.map((classGroup) => <option key={classGroup.id} value={classGroup.id}>{classGroup.name}</option>)}
+            </select>
+          </div>
+        </CardContent>
+      </Card>
 
       <div className="grid gap-6 xl:grid-cols-2">
         <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
@@ -538,29 +578,6 @@ export function EvaluationsCenter() {
 
       <div className="grid gap-6 xl:grid-cols-[1fr_1.15fr]">
         <div className="space-y-6">
-          <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
-            <CardHeader>
-              <CardTitle>{t.filters.title}</CardTitle>
-              <CardDescription>{t.filters.desc}</CardDescription>
-            </CardHeader>
-            <CardContent className="grid gap-4 md:grid-cols-2">
-              <div className="space-y-2">
-                <Label>{t.filters.institution}</Label>
-                <select value={institutionId} onChange={(event) => { setInstitutionId(event.target.value); setClassGroupId(""); setSelectedStudentId(""); }} className="h-11 w-full rounded-md border border-input bg-background px-3 text-sm">
-                  <option value="">{t.filters.allVisible}</option>
-                  {institutions.map((institution) => <option key={institution.id} value={institution.id}>{institution.name}</option>)}
-                </select>
-              </div>
-              <div className="space-y-2">
-                <Label>{t.filters.group}</Label>
-                <select value={classGroupId} onChange={(event) => { setClassGroupId(event.target.value); setSelectedStudentId(""); }} className="h-11 w-full rounded-md border border-input bg-background px-3 text-sm">
-                  <option value="">{t.filters.allGroups}</option>
-                  {classGroups.map((classGroup) => <option key={classGroup.id} value={classGroup.id}>{classGroup.name}</option>)}
-                </select>
-              </div>
-            </CardContent>
-          </Card>
-
           {canCreate ? (
             <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
               <CardHeader>
