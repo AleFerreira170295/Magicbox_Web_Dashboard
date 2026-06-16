@@ -1897,16 +1897,28 @@ export function UsersTable() {
         </Card>
 
         <div className="space-y-6">
+          <div className={cn("hidden 2xl:block", isFormModalOpen && "2xl:hidden")}>{renderUserEditorPanel()}</div>
+
           <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
             <CardHeader>
-              <CardTitle>{t.side.title}</CardTitle>
+              <CardTitle>{t.side.quickLinks}</CardTitle>
               <CardDescription>
-                {t.side.description}
+                {selectedUser ? t.side.quickLinksHint(selectedUser.fullName) : t.side.description}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              {mode === "edit" && selectedUser ? (
-                <div className="rounded-2xl border border-border/70 bg-white/80 p-4">
+              <div className="flex flex-wrap gap-3">
+                <Button type="button" onClick={openCreateUserForm} disabled={!canCreateUsers}>
+                  <UserPlus className="size-4" />
+                  {canCreateUsers ? t.header.newUser : t.header.creationUnavailable}
+                </Button>
+                <Button type="button" variant="outline" onClick={openEditUserForm} disabled={!selectedUser}>
+                  {t.side.editSelected}
+                </Button>
+              </div>
+
+              {selectedUser ? (
+                <div className="rounded-2xl border border-border/70 bg-background/70 p-4">
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div className="flex min-w-0 items-center gap-3">
                       <UserAvatar user={selectedUser} className="size-12 text-xs" />
@@ -1924,30 +1936,7 @@ export function UsersTable() {
                       ))}
                     </div>
                   </div>
-                </div>
-              ) : (
-                <div className="rounded-2xl border border-border/70 bg-white/80 p-4 text-sm leading-6 text-muted-foreground">
-                  {t.side.empty}
-                </div>
-              )}
-
-              <div className="flex flex-wrap gap-3">
-                <Button type="button" onClick={openCreateUserForm} disabled={!canCreateUsers}>
-                  <UserPlus className="size-4" />
-                  {canCreateUsers ? t.header.newUser : t.header.creationUnavailable}
-                </Button>
-                <Button type="button" variant="outline" onClick={openEditUserForm} disabled={!selectedUser}>
-                  {t.side.editSelected}
-                </Button>
-              </div>
-
-              {selectedUser ? (
-                <div className="rounded-2xl border border-border/70 bg-background/70 p-4">
-                  <p className="text-sm font-medium text-foreground">{t.side.quickLinks}</p>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    {t.side.quickLinksHint(selectedUser.fullName)}
-                  </p>
-                  <div className="mt-3 flex flex-wrap gap-3">
+                  <div className="mt-4 flex flex-wrap gap-3">
                     <Link
                       href={buildUserRelationHref("/devices", selectedUser)}
                       className={buttonVariants({ variant: "outline", size: "sm" })}
@@ -1963,8 +1952,6 @@ export function UsersTable() {
                   </div>
                 </div>
               ) : null}
-
-              <div className={cn("hidden 2xl:block", isFormModalOpen && "2xl:hidden")}>{renderUserEditorPanel()}</div>
             </CardContent>
           </Card>
 
