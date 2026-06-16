@@ -1,6 +1,7 @@
 import { apiEndpoints } from "@/lib/api/endpoints";
 import { apiRequest, normalizeImageUrl } from "@/lib/api/fetcher";
 import type { JsonObject } from "@/lib/api/types";
+import type { AuthUser } from "@/features/auth/types";
 import type { UserAddress } from "@/features/users/types";
 
 export type AccountProfile = {
@@ -91,6 +92,23 @@ export function normalizeAccountProfile(input: unknown): AccountProfile {
     roles: Array.isArray(record.roles) ? record.roles.filter((item): item is string => typeof item === "string") : [],
     address: normalizeAddress(record.address),
     raw: record,
+  };
+}
+
+export function accountProfileFromAuthUser(user: AuthUser): AccountProfile {
+  return {
+    id: user.id,
+    identityId: user.identityId || null,
+    firstName: user.firstName || "",
+    lastName: user.lastName || "",
+    email: user.email || "",
+    phoneNumber: readString(user.raw, "phone_number", "phoneNumber"),
+    imageUrl: normalizeImageUrl(user.imageUrl || readString(user.raw, "image_url", "imageUrl")),
+    userType: user.userType || null,
+    educationalCenterId: user.educationalCenterId || null,
+    roles: user.roles,
+    address: normalizeAddress(user.raw.address),
+    raw: user.raw,
   };
 }
 
