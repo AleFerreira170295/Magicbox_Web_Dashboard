@@ -283,7 +283,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                             key={item.href}
                             href={item.href}
                             className={cn(
-                              "group flex items-start gap-3 rounded-[22px] border px-4 py-3 transition-all",
+                              "group flex items-center gap-3 rounded-[22px] border px-4 py-3 transition-all",
                               active
                                 ? "border-primary/18 bg-primary/10 shadow-[0_16px_34px_rgba(71,185,239,0.12)]"
                                 : "border-transparent text-foreground/80 hover:border-border/80 hover:bg-white hover:text-foreground hover:shadow-[0_10px_22px_rgba(33,59,87,0.05)]",
@@ -291,7 +291,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                           >
                             <span
                               className={cn(
-                                "mt-0.5 flex size-10 shrink-0 items-center justify-center rounded-2xl border",
+                                "flex size-10 shrink-0 items-center justify-center rounded-2xl border",
                                 active
                                   ? "border-primary/12 bg-white text-primary"
                                   : "border-border/70 bg-secondary/45 text-foreground/65 group-hover:text-foreground",
@@ -300,7 +300,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                               <Icon className="size-4" />
                             </span>
                             <span className="min-w-0 flex-1">
-                              <span className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                              <span className="flex items-center gap-2 text-[15px] font-semibold leading-5 text-foreground">
                                 {item.label}
                                 {active ? <span className="size-1.5 rounded-full bg-primary" /> : null}
                               </span>
