@@ -1896,10 +1896,10 @@ export function UsersTable() {
           </CardContent>
         </Card>
 
-        <div className="space-y-6">
+        <div className="contents">
           <div className={cn("hidden 2xl:block", isFormModalOpen && "2xl:hidden")}>{renderUserEditorPanel()}</div>
 
-          <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
+          <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)] 2xl:col-span-2">
             <CardHeader>
               <CardTitle>{t.side.quickLinks}</CardTitle>
               <CardDescription>
@@ -1978,7 +1978,7 @@ export function UsersTable() {
             confirmLabel={t.deleteDialog.confirm}
           />
 
-          <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
+          <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)] 2xl:col-span-2">
             <CardHeader>
               <CardTitle>Roles y permisos</CardTitle>
               <CardDescription>
@@ -2096,7 +2096,7 @@ export function UsersTable() {
             </CardContent>
           </Card>
 
-          <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
+          <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)] 2xl:col-span-2">
             <CardHeader>
               <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
                 <div>
