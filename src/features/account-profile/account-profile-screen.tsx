@@ -13,6 +13,7 @@ import { Label } from "@/components/ui/label";
 import { useNotifications } from "@/components/ui/notifications";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
+  accountProfileFromAuthUser,
   changeAccountPassword,
   getAccountProfile,
   updateAccountProfile,
@@ -114,8 +115,10 @@ export function AccountProfileScreen() {
     enabled: Boolean(token),
   });
 
-  const profile = profileQuery.data || null;
+  const fallbackProfile = useMemo(() => user ? accountProfileFromAuthUser(user) : null, [user]);
+  const profile = profileQuery.data || fallbackProfile;
   const title = language === "en" ? "My Profile" : language === "pt" ? "Meu perfil" : "Mi perfil";
+  const editableForm = form || (profile ? formFromProfile(profile) : null);
 
   const displayName = useMemo(() => {
     if (!profile) return user?.fullName || "MagicBox";
@@ -124,28 +127,29 @@ export function AccountProfileScreen() {
 
   const updateMutation = useMutation({
     mutationFn: async () => {
-      if (!token || !form) throw new Error("Sesión no disponible.");
-      if (!form.firstName.trim() || !form.lastName.trim() || !form.email.trim() || !form.phoneNumber.trim()) {
+      const nextForm = form || editableForm;
+      if (!token || !nextForm) throw new Error("Sesión no disponible.");
+      if (!nextForm.firstName.trim() || !nextForm.lastName.trim() || !nextForm.email.trim() || !nextForm.phoneNumber.trim()) {
         throw new Error("Completá nombre, apellido, email y teléfono.");
       }
 
-      const addressTouched = Boolean(buildAddress(form));
-      if (addressTouched && (!form.addressFirstLine.trim() || !form.city.trim() || !form.countryCode.trim())) {
+      const addressTouched = Boolean(buildAddress(nextForm));
+      if (addressTouched && (!nextForm.addressFirstLine.trim() || !nextForm.city.trim() || !nextForm.countryCode.trim())) {
         throw new Error("Si cargás dirección, completá calle, ciudad y país.");
       }
 
-      let imageUrl = form.imageUrl || null;
+      let imageUrl = nextForm.imageUrl || null;
       if (avatarFile) {
         imageUrl = await uploadAccountAvatar(token, avatarFile);
       }
 
       return updateAccountProfile(token, {
-        firstName: form.firstName.trim(),
-        lastName: form.lastName.trim(),
-        email: form.email.trim().toLowerCase(),
-        phoneNumber: form.phoneNumber.trim(),
+        firstName: nextForm.firstName.trim(),
+        lastName: nextForm.lastName.trim(),
+        email: nextForm.email.trim().toLowerCase(),
+        phoneNumber: nextForm.phoneNumber.trim(),
         imageUrl,
-        address: buildAddress(form),
+        address: buildAddress(nextForm),
       });
     },
     onSuccess: async (updatedProfile) => {
@@ -183,7 +187,7 @@ export function AccountProfileScreen() {
   });
 
   function updateField<K extends keyof ProfileFormState>(field: K, value: ProfileFormState[K]) {
-    setForm((current) => current ? { ...current, [field]: value } : current);
+    setForm((current) => current ? { ...current, [field]: value } : editableForm ? { ...editableForm, [field]: value } : current);
   }
 
   const saving = updateMutation.isPending || passwordMutation.isPending;
@@ -193,18 +197,17 @@ export function AccountProfileScreen() {
       <SectionHeader
         eyebrow="Cuenta"
         title={title}
-        description="Ajustá tus datos personales, foto de perfil y contraseña sin cambiar roles, permisos ni alcance institucional."
       />
 
-      {profileQuery.isLoading || !form ? (
+      {profileQuery.error && !editableForm ? (
+        <Card>
+          <CardContent className="pt-6 text-sm text-destructive">{getErrorMessage(profileQuery.error)}</CardContent>
+        </Card>
+      ) : profileQuery.isLoading && !editableForm ? (
         <div className="grid gap-5 xl:grid-cols-[0.85fr_1.15fr]">
           <Skeleton className="h-80 rounded-[24px]" />
           <Skeleton className="h-96 rounded-[24px]" />
         </div>
-      ) : profileQuery.error ? (
-        <Card>
-          <CardContent className="pt-6 text-sm text-destructive">{getErrorMessage(profileQuery.error)}</CardContent>
-        </Card>
       ) : (
         <div className="grid gap-6 xl:grid-cols-[0.85fr_1.15fr]">
           <div className="grid gap-6">
@@ -219,7 +222,7 @@ export function AccountProfileScreen() {
               <CardContent className="space-y-5">
                 <div className="flex items-center gap-4">
                   <div className="flex size-20 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-border bg-white text-xl font-semibold text-primary">
-                    {form.imageUrl ? <img src={form.imageUrl} alt={displayName} className="h-full w-full object-cover" /> : initials(profile)}
+                    {editableForm?.imageUrl ? <img src={editableForm.imageUrl} alt={displayName} className="h-full w-full object-cover" /> : initials(profile)}
                   </div>
                   <div className="min-w-0">
                     <p className="truncate text-lg font-semibold text-foreground">{displayName}</p>
@@ -280,24 +283,24 @@ export function AccountProfileScreen() {
                 <div className="grid gap-4 md:grid-cols-2">
                   <div className="grid gap-2">
                     <Label htmlFor="firstName">Nombre</Label>
-                    <Input id="firstName" value={form.firstName} onChange={(event) => updateField("firstName", event.target.value)} />
+                    <Input id="firstName" value={editableForm?.firstName || ""} onChange={(event) => updateField("firstName", event.target.value)} />
                   </div>
                   <div className="grid gap-2">
                     <Label htmlFor="lastName">Apellido</Label>
-                    <Input id="lastName" value={form.lastName} onChange={(event) => updateField("lastName", event.target.value)} />
+                    <Input id="lastName" value={editableForm?.lastName || ""} onChange={(event) => updateField("lastName", event.target.value)} />
                   </div>
                   <div className="grid gap-2">
                     <Label htmlFor="email">Email</Label>
-                    <Input id="email" type="email" value={form.email} onChange={(event) => updateField("email", event.target.value)} />
+                    <Input id="email" type="email" value={editableForm?.email || ""} onChange={(event) => updateField("email", event.target.value)} />
                   </div>
                   <div className="grid gap-2">
                     <Label htmlFor="phoneNumber">Teléfono</Label>
-                    <Input id="phoneNumber" value={form.phoneNumber} onChange={(event) => updateField("phoneNumber", event.target.value)} />
+                    <Input id="phoneNumber" value={editableForm?.phoneNumber || ""} onChange={(event) => updateField("phoneNumber", event.target.value)} />
                   </div>
                 </div>
 
                 <ImageUploadField
-                  value={form.imageUrl}
+                  value={editableForm?.imageUrl || ""}
                   file={avatarFile}
                   onFileChange={setAvatarFile}
                   onRemoveCurrent={() => {
@@ -314,27 +317,27 @@ export function AccountProfileScreen() {
                   <div className="mt-4 grid gap-4 md:grid-cols-2">
                     <div className="grid gap-2 md:col-span-2">
                       <Label htmlFor="addressFirstLine">Dirección</Label>
-                      <Input id="addressFirstLine" value={form.addressFirstLine} onChange={(event) => updateField("addressFirstLine", event.target.value)} />
+                      <Input id="addressFirstLine" value={editableForm?.addressFirstLine || ""} onChange={(event) => updateField("addressFirstLine", event.target.value)} />
                     </div>
                     <div className="grid gap-2 md:col-span-2">
                       <Label htmlFor="addressSecondLine">Apartamento / referencia</Label>
-                      <Input id="addressSecondLine" value={form.addressSecondLine} onChange={(event) => updateField("addressSecondLine", event.target.value)} />
+                      <Input id="addressSecondLine" value={editableForm?.addressSecondLine || ""} onChange={(event) => updateField("addressSecondLine", event.target.value)} />
                     </div>
                     <div className="grid gap-2">
                       <Label htmlFor="countryCode">País</Label>
-                      <Input id="countryCode" value={form.countryCode} onChange={(event) => updateField("countryCode", event.target.value)} placeholder="UY" />
+                      <Input id="countryCode" value={editableForm?.countryCode || ""} onChange={(event) => updateField("countryCode", event.target.value)} placeholder="UY" />
                     </div>
                     <div className="grid gap-2">
                       <Label htmlFor="city">Ciudad</Label>
-                      <Input id="city" value={form.city} onChange={(event) => updateField("city", event.target.value)} />
+                      <Input id="city" value={editableForm?.city || ""} onChange={(event) => updateField("city", event.target.value)} />
                     </div>
                     <div className="grid gap-2">
                       <Label htmlFor="state">Departamento / estado</Label>
-                      <Input id="state" value={form.state} onChange={(event) => updateField("state", event.target.value)} />
+                      <Input id="state" value={editableForm?.state || ""} onChange={(event) => updateField("state", event.target.value)} />
                     </div>
                     <div className="grid gap-2">
                       <Label htmlFor="postalCode">Código postal</Label>
-                      <Input id="postalCode" value={form.postalCode} onChange={(event) => updateField("postalCode", event.target.value)} />
+                      <Input id="postalCode" value={editableForm?.postalCode || ""} onChange={(event) => updateField("postalCode", event.target.value)} />
                     </div>
                   </div>
                 </div>

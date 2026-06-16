@@ -239,7 +239,6 @@ export function AppShell({ children }: { children: ReactNode }) {
                   <div className="min-w-0">
                     <p className="text-[11px] font-semibold uppercase tracking-[0.26em] text-primary">MagicBox</p>
                     <p className="mt-1 text-xl font-semibold tracking-[-0.03em] text-foreground">{t.appShell.desktopTitle}</p>
-                    <p className="mt-3 text-sm leading-6 text-muted-foreground">{t.appShell.desktopDescription}</p>
                   </div>
                 </div>
 
@@ -248,7 +247,6 @@ export function AppShell({ children }: { children: ReactNode }) {
                     <Sparkles className="size-4 text-primary" />
                     {experienceMeta.title}
                   </div>
-                  <p className="mt-2 text-sm leading-6 text-muted-foreground">{experienceMeta.description}</p>
                 </div>
 
                 {hasTutorialPending ? (
@@ -306,7 +304,6 @@ export function AppShell({ children }: { children: ReactNode }) {
                                 {item.label}
                                 {active ? <span className="size-1.5 rounded-full bg-primary" /> : null}
                               </span>
-                              <span className="mt-1 block text-xs leading-5 text-muted-foreground">{item.summary}</span>
                             </span>
                           </Link>
                         );
@@ -342,9 +339,6 @@ export function AppShell({ children }: { children: ReactNode }) {
                     </h1>
                     {currentItem ? <Badge variant="outline">{t.appShell.activeScreen}</Badge> : null}
                   </div>
-                  <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground lg:text-[15px]">
-                    {currentItem?.summary || experienceMeta.description}
-                  </p>
                 </div>
 
                 <div className="flex min-w-0 flex-col gap-3 lg:items-end">
