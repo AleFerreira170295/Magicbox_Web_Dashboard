@@ -223,9 +223,9 @@ function resultPercentage(result: EvaluationRecord["results"][number]) {
 function SummaryCard({ label, value, hint, icon: Icon }: { label: string; value: string; hint: string; icon: React.ComponentType<{ className?: string }> }) {
   return (
     <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
-      <CardContent className="p-5">
-        <div className="flex items-start justify-between gap-4">
-          <div>
+      <CardContent className="flex min-h-40 items-center p-5">
+        <div className="flex w-full items-start justify-between gap-4">
+          <div className="min-w-0">
             <p className="text-sm text-muted-foreground">{label}</p>
             <p className="mt-2 text-3xl font-semibold tracking-[-0.04em] text-foreground">{value}</p>
             <p className="mt-2 text-xs leading-5 text-muted-foreground">{hint}</p>
@@ -508,33 +508,36 @@ export function EvaluationsCenter() {
       </div>
 
       <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
-        <CardHeader>
+        <CardHeader className="pb-4">
           <CardTitle>{t.filters.title}</CardTitle>
           <CardDescription>{t.filters.desc}</CardDescription>
         </CardHeader>
-        <CardContent className="grid gap-4 md:grid-cols-2 xl:grid-cols-[minmax(260px,1.4fr)_minmax(170px,0.7fr)_minmax(170px,0.7fr)_minmax(220px,1fr)_minmax(220px,1fr)]">
-          <div className="relative min-w-0">
-            <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
-            <Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t.filters.search} className="pl-9" />
+        <CardContent className="grid items-end gap-4 pt-0 md:grid-cols-2 xl:grid-cols-[minmax(300px,1.35fr)_minmax(180px,0.75fr)_minmax(180px,0.75fr)_minmax(240px,1fr)_minmax(240px,1fr)]">
+          <div className="flex min-w-0 flex-col gap-2">
+            <Label className="text-sm font-medium text-foreground">{t.header.search}</Label>
+            <div className="relative min-w-0">
+              <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+              <Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t.filters.search} className="h-11 rounded-xl pl-9 leading-none" />
+            </div>
           </div>
-          <div className="space-y-1.5">
-            <Label>{t.filters.dateFrom}</Label>
-            <Input type="date" value={dateFrom} onChange={(event) => setDateFrom(event.target.value)} />
+          <div className="flex min-w-0 flex-col gap-2">
+            <Label className="text-sm font-medium text-foreground">{t.filters.dateFrom}</Label>
+            <Input type="date" value={dateFrom} onChange={(event) => setDateFrom(event.target.value)} className="h-11 rounded-xl leading-none" />
           </div>
-          <div className="space-y-1.5">
-            <Label>{t.filters.dateTo}</Label>
-            <Input type="date" value={dateTo} onChange={(event) => setDateTo(event.target.value)} />
+          <div className="flex min-w-0 flex-col gap-2">
+            <Label className="text-sm font-medium text-foreground">{t.filters.dateTo}</Label>
+            <Input type="date" value={dateTo} onChange={(event) => setDateTo(event.target.value)} className="h-11 rounded-xl leading-none" />
           </div>
-          <div className="space-y-1.5">
-            <Label>{t.filters.institution}</Label>
-            <select value={institutionId} onChange={(event) => { setInstitutionId(event.target.value); setClassGroupId(""); setSelectedStudentId(""); }} className="h-11 w-full rounded-md border border-input bg-background px-3 text-sm">
+          <div className="flex min-w-0 flex-col gap-2">
+            <Label className="text-sm font-medium text-foreground">{t.filters.institution}</Label>
+            <select value={institutionId} onChange={(event) => { setInstitutionId(event.target.value); setClassGroupId(""); setSelectedStudentId(""); }} className="h-11 w-full rounded-xl border border-input bg-white/92 px-4 text-sm leading-none text-foreground shadow-[0_10px_24px_rgba(66,128,164,0.08)] outline-none transition focus-visible:ring-2 focus-visible:ring-ring">
               <option value="">{t.filters.allVisible}</option>
               {institutions.map((institution) => <option key={institution.id} value={institution.id}>{institution.name}</option>)}
             </select>
           </div>
-          <div className="space-y-1.5">
-            <Label>{t.filters.group}</Label>
-            <select value={classGroupId} onChange={(event) => { setClassGroupId(event.target.value); setSelectedStudentId(""); }} className="h-11 w-full rounded-md border border-input bg-background px-3 text-sm">
+          <div className="flex min-w-0 flex-col gap-2">
+            <Label className="text-sm font-medium text-foreground">{t.filters.group}</Label>
+            <select value={classGroupId} onChange={(event) => { setClassGroupId(event.target.value); setSelectedStudentId(""); }} className="h-11 w-full rounded-xl border border-input bg-white/92 px-4 text-sm leading-none text-foreground shadow-[0_10px_24px_rgba(66,128,164,0.08)] outline-none transition focus-visible:ring-2 focus-visible:ring-ring">
               <option value="">{t.filters.allGroups}</option>
               {classGroups.map((classGroup) => <option key={classGroup.id} value={classGroup.id}>{classGroup.name}</option>)}
             </select>
