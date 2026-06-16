@@ -288,6 +288,7 @@ const messages: Record<AppLanguage, AppMessages> = {
         },
       },
       navigation: {
+        profile: { label: "Mi perfil", summary: "Datos de cuenta, foto y contraseña personal." },
         dashboard: { label: "Dashboard", summary: "Estado general, alertas y próximos focos del rol actual." },
         territorialAlerts: { label: "Alertas territoriales", summary: "Incidentes y territorios que necesitan revisión rápida." },
         territorialOverview: { label: "Territorios e instituciones", summary: "Drilldown territorial con foco en cohortes e instituciones." },
@@ -428,6 +429,7 @@ const messages: Record<AppLanguage, AppMessages> = {
         fallback: { title: "Institution view", description: "Clear, warm and actionable educational follow-up." },
       },
       navigation: {
+        profile: { label: "My profile", summary: "Account details, photo and personal password." },
         dashboard: { label: "Dashboard", summary: "General status, alerts and next priorities for the current role." },
         territorialAlerts: { label: "Territorial alerts", summary: "Incidents and territories that need quick review." },
         territorialOverview: { label: "Territories and institutions", summary: "Territorial drilldown focused on cohorts and institutions." },
@@ -568,6 +570,7 @@ const messages: Record<AppLanguage, AppMessages> = {
         fallback: { title: "Visão institucional", description: "Acompanhamento pedagógico claro, acolhedor e acionável." },
       },
       navigation: {
+        profile: { label: "Meu perfil", summary: "Dados da conta, foto e senha pessoal." },
         dashboard: { label: "Dashboard", summary: "Estado geral, alertas e próximos focos do papel atual." },
         territorialAlerts: { label: "Alertas territoriais", summary: "Incidentes e territórios que precisam de revisão rápida." },
         territorialOverview: { label: "Territórios e instituições", summary: "Drilldown territorial com foco em coortes e instituições." },

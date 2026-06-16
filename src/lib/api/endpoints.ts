@@ -8,6 +8,7 @@ export const apiEndpoints = {
     forgotPassword: "/identity/forgot-password",
     verifyOtp: "/identity/verify-otp-code",
     resetPassword: "/identity/reset-password",
+    changeMyPassword: "/identity/me/password",
   },
   auth: {
     login: "/auth/login",
@@ -17,6 +18,8 @@ export const apiEndpoints = {
   },
   users: {
     list: "/user",
+    me: "/user/me",
+    meAvatar: "/user/me/avatar",
     byId: (id: string) => `/user/${id}`,
   },
   institutions: {
