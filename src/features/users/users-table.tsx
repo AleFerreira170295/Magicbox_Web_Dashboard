@@ -1792,7 +1792,7 @@ export function UsersTable() {
         </CardContent>
       </Card>
 
-      <div className="grid gap-6 2xl:grid-cols-[1.25fr_0.95fr]">
+      <div className="grid items-start gap-6 2xl:grid-cols-[1.25fr_0.95fr]">
         <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
           <CardHeader>
             <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
