@@ -1,0 +1,19 @@
+FROM node:20-alpine
+
+WORKDIR /app
+ENV NEXT_TELEMETRY_DISABLED=1
+ARG NEXT_PUBLIC_API_BASE_URL
+ARG NEXT_PUBLIC_DEFAULT_ROLE
+ENV NEXT_PUBLIC_API_BASE_URL=${NEXT_PUBLIC_API_BASE_URL}
+ENV NEXT_PUBLIC_DEFAULT_ROLE=${NEXT_PUBLIC_DEFAULT_ROLE}
+
+COPY package.json package-lock.json* ./
+RUN npm ci
+
+COPY . .
+RUN npm run build
+
+ENV NODE_ENV=production
+EXPOSE 3001
+
+CMD ["npm", "run", "start", "--", "--hostname", "0.0.0.0"]

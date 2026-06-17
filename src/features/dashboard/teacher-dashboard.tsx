@@ -450,8 +450,8 @@ export function TeacherDashboard() {
     <div className="space-y-8">
       <SectionHeader
         eyebrow="Docente"
-        title="Una vista más clara para acompañar el aula"
-        description="Tomamos como referencia el tono del sitio público de MagicBox para empezar a mover el dashboard hacia una experiencia más cálida, simple y pedagógica, sin perder la capa operativa que ya tenemos."
+        title="Estadísticas sincronizadas del aula"
+        description="Esta vista calcula métricas únicamente con partidas que llegaron a la nube. Las partidas locales de la app o con usuarios manuales que no se suben no forman parte de estos indicadores web."
         actions={
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-sm text-muted-foreground">Período</span>
@@ -498,15 +498,15 @@ export function TeacherDashboard() {
             <div className="mt-8 grid gap-4 md:grid-cols-3">
               <div className="rounded-3xl bg-white/10 p-4 backdrop-blur-sm">
                 <p className="text-sm text-white/70">Visión general</p>
-                <p className="mt-2 text-lg font-medium">Panorama rápido del aula y de la actividad reciente.</p>
+                <p className="mt-2 text-lg font-medium">Panorama rápido de la actividad que ya fue sincronizada.</p>
               </div>
               <div className="rounded-3xl bg-white/10 p-4 backdrop-blur-sm">
                 <p className="text-sm text-white/70">Tono visual</p>
-                <p className="mt-2 text-lg font-medium">Menos tablero industrial, más herramienta educativa.</p>
+                <p className="mt-2 text-lg font-medium">Métricas de nube separadas de lo que queda local en la app.</p>
               </div>
               <div className="rounded-3xl bg-white/10 p-4 backdrop-blur-sm">
                 <p className="text-sm text-white/70">Próxima capa</p>
-                <p className="mt-2 text-lg font-medium">Métricas, progreso y narrativas por grupo y estudiante.</p>
+                <p className="mt-2 text-lg font-medium">Progreso por grupo y estudiante cuando existe vínculo sincronizable.</p>
               </div>
             </div>
           </CardContent>
@@ -522,17 +522,17 @@ export function TeacherDashboard() {
           <CardContent className="space-y-3">
             <InsightRow
               title="Actividad reciente"
-              description="Ver si el grupo viene jugando en la última semana y detectar rápido si el ritmo cayó."
+              description="Ver si el grupo viene sincronizando partidas en la última semana y detectar rápido si el ritmo cayó."
               icon={Sparkles}
             />
             <InsightRow
               title="Participación del grupo"
-              description="Mirar cuántos estudiantes participaron y cómo se está repartiendo la interacción."
+              description="Mirar cuántos estudiantes registrados aparecen en partidas subidas a la nube."
               icon={Users2}
             />
             <InsightRow
               title="Seguimiento por contenido"
-              description="Identificar qué mazos tienen más tracción para ordenar después la lectura didáctica."
+              description="Identificar qué mazos sincronizados tienen más tracción para ordenar después la lectura didáctica."
               icon={BookOpen}
             />
           </CardContent>
@@ -547,14 +547,14 @@ export function TeacherDashboard() {
             <MetricCard
               label={`Partidas ${metrics.periodLabel}`}
               value={String(metrics.recentGames)}
-              hint="Volumen reciente de juego para leer continuidad de uso, no solo histórico acumulado."
+              hint="Volumen reciente de partidas subidas a la nube, no el histórico local completo de la app."
               trend={metrics.trends.games}
               icon={Database}
             />
             <MetricCard
               label="Estudiantes participantes"
               value={String(metrics.activePlayers)}
-              hint="Cuenta única de jugadores visibles en la muestra actual."
+              hint="Cuenta única de jugadores visibles en la muestra sincronizada actual."
               trend={metrics.trends.players}
               icon={Users2}
             />
@@ -568,7 +568,7 @@ export function TeacherDashboard() {
             <MetricCard
               label="Éxito de turnos"
               value={`${metrics.successRate}%`}
-              hint="Proporción agregada de aciertos sobre el total de jugadas visibles."
+              hint="Proporción agregada de aciertos sobre jugadas sincronizadas visibles."
               trend={metrics.trends.success}
               icon={Trophy}
             />

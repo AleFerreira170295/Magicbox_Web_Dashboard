@@ -110,8 +110,9 @@ describe("TeacherDashboard", () => {
     expect(screen.getByText("Tiempo promedio por turno")).toBeInTheDocument();
     expect(screen.getByText("Éxito de turnos")).toBeInTheDocument();
     expect(screen.getAllByText("1").length).toBeGreaterThan(0);
-    expect(screen.getByText(/Volumen reciente de juego para leer continuidad de uso/i)).toBeInTheDocument();
-    expect(screen.getByText(/Cuenta única de jugadores visibles en la muestra actual/i)).toBeInTheDocument();
+    expect(screen.getByText(/partidas que llegaron a la nube/i)).toBeInTheDocument();
+    expect(screen.getByText(/Volumen reciente de partidas subidas a la nube/i)).toBeInTheDocument();
+    expect(screen.getByText(/Cuenta única de jugadores visibles en la muestra sincronizada actual/i)).toBeInTheDocument();
     expect(screen.getAllByText(/50%/i).length).toBeGreaterThan(0);
     expect(screen.getByText("Tendencias del período")).toBeInTheDocument();
     expect(screen.getByText("Ritmo de juego")).toBeInTheDocument();

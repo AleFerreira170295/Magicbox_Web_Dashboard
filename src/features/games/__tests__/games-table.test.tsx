@@ -120,7 +120,7 @@ describe("GamesTable", () => {
 
     expect(screen.getByText("Institution admin")).toBeInTheDocument();
     expect(screen.getByText(/Institución activa: Colegio Norte/)).toBeInTheDocument();
-    expect(screen.getByText(/La tabla queda anclada a la institución visible por ACL/i)).toBeInTheDocument();
+    expect(screen.getByText(/Solo incluye partidas que ya fueron subidas a la nube/i)).toBeInTheDocument();
     expect(screen.getAllByRole("combobox")[0]).toBeDisabled();
   });
 
@@ -200,6 +200,10 @@ describe("GamesTable", () => {
     fireEvent.click(screen.getByText("101"));
 
     expect(screen.getByText("Historial completo de jugadas")).toBeInTheDocument();
+    expect(screen.getByText("Aciertos por ronda")).toBeInTheDocument();
+    expect(screen.getByText("Promedio 63%")).toBeInTheDocument();
+    expect(screen.getByText("Ronda 1")).toBeInTheDocument();
+    expect(screen.getByText("Ronda 8")).toBeInTheDocument();
     expect(screen.getByText("Aciertos 5")).toBeInTheDocument();
     expect(screen.getByText("Errores 3")).toBeInTheDocument();
     expect(screen.getByText("Turno 1")).toBeInTheDocument();

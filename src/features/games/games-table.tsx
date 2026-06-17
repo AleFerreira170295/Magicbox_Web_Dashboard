@@ -12,6 +12,7 @@ import { useAuth } from "@/features/auth/auth-context";
 import { resolveInstitutionScopedRoleLabel } from "@/features/auth/role-resolver";
 import { useDevices } from "@/features/devices/api";
 import { useGames } from "@/features/games/api";
+import type { GameRecord } from "@/features/games/types";
 import { useInstitutions } from "@/features/institutions/api";
 import { cn, formatDateTime, getErrorMessage } from "@/lib/utils";
 
@@ -42,6 +43,37 @@ function SummaryCard({
       </CardContent>
     </Card>
   );
+}
+
+function buildRoundSummaries(turns: GameRecord["turns"]) {
+  const rounds = new Map<
+    number,
+    { round: number; total: number; hits: number; misses: number; totalSeconds: number }
+  >();
+
+  turns.forEach((turn) => {
+    const round = turn.turnNumber || 0;
+    const current = rounds.get(round) || {
+      round,
+      total: 0,
+      hits: 0,
+      misses: 0,
+      totalSeconds: 0,
+    };
+    current.total += 1;
+    current.hits += turn.success ? 1 : 0;
+    current.misses += turn.success ? 0 : 1;
+    current.totalSeconds += turn.playTimeSeconds || 0;
+    rounds.set(round, current);
+  });
+
+  return Array.from(rounds.values())
+    .sort((left, right) => left.round - right.round)
+    .map((round) => ({
+      ...round,
+      successRate: round.total > 0 ? Math.round((round.hits / round.total) * 100) : 0,
+      avgSeconds: round.total > 0 ? round.totalSeconds / round.total : 0,
+    }));
 }
 
 export function GamesTable() {
@@ -129,6 +161,11 @@ export function GamesTable() {
   const selectedFailedTurns = selectedGame?.turns.filter((turn) => !turn.success).length || 0;
   const selectedTotalPlayTimeSeconds = (selectedGame?.turns || []).reduce((acc, turn) => acc + (turn.playTimeSeconds || 0), 0);
   const selectedTurnSuccessRate = selectedGame && selectedGame.turns.length > 0 ? Math.round((selectedSuccessfulTurns / selectedGame.turns.length) * 100) : 0;
+  const selectedRoundSummaries = useMemo(() => buildRoundSummaries(selectedGame?.turns || []), [selectedGame?.turns]);
+  const selectedAverageRoundSuccessRate =
+    selectedRoundSummaries.length > 0
+      ? Math.round(selectedRoundSummaries.reduce((acc, round) => acc + round.successRate, 0) / selectedRoundSummaries.length)
+      : 0;
   const selectedTurnsTimeline = [...(selectedGame?.turns || [])].sort((a, b) => a.turnNumber - b.turnNumber);
 
   return (
@@ -187,12 +224,13 @@ export function GamesTable() {
               <Badge variant={isInstitutionScopedView ? "secondary" : "outline"}>
                 {isInstitutionScopedView ? scopedRoleLabel : "multi-institución / global"}
               </Badge>
-              <Badge variant="outline">game-data real</Badge>
+              <Badge variant="outline">game-data sincronizado</Badge>
+              <Badge variant="warning">solo nube</Badge>
             </div>
             <p className="mt-2 text-sm text-muted-foreground">
               {isInstitutionScopedView
-                ? "La tabla queda anclada a la institución visible por ACL, así que el filtro institucional pasa a ser informativo y no abre otras sedes."
-                : "La vista refleja las partidas visibles según el alcance actual de game-data y permite cruzarlas con institución y dispositivo."}
+                ? "La tabla queda anclada a la institución visible por ACL. Solo incluye partidas que ya fueron subidas a la nube; las partidas locales de la app no entran en esta estadística."
+                : "La vista refleja partidas sincronizadas en game-data según el alcance actual. Las partidas locales no subidas quedan fuera del dashboard web."}
             </p>
           </div>
           {scopedInstitutionName ? <Badge variant="outline">Institución activa: {scopedInstitutionName}</Badge> : null}
@@ -204,7 +242,7 @@ export function GamesTable() {
           Array.from({ length: 5 }).map((_, index) => <Skeleton key={index} className="h-32 rounded-2xl" />)
         ) : (
           <>
-            <SummaryCard label="Partidas" value={String(metrics.totalGames)} hint="Partidas visibles en la consulta actual." icon={Gamepad2} />
+            <SummaryCard label="Partidas en nube" value={String(metrics.totalGames)} hint="Partidas sincronizadas y visibles en la consulta actual." icon={Gamepad2} />
             <SummaryCard label="Participantes" value={String(metrics.totalPlayers)} hint="Suma proyectada de jugadores presentes en la muestra." icon={Users} />
             <SummaryCard label="Turnos" value={String(metrics.totalTurns)} hint="Jugadas persistidas y visibles para revisar la partida completa." icon={TimerReset} />
             <SummaryCard label="Errores" value={String(metrics.failedTurns)} hint="Intentos fallidos detectados en la vista actual." icon={BookOpen} />
@@ -309,6 +347,7 @@ export function GamesTable() {
                     <div className="flex flex-wrap gap-2">
                       <Badge variant="secondary">{selectedInstitution?.name || "sin institución"}</Badge>
                       <Badge variant="outline">{selectedTurnSuccessRate}% éxito</Badge>
+                      <Badge variant="outline">{selectedAverageRoundSuccessRate}% prom. rondas</Badge>
                     </div>
                   </div>
                   <div className="mt-3 grid gap-2 text-xs text-muted-foreground sm:grid-cols-2">
@@ -318,6 +357,8 @@ export function GamesTable() {
                     <p>Turnos: {selectedGame.turns.length}</p>
                     <p>Registrados: {selectedRegisteredCount}</p>
                     <p>Manuales: {selectedManualCount}</p>
+                    <p>Rondas: {selectedRoundSummaries.length}</p>
+                    <p>Promedio por rondas: {selectedAverageRoundSuccessRate}%</p>
                   </div>
                 </div>
 
@@ -331,6 +372,34 @@ export function GamesTable() {
                         <Badge key={player.id || `${player.playerName}-${index}`} variant={player.playerSource === "manual" ? "success" : "outline"}>
                           {player.playerName || player.externalPlayerUid || `Jugador ${index + 1}`}
                         </Badge>
+                      ))
+                    )}
+                  </div>
+                </div>
+
+                <div>
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <p className="text-sm font-medium text-foreground">Aciertos por ronda</p>
+                    <Badge variant="outline">Promedio {selectedAverageRoundSuccessRate}%</Badge>
+                  </div>
+                  <div className="mt-3 space-y-2 rounded-2xl bg-background/40 p-2">
+                    {selectedRoundSummaries.length === 0 ? (
+                      <div className="rounded-2xl bg-background/70 p-3 text-sm text-muted-foreground">Sin datos de rondas.</div>
+                    ) : (
+                      selectedRoundSummaries.map((round) => (
+                        <div key={round.round} className="rounded-2xl bg-background/70 p-3 text-sm">
+                          <div className="flex flex-wrap items-center justify-between gap-3">
+                            <p className="font-medium text-foreground">Ronda {round.round}</p>
+                            <div className="flex flex-wrap gap-2">
+                              <Badge variant="success">Aciertos {round.hits}</Badge>
+                              <Badge variant="outline">Errores {round.misses}</Badge>
+                              <Badge variant="outline">{round.successRate}%</Badge>
+                            </div>
+                          </div>
+                          <div className="mt-2 h-2 overflow-hidden rounded-full bg-border">
+                            <div className="h-full rounded-full bg-primary" style={{ width: `${round.successRate}%` }} />
+                          </div>
+                        </div>
                       ))
                     )}
                   </div>

@@ -16,6 +16,11 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "MagicBox Web Dashboard",
   description: "Dashboard web lossless para sincronizaciones, partidas y dispositivos MagicBox.",
+  icons: {
+    icon: "/magicbox-favicon.png",
+    shortcut: "/magicbox-favicon.png",
+    apple: "/magicbox-favicon.png",
+  },
 };
 
 export default function RootLayout({

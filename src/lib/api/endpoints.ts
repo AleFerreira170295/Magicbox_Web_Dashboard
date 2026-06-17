@@ -34,6 +34,7 @@ export const apiEndpoints = {
   },
   profiles: {
     overview: "/home/profiles/overview",
+    byId: (id: string) => `/home/profiles/${id}`,
   },
   settings: {
     otaRelease: "/system/ota/release",

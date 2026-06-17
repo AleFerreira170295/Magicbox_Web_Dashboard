@@ -1,17 +1,21 @@
 "use client";
 
 import { type ComponentType, useMemo, useState } from "react";
-import { BadgeCheck, CreditCard, Search, UserRound, Users, Waves } from "lucide-react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { BadgeCheck, CreditCard, Search, Trash2, UserRound, Users, Waves } from "lucide-react";
 import { SectionHeader } from "@/components/section-header";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useAuth } from "@/features/auth/auth-context";
 import { resolveInstitutionScopedRoleLabel } from "@/features/auth/role-resolver";
-import { useProfilesOverview } from "@/features/profiles/api";
+import { deleteProfile, useProfilesOverview } from "@/features/profiles/api";
 import { cn, formatDateTime, getErrorMessage } from "@/lib/utils";
+
+type FeedbackState = { type: "success" | "error"; message: string } | null;
 
 function SummaryCard({
   label,
@@ -44,16 +48,39 @@ function SummaryCard({
 
 export function RelevantProfiles() {
   const { tokens, user: currentUser } = useAuth();
+  const queryClient = useQueryClient();
   const [query, setQuery] = useState("");
   const [institutionFilter, setInstitutionFilter] = useState<string>("");
   const [activityFilter, setActivityFilter] = useState<"all" | "active" | "inactive">("all");
   const [selectedProfileId, setSelectedProfileId] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState<FeedbackState>(null);
 
   const profilesQuery = useProfilesOverview(tokens?.accessToken);
   const profiles = useMemo(() => profilesQuery.data || [], [profilesQuery.data]);
   const isScopedActor = Boolean(
     currentUser?.roles.includes("institution-admin") || currentUser?.roles.includes("director"),
   );
+  const currentPermissionKeys = useMemo(() => new Set(currentUser?.permissions || []), [currentUser?.permissions]);
+  const hasGlobalAdminRole = currentUser?.roles.includes("admin") || false;
+  const hasResolvedCapabilities = hasGlobalAdminRole || currentPermissionKeys.size > 0;
+
+  function hasAnyPermission(...keys: string[]) {
+    if (hasGlobalAdminRole) return true;
+    if (!hasResolvedCapabilities) return true;
+    return keys.some((key) => currentPermissionKeys.has(key));
+  }
+
+  const canDeleteScopedProfiles = hasAnyPermission("user:delete");
+
+  const deleteProfileMutation = useMutation({
+    mutationFn: (profileId: string) => deleteProfile(tokens?.accessToken as string, profileId),
+    onSuccess: async (_result, profileId) => {
+      await queryClient.invalidateQueries({ queryKey: ["profiles-overview"] });
+      setSelectedProfileId((current) => (current === profileId ? null : current));
+      setFeedback({ type: "success", message: "Perfil eliminado." });
+    },
+    onError: (error) => setFeedback({ type: "error", message: getErrorMessage(error) }),
+  });
 
   const institutions = useMemo(() => {
     const map = new Map<string, string>();
@@ -103,6 +130,26 @@ export function RelevantProfiles() {
     () => filtered.find((profile) => profile.id === selectedProfileId) || profiles.find((profile) => profile.id === selectedProfileId) || null,
     [filtered, profiles, selectedProfileId],
   );
+
+  const canDeleteSelectedProfile = Boolean(
+    selectedProfile && currentUser && (selectedProfile.userId === currentUser.id || canDeleteScopedProfiles),
+  );
+  const isDeleteBlockedByState = !selectedProfile?.isActive || Boolean(selectedProfile?.deletedAt);
+
+  async function handleDelete() {
+    if (!selectedProfile) return;
+    if (isDeleteBlockedByState) {
+      setFeedback({ type: "error", message: "Ese perfil ya no está activo." });
+      return;
+    }
+    if (!canDeleteSelectedProfile) {
+      setFeedback({ type: "error", message: "Tu acceso actual no permite eliminar este perfil." });
+      return;
+    }
+    if (!globalThis.confirm(`¿Eliminar el perfil ${selectedProfile.displayName}?`)) return;
+    setFeedback(null);
+    await deleteProfileMutation.mutateAsync(selectedProfile.id);
+  }
 
   const metrics = useMemo(() => {
     const activeProfiles = profiles.filter((profile) => profile.isActive).length;
@@ -280,6 +327,19 @@ export function RelevantProfiles() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-5">
+            {feedback ? (
+              <div
+                className={cn(
+                  "rounded-2xl border px-4 py-3 text-sm",
+                  feedback.type === "success"
+                    ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                    : "border-destructive/20 bg-destructive/5 text-destructive",
+                )}
+              >
+                {feedback.message}
+              </div>
+            ) : null}
+
             {!selectedProfile ? (
               <div className="rounded-2xl bg-background/70 p-4 text-sm text-muted-foreground">
                 Elegí un perfil para revisar su detalle operativo.
@@ -292,9 +352,23 @@ export function RelevantProfiles() {
                       <p className="text-sm font-semibold text-foreground">{selectedProfile.displayName}</p>
                       <p className="mt-1 text-xs text-muted-foreground">Owner {selectedProfile.userName || selectedProfile.userEmail || selectedProfile.userId}</p>
                     </div>
-                    <div className="flex flex-wrap gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                       <Badge variant={selectedProfile.isActive ? "success" : "outline"}>{selectedProfile.isActive ? "activo" : "inactivo"}</Badge>
                       <Badge variant="outline">{selectedProfile.sessionCount} sesiones</Badge>
+                      {canDeleteSelectedProfile ? (
+                        <Button
+                          type="button"
+                          variant="destructive"
+                          size="sm"
+                          disabled={deleteProfileMutation.isPending || isDeleteBlockedByState}
+                          onClick={handleDelete}
+                        >
+                          <Trash2 className="size-4" />
+                          {deleteProfileMutation.isPending ? "Eliminando..." : "Eliminar perfil"}
+                        </Button>
+                      ) : (
+                        <Badge variant="outline">Sin permiso para eliminar</Badge>
+                      )}
                     </div>
                   </div>
                   <div className="mt-3 grid gap-2 text-xs text-muted-foreground sm:grid-cols-2">
