@@ -16,7 +16,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/features/auth/auth-context";
 import { hasAnyUserPermission } from "@/features/auth/permission-contract";
 import { useDevices } from "@/features/devices/api";
-import { deleteGame, useGames } from "@/features/games/api";
+import { deleteGame, useGame, useGames } from "@/features/games/api";
 import { buildGameDetailHref, buildGamesOverviewHref, type GamesOverviewRouteState } from "@/features/games/game-route";
 import { buildGameRows, buildSyncRelationHref, buildTurnOutcomeSeriesByParticipant, resolveTurnPlayerLabel } from "@/features/games/game-view";
 import { useInstitutions } from "@/features/institutions/api";
@@ -34,6 +34,7 @@ export function GameDetailPage({
   const queryClient = useQueryClient();
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
+  const gameQuery = useGame(tokens?.accessToken, gameRecordId);
   const gamesQuery = useGames(tokens?.accessToken);
   const devicesQuery = useDevices(tokens?.accessToken);
   const institutionsQuery = useInstitutions(tokens?.accessToken);
@@ -43,10 +44,10 @@ export function GameDetailPage({
   const institutions = useMemo(() => institutionsQuery.data?.data ?? [], [institutionsQuery.data?.data]);
   const gameRows = useMemo(() => buildGameRows(games, devices, institutions, currentUser), [currentUser, devices, games, institutions]);
 
-  const selectedGame = useMemo(() => {
-    if (!gameRecordId) return null;
-    return gameRows.find((game) => game.id === gameRecordId) ?? null;
-  }, [gameRecordId, gameRows]);
+  const selectedGame = useMemo(
+    () => buildGameRows(gameQuery.data ? [gameQuery.data] : [], devices, institutions, currentUser)[0] ?? null,
+    [currentUser, devices, gameQuery.data, institutions],
+  );
 
   const sameDeviceGames = useMemo(() => {
     if (!selectedGame?.bleDeviceId) return [];
@@ -68,8 +69,8 @@ export function GameDetailPage({
   const institutionPagination = useListPagination(sameInstitutionGames, 10, 1);
 
   const backHref = buildGamesOverviewHref(overviewState);
-  const isLoading = gamesQuery.isLoading || devicesQuery.isLoading || institutionsQuery.isLoading;
-  const hasFatalError = gamesQuery.error || devicesQuery.error || institutionsQuery.error;
+  const isLoading = gameQuery.isLoading || gamesQuery.isLoading || devicesQuery.isLoading || institutionsQuery.isLoading;
+  const hasFatalError = gameQuery.error || gamesQuery.error || devicesQuery.error || institutionsQuery.error;
   const canDeleteGames = hasAnyUserPermission(currentUser, "game_data:delete");
 
   const deleteGameMutation = useMutation({

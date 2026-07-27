@@ -95,6 +95,14 @@ export async function listGames(token: string, params: ListGamesParams = {}) {
   } as PaginatedResponse<GameRecord>;
 }
 
+export async function getGame(token: string, gameId: string) {
+  const response = await apiRequest<unknown>(apiEndpoints.games.byId(gameId), {
+    token,
+  });
+
+  return normalizeGame(response);
+}
+
 export async function deleteGame(token: string, gameId: string) {
   await apiRequest<void>(apiEndpoints.games.byId(gameId), {
     method: "DELETE",
@@ -109,5 +117,13 @@ export function useGames(token?: string, params?: ListGamesParams) {
     queryKey: ["games", token, params?.institutionId ?? null, params?.page ?? 1, safeLimit, params?.sortBy ?? "created_at", params?.order ?? "desc"],
     queryFn: () => listGames(token as string, params),
     enabled: Boolean(token),
+  });
+}
+
+export function useGame(token?: string, gameId?: string | null) {
+  return useQuery({
+    queryKey: ["games", "detail", token, gameId ?? null],
+    queryFn: () => getGame(token as string, gameId as string),
+    enabled: Boolean(token && gameId),
   });
 }
