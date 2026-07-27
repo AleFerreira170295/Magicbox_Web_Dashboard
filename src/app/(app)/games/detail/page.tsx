@@ -6,11 +6,13 @@ import { GameDetailPage } from "@/features/games/game-detail-page";
 
 export default function GamesDetailRoute() {
   const searchParams = useSearchParams();
+  const gameRecordId = searchParams.get("gameRecordId");
 
   return (
     <RoleGuard allowedRoles={["teacher", "director", "researcher", "family", "admin", "institution-admin"]}>
       <GameDetailPage
-        gameRecordId={searchParams.get("gameRecordId")}
+        key={gameRecordId || "missing-game"}
+        gameRecordId={gameRecordId}
         overviewState={{
           q: searchParams.get("q"),
           institutionId: searchParams.get("institutionId"),

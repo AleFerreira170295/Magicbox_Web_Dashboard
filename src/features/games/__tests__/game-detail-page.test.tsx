@@ -21,6 +21,7 @@ vi.mock("recharts", () => ({
 }));
 
 const useAuthMock = vi.fn();
+const useGameMock = vi.fn();
 const useGamesMock = vi.fn();
 const useDevicesMock = vi.fn();
 const useInstitutionsMock = vi.fn();
@@ -30,6 +31,7 @@ vi.mock("@/features/auth/auth-context", () => ({
 }));
 
 vi.mock("@/features/games/api", () => ({
+  useGame: (...args: unknown[]) => useGameMock(...args),
   useGames: (...args: unknown[]) => useGamesMock(...args),
   deleteGame: vi.fn(),
 }));
@@ -50,7 +52,7 @@ function okQuery<T>(data: T) {
   };
 }
 
-function renderGameDetailPage() {
+function renderGameDetailPage(initialGameRecordId = "game-1") {
   const queryClient = new QueryClient({
     defaultOptions: {
       queries: { retry: false },
@@ -58,10 +60,11 @@ function renderGameDetailPage() {
     },
   });
 
-  return render(
+  const renderTree = (gameRecordId: string) => (
     <QueryClientProvider client={queryClient}>
       <GameDetailPage
-        gameRecordId="game-1"
+        key={gameRecordId}
+        gameRecordId={gameRecordId}
         overviewState={{
           q: "animal",
           access: "shared",
@@ -71,8 +74,14 @@ function renderGameDetailPage() {
           ownerUserName: "Ines Admin",
         }}
       />
-    </QueryClientProvider>,
+    </QueryClientProvider>
   );
+  const renderResult = render(renderTree(initialGameRecordId));
+
+  return {
+    ...renderResult,
+    rerenderGameDetailPage: (gameRecordId: string) => renderResult.rerender(renderTree(gameRecordId)),
+  };
 }
 
 describe("GameDetailPage", () => {
@@ -190,6 +199,10 @@ describe("GameDetailPage", () => {
         total_pages: 1,
       }),
     );
+    useGameMock.mockImplementation((_token: string, gameRecordId: string) => {
+      const gamesQuery = useGamesMock();
+      return okQuery(gamesQuery.data.data.find((game: { id: string }) => game.id === gameRecordId));
+    });
 
     useDevicesMock.mockReturnValue(
       okQuery({
@@ -286,5 +299,18 @@ describe("GameDetailPage", () => {
     expect(screen.getAllByText(/Mostrando 1-10 de 11/i).length).toBeGreaterThan(0);
     fireEvent.click(screen.getAllByRole("button", { name: "Siguiente" }).at(-1)!);
     expect(screen.getByText(/Turno 11/i)).toBeInTheDocument();
+  });
+
+  it("loads new detail data when the selected game record id changes", () => {
+    const { rerenderGameDetailPage } = renderGameDetailPage();
+
+    expect(useGameMock).toHaveBeenCalledWith("token", "game-1");
+    expect(screen.getAllByRole("heading", { name: /Animales/i }).length).toBeGreaterThan(0);
+
+    rerenderGameDetailPage("game-2");
+
+    expect(useGameMock).toHaveBeenLastCalledWith("token", "game-2");
+    expect(screen.getAllByRole("heading", { name: /Frutas/i }).length).toBeGreaterThan(0);
+    expect(screen.queryByText(/6 turnos registrados/i)).not.toBeInTheDocument();
   });
 });
