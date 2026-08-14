@@ -1,10 +1,11 @@
 import type { ReactNode } from "react";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { GameDetailPage } from "@/features/games/game-detail-page";
 
 const routerPushMock = vi.fn();
+const assignGamePlayerStudentMock = vi.hoisted(() => vi.fn());
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: routerPushMock }),
@@ -25,6 +26,7 @@ const useGameMock = vi.fn();
 const useGamesMock = vi.fn();
 const useDevicesMock = vi.fn();
 const useInstitutionsMock = vi.fn();
+const useAllStudentsMock = vi.fn();
 
 vi.mock("@/features/auth/auth-context", () => ({
   useAuth: () => useAuthMock(),
@@ -34,6 +36,7 @@ vi.mock("@/features/games/api", () => ({
   useGame: (...args: unknown[]) => useGameMock(...args),
   useGames: (...args: unknown[]) => useGamesMock(...args),
   deleteGame: vi.fn(),
+  assignGamePlayerStudent: (...args: unknown[]) => assignGamePlayerStudentMock(...args),
 }));
 
 vi.mock("@/features/devices/api", () => ({
@@ -42,6 +45,10 @@ vi.mock("@/features/devices/api", () => ({
 
 vi.mock("@/features/institutions/api", () => ({
   useInstitutions: (...args: unknown[]) => useInstitutionsMock(...args),
+}));
+
+vi.mock("@/features/students/api", () => ({
+  useAllStudents: (...args: unknown[]) => useAllStudentsMock(...args),
 }));
 
 function okQuery<T>(data: T) {
@@ -260,6 +267,8 @@ describe("GameDetailPage", () => {
         total_pages: 1,
       }),
     );
+    useAllStudentsMock.mockReturnValue(okQuery({ data: [], page: 1, limit: 100, total: 0, total_pages: 1 }));
+    assignGamePlayerStudentMock.mockResolvedValue({ id: "player-2", studentId: "student-2" });
   });
 
   afterEach(() => {
@@ -299,6 +308,39 @@ describe("GameDetailPage", () => {
     expect(screen.getAllByText(/Mostrando 1-10 de 11/i).length).toBeGreaterThan(0);
     fireEvent.click(screen.getAllByRole("button", { name: "Siguiente" }).at(-1)!);
     expect(screen.getByText(/Turno 11/i)).toBeInTheDocument();
+  });
+
+  it("associates a manual participant with an institution student", async () => {
+    useAuthMock.mockReturnValue({
+      tokens: { accessToken: "token", refreshToken: "refresh" },
+      user: {
+        id: "user-1",
+        educationalCenterId: "ec-1",
+        roles: ["teacher"],
+        permissions: ["game_data:read", "game_data:update", "student:read"],
+        raw: {},
+      },
+    });
+    useAllStudentsMock.mockReturnValue(okQuery({
+      data: [
+        { id: "student-1", fullName: "Luna Pérez", fileNumber: "s_1" },
+        { id: "student-2", fullName: "Mateo Silva", fileNumber: "s_2" },
+      ],
+      page: 1,
+      limit: 100,
+      total: 2,
+      total_pages: 1,
+    }));
+    renderGameDetailPage();
+
+    fireEvent.change(screen.getByRole("combobox", { name: "Estudiante para participante 2" }), {
+      target: { value: "student-2" },
+    });
+    fireEvent.click(screen.getAllByRole("button", { name: "Asociar" })[1]);
+
+    await waitFor(() => {
+      expect(assignGamePlayerStudentMock).toHaveBeenCalledWith("token", "game-1", "player-2", "student-2");
+    });
   });
 
   it("loads new detail data when the selected game record id changes", () => {

@@ -54,6 +54,7 @@ export const apiEndpoints = {
   games: {
     list: "/game-data/",
     byId: (id: string) => `/game-data/${id}`,
+    playerById: (gameId: string, playerId: string) => `/game-data/${gameId}/players/${playerId}`,
   },
   evaluations: {
     list: "/evaluation/",
