@@ -9,17 +9,19 @@ import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxi
 import { DeleteRecordDialog } from "@/components/delete-record-dialog";
 import { SectionHeader } from "@/components/section-header";
 import { Badge } from "@/components/ui/badge";
-import { buttonVariants } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ListPaginationControls, useListPagination } from "@/components/ui/list-pagination-controls";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useNotifications } from "@/components/ui/notifications";
 import { useAuth } from "@/features/auth/auth-context";
 import { hasAnyUserPermission } from "@/features/auth/permission-contract";
 import { useDevices } from "@/features/devices/api";
-import { deleteGame, useGame, useGames } from "@/features/games/api";
+import { assignGamePlayerStudent, deleteGame, useGame, useGames } from "@/features/games/api";
 import { buildGameDetailHref, buildGamesOverviewHref, type GamesOverviewRouteState } from "@/features/games/game-route";
 import { buildGameRows, buildSyncRelationHref, buildTurnOutcomeSeriesByParticipant, resolveTurnPlayerLabel } from "@/features/games/game-view";
 import { useInstitutions } from "@/features/institutions/api";
+import { useAllStudents } from "@/features/students/api";
 import { cn, formatDateTime, getErrorMessage } from "@/lib/utils";
 
 export function GameDetailPage({
@@ -32,16 +34,26 @@ export function GameDetailPage({
   const { tokens, user: currentUser } = useAuth();
   const router = useRouter();
   const queryClient = useQueryClient();
+  const { notify } = useNotifications();
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [studentSelectionByPlayer, setStudentSelectionByPlayer] = useState<Record<string, string>>({});
 
   const gameQuery = useGame(tokens?.accessToken, gameRecordId);
   const gamesQuery = useGames(tokens?.accessToken);
   const devicesQuery = useDevices(tokens?.accessToken);
   const institutionsQuery = useInstitutions(tokens?.accessToken);
+  const canReadStudents = hasAnyUserPermission(currentUser, "student:read");
+  const canUpdateGames = hasAnyUserPermission(currentUser, "game_data:update");
+  const studentsQuery = useAllStudents(
+    canReadStudents ? tokens?.accessToken : undefined,
+    { institutionId: gameQuery.data?.educationalCenterId ?? null, sortBy: "last_name", order: "asc" },
+  );
 
   const games = useMemo(() => gamesQuery.data?.data ?? [], [gamesQuery.data?.data]);
   const devices = useMemo(() => devicesQuery.data?.data ?? [], [devicesQuery.data?.data]);
   const institutions = useMemo(() => institutionsQuery.data?.data ?? [], [institutionsQuery.data?.data]);
+  const students = useMemo(() => studentsQuery.data?.data ?? [], [studentsQuery.data?.data]);
+  const studentsById = useMemo(() => new Map(students.map((student) => [student.id, student])), [students]);
   const gameRows = useMemo(() => buildGameRows(games, devices, institutions, currentUser), [currentUser, devices, games, institutions]);
 
   const selectedGame = useMemo(
@@ -86,6 +98,21 @@ export function GameDetailPage({
       ]);
       setIsDeleteDialogOpen(false);
       router.push(backHref);
+    },
+  });
+
+  const assignStudentMutation = useMutation({
+    mutationFn: async ({ playerId, studentId }: { playerId: string; studentId: string }) => {
+      if (!selectedGame || !tokens?.accessToken) throw new Error("No hay partida seleccionada.");
+      return assignGamePlayerStudent(tokens.accessToken, selectedGame.id, playerId, studentId);
+    },
+    onSuccess: async (_player, variables) => {
+      await queryClient.invalidateQueries({ queryKey: ["games"] });
+      const student = studentsById.get(variables.studentId);
+      notify({ tone: "success", message: `${student?.fullName || "El estudiante"} quedó asociado a la partida y a sus turnos.` });
+    },
+    onError: (error) => {
+      notify({ tone: "error", message: getErrorMessage(error) || "No se pudo asociar el estudiante." });
     },
   });
 
@@ -397,8 +424,8 @@ export function GameDetailPage({
                         <div key={player.id || `${player.playerName}-${index}`} className="rounded-2xl bg-background/70 p-3 text-sm">
                           <div className="flex flex-wrap items-center justify-between gap-3">
                             <div>
-                              <p className="font-medium text-foreground">{player.playerName || player.externalPlayerUid || `Jugador ${index + 1}`}</p>
-                              <p className="text-xs text-muted-foreground">{player.studentId || player.externalPlayerUid || player.id || "sin id enlazado"}</p>
+                              <p className="font-medium text-foreground">{studentsById.get(player.studentId || "")?.fullName || player.playerName || player.externalPlayerUid || `Jugador ${index + 1}`}</p>
+                              <p className="text-xs text-muted-foreground">{studentsById.get(player.studentId || "")?.fileNumber || player.externalPlayerUid || player.id || "sin id enlazado"}</p>
                             </div>
                             <div className="flex flex-wrap gap-2">
                               <Badge variant={player.playerSource === "manual" ? "success" : "outline"}>{player.playerSource === "manual" ? "manual" : "registrado"}</Badge>
@@ -406,6 +433,40 @@ export function GameDetailPage({
                               {player.cardColor ? <Badge variant="outline">{player.cardColor}</Badge> : null}
                             </div>
                           </div>
+                          {canUpdateGames && canReadStudents && selectedGame.educationalCenterId ? (
+                            <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+                              <select
+                                aria-label={`Estudiante para participante ${player.position}`}
+                                value={studentSelectionByPlayer[player.id] ?? player.studentId ?? ""}
+                                onChange={(event) => setStudentSelectionByPlayer((current) => ({ ...current, [player.id]: event.target.value }))}
+                                disabled={studentsQuery.isLoading || assignStudentMutation.isPending}
+                                className="h-10 min-w-0 flex-1 rounded-xl border border-border bg-white px-3 text-sm text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+                              >
+                                <option value="">Seleccionar estudiante de la institución</option>
+                                {students.map((student) => (
+                                  <option key={student.id} value={student.id}>{student.fullName} · {student.fileNumber}</option>
+                                ))}
+                              </select>
+                              <Button
+                                type="button"
+                                size="sm"
+                                disabled={
+                                  assignStudentMutation.isPending
+                                  || !(studentSelectionByPlayer[player.id] ?? player.studentId)
+                                  || (studentSelectionByPlayer[player.id] ?? player.studentId) === player.studentId
+                                }
+                                onClick={() => assignStudentMutation.mutate({
+                                  playerId: player.id,
+                                  studentId: studentSelectionByPlayer[player.id] ?? player.studentId ?? "",
+                                })}
+                              >
+                                {assignStudentMutation.isPending && assignStudentMutation.variables?.playerId === player.id ? "Guardando..." : "Asociar"}
+                              </Button>
+                            </div>
+                          ) : null}
+                          {canUpdateGames && canReadStudents && studentsQuery.error ? (
+                            <p className="mt-2 text-xs text-destructive">No se pudo cargar la lista de estudiantes: {getErrorMessage(studentsQuery.error)}</p>
+                          ) : null}
                         </div>
                       ))
                     )}

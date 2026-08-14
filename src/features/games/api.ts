@@ -110,6 +110,15 @@ export async function deleteGame(token: string, gameId: string) {
   });
 }
 
+export async function assignGamePlayerStudent(token: string, gameId: string, playerId: string, studentId: string) {
+  const response = await apiRequest<unknown>(apiEndpoints.games.playerById(gameId, playerId), {
+    method: "PATCH",
+    token,
+    body: { student_id: studentId },
+  });
+  return normalizePlayer(response);
+}
+
 export function useGames(token?: string, params?: ListGamesParams) {
   const safeLimit = Math.min(Math.max(params?.limit ?? 50, 1), 100);
 
