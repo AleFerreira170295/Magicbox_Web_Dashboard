@@ -3,6 +3,25 @@
 import { ShieldAlert } from "lucide-react";
 import { useAuth } from "@/features/auth/auth-context";
 import type { AppRole } from "@/features/auth/types";
+import { useLanguage, type AppLanguage } from "@/features/i18n/i18n-context";
+
+const roleGuardMessages: Record<AppLanguage, {
+  title: string;
+  description: (roles: string) => string;
+}> = {
+  es: {
+    title: "Acceso restringido",
+    description: (roles) => `Esta vista está reservada para ${roles}. Puedes seguir navegando por los módulos permitidos para tu perfil desde el menú.`,
+  },
+  en: {
+    title: "Restricted access",
+    description: (roles) => `This view is reserved for ${roles}. You can keep browsing the modules allowed for your profile from the menu.`,
+  },
+  pt: {
+    title: "Acesso restrito",
+    description: (roles) => `Esta tela é reservada para ${roles}. Você pode continuar navegando pelos módulos permitidos para o seu perfil pelo menu.`,
+  },
+};
 
 interface RoleGuardProps {
   allowedRoles: AppRole[];
@@ -11,6 +30,8 @@ interface RoleGuardProps {
 
 export function RoleGuard({ allowedRoles, children }: RoleGuardProps) {
   const { user } = useAuth();
+  const { language } = useLanguage();
+  const t = roleGuardMessages[language];
 
   const allowed = allowedRoles.some((role) => user?.roles.includes(role));
 
@@ -24,11 +45,8 @@ export function RoleGuard({ allowedRoles, children }: RoleGuardProps) {
         <div className="mx-auto flex size-12 items-center justify-center rounded-2xl bg-primary/12 text-primary">
           <ShieldAlert className="size-6" />
         </div>
-        <h2 className="mt-5 text-2xl font-semibold text-foreground">Acceso restringido</h2>
-        <p className="mt-3 text-sm leading-6 text-muted-foreground">
-          Esta vista está reservada para {allowedRoles.join(", ")}. Puedes seguir navegando por los módulos
-          permitidos para tu perfil desde el menú.
-        </p>
+        <h2 className="mt-5 text-2xl font-semibold text-foreground">{t.title}</h2>
+        <p className="mt-3 text-sm leading-6 text-muted-foreground">{t.description(allowedRoles.join(", "))}</p>
       </div>
     </div>
   );

@@ -4,6 +4,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ImagePlus, Trash2, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useLanguage, type AppLanguage } from "@/features/i18n/i18n-context";
 import { cn } from "@/lib/utils";
 
 type ImageUploadFieldProps = {
@@ -16,15 +17,83 @@ type ImageUploadFieldProps = {
   description?: string;
 };
 
+const imageUploadMessages: Record<AppLanguage, {
+  label: string;
+  description: string;
+  previewAlt: string;
+  empty: string;
+  ready: string;
+  current: string;
+  upload: string;
+  fileReady: (name: string, sizeKb: number) => string;
+  replace: string;
+  instructions: string;
+  change: string;
+  browse: string;
+  discard: string;
+  removeCurrent: string;
+}> = {
+  es: {
+    label: "Imagen",
+    description: "Arrastrá una imagen o buscala en tu computadora. Formatos: PNG, JPG, JPEG, GIF o WEBP.",
+    previewAlt: "Vista previa",
+    empty: "Todavía no hay imagen cargada.",
+    ready: "Imagen lista para subir",
+    current: "Imagen actual",
+    upload: "Subí una imagen",
+    fileReady: (name, sizeKb) => `${name} · ${sizeKb} KB. Guardamos la imagen al confirmar el formulario.`,
+    replace: "Podés reemplazar la imagen arrastrando otra encima o buscándola desde tu computadora.",
+    instructions: "Podés arrastrar una imagen a esta zona o hacer click para seleccionarla desde tu computadora.",
+    change: "Cambiar imagen",
+    browse: "Buscar imagen",
+    discard: "Descartar archivo",
+    removeCurrent: "Quitar imagen actual",
+  },
+  en: {
+    label: "Image",
+    description: "Drag an image here or choose one from your computer. Formats: PNG, JPG, JPEG, GIF, or WEBP.",
+    previewAlt: "Preview",
+    empty: "No image has been uploaded yet.",
+    ready: "Image ready to upload",
+    current: "Current image",
+    upload: "Upload an image",
+    fileReady: (name, sizeKb) => `${name} · ${sizeKb} KB. The image will be saved when you confirm the form.`,
+    replace: "You can replace the image by dragging another one here or choosing it from your computer.",
+    instructions: "You can drag an image to this area or click to select it from your computer.",
+    change: "Change image",
+    browse: "Choose image",
+    discard: "Discard file",
+    removeCurrent: "Remove current image",
+  },
+  pt: {
+    label: "Imagem",
+    description: "Arraste uma imagem ou procure no seu computador. Formatos: PNG, JPG, JPEG, GIF ou WEBP.",
+    previewAlt: "Pré-visualização",
+    empty: "Ainda não há imagem carregada.",
+    ready: "Imagem pronta para envio",
+    current: "Imagem atual",
+    upload: "Envie uma imagem",
+    fileReady: (name, sizeKb) => `${name} · ${sizeKb} KB. Salvamos a imagem ao confirmar o formulário.`,
+    replace: "Você pode substituir a imagem arrastando outra aqui ou procurando no seu computador.",
+    instructions: "Você pode arrastar uma imagem para esta área ou clicar para selecioná-la no computador.",
+    change: "Trocar imagem",
+    browse: "Procurar imagem",
+    discard: "Descartar arquivo",
+    removeCurrent: "Remover imagem atual",
+  },
+};
+
 export function ImageUploadField({
   value,
   file,
   onFileChange,
   onRemoveCurrent,
   disabled = false,
-  label = "Imagen",
-  description = "Arrastrá una imagen o buscala en tu computadora. Formatos: PNG, JPG, JPEG, GIF o WEBP.",
+  label,
+  description,
 }: ImageUploadFieldProps) {
+  const { language } = useLanguage();
+  const t = imageUploadMessages[language];
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [isDragging, setIsDragging] = useState(false);
 
@@ -55,8 +124,8 @@ export function ImageUploadField({
   return (
     <div className="space-y-3 md:col-span-2">
       <div>
-        <p className="text-sm font-medium text-foreground">{label}</p>
-        <p className="mt-1 text-xs leading-5 text-muted-foreground">{description}</p>
+        <p className="text-sm font-medium text-foreground">{label || t.label}</p>
+        <p className="mt-1 text-xs leading-5 text-muted-foreground">{description || t.description}</p>
       </div>
 
       <input
@@ -104,11 +173,11 @@ export function ImageUploadField({
         <div className="grid gap-4 lg:grid-cols-[180px_minmax(0,1fr)] lg:items-center">
           <div className="overflow-hidden rounded-[20px] border border-border/70 bg-white">
             {previewUrl ? (
-              <img src={previewUrl} alt="Vista previa" className="h-40 w-full object-cover" />
+              <img src={previewUrl} alt={t.previewAlt} className="h-40 w-full object-cover" />
             ) : (
               <div className="flex h-40 w-full flex-col items-center justify-center gap-2 text-center text-muted-foreground">
                 <ImagePlus className="size-7 text-primary/70" />
-                <p className="px-4 text-sm">Todavía no hay imagen cargada.</p>
+                <p className="px-4 text-sm">{t.empty}</p>
               </div>
             )}
           </div>
@@ -117,31 +186,31 @@ export function ImageUploadField({
             <div className="flex flex-wrap items-center gap-2">
               <Upload className="size-4 text-primary" />
               <p className="text-sm font-semibold text-foreground">
-                {file ? "Imagen lista para subir" : value ? "Imagen actual" : "Subí una imagen"}
+                {file ? t.ready : value ? t.current : t.upload}
               </p>
             </div>
 
             <p className="text-sm leading-6 text-muted-foreground">
               {file
-                ? `${file.name} · ${Math.max(1, Math.round(file.size / 1024))} KB. Guardamos la imagen al confirmar el formulario.`
+                ? t.fileReady(file.name, Math.max(1, Math.round(file.size / 1024)))
                 : value
-                  ? "Podés reemplazar la imagen arrastrando otra encima o buscándola desde tu computadora."
-                  : "Podés arrastrar una imagen a esta zona o hacer click para seleccionarla desde tu computadora."}
+                  ? t.replace
+                  : t.instructions}
             </p>
 
             <div className="flex flex-wrap gap-3">
               <Button type="button" variant="outline" onClick={pickFile} disabled={disabled}>
-                {file || value ? "Cambiar imagen" : "Buscar imagen"}
+                {file || value ? t.change : t.browse}
               </Button>
               {file ? (
                 <Button type="button" variant="ghost" onClick={() => onFileChange(null)} disabled={disabled}>
-                  Descartar archivo
+                  {t.discard}
                 </Button>
               ) : null}
               {!file && value && onRemoveCurrent ? (
                 <Button type="button" variant="ghost" onClick={onRemoveCurrent} disabled={disabled}>
                   <Trash2 className="size-4" />
-                  Quitar imagen actual
+                  {t.removeCurrent}
                 </Button>
               ) : null}
             </div>

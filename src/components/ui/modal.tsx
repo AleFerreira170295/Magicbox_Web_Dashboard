@@ -3,7 +3,14 @@
 import { useEffect } from "react";
 import { createPortal } from "react-dom";
 import { X } from "lucide-react";
+import { useLanguage, type AppLanguage } from "@/features/i18n/i18n-context";
 import { cn } from "@/lib/utils";
+
+const modalMessages: Record<AppLanguage, { close: string }> = {
+  es: { close: "Cerrar" },
+  en: { close: "Close" },
+  pt: { close: "Fechar" },
+};
 
 export function Modal({
   open,
@@ -22,6 +29,9 @@ export function Modal({
   className?: string;
   hideHeader?: boolean;
 }) {
+  const { language } = useLanguage();
+  const t = modalMessages[language];
+
   useEffect(() => {
     if (!open) return;
     const previousOverflow = document.body.style.overflow;
@@ -61,7 +71,7 @@ export function Modal({
             type="button"
             onClick={onClose}
             className="absolute top-4 right-4 z-[97] inline-flex shrink-0 rounded-full border border-border/70 bg-white p-2.5 text-foreground shadow-[0_8px_18px_rgba(33,59,87,0.06)] transition hover:bg-muted/70"
-            aria-label="Cerrar"
+            aria-label={t.close}
           >
             <X className="size-4" />
           </button>
@@ -75,7 +85,7 @@ export function Modal({
               type="button"
               onClick={onClose}
               className="inline-flex shrink-0 rounded-full border border-border/70 bg-white p-2.5 text-foreground shadow-[0_8px_18px_rgba(33,59,87,0.06)] transition hover:bg-muted/70"
-              aria-label="Cerrar"
+              aria-label={t.close}
             >
               <X className="size-4" />
             </button>
