@@ -23,6 +23,14 @@ describe("resolveApiBaseUrl", () => {
     expect(normalizeImageUrl("https://magicbox.academy/default-student.png")).toBeNull();
     expect(normalizeImageUrl("https://cdn.example.com/avatar.png")).toBe("https://cdn.example.com/avatar.png");
   });
+
+  it("rechaza protocolos de imagen no seguros", () => {
+    expect(normalizeImageUrl("javascript:alert(1)")).toBeNull();
+    expect(normalizeImageUrl("data:image/svg+xml,<svg onload=alert(1)>")).toBeNull();
+    expect(normalizeImageUrl("ftp://example.com/avatar.png")).toBeNull();
+    expect(normalizeImageUrl("/uploads/avatar.png")).toBe("/uploads/avatar.png");
+    expect(normalizeImageUrl("blob:http://localhost/avatar")).toBe("blob:http://localhost/avatar");
+  });
 });
 
 describe("apiRequest", () => {

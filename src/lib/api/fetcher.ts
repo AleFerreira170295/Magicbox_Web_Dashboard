@@ -65,18 +65,30 @@ function ensureTrailingSlash(value: string) {
 }
 
 export function normalizeImageUrl(value?: string | null) {
-  if (!value || value.trim().length === 0) return null;
+  const trimmed = value?.trim();
+  if (!trimmed) return null;
+  if (/[\u0000-\u001F\u007F]/.test(trimmed)) return null;
+
+  if (trimmed.startsWith("/") && !trimmed.startsWith("//")) {
+    return trimmed;
+  }
+
+  if (trimmed.startsWith("blob:")) {
+    return trimmed;
+  }
 
   try {
-    const url = new URL(value);
+    const url = new URL(trimmed);
+    if (url.protocol !== "http:" && url.protocol !== "https:") {
+      return null;
+    }
     if (PLACEHOLDER_IMAGE_HOSTS.has(url.hostname.toLowerCase()) && PLACEHOLDER_IMAGE_PATHS.has(url.pathname.toLowerCase())) {
       return null;
     }
+    return url.toString();
   } catch {
-    return value;
+    return null;
   }
-
-  return value;
 }
 
 export function resolveApiBaseUrl(configuredBaseInput = appConfig.apiBaseUrl, browserOrigin = typeof window !== "undefined" ? window.location.origin : null) {
