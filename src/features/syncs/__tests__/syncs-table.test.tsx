@@ -223,7 +223,7 @@ describe("SyncsTable", () => {
 
     expect(screen.getByText("Teacher")).toBeInTheDocument();
     expect(screen.queryAllByText("historial personal").length).toBeGreaterThan(0);
-    expect(screen.getByText(/la tabla queda limitada a tus propias sincronizaciones/i)).toBeInTheDocument();
+    expect(screen.getByText("Acceso disponible")).toBeInTheDocument();
   });
 
   it("adapts operational sync reading to a teacher-oriented framing", () => {
@@ -294,7 +294,7 @@ describe("SyncsTable", () => {
     renderSyncsTable();
 
     expect(screen.getByText("Teacher")).toBeInTheDocument();
-    expect(screen.getByText(/pensada para conectar captura, participantes y dispositivo/i)).toBeInTheDocument();
+    expect(screen.getByText("Acceso disponible")).toBeInTheDocument();
 
     fireEvent.click(screen.getByText("mb-sync-1"));
 
@@ -461,7 +461,7 @@ describe("SyncsTable", () => {
     renderSyncsTable();
 
     expect(screen.getByText("Researcher")).toBeInTheDocument();
-    expect(screen.getByText(/pensada para leer cobertura de captura/i)).toBeInTheDocument();
+    expect(screen.getByText("Cobertura de captura")).toBeInTheDocument();
 
     fireEvent.click(screen.getByText("mb-sync-1"));
 
@@ -481,7 +481,7 @@ describe("SyncsTable", () => {
         fullName: "Fiona Family",
         educationalCenterId: "ec-1",
         roles: ["family"],
-        permissions: ["ble_device:read"],
+        permissions: ["game_data:read"],
         raw: {},
       },
     });
@@ -538,7 +538,7 @@ describe("SyncsTable", () => {
     renderSyncsTable();
 
     expect(screen.getByText("Family")).toBeInTheDocument();
-    expect(screen.getByText(/seguir la actividad de sincronización reciente/i)).toBeInTheDocument();
+    expect(screen.getByText("Actividad reciente")).toBeInTheDocument();
     expect(screen.queryByText("Todos los accesos")).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByText("mb-sync-1"));

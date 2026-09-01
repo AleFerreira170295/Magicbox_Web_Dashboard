@@ -275,16 +275,6 @@ export function SyncsTable() {
   const linkedDeviceId = searchParams.get("deviceId")?.trim() || "";
   const linkedDeviceName = searchParams.get("deviceName")?.trim() || "";
 
-  const syncsQuery = useSyncSessions(tokens?.accessToken);
-  const devicesQuery = useDevices(tokens?.accessToken);
-  const usersQuery = useUsers(tokens?.accessToken);
-  const gamesQuery = useGames(tokens?.accessToken);
-
-  const syncs = useMemo(() => syncsQuery.data?.data || [], [syncsQuery.data?.data]);
-  const devices = useMemo(() => devicesQuery.data?.data || [], [devicesQuery.data?.data]);
-  const users = useMemo(() => usersQuery.data?.data || [], [usersQuery.data?.data]);
-  const games = useMemo(() => gamesQuery.data?.data || [], [gamesQuery.data?.data]);
-
   const currentPermissionKeys = useMemo(() => new Set(currentUser?.permissions || []), [currentUser?.permissions]);
   const hasGlobalAdminRole = currentUser?.roles.includes("admin") || false;
   const hasResolvedCapabilities = hasGlobalAdminRole || currentPermissionKeys.size > 0;
@@ -296,6 +286,18 @@ export function SyncsTable() {
   }
 
   const canReadOperationalSyncs = hasAnyPermission("ble_device:read", "ble-device:read");
+  const canReadUsers = hasAnyPermission("user:read");
+  const canReadGames = hasAnyPermission("game_data:read", "game-data:read");
+
+  const syncsQuery = useSyncSessions(tokens?.accessToken);
+  const devicesQuery = useDevices(canReadOperationalSyncs ? tokens?.accessToken : undefined);
+  const usersQuery = useUsers(canReadUsers ? tokens?.accessToken : undefined);
+  const gamesQuery = useGames(canReadGames ? tokens?.accessToken : undefined);
+
+  const syncs = useMemo(() => syncsQuery.data?.data || [], [syncsQuery.data?.data]);
+  const devices = useMemo(() => devicesQuery.data?.data || [], [devicesQuery.data?.data]);
+  const users = useMemo(() => usersQuery.data?.data || [], [usersQuery.data?.data]);
+  const games = useMemo(() => gamesQuery.data?.data || [], [gamesQuery.data?.data]);
   const isInstitutionAdminView = currentUser?.roles.includes("institution-admin") || false;
   const isResearcherView = currentUser?.roles.includes("researcher") || false;
   const isFamilyView = currentUser?.roles.includes("family") || false;

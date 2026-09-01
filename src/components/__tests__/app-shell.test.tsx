@@ -66,7 +66,7 @@ describe("AppShell navigation", () => {
     expect(screen.getAllByText("Dashboard").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Usuarios").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Instituciones").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("Perfiles").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Jugadores").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Dispositivos").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Permisos").length).toBeGreaterThan(0);
 
@@ -174,8 +174,28 @@ describe("AppShell navigation", () => {
     expect(screen.getAllByText("Sincronizaciones").length).toBeGreaterThan(0);
     expect(screen.getByText("Vista familia")).toBeInTheDocument();
 
-    expect(screen.getAllByText("Dispositivos").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("Usuarios").length).toBeGreaterThan(0);
+    expect(screen.queryByText("Dispositivos")).not.toBeInTheDocument();
+    expect(screen.queryByText("Usuarios")).not.toBeInTheDocument();
+  });
+
+  it("keeps mobile family accounts without canonical permissions on raw sync views", () => {
+    useAuthMock.mockReturnValue({
+      user: {
+        fullName: "Mobile Family",
+        email: "mobile-family@example.com",
+        roles: ["family"],
+        permissions: [],
+      },
+      logout: vi.fn(),
+    });
+
+    renderShell();
+
+    expect(screen.getAllByText("Dashboard").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Sincronizaciones").length).toBeGreaterThan(0);
+    expect(screen.queryByText("Partidas")).not.toBeInTheDocument();
+    expect(screen.queryByText("Dispositivos")).not.toBeInTheDocument();
+    expect(screen.queryByText("Usuarios")).not.toBeInTheDocument();
   });
 
   it("keeps the navigation matrix aligned across the supported profiles", () => {
@@ -188,7 +208,7 @@ describe("AppShell navigation", () => {
           roles: ["admin"],
           permissions: ["feature:read"],
         },
-        visible: ["Dashboard", "Sincronizaciones", "Partidas", "Usuarios", "Permisos", "Instituciones", "Salud", "Perfiles", "Configuración", "Dispositivos"],
+        visible: ["Dashboard", "Sincronizaciones", "Partidas", "Usuarios", "Permisos", "Instituciones", "Salud", "Jugadores", "Configuración", "Dispositivos"],
         hidden: ["Alertas territoriales", "Territorios e instituciones"],
       },
       {
@@ -199,7 +219,7 @@ describe("AppShell navigation", () => {
           roles: ["director"],
           permissions: ["game_data:read"],
         },
-        visible: ["Dashboard", "Sincronizaciones", "Partidas", "Instituciones", "Perfiles", "Dispositivos"],
+        visible: ["Dashboard", "Sincronizaciones", "Partidas", "Instituciones", "Jugadores", "Dispositivos"],
         hidden: ["Usuarios", "Permisos", "Salud", "Configuración", "Alertas territoriales", "Territorios e instituciones"],
       },
       {
@@ -210,7 +230,7 @@ describe("AppShell navigation", () => {
           roles: ["institution-admin"],
           permissions: ["access_control:read", "feature:read"],
         },
-        visible: ["Dashboard", "Sincronizaciones", "Partidas", "Usuarios", "Permisos", "Instituciones", "Perfiles", "Dispositivos"],
+        visible: ["Dashboard", "Sincronizaciones", "Partidas", "Usuarios", "Permisos", "Instituciones", "Jugadores", "Dispositivos"],
         hidden: ["Salud", "Configuración", "Alertas territoriales", "Territorios e instituciones"],
       },
       {
@@ -221,7 +241,7 @@ describe("AppShell navigation", () => {
           roles: ["institution-admin"],
           permissions: [],
         },
-        visible: ["Dashboard", "Sincronizaciones", "Partidas", "Usuarios", "Permisos", "Instituciones", "Perfiles", "Dispositivos"],
+        visible: ["Dashboard", "Sincronizaciones", "Partidas", "Usuarios", "Permisos", "Instituciones", "Jugadores", "Dispositivos"],
         hidden: ["Salud", "Configuración", "Alertas territoriales", "Territorios e instituciones"],
       },
       {
@@ -233,7 +253,7 @@ describe("AppShell navigation", () => {
           permissions: ["game_data:read"],
         },
         visible: ["Dashboard", "Sincronizaciones", "Partidas", "Dispositivos"],
-        hidden: ["Usuarios", "Permisos", "Instituciones", "Salud", "Perfiles", "Configuración", "Alertas territoriales", "Territorios e instituciones"],
+        hidden: ["Usuarios", "Permisos", "Instituciones", "Salud", "Jugadores", "Configuración", "Alertas territoriales", "Territorios e instituciones"],
       },
       {
         name: "researcher",
@@ -244,7 +264,7 @@ describe("AppShell navigation", () => {
           permissions: ["game_data:read", "ble_device:read"],
         },
         visible: ["Dashboard", "Sincronizaciones", "Partidas"],
-        hidden: ["Dispositivos", "Usuarios", "Permisos", "Instituciones", "Salud", "Perfiles", "Configuración", "Alertas territoriales", "Territorios e instituciones"],
+        hidden: ["Dispositivos", "Usuarios", "Permisos", "Instituciones", "Salud", "Jugadores", "Configuración", "Alertas territoriales", "Territorios e instituciones"],
       },
       {
         name: "family",
@@ -254,8 +274,8 @@ describe("AppShell navigation", () => {
           roles: ["family"],
           permissions: ["game_data:read"],
         },
-        visible: ["Dashboard", "Sincronizaciones", "Partidas", "Dispositivos", "Usuarios"],
-        hidden: ["Permisos", "Instituciones", "Salud", "Perfiles", "Configuración", "Alertas territoriales", "Territorios e instituciones"],
+        visible: ["Dashboard", "Sincronizaciones", "Partidas", "Jugadores"],
+        hidden: ["Dispositivos", "Usuarios", "Permisos", "Instituciones", "Salud", "Configuración", "Alertas territoriales", "Territorios e instituciones"],
       },
       {
         name: "government-viewer",
@@ -266,7 +286,7 @@ describe("AppShell navigation", () => {
           permissions: ["feature:read"],
         },
         visible: ["Dashboard", "Alertas territoriales", "Territorios e instituciones"],
-        hidden: ["Sincronizaciones", "Partidas", "Dispositivos", "Usuarios", "Permisos", "Instituciones", "Salud", "Perfiles", "Configuración"],
+        hidden: ["Sincronizaciones", "Partidas", "Dispositivos", "Usuarios", "Permisos", "Instituciones", "Salud", "Jugadores", "Configuración"],
       },
     ];
 

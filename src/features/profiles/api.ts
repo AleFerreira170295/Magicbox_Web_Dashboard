@@ -59,6 +59,57 @@ export async function deleteHomeProfile(token: string, profileId: string) {
   });
 }
 
+export async function createHomeProfile(token: string, payload: {
+  displayName: string;
+  age?: number | null;
+  ageCategory?: string | null;
+}) {
+  return apiRequest<JsonObject>(apiEndpoints.profiles.list, {
+    method: "POST",
+    token,
+    body: {
+      display_name: payload.displayName,
+      age: payload.age ?? null,
+      age_category: payload.ageCategory ?? null,
+      is_active: true,
+    },
+  });
+}
+
+export async function updateHomeProfile(token: string, profileId: string, payload: {
+  displayName: string;
+  age?: number | null;
+  ageCategory?: string | null;
+  isActive?: boolean;
+}) {
+  return apiRequest<JsonObject>(apiEndpoints.profiles.byId(profileId), {
+    method: "PATCH",
+    token,
+    body: {
+      display_name: payload.displayName,
+      age: payload.age ?? null,
+      age_category: payload.ageCategory ?? null,
+      ...(payload.isActive == null ? {} : { is_active: payload.isActive }),
+    },
+  });
+}
+
+export async function createProfileBinding(token: string, payload: {
+  profileId: string;
+  cardUid: string;
+  bleDeviceId?: string | null;
+}) {
+  return apiRequest<JsonObject>(apiEndpoints.profiles.bindings, {
+    method: "POST",
+    token,
+    body: {
+      profile_id: payload.profileId,
+      card_uid: payload.cardUid,
+      ble_device_id: payload.bleDeviceId || null,
+    },
+  });
+}
+
 export function useProfilesOverview(token?: string) {
   return useQuery({
     queryKey: ["profiles-overview", token],

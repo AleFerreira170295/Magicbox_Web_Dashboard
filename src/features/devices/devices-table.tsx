@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { ListPaginationControls, useListPagination } from "@/components/ui/list-pagination-controls";
+import { useNotifications } from "@/components/ui/notifications";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useAuth } from "@/features/auth/auth-context";
@@ -386,9 +387,18 @@ export function DeviceEditorPanel({
 }) {
   const { language } = useLanguage();
   const t = devicesMessages[language];
+  const { notify } = useNotifications();
   const queryClient = useQueryClient();
   const [formState, setFormState] = useState<DeviceFormState>(() => buildFormState(selectedDevice, scopedInstitutionId));
   const [feedback, setFeedback] = useState<{ tone: "error" | "success"; text: string } | null>(null);
+
+  function showFeedback(nextFeedback: { tone: "error" | "success"; text: string }) {
+    setFeedback(nextFeedback);
+    notify({
+      tone: nextFeedback.tone,
+      message: nextFeedback.text,
+    });
+  }
 
   const assignmentLockedToInstitution = Boolean(scopedInstitutionId);
   const deviceContextBadges = [
@@ -410,7 +420,7 @@ export function DeviceEditorPanel({
       return updateDevice(token, selectedDevice.id, payload);
     },
     onSuccess: async (updatedDevice) => {
-      setFeedback({ tone: "success", text: t.editor.updated });
+      showFeedback({ tone: "success", text: t.editor.updated });
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["devices"] }),
         queryClient.invalidateQueries({ queryKey: ["institutions"] }),
@@ -418,7 +428,7 @@ export function DeviceEditorPanel({
       onUpdated(updatedDevice.id);
     },
     onError: (error) => {
-      setFeedback({ tone: "error", text: getErrorMessage(error) });
+      showFeedback({ tone: "error", text: getErrorMessage(error) });
     },
   });
 
@@ -428,22 +438,22 @@ export function DeviceEditorPanel({
 
   const handleSubmit = async () => {
     if (!selectedDevice) {
-      setFeedback({ tone: "error", text: t.editor.noSelectedDeviceError });
+      showFeedback({ tone: "error", text: t.editor.noSelectedDeviceError });
       return;
     }
 
     if (!canUpdateDevices) {
-      setFeedback({ tone: "error", text: t.editor.noPermission });
+      showFeedback({ tone: "error", text: t.editor.noPermission });
       return;
     }
 
     if (!formState.name.trim()) {
-      setFeedback({ tone: "error", text: t.editor.nameRequired });
+      showFeedback({ tone: "error", text: t.editor.nameRequired });
       return;
     }
 
     if (formState.assignmentScope === "institution" && !formState.educationalCenterId) {
-      setFeedback({ tone: "error", text: t.editor.institutionRequired });
+      showFeedback({ tone: "error", text: t.editor.institutionRequired });
       return;
     }
 

@@ -1,7 +1,6 @@
 "use client";
 
-import Link from "next/link";
-import { useMemo, useState, useSyncExternalStore } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   Building2,
@@ -18,6 +17,7 @@ import { SectionHeader } from "@/components/section-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { useNotifications } from "@/components/ui/notifications";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useSystemDashboardSummary } from "@/features/dashboard/api";
 import {
@@ -193,16 +193,12 @@ function buildInstitutionLoadSeriesFromActivity(institutions: InstitutionRecord[
     .slice(0, 8);
 }
 
-function buildDashboardLocationSeeds(institutions: InstitutionRecord[], devices: Array<{ educationalCenterId?: string | null; ownerUserId?: string | null; assignmentScope?: string | null }>, users: UserRecord[]) {
+function buildDashboardLocationSeeds(institutions: InstitutionRecord[], devices: Array<{ educationalCenterId?: string | null }>) {
   const deviceCountByInstitutionId = new Map<string, number>();
-  const deviceCountByOwnerId = new Map<string, number>();
 
   for (const device of devices) {
     if (device.educationalCenterId) {
       deviceCountByInstitutionId.set(device.educationalCenterId, (deviceCountByInstitutionId.get(device.educationalCenterId) || 0) + 1);
-    }
-    if (device.ownerUserId) {
-      deviceCountByOwnerId.set(device.ownerUserId, (deviceCountByOwnerId.get(device.ownerUserId) || 0) + 1);
     }
   }
 
@@ -219,6 +215,7 @@ function buildDashboardLocationSeeds(institutions: InstitutionRecord[], devices:
     if (!query) continue;
 
     const institutionDeviceCount = deviceCountByInstitutionId.get(institution.id) || institution.operationalSummary?.deviceCount || 0;
+    if (institutionDeviceCount <= 0) continue;
 
     seeds.push({
       key: `institution-${institution.id}`,
@@ -231,32 +228,7 @@ function buildDashboardLocationSeeds(institutions: InstitutionRecord[], devices:
     });
   }
 
-  const ownerSeeds = new Map<string, DashboardLocationSeed>();
-  for (const user of users) {
-    if (!user.address) continue;
-    const ownerDeviceCount = deviceCountByOwnerId.get(user.id) || 0;
-    if (ownerDeviceCount <= 0) continue;
-
-    const query = [user.address.addressFirstLine, user.address.city, user.address.state, user.address.countryCode].filter(Boolean).join(", ");
-    if (!query) continue;
-
-    const key = `owner-${query.toLowerCase()}`;
-    const current = ownerSeeds.get(key) || {
-      key,
-      label: user.fullName || user.email || "Owner home",
-      query,
-      detail: [user.address.city, user.address.state, user.address.countryCode].filter(Boolean).join(" · ") || "Owner con dirección cargada",
-      kind: "home-device",
-      deviceCount: 0,
-      institutionCount: 0,
-    } satisfies DashboardLocationSeed;
-
-    current.deviceCount += ownerDeviceCount;
-    ownerSeeds.set(key, current);
-  }
-
-  return [...seeds, ...ownerSeeds.values()]
-    .filter((seed) => seed.deviceCount > 0 || seed.institutionCount > 0)
+  return seeds
     .sort((a, b) => (b.deviceCount + b.institutionCount) - (a.deviceCount + a.institutionCount));
 }
 
@@ -305,6 +277,20 @@ export function SuperadminDashboard() {
   const localText = language === "en"
     ? {
         smartPreset: { all: "General view", critical: "Critical territories", scoreLt60: "Score < 60", noTurns: "No turns", highPopulationLowActivity: "High population, low activity" },
+        notification: {
+          institutionsTitle: "Institutions pending review",
+          institutionsMessage: (count: number) => `${count} institutions need operational review.`,
+          devicesTitle: "Device data to complete",
+          devicesMessage: (withoutStatus: number, withoutOwner: number) => `${withoutStatus} devices have no status and ${withoutOwner} have no assigned owner.`,
+          syncsTitle: "Sync traceability",
+          syncsMessage: (withoutRaw: number) => `${withoutRaw} syncs still have no raw records available.`,
+          profilesTitle: "Profile coverage",
+          profilesMessage: (withoutBindings: number) => `${withoutBindings} profiles have no active binding.`,
+          gamesTitle: "Activity to monitor",
+          gamesMessage: "There are no games recorded in the current view yet.",
+          healthTitle: "System health",
+          healthMessage: (count: number) => `${count} health checks are not healthy.`,
+        },
         detail: {
           total: "Total",
           role: "Role",
@@ -345,6 +331,20 @@ export function SuperadminDashboard() {
     : language === "pt"
       ? {
           smartPreset: { all: "Visão geral", critical: "Territórios críticos", scoreLt60: "Score < 60", noTurns: "Sem turnos", highPopulationLowActivity: "Alta população, baixa atividade" },
+          notification: {
+            institutionsTitle: "Instituições com revisão pendente",
+            institutionsMessage: (count: number) => `${count} instituições precisam de revisão operacional.`,
+            devicesTitle: "Dados de dispositivos a completar",
+            devicesMessage: (withoutStatus: number, withoutOwner: number) => `${withoutStatus} dispositivos não têm estado e ${withoutOwner} não têm owner associado.`,
+            syncsTitle: "Rastreabilidade de sync",
+            syncsMessage: (withoutRaw: number) => `${withoutRaw} sincronizações ainda não têm registros raw disponíveis.`,
+            profilesTitle: "Cobertura de perfis",
+            profilesMessage: (withoutBindings: number) => `${withoutBindings} perfis não têm binding ativo.`,
+            gamesTitle: "Atividade a monitorar",
+            gamesMessage: "Ainda não há partidas registradas na visão atual.",
+            healthTitle: "Saúde do sistema",
+            healthMessage: (count: number) => `${count} checks de saúde não estão healthy.`,
+          },
           detail: {
             total: "Total",
             role: "Papel",
@@ -384,6 +384,20 @@ export function SuperadminDashboard() {
         }
       : {
           smartPreset: { all: "Vista general", critical: "Territorios críticos", scoreLt60: "Score < 60", noTurns: "Sin turnos", highPopulationLowActivity: "Alta población, baja actividad" },
+          notification: {
+            institutionsTitle: "Instituciones con revisión pendiente",
+            institutionsMessage: (count: number) => `${count} instituciones necesitan revisión operativa.`,
+            devicesTitle: "Datos de dispositivos por completar",
+            devicesMessage: (withoutStatus: number, withoutOwner: number) => `${withoutStatus} dispositivos no tienen estado y ${withoutOwner} no tienen owner asociado.`,
+            syncsTitle: "Trazabilidad de sincronizaciones",
+            syncsMessage: (withoutRaw: number) => `${withoutRaw} sincronizaciones todavía no tienen raw disponible.`,
+            profilesTitle: "Cobertura de perfiles",
+            profilesMessage: (withoutBindings: number) => `${withoutBindings} perfiles no tienen binding activo.`,
+            gamesTitle: "Actividad para mirar",
+            gamesMessage: "Todavía no hay partidas registradas en la vista actual.",
+            healthTitle: "Salud del sistema",
+            healthMessage: (count: number) => `${count} checks de salud no están healthy.`,
+          },
           detail: {
             total: "Total",
             role: "Rol",
@@ -435,8 +449,10 @@ export function SuperadminDashboard() {
   }, [territorialPresetsSnapshot]);
   const [shareLinkState, setShareLinkState] = useState<"idle" | "copied" | "error">("idle");
   const [selectedDetail, setSelectedDetail] = useState<{ kind: string; label: string } | null>(null);
+  const dashboardNotificationSignatureRef = useRef("");
   const { getRange: getModuleRange, setRange: setModuleRange } = useDashboardModuleControls();
   const { tokens, user } = useAuth();
+  const { notify } = useNotifications();
   const isAdmin = user?.roles.includes("admin") || false;
   const isGovernmentViewer = user?.roles.includes("government-viewer") || false;
   const isInstitutionAdmin = user?.roles.includes("institution-admin") || false;
@@ -518,8 +534,8 @@ export function SuperadminDashboard() {
   const territoryAlerts = summaryQuery.data?.segments.territory_alerts ?? EMPTY_LIST;
   const territoryScores = summaryQuery.data?.segments.territory_scores ?? EMPTY_LIST;
   const locationSeeds = useMemo(
-    () => buildDashboardLocationSeeds(institutions, devices, users),
-    [devices, institutions, users],
+    () => buildDashboardLocationSeeds(institutions, devices),
+    [devices, institutions],
   );
 
   const smartPresets = useMemo(
@@ -804,6 +820,84 @@ export function SuperadminDashboard() {
     };
   }, [canSeeHealthModule, devices, devicesQuery.data, games, gamesQuery.data, healthQuery.data, institutions, institutionsQuery.data, profiles, readinessChecks, readinessQuery.data, summaryQuery.data, syncs, syncsQuery.data, usesSystemSummary, users, usersQuery.data]);
 
+  const dashboardNotifications = useMemo(() => {
+    const notifications: Array<{ key: string; tone: "success" | "error"; title: string; message: string }> = [];
+    const devicesWithoutOwner = Math.max(metrics.totalDevices - metrics.devicesWithOwner, 0);
+
+    if ((isAdmin || isGovernmentViewer) && metrics.institutionsNeedingReview > 0) {
+      notifications.push({
+        key: `institutions-${metrics.institutionsNeedingReview}`,
+        tone: "error",
+        title: localText.notification.institutionsTitle,
+        message: localText.notification.institutionsMessage(metrics.institutionsNeedingReview),
+      });
+    }
+
+    if ((isAdmin || isGovernmentViewer || isInstitutionAdmin || isDirector) && (metrics.devicesWithoutStatus > 0 || devicesWithoutOwner > 0)) {
+      notifications.push({
+        key: `devices-${metrics.devicesWithoutStatus}-${devicesWithoutOwner}`,
+        tone: "error",
+        title: localText.notification.devicesTitle,
+        message: localText.notification.devicesMessage(metrics.devicesWithoutStatus, devicesWithoutOwner),
+      });
+    }
+
+    if ((isAdmin || isGovernmentViewer) && metrics.syncsWithoutRaw > 0) {
+      notifications.push({
+        key: `syncs-${metrics.syncsWithoutRaw}`,
+        tone: "error",
+        title: localText.notification.syncsTitle,
+        message: localText.notification.syncsMessage(metrics.syncsWithoutRaw),
+      });
+    }
+
+    if ((isAdmin || isInstitutionAdmin || isDirector) && metrics.profilesWithoutBindings > 0) {
+      notifications.push({
+        key: `profiles-${metrics.profilesWithoutBindings}`,
+        tone: "error",
+        title: localText.notification.profilesTitle,
+        message: localText.notification.profilesMessage(metrics.profilesWithoutBindings),
+      });
+    }
+
+    if ((isInstitutionAdmin || isDirector) && metrics.totalGames === 0) {
+      notifications.push({
+        key: "games-empty",
+        tone: "success",
+        title: localText.notification.gamesTitle,
+        message: localText.notification.gamesMessage,
+      });
+    }
+
+    if (canSeeHealthModule && metrics.degradedChecks > 0) {
+      notifications.push({
+        key: `health-${metrics.degradedChecks}`,
+        tone: "error",
+        title: localText.notification.healthTitle,
+        message: localText.notification.healthMessage(metrics.degradedChecks),
+      });
+    }
+
+    return notifications.slice(0, 3);
+  }, [canSeeHealthModule, isAdmin, isDirector, isGovernmentViewer, isInstitutionAdmin, localText.notification, metrics.degradedChecks, metrics.devicesWithOwner, metrics.devicesWithoutStatus, metrics.institutionsNeedingReview, metrics.profilesWithoutBindings, metrics.syncsWithoutRaw, metrics.totalDevices, metrics.totalGames]);
+
+  useEffect(() => {
+    if (showInitialLoading || error || dashboardNotifications.length === 0) return;
+
+    const signature = dashboardNotifications.map((notification) => notification.key).join("|");
+    if (signature === dashboardNotificationSignatureRef.current) return;
+    dashboardNotificationSignatureRef.current = signature;
+
+    dashboardNotifications.forEach((notification) => {
+      notify({
+        tone: notification.tone,
+        title: notification.title,
+        message: notification.message,
+        durationMs: notification.tone === "error" ? 8500 : 6500,
+      });
+    });
+  }, [dashboardNotifications, error, notify, showInitialLoading]);
+
   const scopeLabel = isAdmin
     ? t.scope.admin
     : isGovernmentViewer
@@ -1018,46 +1112,6 @@ export function SuperadminDashboard() {
           onClear={() => setSelectedDetail(null)}
         />
       ) : null}
-
-      <div>
-        <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
-          <CardHeader>
-            <CardTitle>{t.quickLook.title}</CardTitle>
-            <CardDescription>
-              {t.quickLook.description}
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <Link href="/institutions" className="block rounded-2xl border border-border/70 bg-white/80 p-4 transition hover:border-primary/20 hover:bg-white">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="text-sm font-medium text-foreground">{t.quickLook.institutions}</p>
-                  <p className="mt-1 text-sm leading-6 text-muted-foreground">{t.quickLook.institutionsHint(metrics.institutionsNeedingReview)}</p>
-                </div>
-                <Badge variant={metrics.institutionsNeedingReview > 0 ? "warning" : "success"}>{metrics.institutionsNeedingReview > 0 ? t.quickLook.review : t.quickLook.ok}</Badge>
-              </div>
-            </Link>
-            <Link href="/devices" className="block rounded-2xl border border-border/70 bg-white/80 p-4 transition hover:border-primary/20 hover:bg-white">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="text-sm font-medium text-foreground">{t.quickLook.devices}</p>
-                  <p className="mt-1 text-sm leading-6 text-muted-foreground">{t.quickLook.devicesHint(metrics.devicesWithoutStatus, metrics.totalDevices - metrics.devicesWithOwner)}</p>
-                </div>
-                <Badge variant={metrics.devicesWithoutStatus > 0 ? "warning" : "success"}>{metrics.devicesWithoutStatus > 0 ? t.quickLook.attention : t.quickLook.ok}</Badge>
-              </div>
-            </Link>
-            <Link href="/syncs" className="block rounded-2xl border border-border/70 bg-white/80 p-4 transition hover:border-primary/20 hover:bg-white">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="text-sm font-medium text-foreground">{t.quickLook.syncs}</p>
-                  <p className="mt-1 text-sm leading-6 text-muted-foreground">{t.quickLook.syncsHint(formatPercentLocalized(metrics.syncsWithRaw, metrics.totalSyncs), formatPercentLocalized(metrics.profilesWithBindings, metrics.totalProfiles))}</p>
-                </div>
-                <Badge variant="outline">{t.quickLook.follow}</Badge>
-              </div>
-            </Link>
-          </CardContent>
-        </Card>
-      </div>
 
       <div className="grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(220px,1fr))]">
         {showInitialLoading ? (

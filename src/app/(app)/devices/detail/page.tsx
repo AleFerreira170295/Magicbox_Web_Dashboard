@@ -8,7 +8,7 @@ export default function DevicesDetailPage() {
   const searchParams = useSearchParams();
 
   return (
-    <RoleGuard allowedRoles={["teacher", "director", "admin", "institution-admin", "family"]}>
+    <RoleGuard allowedRoles={["teacher", "director", "admin", "institution-admin"]}>
       <DeviceDetailPage
         deviceRecordId={searchParams.get("deviceRecordId")}
         overviewState={{

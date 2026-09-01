@@ -62,6 +62,10 @@ vi.mock("@/features/profiles/relevant-profiles", () => ({
   RelevantProfiles: () => <div>relevant-profiles</div>,
 }));
 
+vi.mock("@/features/profiles/family-players", () => ({
+  FamilyPlayers: () => <div>relevant-profiles</div>,
+}));
+
 vi.mock("@/features/profiles/profile-detail-page", () => ({
   ProfileDetailPage: () => <div>profile-detail-page</div>,
 }));
@@ -198,7 +202,7 @@ describe("operational route guards", () => {
     },
     {
       role: "family",
-      visible: ["dashboard-home", "devices-table", "games-table", "game-detail-page", "syncs-table", "users-table"],
+      visible: ["dashboard-home", "games-table", "game-detail-page", "syncs-table", "relevant-profiles"],
     },
     {
       role: "government-viewer",

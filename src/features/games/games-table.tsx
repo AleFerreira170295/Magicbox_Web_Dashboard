@@ -362,9 +362,22 @@ export function GamesTable() {
   const initialPage = Number(searchParams.get("page") || 1) > 0 ? Number(searchParams.get("page") || 1) : 1;
   const initialPageSize = Number(searchParams.get("pageSize") || 10);
 
-  const gamesQuery = useGames(tokens?.accessToken, { limit: 100, sortBy: "created_at", order: "desc" });
-  const devicesQuery = useDevices(tokens?.accessToken);
-  const institutionsQuery = useInstitutions(tokens?.accessToken);
+  const currentPermissionKeys = useMemo(() => new Set(currentUser?.permissions || []), [currentUser?.permissions]);
+  const hasGlobalAdminRole = currentUser?.roles.includes("admin") || false;
+  const isFamilyView = currentUser?.roles.includes("family") || false;
+  const hasResolvedCapabilities = hasGlobalAdminRole || currentPermissionKeys.size > 0;
+  const hasAnyPermission = (...keys: string[]) => {
+    if (hasGlobalAdminRole) return true;
+    if (!hasResolvedCapabilities) return !isFamilyView;
+    return keys.some((key) => currentPermissionKeys.has(key));
+  };
+  const canReadGames = hasAnyPermission("game_data:read", "game-data:read");
+  const canReadDevices = hasAnyPermission("ble_device:read", "ble-device:read");
+  const canReadInstitutions = hasAnyPermission("educational_center:read", "educational-center:read");
+
+  const gamesQuery = useGames(canReadGames ? tokens?.accessToken : undefined, { limit: 100, sortBy: "created_at", order: "desc" });
+  const devicesQuery = useDevices(canReadDevices ? tokens?.accessToken : undefined);
+  const institutionsQuery = useInstitutions(canReadInstitutions ? tokens?.accessToken : undefined);
 
   const games = useMemo(() => gamesQuery.data?.data || [], [gamesQuery.data?.data]);
   const devices = useMemo(() => devicesQuery.data?.data || [], [devicesQuery.data?.data]);
@@ -376,7 +389,6 @@ export function GamesTable() {
   const scopedInstitutionName = scopedInstitutionId ? institutions[0]?.name || scopedInstitutionId : null;
   const isInstitutionScopedView = Boolean(scopedInstitutionId && currentUser?.educationalCenterId === scopedInstitutionId);
   const isResearcherView = currentUser?.roles.includes("researcher") || false;
-  const isFamilyView = currentUser?.roles.includes("family") || false;
   const isTeacherView = currentUser?.roles.includes("teacher") || false;
   const isDirectorView = currentUser?.roles.includes("director") || false;
 

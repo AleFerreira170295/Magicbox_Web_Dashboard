@@ -112,28 +112,23 @@ describe("FamilyDashboard", () => {
   it("renders a simplified family dashboard focused on recent activity", () => {
     renderDashboard();
 
-    expect(screen.getByText(/Dashboard de seguimiento para Familia Demo/i)).toBeInTheDocument();
-    expect(screen.getAllByText(/Recursos principales/i).length).toBeGreaterThan(0);
-    expect(screen.getAllByText(/Dispositivos/i).length).toBeGreaterThan(0);
-    expect(screen.getAllByText(/Usuarios/i).length).toBeGreaterThan(0);
-    expect(screen.getByText(/Usuarios por rol/i)).toBeInTheDocument();
-    expect(screen.getByText(/Estado de perfiles/i)).toBeInTheDocument();
-    expect(screen.getByText(/Perfiles por categoría/i)).toBeInTheDocument();
-    expect(screen.getByText(/Recencia de usuarios/i)).toBeInTheDocument();
+    expect(screen.getByText(/Seguimiento de Familia Demo/i)).toBeInTheDocument();
     expect(screen.getAllByText(/Partidas/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Sincronizaciones/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Actividad reciente/i).length).toBeGreaterThan(0);
+    expect(screen.getByText(/Mazos usados/i)).toBeInTheDocument();
     expect(screen.getByText(/Syncs con evidencia/i)).toBeInTheDocument();
+    expect(screen.queryByText(/Usuarios por rol/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Dispositivos/i)).not.toBeInTheDocument();
   });
 
   it("opens family detail filters from cards and summary blocks", () => {
     renderDashboard();
 
-    fireEvent.click(screen.getByRole("button", { name: /Ver detalle Usuarios/i }));
-    expect(screen.getByText(/Detalle de usuarios/i)).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("button", { name: /Filtrar Recursos principales por Dispositivos/i }));
-    expect(screen.getByText(/Recursos · dispositivos/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /Ver detalle Partidas/i }));
+    expect(screen.getByText(/Detalle de partidas/i)).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /Ver detalle de Syncs con evidencia/i }));
-    expect(screen.getByText(/Sincronizaciones que sí traen captura utilizable/i)).toBeInTheDocument();
+    expect(screen.getByText(/Detalle de sincronizaciones/i)).toBeInTheDocument();
   });
 });

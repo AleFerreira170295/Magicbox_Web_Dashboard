@@ -63,6 +63,12 @@ function getExperienceMeta(
   return experienceMeta.fallback;
 }
 
+function canReadGameData(user: { roles?: string[]; permissions?: string[] } | null | undefined) {
+  if (user?.roles?.includes("admin")) return true;
+  const permissions = new Set(user?.permissions || []);
+  return permissions.has("game_data:read") || permissions.has("game-data:read");
+}
+
 function buildNavigation(t: ReturnType<typeof useLanguage>["t"]): NavigationItem[] {
   return [
   {
@@ -103,7 +109,7 @@ function buildNavigation(t: ReturnType<typeof useLanguage>["t"]): NavigationItem
     summary: t.appShell.navigation.devices.summary,
     section: "operation",
     icon: Smartphone,
-    roles: ["teacher", "director", "admin", "institution-admin", "family"] satisfies NavigationRole[],
+    roles: ["teacher", "director", "admin", "institution-admin"] satisfies NavigationRole[],
   },
   {
     href: "/games",
@@ -112,6 +118,7 @@ function buildNavigation(t: ReturnType<typeof useLanguage>["t"]): NavigationItem
     section: "operation",
     icon: Database,
     roles: ["teacher", "director", "researcher", "family", "admin", "institution-admin"] satisfies NavigationRole[],
+    isVisible: (user) => !user?.roles?.includes("family") || canReadGameData(user),
   },
   {
     href: "/evaluations",
@@ -135,7 +142,7 @@ function buildNavigation(t: ReturnType<typeof useLanguage>["t"]): NavigationItem
     summary: t.appShell.navigation.users.summary,
     section: "governance",
     icon: Users,
-    roles: ["admin", "institution-admin", "family"] satisfies NavigationRole[],
+    roles: ["admin", "institution-admin"] satisfies NavigationRole[],
   },
   {
     href: "/institutions",
@@ -151,7 +158,7 @@ function buildNavigation(t: ReturnType<typeof useLanguage>["t"]): NavigationItem
     summary: t.appShell.navigation.profiles.summary,
     section: "governance",
     icon: UserRound,
-    roles: ["admin", "institution-admin", "director"] satisfies NavigationRole[],
+    roles: ["family", "admin", "institution-admin", "director"] satisfies NavigationRole[],
   },
   {
     href: "/permissions",
