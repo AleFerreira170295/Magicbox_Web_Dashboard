@@ -4,12 +4,47 @@ import { resolveApiBaseUrl } from "@/lib/api/fetcher";
 const APP0_ADDRESS = 0x10000;
 const OTA_SELECTOR_ADDRESS = 0xe000;
 const OTA_SELECTOR_URL = "/firmware/esp32/boot_app0.bin";
+const MINIMUM_CABLE_FIRMWARE_VERSION = "V2.3.21";
 
 export interface FirmwareReleaseInput {
   downloadUrl: string;
   sha256?: string | null;
   sizeBytes?: number | null;
   version?: string | null;
+}
+
+export interface ResolvedCableFirmwareRelease extends FirmwareReleaseInput {
+  source: "published" | "bundled";
+}
+
+export const VERIFIED_CABLE_FIRMWARE: ResolvedCableFirmwareRelease = {
+  downloadUrl: "/firmware/esp32/magicbox-v3-V2.3.21.bin",
+  sha256: "41f02428fb29e1a286632ad9965c10dc63208c4ee17459f0e2fc485082967b82",
+  sizeBytes: 1_348_624,
+  version: MINIMUM_CABLE_FIRMWARE_VERSION,
+  source: "bundled",
+};
+
+function versionParts(value?: string | null) {
+  return (value?.match(/\d+/g) || []).map(Number);
+}
+
+function isAtLeastVersion(value: string | null | undefined, minimum: string) {
+  const current = versionParts(value);
+  const required = versionParts(minimum);
+  if (current.length === 0) return false;
+  for (let index = 0; index < Math.max(current.length, required.length); index += 1) {
+    const difference = (current[index] || 0) - (required[index] || 0);
+    if (difference !== 0) return difference > 0;
+  }
+  return true;
+}
+
+export function resolveCableFirmwareRelease(release?: FirmwareReleaseInput | null): ResolvedCableFirmwareRelease {
+  if (release?.downloadUrl && release.sha256 && isAtLeastVersion(release.version, MINIMUM_CABLE_FIRMWARE_VERSION)) {
+    return { ...release, source: "published" };
+  }
+  return VERIFIED_CABLE_FIRMWARE;
 }
 
 interface FlashFirmwareOptions {
@@ -27,6 +62,7 @@ interface SerialNavigator {
 }
 
 function resolveDownloadUrl(value: string) {
+  if (value.startsWith("/firmware/")) return new URL(value, window.location.origin).toString();
   return new URL(value, resolveApiBaseUrl()).toString();
 }
 

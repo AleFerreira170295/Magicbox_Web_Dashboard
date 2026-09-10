@@ -9,7 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/features/auth/auth-context";
 import { buildGamesBatchPayload, buildRawSyncEnvelopes } from "@/features/device-import/payload";
-import { flashMagicBoxFirmware } from "@/features/device-import/firmware-updater";
+import { flashMagicBoxFirmware, resolveCableFirmwareRelease } from "@/features/device-import/firmware-updater";
 import type { ImportedGame, ParticipantTarget } from "@/features/device-import/types";
 import { MagicBoxSerialClient, supportsWebSerial } from "@/features/device-import/web-serial";
 import { uploadGamesBatch, uploadRawGameSync } from "@/features/games/api";
@@ -26,6 +26,12 @@ export function DeviceImportCenter() {
   const students = useAllStudents(tokens?.accessToken, { institutionId: user?.educationalCenterId || undefined });
   const profiles = useProfilesOverview(tokens?.accessToken);
   const otaRelease = useOtaRelease(tokens?.accessToken);
+  const cableRelease = resolveCableFirmwareRelease(otaRelease.data ? {
+    downloadUrl: otaRelease.data.downloadUrl || "",
+    sha256: otaRelease.data.sha256,
+    sizeBytes: otaRelease.data.sizeBytes,
+    version: otaRelease.data.latestVersion,
+  } : null);
   const clientRef = useRef<MagicBoxSerialClient | null>(null);
   const [phase, setPhase] = useState<Phase>("idle");
   const [deviceId, setDeviceId] = useState("");
@@ -91,8 +97,8 @@ export function DeviceImportCenter() {
   }
 
   async function updateFirmware() {
-    const release = otaRelease.data;
-    if (!release?.downloadUrl || !confirmedV3) return;
+    const release = cableRelease;
+    if (!confirmedV3) return;
     setError(null);
     setIsUpdatingFirmware(true);
     setFirmwareProgress(0);
@@ -106,14 +112,14 @@ export function DeviceImportCenter() {
           downloadUrl: release.downloadUrl,
           sha256: release.sha256,
           sizeBytes: release.sizeBytes,
-          version: release.latestVersion,
+          version: release.version,
         },
         onProgress: (progress, message) => {
           setFirmwareProgress(progress);
           setFirmwareStatus(message);
         },
       });
-      setFirmwareStatus(`Actualización ${release.latestVersion || "completada"}. Volvé a conectar la MagicBox para leer partidas.`);
+      setFirmwareStatus(`Actualización ${release.version || "completada"}. Volvé a conectar la MagicBox para leer partidas.`);
     } catch (cause) {
       setError(getErrorMessage(cause));
       setFirmwareStatus("La actualización no se completó. No desconectes la MagicBox hasta revisar el error.");
@@ -202,8 +208,8 @@ export function DeviceImportCenter() {
         <CardContent className="space-y-4">
           <div className="grid gap-3 rounded-xl border p-4 md:grid-cols-3">
             <div><p className="text-xs text-muted-foreground">Hardware habilitado</p><p className="font-medium">MagicBox V3</p></div>
-            <div><p className="text-xs text-muted-foreground">Release activa</p><p className="font-medium">{otaRelease.data?.latestVersion || "Sin release publicada"}</p></div>
-            <div><p className="text-xs text-muted-foreground">Integridad</p><p className="font-medium">{otaRelease.data?.sha256 ? "SHA-256 publicado" : "Falta SHA-256"}</p></div>
+            <div><p className="text-xs text-muted-foreground">Firmware seleccionado</p><p className="font-medium">{cableRelease.version} · {cableRelease.source === "published" ? "release activa" : "release segura integrada"}</p></div>
+            <div><p className="text-xs text-muted-foreground">Integridad</p><p className="font-medium">SHA-256 verificado</p></div>
           </div>
           <label className="flex items-start gap-3 text-sm">
             <input type="checkbox" className="mt-1" checked={confirmedV3} onChange={(event) => setConfirmedV3(event.target.checked)} disabled={isUpdatingFirmware} />
@@ -215,9 +221,9 @@ export function DeviceImportCenter() {
               <p className="text-sm text-muted-foreground">{firmwareStatus}</p>
             </div>
           ) : null}
-          <Button onClick={updateFirmware} disabled={!supported || !confirmedV3 || isUpdatingFirmware || !otaRelease.data?.downloadUrl || !otaRelease.data?.sha256}>
+          <Button onClick={updateFirmware} disabled={!supported || !confirmedV3 || isUpdatingFirmware}>
             {isUpdatingFirmware ? <LoaderCircle className="size-4 animate-spin" /> : <Cpu className="size-4" />}
-            {isUpdatingFirmware ? "Actualizando…" : `Actualizar${otaRelease.data?.latestVersion ? ` a ${otaRelease.data.latestVersion}` : " firmware"}`}
+            {isUpdatingFirmware ? "Actualizando…" : `Actualizar a ${cableRelease.version}`}
           </Button>
         </CardContent>
       </Card>

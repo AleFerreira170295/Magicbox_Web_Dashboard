@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { sha256Hex, validateFirmwareImage } from "@/features/device-import/firmware-updater";
+import { resolveCableFirmwareRelease, sha256Hex, validateFirmwareImage } from "@/features/device-import/firmware-updater";
 
 describe("firmware updater validation", () => {
   it("validates published size and SHA-256", async () => {
@@ -11,6 +11,21 @@ describe("firmware updater validation", () => {
       sizeBytes: firmware.byteLength,
       sha256: hash,
     })).resolves.toBeUndefined();
+  });
+
+  it("uses only a published release new enough for cable import", () => {
+    expect(resolveCableFirmwareRelease({
+      downloadUrl: "/published.bin",
+      sha256: "a".repeat(64),
+      sizeBytes: 123,
+      version: "V2.3.22",
+    })).toMatchObject({ downloadUrl: "/published.bin", source: "published" });
+
+    expect(resolveCableFirmwareRelease({
+      downloadUrl: "/old.bin",
+      sha256: "b".repeat(64),
+      version: "V2.3.20",
+    })).toMatchObject({ version: "V2.3.21", source: "bundled" });
   });
 
   it("rejects an empty or altered firmware image", async () => {
