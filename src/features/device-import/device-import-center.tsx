@@ -1,7 +1,7 @@
 "use client";
 
-import { useRef, useState } from "react";
-import { Cable, CheckCircle2, Download, LoaderCircle, UploadCloud } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Cable, CheckCircle2, Cpu, Download, LoaderCircle, Power, UploadCloud } from "lucide-react";
 import { SectionHeader } from "@/components/section-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -9,10 +9,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/features/auth/auth-context";
 import { buildGamesBatchPayload, buildRawSyncEnvelopes } from "@/features/device-import/payload";
+import { flashMagicBoxFirmware } from "@/features/device-import/firmware-updater";
 import type { ImportedGame, ParticipantTarget } from "@/features/device-import/types";
 import { MagicBoxSerialClient, supportsWebSerial } from "@/features/device-import/web-serial";
 import { uploadGamesBatch, uploadRawGameSync } from "@/features/games/api";
 import { createHomeProfile, useProfilesOverview } from "@/features/profiles/api";
+import { useOtaRelease } from "@/features/settings/api";
 import { useAllStudents } from "@/features/students/api";
 import { getErrorMessage } from "@/lib/utils";
 
@@ -23,14 +25,26 @@ export function DeviceImportCenter() {
   const { tokens, user } = useAuth();
   const students = useAllStudents(tokens?.accessToken, { institutionId: user?.educationalCenterId || undefined });
   const profiles = useProfilesOverview(tokens?.accessToken);
+  const otaRelease = useOtaRelease(tokens?.accessToken);
   const clientRef = useRef<MagicBoxSerialClient | null>(null);
   const [phase, setPhase] = useState<Phase>("idle");
   const [deviceId, setDeviceId] = useState("");
   const [games, setGames] = useState<ImportedGame[]>([]);
   const [newProfileName, setNewProfileName] = useState("");
   const [isCreatingProfile, setIsCreatingProfile] = useState(false);
+  const [isUpdatingFirmware, setIsUpdatingFirmware] = useState(false);
+  const [firmwareProgress, setFirmwareProgress] = useState(0);
+  const [firmwareStatus, setFirmwareStatus] = useState("");
+  const [confirmedV3, setConfirmedV3] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const supported = supportsWebSerial();
+
+  useEffect(() => {
+    return () => {
+      void clientRef.current?.disconnect();
+      clientRef.current = null;
+    };
+  }, []);
 
   async function connect() {
     setError(null);
@@ -61,6 +75,50 @@ export function DeviceImportCenter() {
     } catch (cause) {
       setError(getErrorMessage(cause));
       setPhase("connected");
+    }
+  }
+
+  async function disconnect() {
+    setError(null);
+    try {
+      await clientRef.current?.disconnect();
+    } catch (cause) {
+      setError(getErrorMessage(cause));
+    } finally {
+      clientRef.current = null;
+      setPhase("idle");
+    }
+  }
+
+  async function updateFirmware() {
+    const release = otaRelease.data;
+    if (!release?.downloadUrl || !confirmedV3) return;
+    setError(null);
+    setIsUpdatingFirmware(true);
+    setFirmwareProgress(0);
+    setFirmwareStatus("Preparando actualización…");
+    try {
+      await clientRef.current?.disconnect();
+      clientRef.current = null;
+      setPhase("idle");
+      await flashMagicBoxFirmware({
+        release: {
+          downloadUrl: release.downloadUrl,
+          sha256: release.sha256,
+          sizeBytes: release.sizeBytes,
+          version: release.latestVersion,
+        },
+        onProgress: (progress, message) => {
+          setFirmwareProgress(progress);
+          setFirmwareStatus(message);
+        },
+      });
+      setFirmwareStatus(`Actualización ${release.latestVersion || "completada"}. Volvé a conectar la MagicBox para leer partidas.`);
+    } catch (cause) {
+      setError(getErrorMessage(cause));
+      setFirmwareStatus("La actualización no se completó. No desconectes la MagicBox hasta revisar el error.");
+    } finally {
+      setIsUpdatingFirmware(false);
     }
   }
 
@@ -131,7 +189,36 @@ export function DeviceImportCenter() {
           <div className="min-w-64 flex-1"><label className="text-sm font-medium" htmlFor="magicbox-device-id">ID de la MagicBox</label><Input id="magicbox-device-id" className="mt-2" value={deviceId} onChange={(event) => setDeviceId(event.target.value)} placeholder="AABBCCDDEEFF" /></div>
           <Button onClick={connect} disabled={!supported || phase !== "idle"}><Cable className="size-4" />Conectar</Button>
           <Button onClick={importGames} disabled={phase !== "connected"}><Download className="size-4" />Leer partidas</Button>
+          <Button variant="outline" onClick={disconnect} disabled={phase === "idle" || phase === "reading" || phase === "uploading"}><Power className="size-4" />Desconectar</Button>
           {phase === "reading" ? <Badge><LoaderCircle className="mr-1 size-3 animate-spin" />Leyendo</Badge> : null}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2"><Cpu className="size-5" />Actualizar firmware por cable</CardTitle>
+          <CardDescription>Descarga la release OTA activa, valida tamaño y SHA-256 y actualiza únicamente la aplicación y el selector OTA. No borra NVS ni LittleFS, donde permanecen configuración y partidas.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid gap-3 rounded-xl border p-4 md:grid-cols-3">
+            <div><p className="text-xs text-muted-foreground">Hardware habilitado</p><p className="font-medium">MagicBox V3</p></div>
+            <div><p className="text-xs text-muted-foreground">Release activa</p><p className="font-medium">{otaRelease.data?.latestVersion || "Sin release publicada"}</p></div>
+            <div><p className="text-xs text-muted-foreground">Integridad</p><p className="font-medium">{otaRelease.data?.sha256 ? "SHA-256 publicado" : "Falta SHA-256"}</p></div>
+          </div>
+          <label className="flex items-start gap-3 text-sm">
+            <input type="checkbox" className="mt-1" checked={confirmedV3} onChange={(event) => setConfirmedV3(event.target.checked)} disabled={isUpdatingFirmware} />
+            <span>Confirmo que es una MagicBox V3 y mantendré el cable conectado durante toda la actualización. El hardware anterior requerirá una release específica.</span>
+          </label>
+          {(isUpdatingFirmware || firmwareStatus) ? (
+            <div className="space-y-2">
+              <div className="h-2 overflow-hidden rounded-full bg-muted"><div className="h-full bg-primary transition-all" style={{ width: `${firmwareProgress}%` }} /></div>
+              <p className="text-sm text-muted-foreground">{firmwareStatus}</p>
+            </div>
+          ) : null}
+          <Button onClick={updateFirmware} disabled={!supported || !confirmedV3 || isUpdatingFirmware || !otaRelease.data?.downloadUrl || !otaRelease.data?.sha256}>
+            {isUpdatingFirmware ? <LoaderCircle className="size-4 animate-spin" /> : <Cpu className="size-4" />}
+            {isUpdatingFirmware ? "Actualizando…" : `Actualizar${otaRelease.data?.latestVersion ? ` a ${otaRelease.data.latestVersion}` : " firmware"}`}
+          </Button>
         </CardContent>
       </Card>
 
