@@ -10,20 +10,15 @@ import type { ImportedGame } from "@/features/device-import/types";
 
 const COLOR_LABELS: Record<string, string> = { AM: "Amarillo", NA: "Naranja", VE: "Verde", VI: "Violeta", CI: "Celeste", MA: "Rojo" };
 
-export function ImportedGameCharts({ game }: { game: ImportedGame }) {
+export function ImportedGameCharts({ game, embedded = false }: { game: ImportedGame; embedded?: boolean }) {
   const rounds = useMemo(() => buildRoundOutcomeSeries(game), [game]);
   const players = useMemo(() => buildPlayerOutcomeSeries(game), [game]);
   const hits = game.turns.filter((turn) => turn.correct).length;
   const misses = game.turns.length - hits;
   const accuracy = game.turns.length > 0 ? Math.round((hits / game.turns.length) * 100) : 0;
 
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2"><BarChart3 className="size-5" />Rondas y aciertos</CardTitle>
-        <CardDescription>Detalle visual de los resultados de la partida antes de subirla a la cuenta.</CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-5">
+  const content = (
+    <div className="space-y-5">
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <div className="rounded-2xl bg-muted/40 p-4"><p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Rondas</p><p className="mt-2 text-2xl font-semibold">{rounds.length}</p></div>
           <div className="rounded-2xl bg-emerald-50 p-4"><p className="text-xs uppercase tracking-[0.18em] text-emerald-700">Aciertos</p><p className="mt-2 text-2xl font-semibold text-emerald-700">{hits}</p></div>
@@ -74,7 +69,25 @@ export function ImportedGameCharts({ game }: { game: ImportedGame }) {
             </div>
           </div>
         )}
-      </CardContent>
+    </div>
+  );
+
+  if (embedded) {
+    return (
+      <div>
+        <p className="mb-5 text-sm text-muted-foreground">Detalle visual de los resultados de la partida antes de subirla a la cuenta.</p>
+        {content}
+      </div>
+    );
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2"><BarChart3 className="size-5" />Rondas y aciertos</CardTitle>
+        <CardDescription>Detalle visual de los resultados de la partida antes de subirla a la cuenta.</CardDescription>
+      </CardHeader>
+      <CardContent>{content}</CardContent>
     </Card>
   );
 }

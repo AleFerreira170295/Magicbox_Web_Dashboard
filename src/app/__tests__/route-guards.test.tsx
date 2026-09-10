@@ -12,6 +12,7 @@ import ProfilesPage from "@/app/(app)/profiles/page";
 import ProfilesDetailPage from "@/app/(app)/profiles/detail/page";
 import SettingsPage from "@/app/(app)/settings/page";
 import SyncsPage from "@/app/(app)/syncs/page";
+import CableSyncPage from "@/app/(app)/syncs/cable/page";
 import TerritorialAlertsPage from "@/app/(app)/territorial-alerts/page";
 import TerritorialOverviewPage from "@/app/(app)/territorial-overview/page";
 import UsersPage from "@/app/(app)/users/page";
@@ -74,6 +75,10 @@ vi.mock("@/features/syncs/syncs-table", () => ({
   SyncsTable: () => <div>syncs-table</div>,
 }));
 
+vi.mock("@/features/device-import/device-import-center", () => ({
+  DeviceImportCenter: () => <div>device-import-center</div>,
+}));
+
 vi.mock("@/features/dashboard/territorial-alerts-center", () => ({
   TerritorialAlertsCenter: () => <div>territorial-alerts-center</div>,
 }));
@@ -99,6 +104,7 @@ const allModules = [
   "profile-detail-page",
   "system-settings-center",
   "syncs-table",
+  "device-import-center",
   "territorial-alerts-center",
   "territorial-overview-center",
   "users-table",
@@ -119,6 +125,7 @@ function renderProtectedPages() {
       <ProfilesDetailPage />
       <SettingsPage />
       <SyncsPage />
+      <CableSyncPage />
       <TerritorialAlertsPage />
       <TerritorialOverviewPage />
       <UsersPage />
@@ -155,6 +162,7 @@ describe("operational route guards", () => {
         "profile-detail-page",
         "system-settings-center",
         "syncs-table",
+        "device-import-center",
         "users-table",
       ],
     },
@@ -171,6 +179,7 @@ describe("operational route guards", () => {
         "relevant-profiles",
         "profile-detail-page",
         "syncs-table",
+        "device-import-center",
         "users-table",
       ],
     },
@@ -186,11 +195,12 @@ describe("operational route guards", () => {
         "relevant-profiles",
         "profile-detail-page",
         "syncs-table",
+        "device-import-center",
       ],
     },
     {
       role: "teacher",
-      visible: ["dashboard-home", "devices-table", "games-table", "game-detail-page", "syncs-table"],
+      visible: ["dashboard-home", "devices-table", "games-table", "game-detail-page", "syncs-table", "device-import-center"],
     },
     {
       role: "researcher",
@@ -198,7 +208,7 @@ describe("operational route guards", () => {
     },
     {
       role: "family",
-      visible: ["dashboard-home", "devices-table", "games-table", "game-detail-page", "syncs-table", "users-table"],
+      visible: ["dashboard-home", "devices-table", "games-table", "game-detail-page", "syncs-table", "device-import-center", "users-table"],
     },
     {
       role: "government-viewer",

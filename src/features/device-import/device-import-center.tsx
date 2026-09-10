@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Cable, CheckCircle2, ChevronLeft, ChevronRight, Cpu, Download, List, LoaderCircle, Power, UploadCloud } from "lucide-react";
+import { BarChart3, Cable, CheckCircle2, ChevronLeft, ChevronRight, Cpu, Download, List, LoaderCircle, Power, UploadCloud, Users } from "lucide-react";
 import { SectionHeader } from "@/components/section-header";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -13,6 +13,7 @@ import { useAuth } from "@/features/auth/auth-context";
 import { buildGamesBatchPayload, buildRawSyncEnvelopes } from "@/features/device-import/payload";
 import { flashMagicBoxFirmware, resolveCableFirmwareRelease } from "@/features/device-import/firmware-updater";
 import { ImportedGameCharts } from "@/features/device-import/imported-game-charts";
+import { SyncNavigation } from "@/features/syncs/sync-navigation";
 import type { ImportedGame, ParticipantTarget } from "@/features/device-import/types";
 import { MagicBoxSerialClient, supportsWebSerial } from "@/features/device-import/web-serial";
 import { uploadGamesBatch, uploadRawGameSync } from "@/features/games/api";
@@ -24,6 +25,7 @@ import { useAllStudents } from "@/features/students/api";
 import { getErrorMessage } from "@/lib/utils";
 
 type Phase = "idle" | "connected" | "reading" | "ready" | "uploading" | "done";
+type GameView = "players" | "analytics";
 const COLOR_LABELS: Record<string, string> = { AM: "Amarillo", NA: "Naranja", VE: "Verde", VI: "Violeta", CI: "Celeste", MA: "Rojo" };
 
 function cleanDeviceId(value: string) {
@@ -48,6 +50,7 @@ export function DeviceImportCenter() {
   const [deviceStatus, setDeviceStatus] = useState("");
   const [games, setGames] = useState<ImportedGame[]>([]);
   const [selectedGameId, setSelectedGameId] = useState<number | null>(null);
+  const [gameView, setGameView] = useState<GameView>("players");
   const [uploadedGames, setUploadedGames] = useState<GameRecord[]>([]);
   const [newProfileName, setNewProfileName] = useState("");
   const [isCreatingProfile, setIsCreatingProfile] = useState(false);
@@ -259,11 +262,18 @@ export function DeviceImportCenter() {
 
   return (
     <div className="space-y-6">
-      <SectionHeader eyebrow="Importación por cable" title="Extraer partidas de una MagicBox" description="Conectá la MagicBox por USB, revisá quién usó cada color y recién después subí las partidas. El dispositivo se borra únicamente cuando el servidor confirma cada carga." />
+      <SectionHeader eyebrow="Sync por cable" title="Sincronizar partidas de una MagicBox" description="Conectá la MagicBox por USB, revisá quién usó cada color y recién después subí las partidas. El dispositivo se borra únicamente cuando el servidor confirma cada carga." />
+      <SyncNavigation />
+      <nav aria-label="Pasos de la sincronización por cable" className="flex gap-2 overflow-x-auto rounded-2xl border bg-muted/30 p-2 text-sm">
+        <a className="shrink-0 rounded-full px-4 py-2 font-medium hover:bg-background" href="#cable-connect">1. Conectar</a>
+        <a className="shrink-0 rounded-full px-4 py-2 font-medium hover:bg-background" href="#cable-games">2. Revisar partidas</a>
+        <a className="shrink-0 rounded-full px-4 py-2 font-medium hover:bg-background" href="#cable-players">3. Asociar jugadores</a>
+        <a className="shrink-0 rounded-full px-4 py-2 font-medium hover:bg-background" href="#cable-upload">4. Subir</a>
+      </nav>
       {!supported ? <Card className="border-amber-300 bg-amber-50"><CardHeader><CardTitle>Navegador no compatible</CardTitle><CardDescription>Usá Chrome o Edge de escritorio y abrí el dashboard por HTTPS.</CardDescription></CardHeader></Card> : null}
       {error ? <Card className="border-destructive/40"><CardContent className="pt-6 text-sm text-destructive">{error}</CardContent></Card> : null}
 
-      <Card>
+      <Card id="cable-connect" className="scroll-mt-28">
         <CardHeader><CardTitle className="flex items-center gap-2"><Cable className="size-5" />1. Conectar y leer</CardTitle><CardDescription>El ID se detecta automáticamente desde firmware V2.3.22. Las versiones anteriores conservan el ingreso manual.</CardDescription></CardHeader>
         <CardContent className="space-y-3">
           <div className="flex flex-wrap items-end gap-3">
@@ -277,7 +287,7 @@ export function DeviceImportCenter() {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card id="cable-firmware" className="scroll-mt-28">
         <CardHeader><CardTitle className="flex items-center gap-2"><Cpu className="size-5" />Actualizar firmware por cable</CardTitle><CardDescription>Valida tamaño y SHA-256 y actualiza únicamente la aplicación y el selector OTA. No borra NVS ni LittleFS.</CardDescription></CardHeader>
         <CardContent className="space-y-4">
           <div className="grid gap-3 rounded-xl border p-4 md:grid-cols-3">
@@ -291,34 +301,41 @@ export function DeviceImportCenter() {
         </CardContent>
       </Card>
 
-      {games.length > 0 ? <Card><CardHeader><CardTitle>Crear una persona para asignar</CardTitle><CardDescription>Si todavía no existe, creá un perfil rápido y aparecerá entre las personas de tu cuenta.</CardDescription></CardHeader><CardContent className="flex flex-wrap gap-3"><Input className="min-w-64 flex-1" value={newProfileName} onChange={(event) => setNewProfileName(event.target.value)} placeholder="Nombre de la persona" /><Button variant="outline" onClick={createProfile} disabled={!newProfileName.trim() || isCreatingProfile}>{isCreatingProfile ? <LoaderCircle className="size-4 animate-spin" /> : null}Crear perfil</Button></CardContent></Card> : null}
-
-      {games.length > 0 ? <Card className="border-primary/30 bg-primary/5"><CardHeader><CardTitle className="flex items-center gap-2"><UploadCloud className="size-5" />2. Subir partidas a la cuenta</CardTitle><CardDescription>Esta acción queda antes del listado para que siempre sea visible. Se sube la copia cruda y la partida normalizada; la MagicBox se borra sólo si el servidor confirma todas las partidas.</CardDescription></CardHeader><CardContent><Button onClick={uploadAndDelete} disabled={phase !== "ready" || !validDeviceId}><UploadCloud className="size-4" />Subir {games.length} partidas y borrar originales</Button>{!validDeviceId ? <p className="mt-2 text-sm text-amber-700">Falta un ID válido de 12 caracteres para vincular las partidas.</p> : null}{phase === "uploading" ? <span className="ml-3 text-sm text-muted-foreground"><LoaderCircle className="mr-1 inline size-4 animate-spin" />Procesando…</span> : null}</CardContent></Card> : null}
+      {games.length > 0 ? <Card id="cable-upload" className="scroll-mt-28 border-primary/30 bg-primary/5"><CardHeader><CardTitle className="flex items-center gap-2"><UploadCloud className="size-5" />Subir partidas a la cuenta</CardTitle><CardDescription>Se sube la copia cruda y la partida normalizada; la MagicBox se borra sólo si el servidor confirma todas las partidas.</CardDescription></CardHeader><CardContent className="flex flex-wrap items-center gap-3"><Button onClick={uploadAndDelete} disabled={phase !== "ready" || !validDeviceId}><UploadCloud className="size-4" />Subir {games.length} partidas y borrar originales</Button>{!validDeviceId ? <p className="text-sm text-amber-700">Falta un ID válido de 12 caracteres para vincular las partidas.</p> : null}{phase === "uploading" ? <span className="text-sm text-muted-foreground"><LoaderCircle className="mr-1 inline size-4 animate-spin" />Procesando…</span> : null}</CardContent></Card> : null}
 
       {selectedGame ? (
         <>
-        <div className="grid gap-4 lg:grid-cols-[280px_minmax(0,1fr)]">
-          <Card className="h-fit">
+        <div id="cable-games" className="grid scroll-mt-28 gap-4 lg:grid-cols-[280px_minmax(0,1fr)] lg:items-start">
+          <Card className="h-fit lg:sticky lg:top-24">
             <CardHeader><CardTitle className="flex items-center gap-2"><List className="size-5" />Partidas extraídas</CardTitle><CardDescription>{games.length} disponibles para revisar</CardDescription></CardHeader>
-            <CardContent className="space-y-2">
+            <CardContent className="max-h-[calc(100vh-14rem)] space-y-2 overflow-y-auto pr-3">
               {games.map((game, index) => <button key={game.summary.gameId} type="button" onClick={() => setSelectedGameId(game.summary.gameId)} className={`w-full rounded-xl border p-3 text-left transition ${game.summary.gameId === selectedGame.summary.gameId ? "border-primary bg-primary/5" : "hover:bg-muted/60"}`}><div className="flex items-center justify-between gap-2"><span className="font-medium">Partida #{game.summary.gameId}</span><Badge variant="outline">{index + 1}</Badge></div><p className="mt-1 text-xs text-muted-foreground">{game.summary.deckName} · {game.players.length} jugadores · {game.turns.length} turnos</p></button>)}
             </CardContent>
           </Card>
 
-          <Card>
+          <Card id="cable-players" className="scroll-mt-28">
             <CardHeader>
               <div className="flex flex-wrap items-start justify-between gap-3"><div><CardTitle>Partida #{selectedGame.summary.gameId}</CardTitle><CardDescription>{selectedGame.summary.deckName} · {selectedGame.players.length} jugadores · {selectedGame.turns.length} turnos{selectedGame.turns.length === 0 ? " · finalizada sin jugadas" : ""}</CardDescription></div><div className="flex items-center gap-2"><Button size="sm" className="size-9 p-0" variant="outline" aria-label="Partida anterior" onClick={() => selectRelativeGame(-1)} disabled={selectedIndex <= 0}><ChevronLeft className="size-4" /></Button><span className="text-sm text-muted-foreground">{selectedIndex + 1} de {games.length}</span><Button size="sm" className="size-9 p-0" variant="outline" aria-label="Partida siguiente" onClick={() => selectRelativeGame(1)} disabled={selectedIndex >= games.length - 1}><ChevronRight className="size-4" /></Button></div></div>
+              <div className="mt-4 flex gap-2 overflow-x-auto rounded-xl bg-muted/50 p-1">
+                <Button type="button" size="sm" variant={gameView === "players" ? "default" : "ghost"} onClick={() => setGameView("players")}><Users className="size-4" />Jugadores</Button>
+                <Button type="button" size="sm" variant={gameView === "analytics" ? "default" : "ghost"} onClick={() => setGameView("analytics")}><BarChart3 className="size-4" />Rondas y aciertos</Button>
+              </div>
             </CardHeader>
-            <CardContent className="space-y-3">
+            <CardContent className="space-y-4">
+              {gameView === "players" ? <>
+              <div className="rounded-xl border bg-muted/20 p-4">
+                <p className="font-medium">Crear una persona para asignar</p>
+                <p className="mt-1 text-sm text-muted-foreground">Si todavía no existe, creá un perfil rápido y aparecerá en la lista.</p>
+                <div className="mt-3 flex flex-wrap gap-3"><Input className="min-w-64 flex-1" value={newProfileName} onChange={(event) => setNewProfileName(event.target.value)} placeholder="Nombre de la persona" /><Button variant="outline" onClick={createProfile} disabled={!newProfileName.trim() || isCreatingProfile}>{isCreatingProfile ? <LoaderCircle className="size-4 animate-spin" /> : null}Crear perfil</Button></div>
+              </div>
               {selectedGame.players.map((player) => {
                 const assignment = selectedGame.assignments[player.uid];
                 const manualName = assignment?.kind === "manual" ? assignment.name : player.name || `Jugador ${player.position}`;
                 return <div key={player.uid} className="grid gap-3 rounded-xl border p-4 md:grid-cols-[180px_1fr] md:items-start"><div><Badge variant="outline">{COLOR_LABELS[player.colorCode] || player.colorCode}</Badge><p className="mt-2 text-sm text-muted-foreground">Jugador {player.position}</p></div><div className="space-y-2"><Input aria-label={`Nombre manual ${player.colorCode}`} value={manualName} onChange={(event) => setManualName(selectedGame.summary.gameId, player.uid, event.target.value)} placeholder="Nombre del jugador asignado en el momento" /><select className="h-10 w-full rounded-md border bg-background px-3 text-sm" aria-label={`Asignar ${player.colorCode}`} value={assignment && assignment.kind !== "manual" ? `${assignment.kind}:${assignment.id}` : ""} onChange={(event) => assign(selectedGame.summary.gameId, player.uid, event.target.value)}><option value="">Usar el nombre manual escrito arriba</option>{(students.data?.data || []).map((student) => <option key={`student:${student.id}`} value={`student:${student.id}`}>Alumno · {student.fullName}</option>)}{assignedProfiles.map((profile) => <option key={`profile:${profile.id}`} value={`profile:${profile.id}`}>Mi perfil · {profile.displayName}</option>)}</select></div></div>;
-              })}
+              })}</> : <ImportedGameCharts game={selectedGame} embedded />}
             </CardContent>
           </Card>
         </div>
-        <ImportedGameCharts game={selectedGame} />
         </>
       ) : null}
 

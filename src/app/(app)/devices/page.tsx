@@ -8,7 +8,7 @@ export default function DevicesPage() {
     <RoleGuard allowedRoles={["teacher", "director", "admin", "institution-admin", "family"]}>
       <div className="space-y-4">
         <div className="flex justify-end">
-          <Link href="/devices/import"><Button>Importar partidas por cable</Button></Link>
+          <Link href="/syncs/cable"><Button>Sincronizar partidas por cable</Button></Link>
         </div>
         <DevicesTable />
       </div>
