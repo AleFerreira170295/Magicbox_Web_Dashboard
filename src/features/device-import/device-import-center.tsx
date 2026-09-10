@@ -3,33 +3,43 @@
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { BarChart3, Cable, CheckCircle2, ChevronLeft, ChevronRight, Cpu, Download, List, LoaderCircle, Power, UploadCloud, Users } from "lucide-react";
+import { AlertTriangle, BarChart3, Cable, CheckCircle2, ChevronLeft, ChevronRight, Cpu, Download, List, LoaderCircle, Power, Trash2, UploadCloud, Users } from "lucide-react";
 import { SectionHeader } from "@/components/section-header";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Modal } from "@/components/ui/modal";
 import { useAuth } from "@/features/auth/auth-context";
 import { buildGamesBatchPayload, buildRawSyncEnvelopes } from "@/features/device-import/payload";
 import { flashMagicBoxFirmware, resolveCableFirmwareRelease } from "@/features/device-import/firmware-updater";
 import { ImportedGameCharts } from "@/features/device-import/imported-game-charts";
 import { SyncNavigation } from "@/features/syncs/sync-navigation";
-import type { ImportedGame, ParticipantTarget } from "@/features/device-import/types";
+import type { ImportedGame, MagicBoxDeviceInfo, ParticipantTarget } from "@/features/device-import/types";
 import { MagicBoxSerialClient, supportsWebSerial } from "@/features/device-import/web-serial";
+import { useDevices } from "@/features/devices/api";
 import { uploadGamesBatch, uploadRawGameSync } from "@/features/games/api";
 import { buildGameDetailHref, buildGamesOverviewHref } from "@/features/games/game-route";
 import type { GameRecord } from "@/features/games/types";
+import { useInstitutions } from "@/features/institutions/api";
 import { createHomeProfile, useProfilesOverview } from "@/features/profiles/api";
 import { useOtaRelease } from "@/features/settings/api";
 import { useAllStudents } from "@/features/students/api";
 import { getErrorMessage } from "@/lib/utils";
 
-type Phase = "idle" | "connected" | "reading" | "ready" | "uploading" | "done";
+type Phase = "idle" | "connected" | "reading" | "ready" | "uploading";
 type GameView = "players" | "analytics";
+type Feedback = { kind: "success" | "error"; title: string; message: string; showGameLinks?: boolean };
 const COLOR_LABELS: Record<string, string> = { AM: "Amarillo", NA: "Naranja", VE: "Verde", VI: "Violeta", CI: "Celeste", MA: "Rojo" };
 
 function cleanDeviceId(value: string) {
   return value.replace(/[^a-fA-F0-9]/g, "").toUpperCase();
+}
+
+function formatGameDate(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Fecha no informada";
+  return new Intl.DateTimeFormat("es-UY", { dateStyle: "medium", timeStyle: "short" }).format(date);
 }
 
 export function DeviceImportCenter() {
@@ -37,6 +47,8 @@ export function DeviceImportCenter() {
   const queryClient = useQueryClient();
   const students = useAllStudents(tokens?.accessToken, { institutionId: user?.educationalCenterId || undefined });
   const profiles = useProfilesOverview(tokens?.accessToken);
+  const devicesQuery = useDevices(tokens?.accessToken);
+  const institutionsQuery = useInstitutions(tokens?.accessToken);
   const otaRelease = useOtaRelease(tokens?.accessToken);
   const cableRelease = resolveCableFirmwareRelease(otaRelease.data ? {
     downloadUrl: otaRelease.data.downloadUrl || "",
@@ -47,18 +59,22 @@ export function DeviceImportCenter() {
   const clientRef = useRef<MagicBoxSerialClient | null>(null);
   const [phase, setPhase] = useState<Phase>("idle");
   const [deviceId, setDeviceId] = useState("");
+  const [deviceInfo, setDeviceInfo] = useState<MagicBoxDeviceInfo | null>(null);
   const [deviceStatus, setDeviceStatus] = useState("");
   const [games, setGames] = useState<ImportedGame[]>([]);
   const [selectedGameId, setSelectedGameId] = useState<number | null>(null);
   const [gameView, setGameView] = useState<GameView>("players");
   const [uploadedGames, setUploadedGames] = useState<GameRecord[]>([]);
+  const [deletedGameIds, setDeletedGameIds] = useState<number[]>([]);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+  const [feedback, setFeedback] = useState<Feedback | null>(null);
   const [newProfileName, setNewProfileName] = useState("");
   const [isCreatingProfile, setIsCreatingProfile] = useState(false);
   const [isUpdatingFirmware, setIsUpdatingFirmware] = useState(false);
   const [firmwareProgress, setFirmwareProgress] = useState(0);
   const [firmwareStatus, setFirmwareStatus] = useState("");
   const [confirmedV3, setConfirmedV3] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const supported = supportsWebSerial();
 
   const ownerIds = useMemo(() => new Set([user?.id, user?.identityId].filter(Boolean)), [user?.id, user?.identityId]);
@@ -68,7 +84,25 @@ export function DeviceImportCenter() {
   );
   const selectedIndex = games.findIndex((game) => game.summary.gameId === selectedGameId);
   const selectedGame = selectedIndex >= 0 ? games[selectedIndex] : games[0] ?? null;
-  const validDeviceId = cleanDeviceId(deviceId).length === 12;
+  const normalizedDeviceId = cleanDeviceId(deviceId);
+  const validDeviceId = normalizedDeviceId.length === 12;
+  const matchedDevice = useMemo(
+    () => devicesQuery.data?.data.find((device) => cleanDeviceId(device.deviceId) === normalizedDeviceId) ?? null,
+    [devicesQuery.data?.data, normalizedDeviceId],
+  );
+  const institutionName = matchedDevice?.educationalCenterName
+    || institutionsQuery.data?.data.find((institution) => institution.id === (matchedDevice?.educationalCenterId || user?.educationalCenterId))?.name
+    || (matchedDevice?.assignmentScope === "home" ? "Home" : "Sin institución registrada");
+  const ownerName = matchedDevice?.ownerUserName || matchedDevice?.ownerUserEmail || "Sin owner registrado";
+  const deviceDisplayName = matchedDevice?.name
+    || (normalizedDeviceId ? `MagicBox ${normalizedDeviceId.slice(-6)}` : "MagicBox sin identificar");
+  const uploadedGameIds = useMemo(() => new Set(uploadedGames.map((game) => game.gameId)), [uploadedGames]);
+  const allGamesUploaded = games.length > 0 && games.every((game) => uploadedGameIds.has(game.summary.gameId));
+  const allGamesDeleted = games.length > 0 && games.every((game) => deletedGameIds.includes(game.summary.gameId));
+
+  function showError(cause: unknown, title = "No se pudo completar la acción") {
+    setFeedback({ kind: "error", title, message: getErrorMessage(cause) });
+  }
 
   useEffect(() => {
     return () => {
@@ -78,7 +112,7 @@ export function DeviceImportCenter() {
   }, []);
 
   async function connect() {
-    setError(null);
+    setFeedback(null);
     setDeviceStatus("Conectando…");
     try {
       const client = new MagicBoxSerialClient();
@@ -87,6 +121,7 @@ export function DeviceImportCenter() {
       setPhase("connected");
       try {
         const info = await client.getDeviceInfo();
+        setDeviceInfo(info);
         setDeviceId(info.deviceId);
         setDeviceStatus(`${info.hardware} · ${info.firmwareVersion} · ID detectado automáticamente`);
       } catch {
@@ -94,17 +129,18 @@ export function DeviceImportCenter() {
       }
     } catch (cause) {
       setDeviceStatus("");
-      setError(getErrorMessage(cause));
+      showError(cause, "No se pudo conectar la MagicBox");
     }
   }
 
   async function importGames() {
     const client = clientRef.current;
     if (!client) return;
-    setError(null);
+    setFeedback(null);
     setGames([]);
     setSelectedGameId(null);
     setUploadedGames([]);
+    setDeletedGameIds([]);
     setPhase("reading");
     try {
       const summaries = await client.listGames();
@@ -121,21 +157,21 @@ export function DeviceImportCenter() {
         }
       }
       if (failedGameIds.length > 0) {
-        setError(`Se extrajeron ${downloaded.length} partidas. No se pudieron leer: ${failedGameIds.join(", ")}. Permanecen guardadas en la MagicBox.`);
+        setFeedback({ kind: "error", title: "Lectura incompleta", message: `Se extrajeron ${downloaded.length} partidas. No se pudieron leer: ${failedGameIds.join(", ")}. Permanecen guardadas en la MagicBox.` });
       }
       setPhase(downloaded.length > 0 ? "ready" : "connected");
     } catch (cause) {
-      setError(getErrorMessage(cause));
+      showError(cause, "No se pudieron leer las partidas");
       setPhase("connected");
     }
   }
 
   async function disconnect() {
-    setError(null);
+    setFeedback(null);
     try {
       await clientRef.current?.disconnect();
     } catch (cause) {
-      setError(getErrorMessage(cause));
+      showError(cause, "No se pudo desconectar la MagicBox");
     } finally {
       clientRef.current = null;
       setPhase("idle");
@@ -146,7 +182,7 @@ export function DeviceImportCenter() {
   async function updateFirmware() {
     const release = cableRelease;
     if (!confirmedV3) return;
-    setError(null);
+    setFeedback(null);
     setIsUpdatingFirmware(true);
     setFirmwareProgress(0);
     setFirmwareStatus("Preparando actualización…");
@@ -168,7 +204,7 @@ export function DeviceImportCenter() {
       });
       setFirmwareStatus(`Actualización ${release.version || "completada"}. Volvé a conectar la MagicBox para leer partidas.`);
     } catch (cause) {
-      setError(getErrorMessage(cause));
+      showError(cause, "No se pudo actualizar el firmware");
       setFirmwareStatus("La actualización no se completó. No desconectes la MagicBox hasta revisar el error.");
     } finally {
       setIsUpdatingFirmware(false);
@@ -212,22 +248,22 @@ export function DeviceImportCenter() {
 
   async function createProfile() {
     if (!tokens?.accessToken || !newProfileName.trim()) return;
-    setError(null);
+    setFeedback(null);
     setIsCreatingProfile(true);
     try {
       await createHomeProfile(tokens.accessToken, { displayName: newProfileName.trim() });
       setNewProfileName("");
       await profiles.refetch();
     } catch (cause) {
-      setError(getErrorMessage(cause));
+      showError(cause, "No se pudo crear el perfil");
     } finally {
       setIsCreatingProfile(false);
     }
   }
 
-  async function uploadAndDelete() {
+  async function uploadGames() {
     if (!tokens?.accessToken || !clientRef.current || games.length === 0) return;
-    setError(null);
+    setFeedback(null);
     setPhase("uploading");
     try {
       const rawEnvelopes = buildRawSyncEnvelopes(deviceId, games, user?.educationalCenterId);
@@ -237,19 +273,36 @@ export function DeviceImportCenter() {
       const uploadedByGameId = new Map(uploaded.map((game) => [game.gameId, game]));
       const missing = games.map((game) => game.summary.gameId).filter((gameId) => !uploadedByGameId.has(gameId));
       if (missing.length > 0) {
-        throw new Error(`El servidor no confirmó las partidas ${missing.join(", ")}. No se borró ninguna partida de la MagicBox.`);
+        throw new Error(`El servidor no confirmó las partidas ${missing.join(", ")}. Las partidas permanecen guardadas en la MagicBox.`);
       }
-      await clientRef.current.deleteGames(games.map((game) => game.summary.gameId));
       setUploadedGames(games.map((game) => uploadedByGameId.get(game.summary.gameId) as GameRecord));
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["games"] }),
         queryClient.invalidateQueries({ queryKey: ["devices"] }),
         queryClient.invalidateQueries({ queryKey: ["syncs"] }),
       ]);
-      setPhase("done");
-    } catch (cause) {
-      setError(getErrorMessage(cause));
       setPhase("ready");
+      setFeedback({ kind: "success", title: "Subida completada", message: `Las ${games.length} partidas quedaron cargadas en la cuenta. Los originales siguen guardados en la MagicBox hasta que elijas borrarlos.`, showGameLinks: true });
+    } catch (cause) {
+      showError(cause, "No se pudieron subir las partidas");
+      setPhase("ready");
+    }
+  }
+
+  async function deleteUploadedGames() {
+    if (!clientRef.current || !allGamesUploaded || games.length === 0) return;
+    setConfirmDeleteOpen(false);
+    setFeedback(null);
+    setIsDeleting(true);
+    try {
+      const gameIds = games.map((game) => game.summary.gameId);
+      await clientRef.current.deleteGames(gameIds);
+      setDeletedGameIds(gameIds);
+      setFeedback({ kind: "success", title: "Borrado completado", message: `Se confirmó el borrado de ${gameIds.length} partidas originales en la MagicBox. Las copias cargadas en la cuenta permanecen disponibles.` });
+    } catch (cause) {
+      showError(cause, "No se pudieron borrar las partidas");
+    } finally {
+      setIsDeleting(false);
     }
   }
 
@@ -262,6 +315,22 @@ export function DeviceImportCenter() {
 
   return (
     <div className="space-y-6">
+      <Modal open={Boolean(feedback)} onClose={() => setFeedback(null)} title={feedback?.title || "Resultado"} className="max-w-xl">
+        <div className="space-y-5">
+          <div className={`flex items-start gap-3 rounded-2xl border p-4 ${feedback?.kind === "success" ? "border-emerald-300 bg-emerald-50 text-emerald-900" : "border-destructive/40 bg-destructive/5 text-destructive"}`}>
+            {feedback?.kind === "success" ? <CheckCircle2 className="mt-0.5 size-5 shrink-0" /> : <AlertTriangle className="mt-0.5 size-5 shrink-0" />}
+            <p className="text-sm leading-6">{feedback?.message}</p>
+          </div>
+          {feedback?.showGameLinks ? <div className="flex flex-wrap gap-2">{uploadedGames[0] ? <Link className={buttonVariants()} href={buildGameDetailHref({ gameRecordId: uploadedGames[0].id, deviceId: normalizedDeviceId })}>Ver primera partida cargada</Link> : null}<Link className={buttonVariants({ variant: "outline" })} href={buildGamesOverviewHref({ deviceId: normalizedDeviceId })}>Ver todas las partidas</Link></div> : null}
+          <div className="flex justify-end"><Button onClick={() => setFeedback(null)}>Cerrar</Button></div>
+        </div>
+      </Modal>
+      <Modal open={confirmDeleteOpen} onClose={() => setConfirmDeleteOpen(false)} title="Confirmar borrado" description="Esta acción elimina los originales del almacenamiento de la MagicBox." className="max-w-xl">
+        <div className="space-y-5">
+          <div className="rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm leading-6 text-amber-900">Las {games.length} partidas ya fueron confirmadas por el servidor. ¿Querés borrar ahora sus originales de {deviceDisplayName}?</div>
+          <div className="flex justify-end gap-2"><Button variant="outline" onClick={() => setConfirmDeleteOpen(false)}>Cancelar</Button><Button variant="destructive" onClick={deleteUploadedGames}><Trash2 className="size-4" />Borrar originales</Button></div>
+        </div>
+      </Modal>
       <SectionHeader eyebrow="Sync por cable" title="Sincronizar partidas de una MagicBox" description="Conectá la MagicBox por USB, revisá quién usó cada color y recién después subí las partidas. El dispositivo se borra únicamente cuando el servidor confirma cada carga." />
       <SyncNavigation />
       <nav aria-label="Pasos de la sincronización por cable" className="flex gap-2 overflow-x-auto rounded-2xl border bg-muted/30 p-2 text-sm">
@@ -271,8 +340,6 @@ export function DeviceImportCenter() {
         <a className="shrink-0 rounded-full px-4 py-2 font-medium hover:bg-background" href="#cable-upload">4. Subir</a>
       </nav>
       {!supported ? <Card className="border-amber-300 bg-amber-50"><CardHeader><CardTitle>Navegador no compatible</CardTitle><CardDescription>Usá Chrome o Edge de escritorio y abrí el dashboard por HTTPS.</CardDescription></CardHeader></Card> : null}
-      {error ? <Card className="border-destructive/40"><CardContent className="pt-6 text-sm text-destructive">{error}</CardContent></Card> : null}
-
       <Card id="cable-connect" className="scroll-mt-28">
         <CardHeader><CardTitle className="flex items-center gap-2"><Cable className="size-5" />1. Conectar y leer</CardTitle><CardDescription>El ID se detecta automáticamente desde firmware V2.3.22. Las versiones anteriores conservan el ingreso manual.</CardDescription></CardHeader>
         <CardContent className="space-y-3">
@@ -284,6 +351,7 @@ export function DeviceImportCenter() {
             {phase === "reading" ? <Badge><LoaderCircle className="mr-1 size-3 animate-spin" />Leyendo</Badge> : null}
           </div>
           {deviceStatus ? <p className="text-sm text-muted-foreground">{deviceStatus}</p> : null}
+          {normalizedDeviceId ? <div className="rounded-2xl border bg-muted/20 p-4"><div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Dispositivo conectado</p><p className="mt-1 text-xl font-semibold">{deviceDisplayName}</p></div>{matchedDevice?.status ? <Badge>{matchedDevice.status}</Badge> : null}</div><div className="mt-4 grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4"><div><p className="text-xs text-muted-foreground">ID</p><p className="font-mono font-medium">{normalizedDeviceId}</p></div><div><p className="text-xs text-muted-foreground">Institución</p><p className="font-medium">{institutionName}</p></div><div><p className="text-xs text-muted-foreground">Owner</p><p className="font-medium">{ownerName}</p></div><div><p className="text-xs text-muted-foreground">Hardware / firmware</p><p className="font-medium">{deviceInfo?.hardware || "MagicBox"} · {deviceInfo?.firmwareVersion || matchedDevice?.firmwareVersion || "Sin versión"}</p></div></div></div> : null}
         </CardContent>
       </Card>
 
@@ -301,7 +369,7 @@ export function DeviceImportCenter() {
         </CardContent>
       </Card>
 
-      {games.length > 0 ? <Card id="cable-upload" className="scroll-mt-28 border-primary/30 bg-primary/5"><CardHeader><CardTitle className="flex items-center gap-2"><UploadCloud className="size-5" />Subir partidas a la cuenta</CardTitle><CardDescription>Se sube la copia cruda y la partida normalizada; la MagicBox se borra sólo si el servidor confirma todas las partidas.</CardDescription></CardHeader><CardContent className="flex flex-wrap items-center gap-3"><Button onClick={uploadAndDelete} disabled={phase !== "ready" || !validDeviceId}><UploadCloud className="size-4" />Subir {games.length} partidas y borrar originales</Button>{!validDeviceId ? <p className="text-sm text-amber-700">Falta un ID válido de 12 caracteres para vincular las partidas.</p> : null}{phase === "uploading" ? <span className="text-sm text-muted-foreground"><LoaderCircle className="mr-1 inline size-4 animate-spin" />Procesando…</span> : null}</CardContent></Card> : null}
+      {games.length > 0 ? <Card id="cable-upload" className="scroll-mt-28 border-primary/30 bg-primary/5"><CardHeader><CardTitle className="flex items-center gap-2"><UploadCloud className="size-5" />Subir y administrar originales</CardTitle><CardDescription>La subida y el borrado son acciones separadas. Primero se confirma la copia en el servidor; después podés decidir cuándo borrar los originales de la MagicBox.</CardDescription></CardHeader><CardContent className="space-y-3"><div className="flex flex-wrap items-center gap-3"><Button onClick={uploadGames} disabled={phase !== "ready" || !validDeviceId || isDeleting}><UploadCloud className="size-4" />Subir {games.length} partidas</Button><Button variant="destructive" onClick={() => setConfirmDeleteOpen(true)} disabled={!allGamesUploaded || allGamesDeleted || phase === "uploading" || isDeleting}><Trash2 className="size-4" />{isDeleting ? "Borrando…" : allGamesDeleted ? "Originales borrados" : `Borrar ${games.length} originales`}</Button>{phase === "uploading" ? <span className="text-sm text-muted-foreground"><LoaderCircle className="mr-1 inline size-4 animate-spin" />Subiendo…</span> : null}</div>{!validDeviceId ? <p className="text-sm text-amber-700">Falta un ID válido de 12 caracteres para vincular las partidas.</p> : null}{!allGamesUploaded ? <p className="text-sm text-muted-foreground">El borrado se habilita cuando el servidor confirma todas las partidas.</p> : <p className="text-sm text-emerald-700">Carga confirmada. Los originales siguen en la MagicBox hasta que pulses borrar.</p>}</CardContent></Card> : null}
 
       {selectedGame ? (
         <>
@@ -309,13 +377,14 @@ export function DeviceImportCenter() {
           <Card className="h-fit lg:sticky lg:top-24">
             <CardHeader><CardTitle className="flex items-center gap-2"><List className="size-5" />Partidas extraídas</CardTitle><CardDescription>{games.length} disponibles para revisar</CardDescription></CardHeader>
             <CardContent className="max-h-[calc(100vh-14rem)] space-y-2 overflow-y-auto pr-3">
-              {games.map((game, index) => <button key={game.summary.gameId} type="button" onClick={() => setSelectedGameId(game.summary.gameId)} className={`w-full rounded-xl border p-3 text-left transition ${game.summary.gameId === selectedGame.summary.gameId ? "border-primary bg-primary/5" : "hover:bg-muted/60"}`}><div className="flex items-center justify-between gap-2"><span className="font-medium">Partida #{game.summary.gameId}</span><Badge variant="outline">{index + 1}</Badge></div><p className="mt-1 text-xs text-muted-foreground">{game.summary.deckName} · {game.players.length} jugadores · {game.turns.length} turnos</p></button>)}
+              {games.map((game, index) => <button key={game.summary.gameId} type="button" onClick={() => setSelectedGameId(game.summary.gameId)} className={`w-full rounded-xl border p-3 text-left transition ${game.summary.gameId === selectedGame.summary.gameId ? "border-primary bg-primary/5" : "hover:bg-muted/60"}`}><div className="flex items-center justify-between gap-2"><span className="font-medium">Partida #{game.summary.gameId}</span><Badge variant="outline">{index + 1}</Badge></div><p className="mt-1 text-xs font-medium">{formatGameDate(game.summary.startedAt)}</p><p className="mt-1 text-xs text-muted-foreground">{game.summary.deckName} · {game.players.length} jugadores · {game.turns.length} turnos</p><p className="mt-2 text-xs text-muted-foreground">{deviceDisplayName} · {institutionName} · {ownerName}</p></button>)}
             </CardContent>
           </Card>
 
           <Card id="cable-players" className="scroll-mt-28">
             <CardHeader>
               <div className="flex flex-wrap items-start justify-between gap-3"><div><CardTitle>Partida #{selectedGame.summary.gameId}</CardTitle><CardDescription>{selectedGame.summary.deckName} · {selectedGame.players.length} jugadores · {selectedGame.turns.length} turnos{selectedGame.turns.length === 0 ? " · finalizada sin jugadas" : ""}</CardDescription></div><div className="flex items-center gap-2"><Button size="sm" className="size-9 p-0" variant="outline" aria-label="Partida anterior" onClick={() => selectRelativeGame(-1)} disabled={selectedIndex <= 0}><ChevronLeft className="size-4" /></Button><span className="text-sm text-muted-foreground">{selectedIndex + 1} de {games.length}</span><Button size="sm" className="size-9 p-0" variant="outline" aria-label="Partida siguiente" onClick={() => selectRelativeGame(1)} disabled={selectedIndex >= games.length - 1}><ChevronRight className="size-4" /></Button></div></div>
+              <div className="mt-4 grid gap-3 rounded-xl border bg-muted/20 p-3 text-sm sm:grid-cols-2 lg:grid-cols-4"><div><p className="text-xs text-muted-foreground">Fecha</p><p className="font-medium">{formatGameDate(selectedGame.summary.startedAt)}</p></div><div><p className="text-xs text-muted-foreground">Dispositivo</p><p className="font-medium">{deviceDisplayName}</p><p className="font-mono text-xs text-muted-foreground">{normalizedDeviceId}</p></div><div><p className="text-xs text-muted-foreground">Institución</p><p className="font-medium">{institutionName}</p></div><div><p className="text-xs text-muted-foreground">Owner</p><p className="font-medium">{ownerName}</p></div></div>
               <div className="mt-4 flex gap-2 overflow-x-auto rounded-xl bg-muted/50 p-1">
                 <Button type="button" size="sm" variant={gameView === "players" ? "default" : "ghost"} onClick={() => setGameView("players")}><Users className="size-4" />Jugadores</Button>
                 <Button type="button" size="sm" variant={gameView === "analytics" ? "default" : "ghost"} onClick={() => setGameView("analytics")}><BarChart3 className="size-4" />Rondas y aciertos</Button>
@@ -339,7 +408,7 @@ export function DeviceImportCenter() {
         </>
       ) : null}
 
-      {phase === "done" ? <Card className="border-emerald-300 bg-emerald-50"><CardContent className="space-y-4 pt-6 text-emerald-800"><div className="flex items-center gap-3"><CheckCircle2 className="size-5" />Las {uploadedGames.length} partidas quedaron cargadas y se confirmó el borrado en la MagicBox.</div><div className="flex flex-wrap gap-2">{uploadedGames[0] ? <Link className={buttonVariants()} href={buildGameDetailHref({ gameRecordId: uploadedGames[0].id, deviceId: cleanDeviceId(deviceId) })}>Ver primera partida cargada</Link> : null}<Link className={buttonVariants({ variant: "outline" })} href={buildGamesOverviewHref({ deviceId: cleanDeviceId(deviceId) })}>Ver todas las partidas</Link></div></CardContent></Card> : null}
+
     </div>
   );
 }
