@@ -1,7 +1,17 @@
 import { describe, expect, it } from "vitest";
-import { buildDownloadedGame, encodeProtocolCommand, parseProtocolLine, turnDateFromGameStart } from "@/features/device-import/protocol";
+import { buildDownloadedGame, encodeProtocolCommand, normalizeDeviceInfo, parseProtocolLine, turnDateFromGameStart } from "@/features/device-import/protocol";
 
 describe("MagicBox cable protocol", () => {
+  it("normalizes the MagicBox identity response", () => {
+    expect(normalizeDeviceInfo({
+      type: "deviceInfo",
+      deviceId: "aa:bb:cc:dd:ee:ff",
+      firmwareVersion: "V2.3.22",
+      hardware: "V3",
+    })).toEqual({ deviceId: "AABBCCDDEEFF", firmwareVersion: "V2.3.22", hardware: "V3" });
+    expect(normalizeDeviceInfo({ type: "deviceInfo", deviceId: "invalid" })).toBeNull();
+  });
+
   it("ignores firmware logs and parses JSON frames", () => {
     expect(parseProtocolLine("[battery] ready")).toBeNull();
     expect(parseProtocolLine('{"type":"savedGamesList","isLastChunk":true}')).toMatchObject({ type: "savedGamesList", isLastChunk: true });

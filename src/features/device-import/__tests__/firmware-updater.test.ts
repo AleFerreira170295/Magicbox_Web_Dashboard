@@ -18,14 +18,14 @@ describe("firmware updater validation", () => {
       downloadUrl: "/published.bin",
       sha256: "a".repeat(64),
       sizeBytes: 123,
-      version: "V2.3.22",
+      version: "V2.3.23",
     })).toMatchObject({ downloadUrl: "/published.bin", source: "published" });
 
     expect(resolveCableFirmwareRelease({
       downloadUrl: "/old.bin",
       sha256: "b".repeat(64),
       version: "V2.3.20",
-    })).toMatchObject({ version: "V2.3.21", source: "bundled" });
+    })).toMatchObject({ version: "V2.3.22", source: "bundled" });
   });
 
   it("rejects an empty or altered firmware image", async () => {

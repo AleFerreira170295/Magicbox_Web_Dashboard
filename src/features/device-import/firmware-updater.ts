@@ -4,7 +4,7 @@ import { resolveApiBaseUrl } from "@/lib/api/fetcher";
 const APP0_ADDRESS = 0x10000;
 const OTA_SELECTOR_ADDRESS = 0xe000;
 const OTA_SELECTOR_URL = "/firmware/esp32/boot_app0.bin";
-const MINIMUM_CABLE_FIRMWARE_VERSION = "V2.3.21";
+const MINIMUM_CABLE_FIRMWARE_VERSION = "V2.3.22";
 
 export interface FirmwareReleaseInput {
   downloadUrl: string;
@@ -18,9 +18,9 @@ export interface ResolvedCableFirmwareRelease extends FirmwareReleaseInput {
 }
 
 export const VERIFIED_CABLE_FIRMWARE: ResolvedCableFirmwareRelease = {
-  downloadUrl: "/firmware/esp32/magicbox-v3-V2.3.21.bin",
-  sha256: "41f02428fb29e1a286632ad9965c10dc63208c4ee17459f0e2fc485082967b82",
-  sizeBytes: 1_348_624,
+  downloadUrl: "/firmware/esp32/magicbox-v3-V2.3.22.bin",
+  sha256: "46239b0c927a4d1bfebcfb8adb6ee5bd78c1b15bd9a71ff3237a4ffb951a7e59",
+  sizeBytes: 1_349_040,
   version: MINIMUM_CABLE_FIRMWARE_VERSION,
   source: "bundled",
 };

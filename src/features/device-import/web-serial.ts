@@ -1,5 +1,5 @@
-import { buildDownloadedGame, encodeProtocolCommand, normalizeGameSummary, parseProtocolLine, type ProtocolMessage } from "@/features/device-import/protocol";
-import type { DeviceGameDownload, DeviceGameSummary } from "@/features/device-import/types";
+import { buildDownloadedGame, encodeProtocolCommand, normalizeDeviceInfo, normalizeGameSummary, parseProtocolLine, type ProtocolMessage } from "@/features/device-import/protocol";
+import type { DeviceGameDownload, DeviceGameSummary, MagicBoxDeviceInfo } from "@/features/device-import/types";
 
 interface SerialPortLike {
   readable: ReadableStream<Uint8Array> | null;
@@ -157,6 +157,15 @@ export class MagicBoxSerialClient {
       }
     }
     return [];
+  }
+
+  async getDeviceInfo(): Promise<MagicBoxDeviceInfo> {
+    await this.send({ type: "deviceInfoRequest" });
+    while (true) {
+      const message = await this.nextMessage(3_000);
+      const info = normalizeDeviceInfo(message);
+      if (info) return info;
+    }
   }
 
   async downloadGame(gameId: number): Promise<DeviceGameDownload> {

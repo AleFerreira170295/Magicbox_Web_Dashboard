@@ -1,4 +1,4 @@
-import type { DeviceGameDownload, DeviceGamePlayer, DeviceGameSummary, DeviceGameTurn } from "@/features/device-import/types";
+import type { DeviceGameDownload, DeviceGamePlayer, DeviceGameSummary, DeviceGameTurn, MagicBoxDeviceInfo } from "@/features/device-import/types";
 
 export type ProtocolMessage = Record<string, unknown>;
 
@@ -39,6 +39,18 @@ export function normalizeGameSummary(input: unknown): DeviceGameSummary | null {
     durationSeconds: asNumber(record.duration ?? record.durationSeconds),
     totalPlayers: asNumber(record.totalPlayers),
     deckName: asString(record.deckName, "UNKNOWN"),
+  };
+}
+
+export function normalizeDeviceInfo(input: unknown): MagicBoxDeviceInfo | null {
+  const record = asRecord(input);
+  if (record.type !== "deviceInfo") return null;
+  const deviceId = asString(record.deviceId ?? record.chipId).replace(/[^a-fA-F0-9]/g, "").toUpperCase();
+  if (deviceId.length !== 12) return null;
+  return {
+    deviceId,
+    firmwareVersion: asString(record.firmwareVersion ?? record.version, "Desconocida"),
+    hardware: asString(record.hardware, "MagicBox"),
   };
 }
 

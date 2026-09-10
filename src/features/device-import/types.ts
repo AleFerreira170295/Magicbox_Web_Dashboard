@@ -31,6 +31,12 @@ export interface DeviceGameDownload {
   turns: DeviceGameTurn[];
 }
 
+export interface MagicBoxDeviceInfo {
+  deviceId: string;
+  firmwareVersion: string;
+  hardware: string;
+}
+
 export type ParticipantTarget =
   | { kind: "student"; id: string; name: string }
   | { kind: "profile"; id: string; name: string }
