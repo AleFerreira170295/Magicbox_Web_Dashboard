@@ -104,6 +104,27 @@ export async function settleWithin(operation: Promise<unknown>, timeoutMs: numbe
   return result;
 }
 
+interface ResetControlLines {
+  setDTR(state: boolean): Promise<void>;
+  setRTS(state: boolean): Promise<void>;
+}
+
+function sleep(milliseconds: number) {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds));
+}
+
+export async function resetMagicBoxToApplication(control: ResetControlLines) {
+  // Keep IO0 high (DTR false) and pulse EN low through RTS. Merely releasing
+  // RTS, as esptool-js' hard_reset does, can leave this CP210x/PICO-D4 board
+  // running the flasher stub until the cable is physically reconnected.
+  await control.setDTR(false);
+  await control.setRTS(true);
+  await sleep(120);
+  await control.setRTS(false);
+  await sleep(120);
+  await control.setDTR(false);
+}
+
 export async function flashMagicBoxFirmware({ release, onProgress, onLog }: FlashFirmwareOptions) {
   const serial = (navigator as Navigator & SerialNavigator).serial;
   if (!serial) throw new Error("Web Serial no está disponible en este navegador.");
@@ -158,7 +179,7 @@ export async function flashMagicBoxFirmware({ release, onProgress, onLog }: Flas
     });
 
     onProgress?.(97, "Reiniciando MagicBox…");
-    const resetCompleted = await settleWithin(loader.after("hard_reset"), 2_500);
+    const resetCompleted = await settleWithin(resetMagicBoxToApplication(transport), 2_500);
     if (!resetCompleted) {
       onLog?.("La escritura terminó, pero el controlador serie no confirmó el reset. La MagicBox puede reiniciarse al desconectar el cable.");
     }

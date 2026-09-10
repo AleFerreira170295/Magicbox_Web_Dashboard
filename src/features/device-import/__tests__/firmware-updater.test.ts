@@ -1,11 +1,20 @@
 import { describe, expect, it } from "vitest";
-import { resolveCableFirmwareRelease, settleWithin, sha256Hex, validateFirmwareImage } from "@/features/device-import/firmware-updater";
+import { resetMagicBoxToApplication, resolveCableFirmwareRelease, settleWithin, sha256Hex, validateFirmwareImage } from "@/features/device-import/firmware-updater";
 
 describe("firmware updater validation", () => {
   it("bounds serial cleanup waits", async () => {
     await expect(settleWithin(Promise.resolve(), 20)).resolves.toBe(true);
     await expect(settleWithin(new Promise(() => undefined), 5)).resolves.toBe(false);
     await expect(settleWithin(Promise.reject(new Error("closed")), 20)).resolves.toBe(false);
+  });
+
+  it("pulses reset while keeping the ESP32 out of download mode", async () => {
+    const calls: string[] = [];
+    await resetMagicBoxToApplication({
+      async setDTR(state) { calls.push(`DTR:${state}`); },
+      async setRTS(state) { calls.push(`RTS:${state}`); },
+    });
+    expect(calls).toEqual(["DTR:false", "RTS:true", "RTS:false", "DTR:false"]);
   });
 
   it("validates published size and SHA-256", async () => {

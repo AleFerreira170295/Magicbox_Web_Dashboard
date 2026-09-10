@@ -6,6 +6,7 @@ interface SerialPortLike {
   writable: WritableStream<Uint8Array> | null;
   open(options: { baudRate: number }): Promise<void>;
   close(): Promise<void>;
+  setSignals?(signals: { dataTerminalReady?: boolean; requestToSend?: boolean }): Promise<void>;
 }
 
 interface SerialNavigatorLike {
@@ -40,6 +41,13 @@ export class MagicBoxSerialClient {
     if (!serial) throw new Error("Web Serial no está disponible en este navegador.");
     this.port = await serial.requestPort();
     await this.port.open({ baudRate: 115200 });
+    if (this.port.setSignals) {
+      // Recover transparently if a previous update left the ESP32 in its
+      // bootloader: IO0 high plus a short EN pulse starts the application.
+      await this.port.setSignals({ dataTerminalReady: false, requestToSend: true });
+      await new Promise((resolve) => setTimeout(resolve, 120));
+      await this.port.setSignals({ dataTerminalReady: false, requestToSend: false });
+    }
     if (!this.port.readable || !this.port.writable) throw new Error("El puerto serie no quedó disponible.");
     this.reader = this.port.readable.getReader();
     this.writer = this.port.writable.getWriter();
