@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { useAuth } from "@/features/auth/auth-context";
 import { buildGamesBatchPayload, buildRawSyncEnvelopes } from "@/features/device-import/payload";
 import { flashMagicBoxFirmware, resolveCableFirmwareRelease } from "@/features/device-import/firmware-updater";
+import { ImportedGameCharts } from "@/features/device-import/imported-game-charts";
 import type { ImportedGame, ParticipantTarget } from "@/features/device-import/types";
 import { MagicBoxSerialClient, supportsWebSerial } from "@/features/device-import/web-serial";
 import { uploadGamesBatch, uploadRawGameSync } from "@/features/games/api";
@@ -292,7 +293,10 @@ export function DeviceImportCenter() {
 
       {games.length > 0 ? <Card><CardHeader><CardTitle>Crear una persona para asignar</CardTitle><CardDescription>Si todavía no existe, creá un perfil rápido y aparecerá entre las personas de tu cuenta.</CardDescription></CardHeader><CardContent className="flex flex-wrap gap-3"><Input className="min-w-64 flex-1" value={newProfileName} onChange={(event) => setNewProfileName(event.target.value)} placeholder="Nombre de la persona" /><Button variant="outline" onClick={createProfile} disabled={!newProfileName.trim() || isCreatingProfile}>{isCreatingProfile ? <LoaderCircle className="size-4 animate-spin" /> : null}Crear perfil</Button></CardContent></Card> : null}
 
+      {games.length > 0 ? <Card className="border-primary/30 bg-primary/5"><CardHeader><CardTitle className="flex items-center gap-2"><UploadCloud className="size-5" />2. Subir partidas a la cuenta</CardTitle><CardDescription>Esta acción queda antes del listado para que siempre sea visible. Se sube la copia cruda y la partida normalizada; la MagicBox se borra sólo si el servidor confirma todas las partidas.</CardDescription></CardHeader><CardContent><Button onClick={uploadAndDelete} disabled={phase !== "ready" || !validDeviceId}><UploadCloud className="size-4" />Subir {games.length} partidas y borrar originales</Button>{!validDeviceId ? <p className="mt-2 text-sm text-amber-700">Falta un ID válido de 12 caracteres para vincular las partidas.</p> : null}{phase === "uploading" ? <span className="ml-3 text-sm text-muted-foreground"><LoaderCircle className="mr-1 inline size-4 animate-spin" />Procesando…</span> : null}</CardContent></Card> : null}
+
       {selectedGame ? (
+        <>
         <div className="grid gap-4 lg:grid-cols-[280px_minmax(0,1fr)]">
           <Card className="h-fit">
             <CardHeader><CardTitle className="flex items-center gap-2"><List className="size-5" />Partidas extraídas</CardTitle><CardDescription>{games.length} disponibles para revisar</CardDescription></CardHeader>
@@ -314,9 +318,10 @@ export function DeviceImportCenter() {
             </CardContent>
           </Card>
         </div>
+        <ImportedGameCharts game={selectedGame} />
+        </>
       ) : null}
 
-      {games.length > 0 ? <Card><CardHeader><CardTitle className="flex items-center gap-2"><UploadCloud className="size-5" />2. Confirmar carga y limpieza</CardTitle><CardDescription>Se sube la copia cruda y la partida normalizada. La MagicBox se borra sólo si el servidor devuelve todas las partidas esperadas.</CardDescription></CardHeader><CardContent><Button onClick={uploadAndDelete} disabled={phase !== "ready" || !validDeviceId}><UploadCloud className="size-4" />Subir {games.length} partidas y borrar originales</Button>{!validDeviceId ? <p className="mt-2 text-sm text-amber-700">Falta un ID válido de 12 caracteres para vincular las partidas.</p> : null}{phase === "uploading" ? <span className="ml-3 text-sm text-muted-foreground"><LoaderCircle className="mr-1 inline size-4 animate-spin" />Procesando…</span> : null}</CardContent></Card> : null}
       {phase === "done" ? <Card className="border-emerald-300 bg-emerald-50"><CardContent className="space-y-4 pt-6 text-emerald-800"><div className="flex items-center gap-3"><CheckCircle2 className="size-5" />Las {uploadedGames.length} partidas quedaron cargadas y se confirmó el borrado en la MagicBox.</div><div className="flex flex-wrap gap-2">{uploadedGames[0] ? <Link className={buttonVariants()} href={buildGameDetailHref({ gameRecordId: uploadedGames[0].id, deviceId: cleanDeviceId(deviceId) })}>Ver primera partida cargada</Link> : null}<Link className={buttonVariants({ variant: "outline" })} href={buildGamesOverviewHref({ deviceId: cleanDeviceId(deviceId) })}>Ver todas las partidas</Link></div></CardContent></Card> : null}
     </div>
   );
