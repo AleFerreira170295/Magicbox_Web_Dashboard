@@ -1,0 +1,42 @@
+import { describe, expect, it } from "vitest";
+import { buildGamesBatchPayload, buildRawSyncEnvelopes } from "@/features/device-import/payload";
+
+describe("device import payload", () => {
+  it("maps colors to students and preserves manual identities", () => {
+    const payload = buildGamesBatchPayload("AA:BB:CC:DD:EE:FF", [{
+      summary: { gameId: 7, startedAt: "2026-09-10T12:00:00Z", durationSeconds: 10, totalPlayers: 2, deckName: "Mazo" },
+      players: [
+        { position: 1, uid: "P1", colorCode: "AM", name: "Uno" },
+        { position: 2, uid: "P2", colorCode: "VE", name: "Dos" },
+      ],
+      turns: [
+        { turnNumber: 1, playerUid: "P1", cardId: "C1", correct: true, difficulty: "4", timestamp: 0, playTimeSeconds: 1 },
+        { turnNumber: 2, playerUid: "P2", cardId: "C2", correct: false, difficulty: "3", timestamp: 2, playTimeSeconds: 2 },
+      ],
+      assignments: { P1: { kind: "student", id: "student-1", name: "Ana" } },
+    }], "center-1");
+
+    expect(payload.games[0].device_id).toBe("AABBCCDDEEFF");
+    expect(payload.games[0].players[0]).toMatchObject({ student_id: "student-1", card_color: "yellow" });
+    expect(payload.games[0].players[1]).toMatchObject({ external_player_uid: "P2", player_name: "Dos", card_color: "green" });
+  });
+
+  it("builds a stable lossless envelope for safe retries", () => {
+    const games = [{
+      summary: { gameId: 7, startedAt: "2026-09-10T12:00:00Z", durationSeconds: 10, totalPlayers: 1, deckName: "Mazo" },
+      players: [{ position: 1, uid: "P1", colorCode: "AM", name: "Uno" }],
+      turns: [{ turnNumber: 1, playerUid: "P1", cardId: "C1", correct: true, difficulty: "4", timestamp: 0, playTimeSeconds: 1 }],
+      assignments: {},
+    }];
+
+    const first = buildRawSyncEnvelopes("AABBCCDDEEFF", games, "center-1")[0];
+    const second = buildRawSyncEnvelopes("AABBCCDDEEFF", games, "center-1")[0];
+
+    expect(first.ingestion_key).toBe(second.ingestion_key);
+    expect(first).toMatchObject({
+      source_channel: "web_dashboard",
+      payload_schema_version: "magicbox.device_cable_import.v1",
+      payload: { game_data_payload: { game_id: 7 } },
+    });
+  });
+});

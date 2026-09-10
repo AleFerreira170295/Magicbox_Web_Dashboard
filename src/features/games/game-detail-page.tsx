@@ -84,6 +84,17 @@ export function GameDetailPage({
   const isLoading = gameQuery.isLoading || gamesQuery.isLoading || devicesQuery.isLoading || institutionsQuery.isLoading;
   const hasFatalError = gameQuery.error || gamesQuery.error || devicesQuery.error || institutionsQuery.error;
   const canDeleteGames = hasAnyUserPermission(currentUser, "game_data:delete");
+  const canUpdateGames = hasAnyUserPermission(currentUser, "game_data:update");
+
+  const assignStudentMutation = useMutation({
+    mutationFn: async ({ gameId, playerId, studentId }: { gameId: string; playerId: string; studentId: string }) => {
+      if (!tokens?.accessToken) throw new Error("No hay una sesión activa.");
+      await assignGamePlayerStudent(tokens.accessToken, gameId, playerId, studentId);
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["games"] });
+    },
+  });
 
   const deleteGameMutation = useMutation({
     mutationFn: async () => {
@@ -178,6 +189,13 @@ export function GameDetailPage({
             <Card className="border-destructive/30 bg-destructive/5 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
               <CardContent className="p-6 text-sm text-destructive">
                 No pude eliminar la partida. {getErrorMessage(deleteGameMutation.error)}
+              </CardContent>
+            </Card>
+          ) : null}
+          {assignStudentMutation.error ? (
+            <Card className="border-destructive/30 bg-destructive/5 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
+              <CardContent className="p-6 text-sm text-destructive">
+                No pude asignar el alumno. {getErrorMessage(assignStudentMutation.error)}
               </CardContent>
             </Card>
           ) : null}
@@ -427,10 +445,28 @@ export function GameDetailPage({
                               <p className="font-medium text-foreground">{studentsById.get(player.studentId || "")?.fullName || player.playerName || player.externalPlayerUid || `Jugador ${index + 1}`}</p>
                               <p className="text-xs text-muted-foreground">{studentsById.get(player.studentId || "")?.fileNumber || player.externalPlayerUid || player.id || "sin id enlazado"}</p>
                             </div>
-                            <div className="flex flex-wrap gap-2">
+                            <div className="flex flex-wrap items-center gap-2">
                               <Badge variant={player.playerSource === "manual" ? "success" : "outline"}>{player.playerSource === "manual" ? "manual" : "registrado"}</Badge>
                               <Badge variant="outline">posición {player.position}</Badge>
                               {player.cardColor ? <Badge variant="outline">{player.cardColor}</Badge> : null}
+                              {canUpdateGames && player.id ? (
+                                <select
+                                  className="h-9 min-w-48 rounded-md border bg-background px-3 text-xs"
+                                  aria-label={`Asignar alumno a ${player.playerName || player.externalPlayerUid || `jugador ${index + 1}`}`}
+                                  value={player.studentId || ""}
+                                  disabled={assignStudentMutation.isPending || studentsQuery.isLoading}
+                                  onChange={(event) => {
+                                    const studentId = event.target.value;
+                                    if (!studentId || studentId === player.studentId) return;
+                                    assignStudentMutation.mutate({ gameId: selectedGame.id, playerId: player.id, studentId });
+                                  }}
+                                >
+                                  <option value="">Asignar alumno…</option>
+                                  {(studentsQuery.data?.data || []).map((student) => (
+                                    <option key={student.id} value={student.id}>{student.fullName}</option>
+                                  ))}
+                                </select>
+                              ) : null}
                             </div>
                           </div>
                           {canUpdateGames && canReadStudents && selectedGame.educationalCenterId ? (

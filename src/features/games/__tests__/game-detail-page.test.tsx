@@ -27,6 +27,7 @@ const useGamesMock = vi.fn();
 const useDevicesMock = vi.fn();
 const useInstitutionsMock = vi.fn();
 const useAllStudentsMock = vi.fn();
+const assignGamePlayerStudentMock = vi.fn();
 
 vi.mock("@/features/auth/auth-context", () => ({
   useAuth: () => useAuthMock(),
@@ -95,6 +96,8 @@ describe("GameDetailPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     routerPushMock.mockReset();
+    assignGamePlayerStudentMock.mockReset();
+    assignGamePlayerStudentMock.mockResolvedValue({});
 
     useAuthMock.mockReturnValue({
       tokens: { accessToken: "token", refreshToken: "refresh" },
@@ -300,6 +303,32 @@ describe("GameDetailPage", () => {
       "href",
       "/games/detail?gameRecordId=game-2&q=animal&access=shared&ownerUserId=user-1&ownerUserName=Ines+Admin&page=2&pageSize=20",
     );
+  });
+
+  it("allows an authorized user to assign a student after import", async () => {
+    useAuthMock.mockReturnValue({
+      tokens: { accessToken: "token", refreshToken: "refresh" },
+      user: {
+        id: "user-1",
+        email: "admin@example.com",
+        firstName: "Ines",
+        lastName: "Admin",
+        fullName: "Ines Admin",
+        educationalCenterId: "ec-1",
+        roles: ["institution-admin"],
+        permissions: ["game_data:read", "game_data:update"],
+        raw: {},
+      },
+    });
+    renderGameDetailPage();
+
+    fireEvent.change(screen.getByRole("combobox", { name: /Asignar alumno a Mateo/i }), {
+      target: { value: "student-2" },
+    });
+
+    await waitFor(() => {
+      expect(assignGamePlayerStudentMock).toHaveBeenCalledWith("token", "game-1", "player-2", "student-2");
+    });
   });
 
   it("paginates the turn list inside the detail page", () => {

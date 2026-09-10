@@ -53,6 +53,7 @@ export const apiEndpoints = {
   },
   games: {
     list: "/game-data/",
+    batch: "/game-data/batch",
     byId: (id: string) => `/game-data/${id}`,
     playerById: (gameId: string, playerId: string) => `/game-data/${gameId}/players/${playerId}`,
   },
