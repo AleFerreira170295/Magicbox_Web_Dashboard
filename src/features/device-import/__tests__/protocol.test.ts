@@ -24,4 +24,16 @@ describe("MagicBox cable protocol", () => {
     expect(game.turns[0]).toMatchObject({ playerUid: "P1", correct: true });
     expect(turnDateFromGameStart(game.summary.startedAt, 2)).toBe("2026-09-10T12:00:02.000Z");
   });
+
+  it("preserves valid saved games that ended before recording turns", () => {
+    const game = buildDownloadedGame([
+      { type: "savedGameTransferStart", gameId: "43" },
+      { type: "savedGameMeta", gameId: "43", startedAt: "2026-09-10T12:00:00Z", deckName: "Mazo", duration: 0 },
+      { type: "savedGamePlayer", player: { position: 1, uid: "P1", colorCode: "AM", name: "Jugador" } },
+      { type: "savedGameTransferComplete", status: "ok" },
+    ]);
+    expect(game.summary.gameId).toBe(43);
+    expect(game.players).toHaveLength(1);
+    expect(game.turns).toEqual([]);
+  });
 });

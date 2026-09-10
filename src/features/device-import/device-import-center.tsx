@@ -72,12 +72,22 @@ export function DeviceImportCenter() {
     try {
       const summaries = await client.listGames();
       const downloaded: ImportedGame[] = [];
+      const failedGameIds: number[] = [];
       for (const summary of summaries) {
-        const game = await client.downloadGame(summary.gameId);
-        downloaded.push({ ...game, assignments: {} });
+        try {
+          const game = await client.downloadGame(summary.gameId);
+          downloaded.push({ ...game, assignments: {} });
+          // Preserve visible progress and avoid hiding every valid game if one
+          // old record is malformed or cannot be read.
+          setGames([...downloaded]);
+        } catch {
+          failedGameIds.push(summary.gameId);
+        }
       }
-      setGames(downloaded);
-      setPhase("ready");
+      if (failedGameIds.length > 0) {
+        setError(`Se extrajeron ${downloaded.length} partidas. No se pudieron leer: ${failedGameIds.join(", ")}. Permanecen guardadas en la MagicBox.`);
+      }
+      setPhase(downloaded.length > 0 ? "ready" : "connected");
     } catch (cause) {
       setError(getErrorMessage(cause));
       setPhase("connected");
@@ -242,7 +252,7 @@ export function DeviceImportCenter() {
 
       {games.map((game) => (
         <Card key={game.summary.gameId}>
-          <CardHeader><CardTitle>Partida #{game.summary.gameId}</CardTitle><CardDescription>{game.summary.deckName} · {game.players.length} jugadores · {game.turns.length} turnos</CardDescription></CardHeader>
+          <CardHeader><CardTitle>Partida #{game.summary.gameId}</CardTitle><CardDescription>{game.summary.deckName} · {game.players.length} jugadores · {game.turns.length} turnos{game.turns.length === 0 ? " · finalizada sin jugadas" : ""}</CardDescription></CardHeader>
           <CardContent className="space-y-3">
             {game.players.map((player) => (
               <div key={player.uid} className="grid gap-2 rounded-xl border p-4 md:grid-cols-[180px_1fr] md:items-center">

@@ -74,7 +74,7 @@ export function buildDownloadedGame(messages: ProtocolMessage[]): DeviceGameDown
     }))
     .filter((turn) => turn.turnNumber > 0 && turn.playerUid.length > 0 && turn.cardId.length > 0);
 
-  if (players.length === 0 || turns.length === 0) throw new Error(`La partida ${summary.gameId} llegó incompleta.`);
+  if (players.length === 0) throw new Error(`La partida ${summary.gameId} llegó sin jugadores.`);
   return { summary: { ...summary, totalPlayers: players.length }, players, turns };
 }
 
