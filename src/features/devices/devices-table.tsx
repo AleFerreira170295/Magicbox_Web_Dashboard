@@ -640,17 +640,6 @@ export function DevicesTable() {
   const scopedInstitutionName = scopedInstitutionId ? institutions[0]?.name || scopedInstitutionId : null;
   const isInstitutionScopedView = Boolean(scopedInstitutionId && currentUser?.educationalCenterId === scopedInstitutionId);
 
-  const currentPermissionKeys = useMemo(() => new Set(currentUser?.permissions || []), [currentUser?.permissions]);
-  const hasGlobalAdminRole = currentUser?.roles.includes("admin") || false;
-  const hasResolvedCapabilities = hasGlobalAdminRole || currentPermissionKeys.size > 0;
-
-  function hasAnyPermission(...keys: string[]) {
-    if (hasGlobalAdminRole) return true;
-    if (!hasResolvedCapabilities) return true;
-    return keys.some((key) => currentPermissionKeys.has(key));
-  }
-
-  const canUpdateDevices = hasAnyPermission("ble_device:update", "ble-device:update");
   const currentUserEmail = (currentUser?.email || "").trim().toLowerCase();
   const isTeacherView = currentUser?.roles.includes("teacher") || false;
   const isDirectorView = currentUser?.roles.includes("director") || false;

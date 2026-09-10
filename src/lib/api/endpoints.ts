@@ -63,6 +63,7 @@ export const apiEndpoints = {
     results: (id: string) => `/evaluation/${id}/results`,
   },
   profiles: {
+    list: "/home/profiles",
     overview: "/home/profiles/overview",
     byId: (id: string) => `/home/profiles/${id}`,
     bindingById: (id: string) => `/home/profile-bindings/${id}`,

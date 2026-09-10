@@ -59,6 +59,23 @@ export async function deleteHomeProfile(token: string, profileId: string) {
   });
 }
 
+export async function createHomeProfile(token: string, payload: {
+  displayName: string;
+  age?: number | null;
+  ageCategory?: string | null;
+}) {
+  return apiRequest<JsonObject>(apiEndpoints.profiles.list, {
+    method: "POST",
+    token,
+    body: {
+      display_name: payload.displayName,
+      age: payload.age ?? null,
+      age_category: payload.ageCategory ?? null,
+      is_active: true,
+    },
+  });
+}
+
 export function useProfilesOverview(token?: string) {
   return useQuery({
     queryKey: ["profiles-overview", token],
