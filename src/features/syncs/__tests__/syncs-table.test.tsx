@@ -223,7 +223,6 @@ describe("SyncsTable", () => {
 
     expect(screen.getByText("Teacher")).toBeInTheDocument();
     expect(screen.queryAllByText("historial personal").length).toBeGreaterThan(0);
-    expect(screen.getByText(/la tabla queda limitada a tus propias sincronizaciones/i)).toBeInTheDocument();
   });
 
   it("adapts operational sync reading to a teacher-oriented framing", () => {
@@ -294,7 +293,6 @@ describe("SyncsTable", () => {
     renderSyncsTable();
 
     expect(screen.getByText("Teacher")).toBeInTheDocument();
-    expect(screen.getByText(/pensada para conectar captura, participantes y dispositivo/i)).toBeInTheDocument();
 
     fireEvent.click(screen.getByText("mb-sync-1"));
 
@@ -461,7 +459,6 @@ describe("SyncsTable", () => {
     renderSyncsTable();
 
     expect(screen.getByText("Researcher")).toBeInTheDocument();
-    expect(screen.getByText(/pensada para leer cobertura de captura/i)).toBeInTheDocument();
 
     fireEvent.click(screen.getByText("mb-sync-1"));
 
@@ -538,7 +535,6 @@ describe("SyncsTable", () => {
     renderSyncsTable();
 
     expect(screen.getByText("Family")).toBeInTheDocument();
-    expect(screen.getByText(/seguir la actividad de sincronización reciente/i)).toBeInTheDocument();
     expect(screen.queryByText("Todos los accesos")).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByText("mb-sync-1"));

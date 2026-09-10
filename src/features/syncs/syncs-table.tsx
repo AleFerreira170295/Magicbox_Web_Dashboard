@@ -19,6 +19,7 @@ import { buildGameDetailHref, buildGamesOverviewHref } from "@/features/games/ga
 import type { GameRecord } from "@/features/games/types";
 import { useLanguage, type AppLanguage } from "@/features/i18n/i18n-context";
 import { useSyncSessions } from "@/features/syncs/api";
+import { SyncNavigation } from "@/features/syncs/sync-navigation";
 import { useUsers } from "@/features/users/api";
 import { cn, formatDateTime, getErrorMessage } from "@/lib/utils";
 
@@ -487,6 +488,8 @@ export function SyncsTable() {
           </div>
         }
       />
+
+      <SyncNavigation />
 
       {linkedBleDeviceId || linkedDeviceId ? (
         <div className="flex flex-wrap gap-2">

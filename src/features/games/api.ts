@@ -110,6 +110,23 @@ export async function deleteGame(token: string, gameId: string) {
   });
 }
 
+export async function uploadRawGameSync(token: string, payload: unknown) {
+  return apiRequest<unknown>(apiEndpoints.ingestion.rawSyncs, {
+    method: "POST",
+    token,
+    body: payload,
+  });
+}
+
+export async function uploadGamesBatch(token: string, payload: unknown) {
+  const response = await apiRequest<unknown[]>(apiEndpoints.games.batch, {
+    method: "POST",
+    token,
+    body: payload,
+  });
+  return response.map(normalizeGame);
+}
+
 export async function assignGamePlayerStudent(token: string, gameId: string, playerId: string, studentId: string) {
   const response = await apiRequest<unknown>(apiEndpoints.games.playerById(gameId, playerId), {
     method: "PATCH",

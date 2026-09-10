@@ -95,6 +95,8 @@ describe("GameDetailPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     routerPushMock.mockReset();
+    assignGamePlayerStudentMock.mockReset();
+    assignGamePlayerStudentMock.mockResolvedValue({});
 
     useAuthMock.mockReturnValue({
       tokens: { accessToken: "token", refreshToken: "refresh" },

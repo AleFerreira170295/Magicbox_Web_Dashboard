@@ -181,6 +181,13 @@ export function GameDetailPage({
               </CardContent>
             </Card>
           ) : null}
+          {assignStudentMutation.error ? (
+            <Card className="border-destructive/30 bg-destructive/5 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
+              <CardContent className="p-6 text-sm text-destructive">
+                No pude asignar el alumno. {getErrorMessage(assignStudentMutation.error)}
+              </CardContent>
+            </Card>
+          ) : null}
 
           <div className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
             <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
@@ -427,7 +434,7 @@ export function GameDetailPage({
                               <p className="font-medium text-foreground">{studentsById.get(player.studentId || "")?.fullName || player.playerName || player.externalPlayerUid || `Jugador ${index + 1}`}</p>
                               <p className="text-xs text-muted-foreground">{studentsById.get(player.studentId || "")?.fileNumber || player.externalPlayerUid || player.id || "sin id enlazado"}</p>
                             </div>
-                            <div className="flex flex-wrap gap-2">
+                            <div className="flex flex-wrap items-center gap-2">
                               <Badge variant={player.playerSource === "manual" ? "success" : "outline"}>{player.playerSource === "manual" ? "manual" : "registrado"}</Badge>
                               <Badge variant="outline">posición {player.position}</Badge>
                               {player.cardColor ? <Badge variant="outline">{player.cardColor}</Badge> : null}
