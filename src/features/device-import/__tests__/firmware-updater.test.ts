@@ -1,7 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { resolveCableFirmwareRelease, sha256Hex, validateFirmwareImage } from "@/features/device-import/firmware-updater";
+import { resolveCableFirmwareRelease, settleWithin, sha256Hex, validateFirmwareImage } from "@/features/device-import/firmware-updater";
 
 describe("firmware updater validation", () => {
+  it("bounds serial cleanup waits", async () => {
+    await expect(settleWithin(Promise.resolve(), 20)).resolves.toBe(true);
+    await expect(settleWithin(new Promise(() => undefined), 5)).resolves.toBe(false);
+    await expect(settleWithin(Promise.reject(new Error("closed")), 20)).resolves.toBe(false);
+  });
+
   it("validates published size and SHA-256", async () => {
     const firmware = new TextEncoder().encode("magicbox-firmware");
     const hash = await sha256Hex(firmware);

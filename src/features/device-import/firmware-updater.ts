@@ -92,6 +92,18 @@ async function downloadBinary(url: string) {
   return new Uint8Array(await response.arrayBuffer());
 }
 
+export async function settleWithin(operation: Promise<unknown>, timeoutMs: number) {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const result = await Promise.race([
+    operation.then(() => true, () => false),
+    new Promise<boolean>((resolve) => {
+      timer = setTimeout(() => resolve(false), timeoutMs);
+    }),
+  ]);
+  if (timer) clearTimeout(timer);
+  return result;
+}
+
 export async function flashMagicBoxFirmware({ release, onProgress, onLog }: FlashFirmwareOptions) {
   const serial = (navigator as Navigator & SerialNavigator).serial;
   if (!serial) throw new Error("Web Serial no está disponible en este navegador.");
@@ -146,9 +158,15 @@ export async function flashMagicBoxFirmware({ release, onProgress, onLog }: Flas
     });
 
     onProgress?.(97, "Reiniciando MagicBox…");
-    await loader.after("hard_reset");
-    onProgress?.(100, `Firmware ${release.version || "nuevo"} instalado.`);
+    const resetCompleted = await settleWithin(loader.after("hard_reset"), 2_500);
+    if (!resetCompleted) {
+      onLog?.("La escritura terminó, pero el controlador serie no confirmó el reset. La MagicBox puede reiniciarse al desconectar el cable.");
+    }
+    onProgress?.(100, `Firmware ${release.version || "nuevo"} instalado. Ya podés reconectar la MagicBox.`);
   } finally {
-    try { await transport.disconnect(); } catch { /* el reset puede cerrar el puerto */ }
+    // Chromium/macOS can leave esptool-js' read loop locked after the ESP32
+    // resets. Never keep the UI waiting forever after a completed flash.
+    const disconnected = await settleWithin(transport.disconnect(), 2_000);
+    if (!disconnected) onLog?.("El puerto quedó pendiente de liberación; desconectá y reconectá el cable antes de continuar.");
   }
 }
