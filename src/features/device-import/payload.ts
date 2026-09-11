@@ -78,7 +78,6 @@ export function buildRawSyncEnvelopes(deviceId: string, games: ImportedGame[], e
       device_id: normalizedDeviceId,
       payload_schema_version: "magicbox.device_cable_import.v1",
       captured_at: gamePayload.start_date,
-      received_at: new Date().toISOString(),
       session_type: "device_memory_relay",
       deck_name: gamePayload.deck_name,
       total_cards: gamePayload.turns.length,
