@@ -11,6 +11,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
 import { useAuth } from "@/features/auth/auth-context";
+import { inferDeckNameFromTurns } from "@/features/device-import/deck-inference";
 import { buildGamesBatchPayload, buildRawSyncEnvelopes } from "@/features/device-import/payload";
 import { flashMagicBoxFirmware, resolveCableFirmwareRelease } from "@/features/device-import/firmware-updater";
 import { ImportedGameCharts } from "@/features/device-import/imported-game-charts";
@@ -159,9 +160,17 @@ export function DeviceImportCenter() {
       for (const summary of sortedSummaries) {
         try {
           const game = await client.downloadGame(summary.gameId);
-          downloaded.push({ ...game, assignments: {} });
+          const importedGame: ImportedGame = {
+            ...game,
+            summary: {
+              ...game.summary,
+              deckName: inferDeckNameFromTurns(game.turns, game.summary.deckName),
+            },
+            assignments: {},
+          };
+          downloaded.push(importedGame);
           setGames([...downloaded]);
-          setSelectedGameId((current) => current ?? game.summary.gameId);
+          setSelectedGameId((current) => current ?? importedGame.summary.gameId);
         } catch {
           failedGameIds.push(summary.gameId);
         }
@@ -401,7 +410,7 @@ export function DeviceImportCenter() {
             <CardHeader>
               <div className="flex flex-wrap items-start justify-between gap-3"><div><CardTitle>Partida #{selectedGame.summary.gameId}</CardTitle><CardDescription>{selectedGame.summary.deckName} · {selectedGame.players.length} jugadores · {selectedGame.turns.length} turnos{selectedGame.turns.length === 0 ? " · finalizada sin jugadas" : ""}</CardDescription></div><div className="flex items-center gap-2"><Button size="sm" className="size-9 p-0" variant="outline" aria-label="Partida anterior" onClick={() => selectRelativeGame(-1)} disabled={selectedIndex <= 0}><ChevronLeft className="size-4" /></Button><span className="text-sm text-muted-foreground">{selectedIndex + 1} de {games.length}</span><Button size="sm" className="size-9 p-0" variant="outline" aria-label="Partida siguiente" onClick={() => selectRelativeGame(1)} disabled={selectedIndex >= games.length - 1}><ChevronRight className="size-4" /></Button></div></div>
               <div className="mt-4 grid gap-3 rounded-xl border bg-muted/20 p-3 text-sm sm:grid-cols-2 lg:grid-cols-4"><div><p className="text-xs text-muted-foreground">Fecha</p><p className="font-medium">{formatGameDate(selectedGame.summary.startedAt)}</p></div><div><p className="text-xs text-muted-foreground">Dispositivo</p><p className="font-medium">{deviceDisplayName}</p><p className="font-mono text-xs text-muted-foreground">{normalizedDeviceId}</p></div><div><p className="text-xs text-muted-foreground">Institución</p><p className="font-medium">{institutionName}</p></div><div><p className="text-xs text-muted-foreground">Owner</p><p className="font-medium">{ownerName}</p></div></div>
-              <div className="mt-4"><label className="text-sm font-medium" htmlFor={`deck-name-${selectedGame.summary.gameId}`}>Nombre del mazo utilizado</label><Input id={`deck-name-${selectedGame.summary.gameId}`} className="mt-2" value={selectedGame.summary.deckName} onChange={(event) => updateDeckName(selectedGame.summary.gameId, event.target.value)} placeholder="Nombre del mazo" maxLength={100} disabled={phase === "uploading" || allGamesUploaded} /><p className="mt-1 text-xs text-muted-foreground">Este nombre se guardará con la partida al subirla.</p></div>
+              <div className="mt-4"><label className="text-sm font-medium" htmlFor={`deck-name-${selectedGame.summary.gameId}`}>Nombre del mazo utilizado</label><Input id={`deck-name-${selectedGame.summary.gameId}`} className="mt-2" value={selectedGame.summary.deckName} onChange={(event) => updateDeckName(selectedGame.summary.gameId, event.target.value)} placeholder="Nombre del mazo" maxLength={100} disabled={phase === "uploading" || allGamesUploaded} /><p className="mt-1 text-xs text-muted-foreground">Se precarga según los números de las cartas utilizadas y podés corregirlo antes de subir.</p></div>
               <div className="mt-4 flex gap-2 overflow-x-auto rounded-xl bg-muted/50 p-1">
                 <Button type="button" size="sm" variant={gameView === "players" ? "default" : "ghost"} onClick={() => setGameView("players")}><Users className="size-4" />Jugadores</Button>
                 <Button type="button" size="sm" variant={gameView === "analytics" ? "default" : "ghost"} onClick={() => setGameView("analytics")}><BarChart3 className="size-4" />Rondas y aciertos</Button>
