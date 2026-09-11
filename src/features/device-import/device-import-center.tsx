@@ -29,7 +29,7 @@ import { getErrorMessage } from "@/lib/utils";
 
 type Phase = "idle" | "connected" | "reading" | "ready" | "uploading";
 type GameView = "players" | "analytics";
-type Feedback = { kind: "success" | "error"; title: string; message: string; showGameLinks?: boolean };
+type Feedback = { kind: "success" | "error" | "info"; title: string; message: string; showGameLinks?: boolean };
 const COLOR_LABELS: Record<string, string> = { AM: "Amarillo", NA: "Naranja", VE: "Verde", VI: "Violeta", CI: "Celeste", MA: "Rojo" };
 
 function cleanDeviceId(value: string) {
@@ -144,9 +144,19 @@ export function DeviceImportCenter() {
     setPhase("reading");
     try {
       const summaries = await client.listGames();
+      const sortedSummaries = [...summaries].sort((a, b) => {
+        const aTime = Date.parse(a.startedAt);
+        const bTime = Date.parse(b.startedAt);
+        return (Number.isFinite(bTime) ? bTime : 0) - (Number.isFinite(aTime) ? aTime : 0);
+      });
+      if (sortedSummaries.length === 0) {
+        setFeedback({ kind: "info", title: "No hay partidas para sincronizar", message: "La MagicBox está conectada correctamente, pero no tiene partidas guardadas internamente." });
+        setPhase("connected");
+        return;
+      }
       const downloaded: ImportedGame[] = [];
       const failedGameIds: number[] = [];
-      for (const summary of summaries) {
+      for (const summary of sortedSummaries) {
         try {
           const game = await client.downloadGame(summary.gameId);
           downloaded.push({ ...game, assignments: {} });
@@ -219,6 +229,12 @@ export function DeviceImportCenter() {
 
   function setManualName(gameId: number, playerUid: string, name: string) {
     updateAssignment(gameId, playerUid, { kind: "manual", id: playerUid, name });
+  }
+
+  function updateDeckName(gameId: number, deckName: string) {
+    setGames((current) => current.map((game) => game.summary.gameId === gameId
+      ? { ...game, summary: { ...game.summary, deckName } }
+      : game));
   }
 
   function assign(gameId: number, playerUid: string, encoded: string) {
@@ -317,8 +333,8 @@ export function DeviceImportCenter() {
     <div className="space-y-6">
       <Modal open={Boolean(feedback)} onClose={() => setFeedback(null)} title={feedback?.title || "Resultado"} className="max-w-xl">
         <div className="space-y-5">
-          <div className={`flex items-start gap-3 rounded-2xl border p-4 ${feedback?.kind === "success" ? "border-emerald-300 bg-emerald-50 text-emerald-900" : "border-destructive/40 bg-destructive/5 text-destructive"}`}>
-            {feedback?.kind === "success" ? <CheckCircle2 className="mt-0.5 size-5 shrink-0" /> : <AlertTriangle className="mt-0.5 size-5 shrink-0" />}
+          <div className={`flex items-start gap-3 rounded-2xl border p-4 ${feedback?.kind === "success" ? "border-emerald-300 bg-emerald-50 text-emerald-900" : feedback?.kind === "info" ? "border-sky-300 bg-sky-50 text-sky-900" : "border-destructive/40 bg-destructive/5 text-destructive"}`}>
+            {feedback?.kind === "success" ? <CheckCircle2 className="mt-0.5 size-5 shrink-0" /> : feedback?.kind === "info" ? <List className="mt-0.5 size-5 shrink-0" /> : <AlertTriangle className="mt-0.5 size-5 shrink-0" />}
             <p className="text-sm leading-6">{feedback?.message}</p>
           </div>
           {feedback?.showGameLinks ? <div className="flex flex-wrap gap-2">{uploadedGames[0] ? <Link className={buttonVariants()} href={buildGameDetailHref({ gameRecordId: uploadedGames[0].id, deviceId: normalizedDeviceId })}>Ver primera partida cargada</Link> : null}<Link className={buttonVariants({ variant: "outline" })} href={buildGamesOverviewHref({ deviceId: normalizedDeviceId })}>Ver todas las partidas</Link></div> : null}
@@ -385,6 +401,7 @@ export function DeviceImportCenter() {
             <CardHeader>
               <div className="flex flex-wrap items-start justify-between gap-3"><div><CardTitle>Partida #{selectedGame.summary.gameId}</CardTitle><CardDescription>{selectedGame.summary.deckName} · {selectedGame.players.length} jugadores · {selectedGame.turns.length} turnos{selectedGame.turns.length === 0 ? " · finalizada sin jugadas" : ""}</CardDescription></div><div className="flex items-center gap-2"><Button size="sm" className="size-9 p-0" variant="outline" aria-label="Partida anterior" onClick={() => selectRelativeGame(-1)} disabled={selectedIndex <= 0}><ChevronLeft className="size-4" /></Button><span className="text-sm text-muted-foreground">{selectedIndex + 1} de {games.length}</span><Button size="sm" className="size-9 p-0" variant="outline" aria-label="Partida siguiente" onClick={() => selectRelativeGame(1)} disabled={selectedIndex >= games.length - 1}><ChevronRight className="size-4" /></Button></div></div>
               <div className="mt-4 grid gap-3 rounded-xl border bg-muted/20 p-3 text-sm sm:grid-cols-2 lg:grid-cols-4"><div><p className="text-xs text-muted-foreground">Fecha</p><p className="font-medium">{formatGameDate(selectedGame.summary.startedAt)}</p></div><div><p className="text-xs text-muted-foreground">Dispositivo</p><p className="font-medium">{deviceDisplayName}</p><p className="font-mono text-xs text-muted-foreground">{normalizedDeviceId}</p></div><div><p className="text-xs text-muted-foreground">Institución</p><p className="font-medium">{institutionName}</p></div><div><p className="text-xs text-muted-foreground">Owner</p><p className="font-medium">{ownerName}</p></div></div>
+              <div className="mt-4"><label className="text-sm font-medium" htmlFor={`deck-name-${selectedGame.summary.gameId}`}>Nombre del mazo utilizado</label><Input id={`deck-name-${selectedGame.summary.gameId}`} className="mt-2" value={selectedGame.summary.deckName} onChange={(event) => updateDeckName(selectedGame.summary.gameId, event.target.value)} placeholder="Nombre del mazo" maxLength={100} disabled={phase === "uploading" || allGamesUploaded} /><p className="mt-1 text-xs text-muted-foreground">Este nombre se guardará con la partida al subirla.</p></div>
               <div className="mt-4 flex gap-2 overflow-x-auto rounded-xl bg-muted/50 p-1">
                 <Button type="button" size="sm" variant={gameView === "players" ? "default" : "ghost"} onClick={() => setGameView("players")}><Users className="size-4" />Jugadores</Button>
                 <Button type="button" size="sm" variant={gameView === "analytics" ? "default" : "ghost"} onClick={() => setGameView("analytics")}><BarChart3 className="size-4" />Rondas y aciertos</Button>

@@ -362,7 +362,7 @@ export function GamesTable() {
   const initialPage = Number(searchParams.get("page") || 1) > 0 ? Number(searchParams.get("page") || 1) : 1;
   const initialPageSize = Number(searchParams.get("pageSize") || 10);
 
-  const gamesQuery = useGames(tokens?.accessToken, { limit: 100, sortBy: "created_at", order: "desc" });
+  const gamesQuery = useGames(tokens?.accessToken, { limit: 100, sortBy: "start_date", order: "desc" });
   const devicesQuery = useDevices(tokens?.accessToken);
   const institutionsQuery = useInstitutions(tokens?.accessToken);
 

@@ -474,4 +474,10 @@ describe("GamesTable", () => {
     expect(screen.queryByText("Todos los accesos")).not.toBeInTheDocument();
 
   });
+  it("requests games by play date with newest first", () => {
+    renderGamesTable();
+
+    expect(useGamesMock).toHaveBeenCalledWith("token", { limit: 100, sortBy: "start_date", order: "desc" });
+  });
+
 });

@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DeviceImportCenter } from "@/features/device-import/device-import-center";
 
 const mocks = vi.hoisted(() => ({
@@ -96,6 +96,10 @@ const uploadedGame = {
 };
 
 describe("DeviceImportCenter cable actions", () => {
+  afterEach(() => {
+    document.body.innerHTML = "";
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.connect.mockResolvedValue(undefined);
@@ -121,11 +125,15 @@ describe("DeviceImportCenter cable actions", () => {
     expect(screen.getAllByText("Ana Admin").length).toBeGreaterThan(0);
     expect(screen.getAllByText(/10 .*2026/i).length).toBeGreaterThan(0);
 
+    const deckNameInput = screen.getByLabelText("Nombre del mazo utilizado");
+    fireEvent.change(deckNameInput, { target: { value: "Mazo personalizado" } });
+
     const deleteButton = screen.getByRole("button", { name: /Borrar 1 originales/ });
     expect(deleteButton).toBeDisabled();
 
     fireEvent.click(screen.getByRole("button", { name: /Subir 1 partidas/ }));
     expect(await screen.findByRole("dialog", { name: "Subida completada" })).toBeInTheDocument();
+    expect(mocks.uploadGamesBatch).toHaveBeenCalledWith("token", expect.objectContaining({ games: [expect.objectContaining({ deck_name: "Mazo personalizado" })] }));
     expect(mocks.deleteGames).not.toHaveBeenCalled();
 
     fireEvent.click(screen.getByRole("button", { name: "Cerrar" }));
@@ -136,5 +144,17 @@ describe("DeviceImportCenter cable actions", () => {
     fireEvent.click(screen.getByRole("button", { name: "Borrar originales" }));
     expect(await screen.findByRole("dialog", { name: "Borrado completado" })).toBeInTheDocument();
     expect(mocks.deleteGames).toHaveBeenCalledWith([7]);
+  });
+
+  it("shows an immediate modal when the connected device has no saved games", async () => {
+    mocks.listGames.mockResolvedValue([]);
+    render(<DeviceImportCenter />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Conectar" }));
+    await screen.findByText("MagicBox Aula Norte");
+    fireEvent.click(screen.getByRole("button", { name: "Leer partidas" }));
+
+    expect(await screen.findByRole("dialog", { name: "No hay partidas para sincronizar" })).toBeInTheDocument();
+    expect(screen.getByText(/no tiene partidas guardadas internamente/i)).toBeInTheDocument();
   });
 });

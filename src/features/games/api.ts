@@ -103,6 +103,15 @@ export async function getGame(token: string, gameId: string) {
   return normalizeGame(response);
 }
 
+export async function updateGameDeckName(token: string, gameId: string, deckName: string) {
+  const response = await apiRequest<unknown>(apiEndpoints.games.byId(gameId), {
+    method: "PATCH",
+    token,
+    body: { deck_name: deckName.trim() },
+  });
+  return normalizeGame(response);
+}
+
 export async function deleteGame(token: string, gameId: string) {
   await apiRequest<void>(apiEndpoints.games.byId(gameId), {
     method: "DELETE",
