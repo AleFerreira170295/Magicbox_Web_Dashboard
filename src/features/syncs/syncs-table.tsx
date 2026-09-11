@@ -246,6 +246,12 @@ function getSyncInitials(source?: string | null, deckName?: string | null) {
     .join("") || "SY";
 }
 
+function getSyncSortTime(sync: { syncedAt?: string | null; receivedAt?: string | null; startedAt?: string | null; createdAt?: string | null }) {
+  const value = sync.syncedAt || sync.receivedAt || sync.startedAt || sync.createdAt || "";
+  const time = value ? new Date(value).getTime() : 0;
+  return Number.isFinite(time) ? time : 0;
+}
+
 function buildSyncGamesHref(sync: {
   bleDeviceId?: string | null;
   deviceId?: string | null;
@@ -362,7 +368,7 @@ export function SyncsTable() {
         participantCount: sync.participants.length || sync.totalPlayers || 0,
         evidenceState: hasRaw ? "con evidencia" : "sin evidencia",
       };
-    });
+    }).sort((a, b) => getSyncSortTime(b) - getSyncSortTime(a));
   }, [canReadOperationalSyncs, currentUser, deviceById, gameById, syncs, userById]);
 
   const filtered = useMemo(() => {

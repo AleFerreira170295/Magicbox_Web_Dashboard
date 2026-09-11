@@ -640,4 +640,75 @@ describe("SyncsTable", () => {
     expect(screen.queryAllByText("mb-sync-1").length).toBeGreaterThan(0);
     expect(screen.queryAllByText("mb-sync-2")).toHaveLength(0);
   });
+  it("orders synchronization rows from newest to oldest", () => {
+    useAuthMock.mockReturnValue({
+      tokens: { accessToken: "token", refreshToken: "refresh" },
+      user: {
+        id: "user-1",
+        email: "admin@example.com",
+        firstName: "Ines",
+        lastName: "Admin",
+        fullName: "Ines Admin",
+        educationalCenterId: "ec-1",
+        roles: ["admin"],
+        permissions: ["ble_device:read", "game_data:read"],
+        raw: {},
+      },
+    });
+    const sync = (id: string, deckName: string, startedAt: string) => ({
+      id,
+      userId: "user-1",
+      syncId: id,
+      source: "magicbox",
+      sourceType: "device",
+      sessionType: null,
+      status: "done",
+      bleDeviceId: "device-1",
+      deviceId: "mb-1",
+      firmwareVersion: "v2.2",
+      appVersion: "1.0.0",
+      payloadSchemaVersion: "1",
+      gameId: null,
+      deckName,
+      totalCards: 10,
+      totalPlayers: 2,
+      durationSeconds: 60,
+      score: 100,
+      finalResult: null,
+      gameEndReason: null,
+      startedAt,
+      endedAt: null,
+      syncedAt: null,
+      capturedAt: null,
+      participants: [],
+      rawRecordIds: [],
+      rawRecordCount: 0,
+      lastRawRecordId: null,
+      rawPayload: {},
+      fragmentCount: 0,
+      rawFragmentCount: 0,
+      additionalFields: {},
+      receivedAt: null,
+      createdAt: null,
+      updatedAt: null,
+      raw: {},
+    });
+    useSyncSessionsMock.mockReturnValue(okQuery({
+      data: [
+        sync("sync-old", "Mazo antiguo", "2026-09-09T12:00:00Z"),
+        sync("sync-new", "Mazo reciente", "2026-09-11T12:00:00Z"),
+      ],
+      page: 1,
+      limit: 2,
+      total: 2,
+      total_pages: 1,
+    }));
+
+    renderSyncsTable();
+
+    const recent = screen.getAllByText("sync-new")[0]!;
+    const old = screen.getAllByText("sync-old")[0]!;
+    expect(recent.compareDocumentPosition(old) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
 });

@@ -11,13 +11,14 @@ import { SectionHeader } from "@/components/section-header";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { ListPaginationControls, useListPagination } from "@/components/ui/list-pagination-controls";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useNotifications } from "@/components/ui/notifications";
 import { useAuth } from "@/features/auth/auth-context";
 import { hasAnyUserPermission } from "@/features/auth/permission-contract";
 import { useDevices } from "@/features/devices/api";
-import { assignGamePlayerStudent, deleteGame, useGame, useGames } from "@/features/games/api";
+import { assignGamePlayerStudent, deleteGame, updateGameDeckName, useGame, useGames } from "@/features/games/api";
 import { buildGameDetailHref, buildGamesOverviewHref, type GamesOverviewRouteState } from "@/features/games/game-route";
 import { buildGameRows, buildSyncRelationHref, buildTurnOutcomeSeriesByParticipant, resolveTurnPlayerLabel } from "@/features/games/game-view";
 import { useInstitutions } from "@/features/institutions/api";
@@ -37,9 +38,10 @@ export function GameDetailPage({
   const { notify } = useNotifications();
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [studentSelectionByPlayer, setStudentSelectionByPlayer] = useState<Record<string, string>>({});
+  const [deckNameDraftByGame, setDeckNameDraftByGame] = useState<Record<string, string>>({});
 
   const gameQuery = useGame(tokens?.accessToken, gameRecordId);
-  const gamesQuery = useGames(tokens?.accessToken);
+  const gamesQuery = useGames(tokens?.accessToken, { limit: 100, sortBy: "start_date", order: "desc" });
   const devicesQuery = useDevices(tokens?.accessToken);
   const institutionsQuery = useInstitutions(tokens?.accessToken);
   const canReadStudents = hasAnyUserPermission(currentUser, "student:read");
@@ -60,6 +62,7 @@ export function GameDetailPage({
     () => buildGameRows(gameQuery.data ? [gameQuery.data] : [], devices, institutions, currentUser)[0] ?? null,
     [currentUser, devices, gameQuery.data, institutions],
   );
+  const deckNameDraft = selectedGame ? (deckNameDraftByGame[selectedGame.id] ?? selectedGame.deckName ?? "") : "";
 
   const sameDeviceGames = useMemo(() => {
     if (!selectedGame?.bleDeviceId) return [];
@@ -84,6 +87,21 @@ export function GameDetailPage({
   const isLoading = gameQuery.isLoading || gamesQuery.isLoading || devicesQuery.isLoading || institutionsQuery.isLoading;
   const hasFatalError = gameQuery.error || gamesQuery.error || devicesQuery.error || institutionsQuery.error;
   const canDeleteGames = hasAnyUserPermission(currentUser, "game_data:delete");
+
+  const updateDeckNameMutation = useMutation({
+    mutationFn: async () => {
+      if (!selectedGame || !tokens?.accessToken) throw new Error("No hay partida seleccionada.");
+      if (!deckNameDraft.trim()) throw new Error("El nombre del mazo es obligatorio.");
+      return updateGameDeckName(tokens.accessToken, selectedGame.id, deckNameDraft);
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["games"] });
+      notify({ tone: "success", message: "El nombre del mazo quedó actualizado." });
+    },
+    onError: (error) => {
+      notify({ tone: "error", message: getErrorMessage(error) || "No se pudo actualizar el nombre del mazo." });
+    },
+  });
 
   const deleteGameMutation = useMutation({
     mutationFn: async () => {
@@ -212,6 +230,7 @@ export function GameDetailPage({
                     <p className="mt-4 text-sm leading-6 text-muted-foreground">
                       Esta vista deja la partida en primer plano y mantiene a mano la navegación hacia otras sesiones relacionadas del mismo dispositivo o de la misma institución.
                     </p>
+                    {canUpdateGames ? <div className="mt-4 rounded-2xl border bg-background/70 p-3"><label className="text-sm font-medium" htmlFor="game-deck-name">Nombre del mazo utilizado</label><div className="mt-2 flex flex-wrap gap-2"><Input id="game-deck-name" className="min-w-60 flex-1" value={deckNameDraft} onChange={(event) => setDeckNameDraftByGame((current) => ({ ...current, [selectedGame.id]: event.target.value }))} maxLength={100} /><Button onClick={() => updateDeckNameMutation.mutate()} disabled={updateDeckNameMutation.isPending || !deckNameDraft.trim() || deckNameDraft.trim() === (selectedGame.deckName || "").trim()}>{updateDeckNameMutation.isPending ? "Guardando..." : "Guardar mazo"}</Button></div></div> : null}
                   </div>
                 </div>
 

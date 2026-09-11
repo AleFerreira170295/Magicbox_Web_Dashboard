@@ -6,6 +6,7 @@ import { GameDetailPage } from "@/features/games/game-detail-page";
 
 const routerPushMock = vi.fn();
 const assignGamePlayerStudentMock = vi.hoisted(() => vi.fn());
+const updateGameDeckNameMock = vi.hoisted(() => vi.fn());
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: routerPushMock }),
@@ -37,6 +38,7 @@ vi.mock("@/features/games/api", () => ({
   useGames: (...args: unknown[]) => useGamesMock(...args),
   deleteGame: vi.fn(),
   assignGamePlayerStudent: (...args: unknown[]) => assignGamePlayerStudentMock(...args),
+  updateGameDeckName: (...args: unknown[]) => updateGameDeckNameMock(...args),
 }));
 
 vi.mock("@/features/devices/api", () => ({
@@ -97,6 +99,8 @@ describe("GameDetailPage", () => {
     routerPushMock.mockReset();
     assignGamePlayerStudentMock.mockReset();
     assignGamePlayerStudentMock.mockResolvedValue({});
+    updateGameDeckNameMock.mockReset();
+    updateGameDeckNameMock.mockResolvedValue({});
 
     useAuthMock.mockReturnValue({
       tokens: { accessToken: "token", refreshToken: "refresh" },
@@ -342,6 +346,27 @@ describe("GameDetailPage", () => {
 
     await waitFor(() => {
       expect(assignGamePlayerStudentMock).toHaveBeenCalledWith("token", "game-1", "player-2", "student-2");
+    });
+  });
+
+  it("updates the deck name from the same detail used for student assignment", async () => {
+    useAuthMock.mockReturnValue({
+      tokens: { accessToken: "token", refreshToken: "refresh" },
+      user: {
+        id: "user-1",
+        educationalCenterId: "ec-1",
+        roles: ["teacher"],
+        permissions: ["game_data:read", "game_data:update"],
+        raw: {},
+      },
+    });
+    renderGameDetailPage();
+
+    fireEvent.change(screen.getByLabelText("Nombre del mazo utilizado"), { target: { value: "Ciencias naturales" } });
+    fireEvent.click(screen.getByRole("button", { name: "Guardar mazo" }));
+
+    await waitFor(() => {
+      expect(updateGameDeckNameMock).toHaveBeenCalledWith("token", "game-1", "Ciencias naturales");
     });
   });
 
