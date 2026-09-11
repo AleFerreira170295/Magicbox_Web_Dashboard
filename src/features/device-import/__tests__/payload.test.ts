@@ -33,6 +33,8 @@ describe("device import payload", () => {
     const second = buildRawSyncEnvelopes("AABBCCDDEEFF", games, "center-1")[0];
 
     expect(first.ingestion_key).toBe(second.ingestion_key);
+    expect(first).toEqual(second);
+    expect(first).not.toHaveProperty("received_at");
     expect(first).toMatchObject({
       source_channel: "web_dashboard",
       payload_schema_version: "magicbox.device_cable_import.v1",
