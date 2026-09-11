@@ -214,7 +214,12 @@ export function AppShell({ children }: { children: ReactNode }) {
   );
 
   const currentItem = useMemo(
-    () => visibleNavigation.find((item) => item.href === pathname) ?? visibleNavigation[0] ?? null,
+    () =>
+      visibleNavigation
+        .filter((item) => pathname === item.href || pathname.startsWith(`${item.href}/`))
+        .sort((left, right) => right.href.length - left.href.length)[0] ??
+      visibleNavigation[0] ??
+      null,
     [pathname, visibleNavigation],
   );
 
@@ -277,7 +282,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                     <div className="mt-2 space-y-1.5">
                       {group.items.map((item) => {
                         const Icon = item.icon;
-                        const active = pathname === item.href;
+                        const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
                         return (
                           <Link
                             key={item.href}
@@ -374,7 +379,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               <div className="container-shell flex gap-2 overflow-x-auto pb-4 xl:hidden">
                 {visibleNavigation.map((item) => {
                   const Icon = item.icon;
-                  const active = pathname === item.href;
+                  const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
                   return (
                     <Link
                       key={item.href}
