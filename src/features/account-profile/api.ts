@@ -113,8 +113,8 @@ export function accountProfileFromAuthUser(user: AuthUser): AccountProfile {
 }
 
 export async function getAccountProfile(token: string) {
-  const response = await apiRequest<unknown>(apiEndpoints.users.me, { token });
-  return normalizeAccountProfile(response);
+  const response = await apiRequest<{ user?: unknown }>(apiEndpoints.identity.me, { token });
+  return normalizeAccountProfile(response?.user ?? response);
 }
 
 export async function updateAccountProfile(token: string, payload: UpdateAccountProfilePayload) {

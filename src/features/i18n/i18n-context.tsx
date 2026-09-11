@@ -625,12 +625,28 @@ const LanguageContext = createContext<LanguageContextValue>({
 });
 
 export function LanguageProvider({ children }: { children: ReactNode }) {
-  const [language, setLanguage] = useState<AppLanguage>(() => detectInitialLanguage());
+  // Keep the server and the first client render deterministic. Browser preferences
+  // are applied after hydration so translated loading states never mismatch.
+  const [language, setLanguage] = useState<AppLanguage>("es");
+  const [browserPreferenceLoaded, setBrowserPreferenceLoaded] = useState(false);
 
   useEffect(() => {
-    window.localStorage.setItem(STORAGE_KEY, language);
+    // Capture the preference before the initial Spanish snapshot can persist, then
+    // apply it after every selectively hydrated subtree has committed.
+    const detectedLanguage = detectInitialLanguage();
+    const timeoutId = window.setTimeout(() => {
+      setLanguage(detectedLanguage);
+      setBrowserPreferenceLoaded(true);
+    }, 0);
+    return () => window.clearTimeout(timeoutId);
+  }, []);
+
+  useEffect(() => {
     document.documentElement.lang = language;
-  }, [language]);
+    if (browserPreferenceLoaded) {
+      window.localStorage.setItem(STORAGE_KEY, language);
+    }
+  }, [browserPreferenceLoaded, language]);
 
   const value = useMemo(
     () => ({ language, setLanguage, t: messages[language] }),

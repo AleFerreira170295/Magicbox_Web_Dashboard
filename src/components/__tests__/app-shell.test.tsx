@@ -91,6 +91,25 @@ describe("AppShell navigation", () => {
     expect(screen.getAllByText("docente").length).toBeGreaterThan(0);
   });
 
+  it("keeps the parent module active on nested routes", () => {
+    usePathnameMock.mockReturnValue("/syncs/cable");
+    useAuthMock.mockReturnValue({
+      user: {
+        fullName: "Ada Admin",
+        email: "admin@example.com",
+        roles: ["admin"],
+        permissions: ["feature:read"],
+      },
+      logout: vi.fn(),
+    });
+
+    renderShell();
+
+    expect(screen.getByRole("heading", { name: "Sincronizaciones" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Mi perfil" })).not.toBeInTheDocument();
+    expect(screen.getAllByRole("link", { name: "Sincronizaciones" })[0]).toHaveClass("bg-primary/10");
+  });
+
   it("keeps permissions navigation visible for institution-admin sessions with ACL read access", () => {
     useAuthMock.mockReturnValue({
       user: {

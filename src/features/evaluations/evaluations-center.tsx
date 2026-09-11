@@ -512,7 +512,7 @@ export function EvaluationsCenter() {
           <CardTitle>{t.filters.title}</CardTitle>
           <CardDescription>{t.filters.desc}</CardDescription>
         </CardHeader>
-        <CardContent className="grid items-end gap-4 pt-0 md:grid-cols-2 xl:grid-cols-[minmax(300px,1.35fr)_minmax(180px,0.75fr)_minmax(180px,0.75fr)_minmax(240px,1fr)_minmax(240px,1fr)]">
+        <CardContent className="grid items-end gap-4 pt-0 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5">
           <div className="flex min-w-0 flex-col gap-2">
             <Label className="text-sm font-medium text-foreground">{t.header.search}</Label>
             <div className="relative min-w-0">
@@ -579,8 +579,8 @@ export function EvaluationsCenter() {
         </Card>
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-[1fr_1.15fr]">
-        <div className="space-y-6">
+      <div className="grid min-w-0 gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)]">
+        <div className="min-w-0 space-y-6">
           {canCreate ? (
             <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
               <CardHeader>
@@ -663,7 +663,7 @@ export function EvaluationsCenter() {
           ) : null}
         </div>
 
-        <div className="space-y-6">
+        <div className="min-w-0 space-y-6">
           <Card className="border-border/80 bg-card/95 shadow-[0_16px_40px_rgba(31,42,55,0.06)]">
             <CardHeader><CardTitle>{t.list.title}</CardTitle><CardDescription>{t.list.desc}</CardDescription></CardHeader>
             <CardContent>
@@ -717,7 +717,7 @@ function EvaluationDetail({ evaluation, studentById, institutionName, language }
         <p className="mt-1 text-sm text-muted-foreground">{evaluation.subject} · {formatDateTime(evaluation.evaluationDate)}</p>
         {evaluation.notes ? <p className="mt-3 text-sm leading-6 text-muted-foreground">{evaluation.notes}</p> : null}
       </div>
-      <div className="rounded-2xl border border-border/70">
+      <div className="overflow-x-auto rounded-2xl border border-border/70">
         <Table>
           <TableHeader><TableRow><TableHead>{t.detail.student}</TableHead><TableHead>{t.detail.result}</TableHead><TableHead>{t.detail.level}</TableHead><TableHead>{t.detail.observation}</TableHead></TableRow></TableHeader>
           <TableBody>
