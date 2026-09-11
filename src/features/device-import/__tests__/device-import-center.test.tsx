@@ -79,7 +79,7 @@ vi.mock("@/features/syncs/sync-navigation", () => ({
 const downloadedGame = {
   summary: { gameId: 7, startedAt: "2026-09-10T12:00:00.000Z", durationSeconds: 40, totalPlayers: 1, deckName: "Demo" },
   players: [{ position: 1, uid: "p1", colorCode: "AM", name: "Jugador 1" }],
-  turns: [{ turnNumber: 1, playerUid: "p1", cardId: "card-1", correct: true, difficulty: "EASY", timestamp: 1, playTimeSeconds: 2 }],
+  turns: [{ turnNumber: 1, playerUid: "p1", cardId: "1DACCAD8A00000", correct: true, difficulty: "3102", timestamp: 1, playTimeSeconds: 2 }],
 };
 
 const uploadedGame = {
@@ -126,6 +126,7 @@ describe("DeviceImportCenter cable actions", () => {
     expect(screen.getAllByText(/10 .*2026/i).length).toBeGreaterThan(0);
 
     const deckNameInput = screen.getByLabelText("Nombre del mazo utilizado");
+    expect(deckNameInput).toHaveValue("3.1 Geometría | Fácil");
     fireEvent.change(deckNameInput, { target: { value: "Mazo personalizado" } });
 
     const deleteButton = screen.getByRole("button", { name: /Borrar 1 originales/ });
