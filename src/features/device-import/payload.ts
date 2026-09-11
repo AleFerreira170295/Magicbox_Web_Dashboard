@@ -66,7 +66,7 @@ export function buildRawSyncEnvelopes(deviceId: string, games: ImportedGame[], e
 
   return batch.games.map((gamePayload, index) => {
     const importedGame = games[index];
-    const startedAtMs = Date.parse(gamePayload.start_date);
+    const startedAtMs = Date.parse(importedGame.summary.sourceStartedAt || gamePayload.start_date);
     const stableStartedAt = Number.isFinite(startedAtMs) ? startedAtMs : 0;
     const syncSessionId = `cable:${normalizedDeviceId}:${gamePayload.game_id}:${stableStartedAt}`;
 
