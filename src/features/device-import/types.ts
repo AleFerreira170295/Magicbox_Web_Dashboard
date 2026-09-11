@@ -3,6 +3,7 @@ export type MagicBoxColorCode = "AM" | "NA" | "VE" | "VI" | "CI" | "MA" | string
 export interface DeviceGameSummary {
   gameId: number;
   startedAt: string;
+  sourceStartedAt?: string;
   durationSeconds: number;
   totalPlayers: number;
   deckName: string;

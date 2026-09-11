@@ -29,14 +29,24 @@ export function encodeProtocolCommand(command: ProtocolMessage) {
   return `${JSON.stringify(command)}\n`;
 }
 
-export function normalizeGameSummary(input: unknown): DeviceGameSummary | null {
+function resolveGameStartedAt(sourceStartedAt: string, durationSeconds: number, receivedAtMs: number) {
+  const isFirmwarePlaceholder = /^2024-01-01(?:[ T]00:00(?::00)?(?:\.000)?(?:Z)?)?$/u.test(sourceStartedAt.trim());
+  const parsed = Date.parse(sourceStartedAt);
+  if (!isFirmwarePlaceholder && Number.isFinite(parsed)) return new Date(parsed).toISOString();
+  return new Date(receivedAtMs - Math.max(0, durationSeconds) * 1000).toISOString();
+}
+
+export function normalizeGameSummary(input: unknown, receivedAtMs = Date.now()): DeviceGameSummary | null {
   const record = asRecord(input);
   const gameId = asNumber(record.gameId ?? record.game_id);
   if (gameId <= 0) return null;
+  const sourceStartedAt = asString(record.startedAt ?? record.start_date);
+  const durationSeconds = asNumber(record.duration ?? record.durationSeconds);
   return {
     gameId,
-    startedAt: asString(record.startedAt ?? record.start_date),
-    durationSeconds: asNumber(record.duration ?? record.durationSeconds),
+    startedAt: resolveGameStartedAt(sourceStartedAt, durationSeconds, receivedAtMs),
+    sourceStartedAt,
+    durationSeconds,
     totalPlayers: asNumber(record.totalPlayers),
     deckName: asString(record.deckName, "UNKNOWN"),
   };
@@ -54,10 +64,10 @@ export function normalizeDeviceInfo(input: unknown): MagicBoxDeviceInfo | null {
   };
 }
 
-export function buildDownloadedGame(messages: ProtocolMessage[]): DeviceGameDownload {
+export function buildDownloadedGame(messages: ProtocolMessage[], receivedAtMs = Date.now()): DeviceGameDownload {
   const metaMessage = messages.find((message) => message.type === "savedGameMeta");
   const startMessage = messages.find((message) => message.type === "savedGameTransferStart");
-  const summary = normalizeGameSummary({ ...startMessage, ...metaMessage });
+  const summary = normalizeGameSummary({ ...startMessage, ...metaMessage }, receivedAtMs);
   if (!summary) throw new Error("La MagicBox no informó un gameId válido.");
 
   const players: DeviceGamePlayer[] = messages
@@ -90,8 +100,8 @@ export function buildDownloadedGame(messages: ProtocolMessage[]): DeviceGameDown
   return { summary: { ...summary, totalPlayers: players.length }, players, turns };
 }
 
-export function turnDateFromGameStart(startedAt: string, timestampSeconds: number) {
+export function turnDateFromGameStart(startedAt: string, timestampMilliseconds: number) {
   const parsed = Date.parse(startedAt);
   const base = Number.isFinite(parsed) ? parsed : Date.now();
-  return new Date(base + Math.max(0, timestampSeconds) * 1000).toISOString();
+  return new Date(base + Math.max(0, timestampMilliseconds)).toISOString();
 }
