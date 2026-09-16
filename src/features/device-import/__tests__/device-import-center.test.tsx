@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import type { ReactNode } from "react";
+import { StrictMode, type ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DeviceImportCenter } from "@/features/device-import/device-import-center";
 
@@ -10,6 +10,8 @@ const mocks = vi.hoisted(() => ({
   downloadGame: vi.fn(),
   deleteGames: vi.fn(),
   disconnect: vi.fn(),
+  flashMagicBoxFirmware: vi.fn(),
+  unexpectedDisconnects: [] as Array<() => void>,
   uploadRawGameSync: vi.fn(),
   uploadGamesBatch: vi.fn(),
   invalidateQueries: vi.fn(),
@@ -33,6 +35,9 @@ vi.mock("@/features/auth/auth-context", () => ({
 vi.mock("@/features/device-import/web-serial", () => ({
   supportsWebSerial: () => true,
   MagicBoxSerialClient: class {
+    constructor(onUnexpectedDisconnect?: () => void) {
+      if (onUnexpectedDisconnect) mocks.unexpectedDisconnects.push(onUnexpectedDisconnect);
+    }
     connect = mocks.connect;
     getDeviceInfo = mocks.getDeviceInfo;
     listGames = mocks.listGames;
@@ -40,6 +45,17 @@ vi.mock("@/features/device-import/web-serial", () => ({
     deleteGames = mocks.deleteGames;
     disconnect = mocks.disconnect;
   },
+}));
+
+vi.mock("@/features/device-import/firmware-updater", () => ({
+  resolveCableFirmwareRelease: () => ({
+    downloadUrl: "/firmware.bin",
+    sha256: "a".repeat(64),
+    sizeBytes: 123,
+    version: "V2.3.22",
+    source: "bundled",
+  }),
+  flashMagicBoxFirmware: mocks.flashMagicBoxFirmware,
 }));
 
 vi.mock("@/features/devices/api", () => ({
@@ -102,6 +118,7 @@ describe("DeviceImportCenter cable actions", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.unexpectedDisconnects.length = 0;
     mocks.connect.mockResolvedValue(undefined);
     mocks.getDeviceInfo.mockResolvedValue({ deviceId: "AABBCCDDEEFF", firmwareVersion: "V2.3.22", hardware: "MagicBox V3" });
     mocks.listGames.mockResolvedValue([downloadedGame.summary]);
@@ -110,6 +127,7 @@ describe("DeviceImportCenter cable actions", () => {
     mocks.uploadGamesBatch.mockResolvedValue([uploadedGame]);
     mocks.deleteGames.mockResolvedValue(undefined);
     mocks.disconnect.mockResolvedValue(undefined);
+    mocks.flashMagicBoxFirmware.mockResolvedValue(undefined);
     mocks.invalidateQueries.mockResolvedValue(undefined);
   });
 
@@ -157,5 +175,110 @@ describe("DeviceImportCenter cable actions", () => {
 
     expect(await screen.findByRole("dialog", { name: "No hay partidas para sincronizar" })).toBeInTheDocument();
     expect(screen.getByText(/no tiene partidas guardadas internamente/i)).toBeInTheDocument();
+  });
+
+  it("keeps session guards active after Strict Mode replays mount effects", async () => {
+    render(<StrictMode><DeviceImportCenter /></StrictMode>);
+
+    fireEvent.click(screen.getByRole("button", { name: "Conectar" }));
+
+    await waitFor(() => expect(screen.getByLabelText("ID de la MagicBox")).toHaveValue("AABBCCDDEEFF"));
+    expect(screen.getByText("MagicBox Aula Norte")).toBeInTheDocument();
+  });
+
+  it("clears device A state before updating and connecting device B", async () => {
+    const deviceBGame = {
+      ...downloadedGame,
+      summary: { ...downloadedGame.summary, gameId: 8 },
+    };
+    mocks.getDeviceInfo
+      .mockResolvedValueOnce({ deviceId: "AABBCCDDEEFF", firmwareVersion: "V2.3.22", hardware: "MagicBox V3" })
+      .mockResolvedValueOnce({ deviceId: "112233445566", firmwareVersion: "V2.3.19", hardware: "MagicBox V2" });
+    mocks.listGames
+      .mockResolvedValueOnce([downloadedGame.summary])
+      .mockResolvedValueOnce([deviceBGame.summary]);
+    mocks.downloadGame
+      .mockResolvedValueOnce(downloadedGame)
+      .mockResolvedValueOnce(deviceBGame);
+
+    render(<DeviceImportCenter />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Conectar" }));
+    await screen.findByText("MagicBox Aula Norte");
+    fireEvent.click(screen.getByRole("button", { name: "Leer partidas" }));
+    expect((await screen.findAllByText("Partida #7")).length).toBeGreaterThan(0);
+
+    fireEvent.click(screen.getByRole("checkbox"));
+    fireEvent.click(screen.getByRole("button", { name: "Actualizar a V2.3.22" }));
+
+    await waitFor(() => expect(mocks.flashMagicBoxFirmware).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Conectar" })).toBeEnabled());
+    expect(screen.queryAllByText("Partida #7")).toHaveLength(0);
+    expect(screen.queryByText("MagicBox Aula Norte")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("ID de la MagicBox")).toHaveValue("");
+
+    fireEvent.click(screen.getByRole("button", { name: "Conectar" }));
+    await waitFor(() => expect(screen.getByLabelText("ID de la MagicBox")).toHaveValue("112233445566"));
+    expect(mocks.getDeviceInfo).toHaveBeenCalledTimes(2);
+    expect(screen.getAllByText("MagicBox V2 · V2.3.19").length).toBeGreaterThan(0);
+    expect(screen.queryByText("MagicBox V3 · V2.3.22")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Leer partidas" }));
+    expect((await screen.findAllByText("Partida #8")).length).toBeGreaterThan(0);
+    expect(screen.queryAllByText("Partida #7")).toHaveLength(0);
+
+    fireEvent.click(screen.getByRole("checkbox"));
+    fireEvent.click(screen.getByRole("button", { name: "Actualizar a V2.3.22" }));
+    await waitFor(() => expect(mocks.flashMagicBoxFirmware).toHaveBeenCalledTimes(2));
+    expect(mocks.disconnect).toHaveBeenCalledTimes(2);
+  });
+
+  it("recovers from a cable loss during update and ignores late progress from device A", async () => {
+    mocks.getDeviceInfo
+      .mockResolvedValueOnce({ deviceId: "AABBCCDDEEFF", firmwareVersion: "V2.3.22", hardware: "MagicBox V3" })
+      .mockResolvedValueOnce({ deviceId: "112233445566", firmwareVersion: "V2.3.22", hardware: "MagicBox V3" });
+    mocks.flashMagicBoxFirmware.mockImplementationOnce(async ({ onProgress }) => {
+      onProgress?.(52, "Escribiendo A…");
+      throw new Error("device has been lost");
+    });
+
+    render(<DeviceImportCenter />);
+    fireEvent.click(screen.getByRole("button", { name: "Conectar" }));
+    await screen.findByText("MagicBox Aula Norte");
+    fireEvent.click(screen.getByRole("checkbox"));
+    fireEvent.click(screen.getByRole("button", { name: "Actualizar a V2.3.22" }));
+
+    expect(await screen.findByRole("dialog", { name: "No se pudo actualizar el firmware" })).toBeInTheDocument();
+    expect(screen.getByText("device has been lost")).toBeInTheDocument();
+    expect(screen.queryByText("MagicBox Aula Norte")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Conectar" })).toBeEnabled();
+
+    fireEvent.click(screen.getByRole("button", { name: "Conectar" }));
+    await waitFor(() => expect(screen.getByLabelText("ID de la MagicBox")).toHaveValue("112233445566"));
+    const firstFlashOptions = mocks.flashMagicBoxFirmware.mock.calls[0][0];
+    firstFlashOptions.onProgress?.(99, "Progreso tardío de A");
+
+    expect(screen.queryByText("Progreso tardío de A")).not.toBeInTheDocument();
+    expect(screen.queryByRole("dialog", { name: "No se pudo actualizar el firmware" })).not.toBeInTheDocument();
+  });
+
+  it("clears the active session on physical disconnect and ignores its late read", async () => {
+    let resolveGames: ((value: (typeof downloadedGame.summary)[]) => void) | undefined;
+    mocks.listGames.mockImplementationOnce(() => new Promise((resolve) => { resolveGames = resolve; }));
+
+    render(<DeviceImportCenter />);
+    fireEvent.click(screen.getByRole("button", { name: "Conectar" }));
+    await screen.findByText("MagicBox Aula Norte");
+    fireEvent.click(screen.getByRole("button", { name: "Leer partidas" }));
+    expect(await screen.findByText("Leyendo")).toBeInTheDocument();
+
+    mocks.unexpectedDisconnects[0]();
+    await waitFor(() => expect(screen.getByRole("button", { name: "Conectar" })).toBeEnabled());
+    expect(screen.getByText("Desconectada")).toBeInTheDocument();
+    expect(screen.queryByText("MagicBox Aula Norte")).not.toBeInTheDocument();
+
+    resolveGames?.([downloadedGame.summary]);
+    await Promise.resolve();
+    expect(screen.queryAllByText("Partida #7")).toHaveLength(0);
+    expect(mocks.downloadGame).not.toHaveBeenCalled();
   });
 });

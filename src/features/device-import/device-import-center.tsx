@@ -58,6 +58,8 @@ export function DeviceImportCenter() {
     version: otaRelease.data.latestVersion,
   } : null);
   const clientRef = useRef<MagicBoxSerialClient | null>(null);
+  const sessionGenerationRef = useRef(0);
+  const mountedRef = useRef(true);
   const [phase, setPhase] = useState<Phase>("idle");
   const [deviceId, setDeviceId] = useState("");
   const [deviceInfo, setDeviceInfo] = useState<MagicBoxDeviceInfo | null>(null);
@@ -105,30 +107,79 @@ export function DeviceImportCenter() {
     setFeedback({ kind: "error", title, message: getErrorMessage(cause) });
   }
 
+  function isCurrentSession(generation: number, client?: MagicBoxSerialClient) {
+    return mountedRef.current
+      && sessionGenerationRef.current === generation
+      && (!client || clientRef.current === client);
+  }
+
+  function clearDeviceSession(status = "") {
+    setPhase("idle");
+    setDeviceId("");
+    setDeviceInfo(null);
+    setDeviceStatus(status);
+    setGames([]);
+    setSelectedGameId(null);
+    setGameView("players");
+    setUploadedGames([]);
+    setDeletedGameIds([]);
+    setIsDeleting(false);
+    setConfirmDeleteOpen(false);
+    setFeedback(null);
+    setFirmwareProgress(0);
+    setFirmwareStatus("");
+    setConfirmedV3(false);
+  }
+
   useEffect(() => {
+    mountedRef.current = true;
     return () => {
-      void clientRef.current?.disconnect();
+      mountedRef.current = false;
+      sessionGenerationRef.current += 1;
+      const client = clientRef.current;
       clientRef.current = null;
+      void client?.disconnect();
     };
   }, []);
 
   async function connect() {
-    setFeedback(null);
+    const generation = sessionGenerationRef.current + 1;
+    sessionGenerationRef.current = generation;
+    const previousClient = clientRef.current;
+    clientRef.current = null;
+    clearDeviceSession();
     setDeviceStatus("Conectando…");
+    if (previousClient) await previousClient.disconnect().catch(() => undefined);
+
+    const client = new MagicBoxSerialClient(() => {
+      if (!isCurrentSession(generation, client)) return;
+      sessionGenerationRef.current += 1;
+      clientRef.current = null;
+      clearDeviceSession("Desconectada");
+    });
+    clientRef.current = client;
     try {
-      const client = new MagicBoxSerialClient();
       await client.connect();
-      clientRef.current = client;
+      if (!isCurrentSession(generation, client)) {
+        await client.disconnect();
+        return;
+      }
       setPhase("connected");
       try {
         const info = await client.getDeviceInfo();
+        if (!isCurrentSession(generation, client)) return;
         setDeviceInfo(info);
         setDeviceId(info.deviceId);
         setDeviceStatus(`${info.hardware} · ${info.firmwareVersion} · ID detectado automáticamente`);
       } catch {
+        if (!isCurrentSession(generation, client)) return;
         setDeviceStatus("Conectada. Este firmware no informa el ID automáticamente; ingresalo manualmente o actualizá a V2.3.22.");
       }
     } catch (cause) {
+      if (!isCurrentSession(generation, client)) return;
+      clientRef.current = null;
+      await client.disconnect().catch(() => undefined);
+      clearDeviceSession();
       setDeviceStatus("");
       showError(cause, "No se pudo conectar la MagicBox");
     }
@@ -137,6 +188,7 @@ export function DeviceImportCenter() {
   async function importGames() {
     const client = clientRef.current;
     if (!client) return;
+    const generation = sessionGenerationRef.current;
     setFeedback(null);
     setGames([]);
     setSelectedGameId(null);
@@ -145,6 +197,7 @@ export function DeviceImportCenter() {
     setPhase("reading");
     try {
       const summaries = await client.listGames();
+      if (!isCurrentSession(generation, client)) return;
       const sortedSummaries = [...summaries].sort((a, b) => {
         const aTime = Date.parse(a.startedAt);
         const bTime = Date.parse(b.startedAt);
@@ -160,6 +213,7 @@ export function DeviceImportCenter() {
       for (const summary of sortedSummaries) {
         try {
           const game = await client.downloadGame(summary.gameId);
+          if (!isCurrentSession(generation, client)) return;
           const importedGame: ImportedGame = {
             ...game,
             summary: {
@@ -175,40 +229,47 @@ export function DeviceImportCenter() {
           failedGameIds.push(summary.gameId);
         }
       }
+      if (!isCurrentSession(generation, client)) return;
       if (failedGameIds.length > 0) {
         setFeedback({ kind: "error", title: "Lectura incompleta", message: `Se extrajeron ${downloaded.length} partidas. No se pudieron leer: ${failedGameIds.join(", ")}. Permanecen guardadas en la MagicBox.` });
       }
       setPhase(downloaded.length > 0 ? "ready" : "connected");
     } catch (cause) {
+      if (!isCurrentSession(generation, client)) return;
       showError(cause, "No se pudieron leer las partidas");
       setPhase("connected");
     }
   }
 
   async function disconnect() {
-    setFeedback(null);
+    const generation = sessionGenerationRef.current + 1;
+    sessionGenerationRef.current = generation;
+    const client = clientRef.current;
+    clientRef.current = null;
+    clearDeviceSession("Desconectada");
     try {
-      await clientRef.current?.disconnect();
+      await client?.disconnect();
     } catch (cause) {
-      showError(cause, "No se pudo desconectar la MagicBox");
-    } finally {
-      clientRef.current = null;
-      setPhase("idle");
-      setDeviceStatus("Desconectada");
+      if (mountedRef.current && sessionGenerationRef.current === generation) {
+        showError(cause, "No se pudo desconectar la MagicBox");
+      }
     }
   }
 
   async function updateFirmware() {
     const release = cableRelease;
     if (!confirmedV3) return;
-    setFeedback(null);
+    const generation = sessionGenerationRef.current + 1;
+    sessionGenerationRef.current = generation;
+    const client = clientRef.current;
+    clientRef.current = null;
+    clearDeviceSession();
     setIsUpdatingFirmware(true);
     setFirmwareProgress(0);
     setFirmwareStatus("Preparando actualización…");
     try {
-      await clientRef.current?.disconnect();
-      clientRef.current = null;
-      setPhase("idle");
+      await client?.disconnect();
+      if (!isCurrentSession(generation)) return;
       await flashMagicBoxFirmware({
         release: {
           downloadUrl: release.downloadUrl,
@@ -217,16 +278,19 @@ export function DeviceImportCenter() {
           version: release.version,
         },
         onProgress: (progress, message) => {
+          if (!isCurrentSession(generation)) return;
           setFirmwareProgress(progress);
           setFirmwareStatus(message);
         },
       });
+      if (!isCurrentSession(generation)) return;
       setFirmwareStatus(`Actualización ${release.version || "completada"}. Volvé a conectar la MagicBox para leer partidas.`);
     } catch (cause) {
+      if (!isCurrentSession(generation)) return;
       showError(cause, "No se pudo actualizar el firmware");
       setFirmwareStatus("La actualización no se completó. No desconectes la MagicBox hasta revisar el error.");
     } finally {
-      setIsUpdatingFirmware(false);
+      if (isCurrentSession(generation)) setIsUpdatingFirmware(false);
     }
   }
 
@@ -287,7 +351,9 @@ export function DeviceImportCenter() {
   }
 
   async function uploadGames() {
-    if (!tokens?.accessToken || !clientRef.current || games.length === 0) return;
+    const client = clientRef.current;
+    if (!tokens?.accessToken || !client || games.length === 0) return;
+    const generation = sessionGenerationRef.current;
     setFeedback(null);
     setPhase("uploading");
     try {
@@ -295,6 +361,7 @@ export function DeviceImportCenter() {
       const payload = buildGamesBatchPayload(deviceId, games, user?.educationalCenterId);
       for (const envelope of rawEnvelopes) await uploadRawGameSync(tokens.accessToken, envelope);
       const uploaded = await uploadGamesBatch(tokens.accessToken, payload);
+      if (!isCurrentSession(generation, client)) return;
       const uploadedByGameId = new Map(uploaded.map((game) => [game.gameId, game]));
       const missing = games.map((game) => game.summary.gameId).filter((gameId) => !uploadedByGameId.has(gameId));
       if (missing.length > 0) {
@@ -306,28 +373,34 @@ export function DeviceImportCenter() {
         queryClient.invalidateQueries({ queryKey: ["devices"] }),
         queryClient.invalidateQueries({ queryKey: ["syncs"] }),
       ]);
+      if (!isCurrentSession(generation, client)) return;
       setPhase("ready");
       setFeedback({ kind: "success", title: "Subida completada", message: `Las ${games.length} partidas quedaron cargadas en la cuenta. Los originales siguen guardados en la MagicBox hasta que elijas borrarlos.`, showGameLinks: true });
     } catch (cause) {
+      if (!isCurrentSession(generation, client)) return;
       showError(cause, "No se pudieron subir las partidas");
       setPhase("ready");
     }
   }
 
   async function deleteUploadedGames() {
-    if (!clientRef.current || !allGamesUploaded || games.length === 0) return;
+    const client = clientRef.current;
+    if (!client || !allGamesUploaded || games.length === 0) return;
+    const generation = sessionGenerationRef.current;
     setConfirmDeleteOpen(false);
     setFeedback(null);
     setIsDeleting(true);
     try {
       const gameIds = games.map((game) => game.summary.gameId);
-      await clientRef.current.deleteGames(gameIds);
+      await client.deleteGames(gameIds);
+      if (!isCurrentSession(generation, client)) return;
       setDeletedGameIds(gameIds);
       setFeedback({ kind: "success", title: "Borrado completado", message: `Se confirmó el borrado de ${gameIds.length} partidas originales en la MagicBox. Las copias cargadas en la cuenta permanecen disponibles.` });
     } catch (cause) {
+      if (!isCurrentSession(generation, client)) return;
       showError(cause, "No se pudieron borrar las partidas");
     } finally {
-      setIsDeleting(false);
+      if (isCurrentSession(generation, client)) setIsDeleting(false);
     }
   }
 
@@ -370,7 +443,7 @@ export function DeviceImportCenter() {
         <CardContent className="space-y-3">
           <div className="flex flex-wrap items-end gap-3">
             <div className="min-w-64 flex-1"><label className="text-sm font-medium" htmlFor="magicbox-device-id">ID de la MagicBox</label><Input id="magicbox-device-id" className="mt-2 font-mono" value={deviceId} onChange={(event) => setDeviceId(cleanDeviceId(event.target.value))} placeholder="AABBCCDDEEFF" maxLength={12} /></div>
-            <Button onClick={connect} disabled={!supported || phase !== "idle"}><Cable className="size-4" />Conectar</Button>
+            <Button onClick={connect} disabled={!supported || phase !== "idle" || isUpdatingFirmware}><Cable className="size-4" />Conectar</Button>
             <Button onClick={importGames} disabled={phase !== "connected"}><Download className="size-4" />Leer partidas</Button>
             <Button variant="outline" onClick={disconnect} disabled={phase === "idle" || phase === "reading" || phase === "uploading"}><Power className="size-4" />Desconectar</Button>
             {phase === "reading" ? <Badge><LoaderCircle className="mr-1 size-3 animate-spin" />Leyendo</Badge> : null}
