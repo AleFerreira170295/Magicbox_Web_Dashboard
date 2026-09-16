@@ -18,7 +18,7 @@ import { ImportedGameCharts } from "@/features/device-import/imported-game-chart
 import { SyncNavigation } from "@/features/syncs/sync-navigation";
 import type { ImportedGame, MagicBoxDeviceInfo, ParticipantTarget } from "@/features/device-import/types";
 import { MagicBoxSerialClient, supportsWebSerial } from "@/features/device-import/web-serial";
-import { useDevices } from "@/features/devices/api";
+import { useDeviceByDeviceId, useDevices } from "@/features/devices/api";
 import { uploadGamesBatch, uploadRawGameSync } from "@/features/games/api";
 import { buildGameDetailHref, buildGamesOverviewHref } from "@/features/games/game-route";
 import type { GameRecord } from "@/features/games/types";
@@ -89,14 +89,29 @@ export function DeviceImportCenter() {
   const selectedGame = selectedIndex >= 0 ? games[selectedIndex] : games[0] ?? null;
   const normalizedDeviceId = cleanDeviceId(deviceId);
   const validDeviceId = normalizedDeviceId.length === 12;
+  const exactDeviceQuery = useDeviceByDeviceId(tokens?.accessToken, validDeviceId ? normalizedDeviceId : undefined);
   const matchedDevice = useMemo(
-    () => devicesQuery.data?.data.find((device) => cleanDeviceId(device.deviceId) === normalizedDeviceId) ?? null,
-    [devicesQuery.data?.data, normalizedDeviceId],
+    () => exactDeviceQuery.data
+      ?? devicesQuery.data?.data.find((device) => cleanDeviceId(device.deviceId) === normalizedDeviceId)
+      ?? null,
+    [devicesQuery.data?.data, exactDeviceQuery.data, normalizedDeviceId],
   );
-  const institutionName = matchedDevice?.educationalCenterName
-    || institutionsQuery.data?.data.find((institution) => institution.id === (matchedDevice?.educationalCenterId || user?.educationalCenterId))?.name
-    || (matchedDevice?.assignmentScope === "home" ? "Home" : "Sin institución registrada");
-  const ownerName = matchedDevice?.ownerUserName || matchedDevice?.ownerUserEmail || "Sin owner registrado";
+  const deviceRecordUnavailable = validDeviceId && exactDeviceQuery.isError && !matchedDevice;
+  const deviceRecordLoading = validDeviceId && exactDeviceQuery.isLoading && !matchedDevice;
+  const institutionName = matchedDevice
+    ? matchedDevice.assignmentScope === "home"
+      ? "Home"
+      : matchedDevice.educationalCenterName
+        || institutionsQuery.data?.data.find((institution) => institution.id === matchedDevice.educationalCenterId)?.name
+        || "Sin institución registrada"
+    : deviceRecordLoading
+      ? "Consultando registro…"
+      : deviceRecordUnavailable
+        ? "No disponible para esta cuenta"
+        : "Sin institución registrada";
+  const ownerName = matchedDevice?.ownerUserName
+    || matchedDevice?.ownerUserEmail
+    || (deviceRecordLoading ? "Consultando registro…" : deviceRecordUnavailable ? "No disponible para esta cuenta" : "Sin owner registrado");
   const deviceDisplayName = matchedDevice?.name
     || (normalizedDeviceId ? `MagicBox ${normalizedDeviceId.slice(-6)}` : "MagicBox sin identificar");
   const uploadedGameIds = useMemo(() => new Set(uploadedGames.map((game) => game.gameId)), [uploadedGames]);

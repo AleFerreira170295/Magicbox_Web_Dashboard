@@ -50,6 +50,7 @@ export const apiEndpoints = {
   devices: {
     list: "/ble-device",
     byId: (id: string) => `/ble-device/${id}`,
+    byDeviceId: (deviceId: string) => `/ble-device/device-id/${deviceId}`,
   },
   games: {
     list: "/game-data/",
