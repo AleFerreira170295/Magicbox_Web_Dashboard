@@ -7,6 +7,8 @@ interface SerialPortLike {
   open(options: { baudRate: number }): Promise<void>;
   close(): Promise<void>;
   setSignals?(signals: { dataTerminalReady?: boolean; requestToSend?: boolean }): Promise<void>;
+  addEventListener?(type: "disconnect", listener: () => void): void;
+  removeEventListener?(type: "disconnect", listener: () => void): void;
 }
 
 interface SerialNavigatorLike {
@@ -35,42 +37,83 @@ export class MagicBoxSerialClient {
     timer: ReturnType<typeof setTimeout>;
   }> = [];
   private readError: Error | null = null;
+  private disconnectPromise: Promise<void> | null = null;
+
+  constructor(private readonly onUnexpectedDisconnect?: () => void) {}
+
+  private readonly handleUnexpectedDisconnect = () => {
+    if (!this.port) return;
+    this.onUnexpectedDisconnect?.();
+    void this.disconnect().catch(() => undefined);
+  };
 
   async connect() {
     const serial = serialApi();
     if (!serial) throw new Error("Web Serial no está disponible en este navegador.");
-    this.port = await serial.requestPort();
-    await this.port.open({ baudRate: 115200 });
-    if (this.port.setSignals) {
-      // Recover transparently if a previous update left the ESP32 in its
-      // bootloader: IO0 high plus a short EN pulse starts the application.
-      await this.port.setSignals({ dataTerminalReady: false, requestToSend: true });
-      await new Promise((resolve) => setTimeout(resolve, 120));
-      await this.port.setSignals({ dataTerminalReady: false, requestToSend: false });
-    }
-    if (!this.port.readable || !this.port.writable) throw new Error("El puerto serie no quedó disponible.");
-    this.reader = this.port.readable.getReader();
-    this.writer = this.port.writable.getWriter();
-    this.readLoop = this.pumpMessages();
+    if (this.port || this.disconnectPromise) await this.disconnect();
+    this.buffer = "";
+    this.pendingMessages = [];
+    this.readError = null;
 
-    // Opening an ESP32 serial port can reset the board through DTR/RTS. Give
-    // the firmware enough time to mount LittleFS before the first command.
-    await new Promise((resolve) => setTimeout(resolve, 1_500));
+    const port = await serial.requestPort();
+    this.port = port;
+    port.addEventListener?.("disconnect", this.handleUnexpectedDisconnect);
+    try {
+      await port.open({ baudRate: 115200 });
+      if (port.setSignals) {
+        // Recover transparently if a previous update left the ESP32 in its
+        // bootloader: IO0 high plus a short EN pulse starts the application.
+        await port.setSignals({ dataTerminalReady: false, requestToSend: true });
+        await new Promise((resolve) => setTimeout(resolve, 120));
+        await port.setSignals({ dataTerminalReady: false, requestToSend: false });
+      }
+      if (!port.readable || !port.writable) throw new Error("El puerto serie no quedó disponible.");
+      this.reader = port.readable.getReader();
+      this.writer = port.writable.getWriter();
+      this.readLoop = this.pumpMessages();
+
+      // Opening an ESP32 serial port can reset the board through DTR/RTS. Give
+      // the firmware enough time to mount LittleFS before the first command.
+      await new Promise((resolve) => setTimeout(resolve, 1_500));
+    } catch (cause) {
+      await this.disconnect().catch(() => undefined);
+      throw cause;
+    }
   }
 
   async disconnect() {
-    try { await this.reader?.cancel(); } catch { /* noop */ }
-    try { await this.readLoop; } catch { /* surfaced through pending waiters */ }
-    try { this.reader?.releaseLock(); } catch { /* noop */ }
-    try { this.writer?.releaseLock(); } catch { /* noop */ }
+    if (this.disconnectPromise) return this.disconnectPromise;
+    const operation = this.performDisconnect();
+    this.disconnectPromise = operation;
+    try {
+      await operation;
+    } finally {
+      if (this.disconnectPromise === operation) this.disconnectPromise = null;
+    }
+  }
+
+  private async performDisconnect() {
+    const port = this.port;
+    const reader = this.reader;
+    const writer = this.writer;
+    const readLoop = this.readLoop;
+    port?.removeEventListener?.("disconnect", this.handleUnexpectedDisconnect);
+    this.port = null;
     this.reader = null;
     this.writer = null;
     this.readLoop = null;
     this.readError = null;
+    this.buffer = "";
     this.pendingMessages = [];
     this.rejectWaiters(new Error("La conexión serie se cerró."));
-    if (this.port) await this.port.close();
-    this.port = null;
+    try { await reader?.cancel(); } catch { /* noop */ }
+    try { await readLoop; } catch { /* surfaced through pending waiters */ }
+    try { reader?.releaseLock(); } catch { /* noop */ }
+    try { writer?.releaseLock(); } catch { /* noop */ }
+    this.readError = null;
+    this.buffer = "";
+    this.pendingMessages = [];
+    if (port) await port.close();
   }
 
   private async send(command: ProtocolMessage) {
