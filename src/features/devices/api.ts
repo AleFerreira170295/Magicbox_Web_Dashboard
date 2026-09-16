@@ -42,6 +42,11 @@ export async function listDevices(token: string) {
   } as PaginatedResponse<DeviceRecord>;
 }
 
+export async function getDeviceByDeviceId(token: string, deviceId: string) {
+  const response = await apiRequest<unknown>(apiEndpoints.devices.byDeviceId(deviceId), { token });
+  return normalizeDevice(response);
+}
+
 export async function updateDevice(token: string, deviceId: string, payload: UpdateDevicePayload) {
   const response = await apiRequest<unknown>(apiEndpoints.devices.byId(deviceId), {
     method: "PATCH",
@@ -70,5 +75,15 @@ export function useDevices(token?: string) {
     queryKey: ["devices", token],
     queryFn: () => listDevices(token as string),
     enabled: Boolean(token),
+  });
+}
+
+export function useDeviceByDeviceId(token?: string, deviceId?: string) {
+  const normalizedDeviceId = String(deviceId || "").replace(/[^a-fA-F0-9]/g, "").toUpperCase();
+  return useQuery({
+    queryKey: ["devices", "device-id", normalizedDeviceId, token],
+    queryFn: () => getDeviceByDeviceId(token as string, normalizedDeviceId),
+    enabled: Boolean(token) && normalizedDeviceId.length === 12,
+    retry: false,
   });
 }

@@ -15,6 +15,7 @@ const mocks = vi.hoisted(() => ({
   uploadRawGameSync: vi.fn(),
   uploadGamesBatch: vi.fn(),
   invalidateQueries: vi.fn(),
+  useDeviceByDeviceId: vi.fn(),
 }));
 
 vi.mock("@tanstack/react-query", () => ({
@@ -60,6 +61,7 @@ vi.mock("@/features/device-import/firmware-updater", () => ({
 
 vi.mock("@/features/devices/api", () => ({
   useDevices: () => ({ data: { data: [{ id: "device-record-1", deviceId: "AABBCCDDEEFF", name: "MagicBox Aula Norte", educationalCenterId: "institution-1", educationalCenterName: "Colegio Demo", assignmentScope: "institution", ownerUserId: "user-1", ownerUserName: "Ana Admin", ownerUserEmail: "ana@example.com", firmwareVersion: "V2.3.22", status: "online", deviceMetadata: {}, raw: {} }] } }),
+  useDeviceByDeviceId: mocks.useDeviceByDeviceId,
 }));
 
 vi.mock("@/features/institutions/api", () => ({
@@ -129,6 +131,25 @@ describe("DeviceImportCenter cable actions", () => {
     mocks.disconnect.mockResolvedValue(undefined);
     mocks.flashMagicBoxFirmware.mockResolvedValue(undefined);
     mocks.invalidateQueries.mockResolvedValue(undefined);
+    mocks.useDeviceByDeviceId.mockImplementation((_token: string | undefined, deviceId: string | undefined) => ({
+      data: deviceId === "AABBCCDDEEFF" ? {
+        id: "device-record-1",
+        deviceId: "AABBCCDDEEFF",
+        name: "MagicBox Aula Norte",
+        educationalCenterId: "institution-1",
+        educationalCenterName: "Colegio Demo",
+        assignmentScope: "institution",
+        ownerUserId: "user-1",
+        ownerUserName: "Ana Admin",
+        ownerUserEmail: "ana@example.com",
+        firmwareVersion: "V2.3.22",
+        status: "online",
+        deviceMetadata: {},
+        raw: {},
+      } : undefined,
+      isLoading: false,
+      isError: false,
+    }));
   });
 
   it("shows device/game metadata and keeps upload and deletion as separate popup-confirmed actions", async () => {
@@ -163,6 +184,39 @@ describe("DeviceImportCenter cable actions", () => {
     fireEvent.click(screen.getByRole("button", { name: "Borrar originales" }));
     expect(await screen.findByRole("dialog", { name: "Borrado completado" })).toBeInTheDocument();
     expect(mocks.deleteGames).toHaveBeenCalledWith([7]);
+  });
+
+  it("loads the authoritative device record by the fresh USB ID even when it is outside the first list page", async () => {
+    mocks.getDeviceInfo.mockResolvedValue({ deviceId: "CC88311D16F0", firmwareVersion: "V2.3.22", hardware: "V3" });
+    mocks.useDeviceByDeviceId.mockImplementation((_token: string | undefined, deviceId: string | undefined) => ({
+      data: deviceId === "CC88311D16F0" ? {
+        id: "caracal-record",
+        deviceId: "CC88311D16F0",
+        name: "Caracal205",
+        educationalCenterId: null,
+        educationalCenterName: null,
+        assignmentScope: "home",
+        ownerUserId: "owner-205",
+        ownerUserName: "Owner Caracal",
+        ownerUserEmail: "owner@example.com",
+        firmwareVersion: "V2.3.14",
+        status: "offline",
+        deviceMetadata: {},
+        raw: {},
+      } : undefined,
+      isLoading: false,
+      isError: false,
+    }));
+
+    render(<DeviceImportCenter />);
+    fireEvent.click(screen.getByRole("button", { name: "Conectar" }));
+
+    expect(await screen.findByText("Caracal205")).toBeInTheDocument();
+    expect(screen.getByText("Owner Caracal")).toBeInTheDocument();
+    expect(screen.getByText("Home")).toBeInTheDocument();
+    expect(screen.getByLabelText("ID de la MagicBox")).toHaveValue("CC88311D16F0");
+    expect(mocks.useDeviceByDeviceId).toHaveBeenLastCalledWith("token", "CC88311D16F0");
+    expect(screen.queryByText("Sin owner registrado")).not.toBeInTheDocument();
   });
 
   it("shows an immediate modal when the connected device has no saved games", async () => {
