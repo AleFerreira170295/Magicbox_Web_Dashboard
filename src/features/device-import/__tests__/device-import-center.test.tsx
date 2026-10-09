@@ -262,7 +262,7 @@ describe("DeviceImportCenter cable actions", () => {
     fireEvent.click(screen.getByRole("button", { name: "Leer partidas" }));
     expect((await screen.findAllByText("Partida #7")).length).toBeGreaterThan(0);
 
-    fireEvent.click(screen.getByRole("checkbox"));
+    fireEvent.click(screen.getByRole("checkbox", { name: /Confirmo que es una MagicBox V3/i }));
     fireEvent.click(screen.getByRole("button", { name: "Actualizar a V2.3.22" }));
 
     await waitFor(() => expect(mocks.flashMagicBoxFirmware).toHaveBeenCalledTimes(1));
@@ -280,7 +280,7 @@ describe("DeviceImportCenter cable actions", () => {
     expect((await screen.findAllByText("Partida #8")).length).toBeGreaterThan(0);
     expect(screen.queryAllByText("Partida #7")).toHaveLength(0);
 
-    fireEvent.click(screen.getByRole("checkbox"));
+    fireEvent.click(screen.getByRole("checkbox", { name: /Confirmo que es una MagicBox V3/i }));
     fireEvent.click(screen.getByRole("button", { name: "Actualizar a V2.3.22" }));
     await waitFor(() => expect(mocks.flashMagicBoxFirmware).toHaveBeenCalledTimes(2));
     expect(mocks.disconnect).toHaveBeenCalledTimes(2);
@@ -298,7 +298,7 @@ describe("DeviceImportCenter cable actions", () => {
     render(<DeviceImportCenter />);
     fireEvent.click(screen.getByRole("button", { name: "Conectar" }));
     await screen.findByText("MagicBox Aula Norte");
-    fireEvent.click(screen.getByRole("checkbox"));
+    fireEvent.click(screen.getByRole("checkbox", { name: /Confirmo que es una MagicBox V3/i }));
     fireEvent.click(screen.getByRole("button", { name: "Actualizar a V2.3.22" }));
 
     expect(await screen.findByRole("dialog", { name: "No se pudo actualizar el firmware" })).toBeInTheDocument();

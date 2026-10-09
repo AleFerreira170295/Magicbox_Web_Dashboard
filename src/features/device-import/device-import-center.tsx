@@ -115,8 +115,17 @@ export function DeviceImportCenter() {
   const deviceDisplayName = matchedDevice?.name
     || (normalizedDeviceId ? `MagicBox ${normalizedDeviceId.slice(-6)}` : "MagicBox sin identificar");
   const uploadedGameIds = useMemo(() => new Set(uploadedGames.map((game) => game.gameId)), [uploadedGames]);
-  const allGamesUploaded = games.length > 0 && games.every((game) => uploadedGameIds.has(game.summary.gameId));
-  const allGamesDeleted = games.length > 0 && games.every((game) => deletedGameIds.includes(game.summary.gameId));
+
+  const [selectedGameIds, setSelectedGameIds] = useState<number[]>([]);
+
+  const selectedGames = useMemo(
+    () => games.filter((game) => selectedGameIds.includes(game.summary.gameId)),
+    [games, selectedGameIds],
+  );
+  const selectedGameIdSet = useMemo(() => new Set(selectedGameIds), [selectedGameIds]);
+
+  const allSelectedGamesUploaded = selectedGames.length > 0 && selectedGames.every((game) => uploadedGameIds.has(game.summary.gameId));
+  const allSelectedGamesDeleted = selectedGames.length > 0 && selectedGames.every((game) => deletedGameIds.includes(game.summary.gameId));
 
   function showError(cause: unknown, title = "No se pudo completar la acción") {
     setFeedback({ kind: "error", title, message: getErrorMessage(cause) });
@@ -135,6 +144,7 @@ export function DeviceImportCenter() {
     setDeviceStatus(status);
     setGames([]);
     setSelectedGameId(null);
+    setSelectedGameIds([]);
     setGameView("players");
     setUploadedGames([]);
     setDeletedGameIds([]);
@@ -248,6 +258,7 @@ export function DeviceImportCenter() {
       if (failedGameIds.length > 0) {
         setFeedback({ kind: "error", title: "Lectura incompleta", message: `Se extrajeron ${downloaded.length} partidas. No se pudieron leer: ${failedGameIds.join(", ")}. Permanecen guardadas en la MagicBox.` });
       }
+      setSelectedGameIds(downloaded.map((game) => game.summary.gameId));
       setPhase(downloaded.length > 0 ? "ready" : "connected");
     } catch (cause) {
       if (!isCurrentSession(generation, client)) return;
@@ -367,22 +378,32 @@ export function DeviceImportCenter() {
 
   async function uploadGames() {
     const client = clientRef.current;
-    if (!tokens?.accessToken || !client || games.length === 0) return;
+    if (!tokens?.accessToken || !client || selectedGames.length === 0) return;
     const generation = sessionGenerationRef.current;
     setFeedback(null);
     setPhase("uploading");
     try {
-      const rawEnvelopes = buildRawSyncEnvelopes(deviceId, games, user?.educationalCenterId);
-      const payload = buildGamesBatchPayload(deviceId, games, user?.educationalCenterId);
+      const educationalCenterId = matchedDevice?.educationalCenterId ?? user?.educationalCenterId;
+      const rawEnvelopes = buildRawSyncEnvelopes(deviceId, selectedGames, educationalCenterId);
+      const payload = buildGamesBatchPayload(deviceId, selectedGames, educationalCenterId);
       for (const envelope of rawEnvelopes) await uploadRawGameSync(tokens.accessToken, envelope);
       const uploaded = await uploadGamesBatch(tokens.accessToken, payload);
       if (!isCurrentSession(generation, client)) return;
       const uploadedByGameId = new Map(uploaded.map((game) => [game.gameId, game]));
-      const missing = games.map((game) => game.summary.gameId).filter((gameId) => !uploadedByGameId.has(gameId));
+      const missing = selectedGames.map((game) => game.summary.gameId).filter((gameId) => !uploadedByGameId.has(gameId));
       if (missing.length > 0) {
         throw new Error(`El servidor no confirmó las partidas ${missing.join(", ")}. Las partidas permanecen guardadas en la MagicBox.`);
       }
-      setUploadedGames(games.map((game) => uploadedByGameId.get(game.summary.gameId) as GameRecord));
+
+      setUploadedGames((current) => {
+        const byId = new Map(current.map((game) => [game.gameId, game] as const));
+        for (const game of selectedGames) {
+          const uploadedGame = uploadedByGameId.get(game.summary.gameId);
+          if (uploadedGame) byId.set(uploadedGame.gameId, uploadedGame);
+        }
+        return [...byId.values()];
+      });
+
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["games"] }),
         queryClient.invalidateQueries({ queryKey: ["devices"] }),
@@ -390,7 +411,12 @@ export function DeviceImportCenter() {
       ]);
       if (!isCurrentSession(generation, client)) return;
       setPhase("ready");
-      setFeedback({ kind: "success", title: "Subida completada", message: `Las ${games.length} partidas quedaron cargadas en la cuenta. Los originales siguen guardados en la MagicBox hasta que elijas borrarlos.`, showGameLinks: true });
+      setFeedback({
+        kind: "success",
+        title: "Subida completada",
+        message: `Las ${selectedGames.length} partidas seleccionadas quedaron cargadas en la cuenta. Los originales siguen guardados en la MagicBox hasta que elijas borrarlos.`,
+        showGameLinks: true,
+      });
     } catch (cause) {
       if (!isCurrentSession(generation, client)) return;
       showError(cause, "No se pudieron subir las partidas");
@@ -400,16 +426,16 @@ export function DeviceImportCenter() {
 
   async function deleteUploadedGames() {
     const client = clientRef.current;
-    if (!client || !allGamesUploaded || games.length === 0) return;
+    if (!client || !allSelectedGamesUploaded || selectedGames.length === 0) return;
     const generation = sessionGenerationRef.current;
     setConfirmDeleteOpen(false);
     setFeedback(null);
     setIsDeleting(true);
     try {
-      const gameIds = games.map((game) => game.summary.gameId);
+      const gameIds = selectedGames.map((game) => game.summary.gameId);
       await client.deleteGames(gameIds);
       if (!isCurrentSession(generation, client)) return;
-      setDeletedGameIds(gameIds);
+      setDeletedGameIds((current) => Array.from(new Set([...current, ...gameIds])));
       setFeedback({ kind: "success", title: "Borrado completado", message: `Se confirmó el borrado de ${gameIds.length} partidas originales en la MagicBox. Las copias cargadas en la cuenta permanecen disponibles.` });
     } catch (cause) {
       if (!isCurrentSession(generation, client)) return;
@@ -417,6 +443,10 @@ export function DeviceImportCenter() {
     } finally {
       if (isCurrentSession(generation, client)) setIsDeleting(false);
     }
+  }
+
+  function toggleSelectedGame(gameId: number) {
+    setSelectedGameIds((current) => current.includes(gameId) ? current.filter((id) => id !== gameId) : [...current, gameId]);
   }
 
   function selectRelativeGame(offset: number) {
@@ -440,7 +470,7 @@ export function DeviceImportCenter() {
       </Modal>
       <Modal open={confirmDeleteOpen} onClose={() => setConfirmDeleteOpen(false)} title="Confirmar borrado" description="Esta acción elimina los originales del almacenamiento de la MagicBox." className="max-w-xl">
         <div className="space-y-5">
-          <div className="rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm leading-6 text-amber-900">Las {games.length} partidas ya fueron confirmadas por el servidor. ¿Querés borrar ahora sus originales de {deviceDisplayName}?</div>
+          <div className="rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm leading-6 text-amber-900">Las {selectedGames.length} partidas seleccionadas ya fueron confirmadas por el servidor. ¿Querés borrar ahora sus originales de {deviceDisplayName}?</div>
           <div className="flex justify-end gap-2"><Button variant="outline" onClick={() => setConfirmDeleteOpen(false)}>Cancelar</Button><Button variant="destructive" onClick={deleteUploadedGames}><Trash2 className="size-4" />Borrar originales</Button></div>
         </div>
       </Modal>
@@ -482,15 +512,45 @@ export function DeviceImportCenter() {
         </CardContent>
       </Card>
 
-      {games.length > 0 ? <Card id="cable-upload" className="scroll-mt-28 border-primary/30 bg-primary/5"><CardHeader><CardTitle className="flex items-center gap-2"><UploadCloud className="size-5" />Subir y administrar originales</CardTitle><CardDescription>La subida y el borrado son acciones separadas. Primero se confirma la copia en el servidor; después podés decidir cuándo borrar los originales de la MagicBox.</CardDescription></CardHeader><CardContent className="space-y-3"><div className="flex flex-wrap items-center gap-3"><Button onClick={uploadGames} disabled={phase !== "ready" || !validDeviceId || isDeleting}><UploadCloud className="size-4" />Subir {games.length} partidas</Button><Button variant="destructive" onClick={() => setConfirmDeleteOpen(true)} disabled={!allGamesUploaded || allGamesDeleted || phase === "uploading" || isDeleting}><Trash2 className="size-4" />{isDeleting ? "Borrando…" : allGamesDeleted ? "Originales borrados" : `Borrar ${games.length} originales`}</Button>{phase === "uploading" ? <span className="text-sm text-muted-foreground"><LoaderCircle className="mr-1 inline size-4 animate-spin" />Subiendo…</span> : null}</div>{!validDeviceId ? <p className="text-sm text-amber-700">Falta un ID válido de 12 caracteres para vincular las partidas.</p> : null}{!allGamesUploaded ? <p className="text-sm text-muted-foreground">El borrado se habilita cuando el servidor confirma todas las partidas.</p> : <p className="text-sm text-emerald-700">Carga confirmada. Los originales siguen en la MagicBox hasta que pulses borrar.</p>}</CardContent></Card> : null}
+      {games.length > 0 ? <Card id="cable-upload" className="scroll-mt-28 border-primary/30 bg-primary/5"><CardHeader><CardTitle className="flex items-center gap-2"><UploadCloud className="size-5" />Subir y administrar originales</CardTitle><CardDescription>La subida y el borrado son acciones separadas. Primero se confirma la copia en el servidor; después podés decidir cuándo borrar los originales de la MagicBox.</CardDescription></CardHeader><CardContent className="space-y-3"><div className="flex flex-wrap items-center gap-3"><Button onClick={uploadGames} disabled={phase !== "ready" || !validDeviceId || isDeleting || selectedGames.length === 0}><UploadCloud className="size-4" />Subir {selectedGames.length} partidas</Button><Button variant="destructive" onClick={() => setConfirmDeleteOpen(true)} disabled={!allSelectedGamesUploaded || allSelectedGamesDeleted || phase === "uploading" || isDeleting}><Trash2 className="size-4" />{isDeleting ? "Borrando…" : allSelectedGamesDeleted ? "Originales borrados" : `Borrar ${selectedGames.length} originales`}</Button>{phase === "uploading" ? <span className="text-sm text-muted-foreground"><LoaderCircle className="mr-1 inline size-4 animate-spin" />Subiendo…</span> : null}</div>{!validDeviceId ? <p className="text-sm text-amber-700">Falta un ID válido de 12 caracteres para vincular las partidas.</p> : null}{!allSelectedGamesUploaded ? <p className="text-sm text-muted-foreground">El borrado se habilita cuando el servidor confirma todas las partidas seleccionadas.</p> : <p className="text-sm text-emerald-700">Carga confirmada para la selección. Los originales siguen en la MagicBox hasta que pulses borrar.</p>}</CardContent></Card> : null}
 
       {selectedGame ? (
         <>
         <div id="cable-games" className="grid scroll-mt-28 gap-4 lg:grid-cols-[280px_minmax(0,1fr)] lg:items-start">
           <Card className="h-fit lg:sticky lg:top-24">
-            <CardHeader><CardTitle className="flex items-center gap-2"><List className="size-5" />Partidas extraídas</CardTitle><CardDescription>{games.length} disponibles para revisar</CardDescription></CardHeader>
+            <CardHeader><CardTitle className="flex items-center gap-2"><List className="size-5" />Partidas extraídas</CardTitle><CardDescription>{games.length} disponibles para revisar · {selectedGames.length} seleccionadas</CardDescription></CardHeader>
             <CardContent className="max-h-[calc(100vh-14rem)] space-y-2 overflow-y-auto pr-3">
-              {games.map((game, index) => <button key={game.summary.gameId} type="button" onClick={() => setSelectedGameId(game.summary.gameId)} className={`w-full rounded-xl border p-3 text-left transition ${game.summary.gameId === selectedGame.summary.gameId ? "border-primary bg-primary/5" : "hover:bg-muted/60"}`}><div className="flex items-center justify-between gap-2"><span className="font-medium">Partida #{game.summary.gameId}</span><Badge variant="outline">{index + 1}</Badge></div><p className="mt-1 text-xs font-medium">{formatGameDate(game.summary.startedAt)}</p><p className="mt-1 text-xs text-muted-foreground">{game.summary.deckName} · {game.players.length} jugadores · {game.turns.length} turnos</p><p className="mt-2 text-xs text-muted-foreground">{deviceDisplayName} · {institutionName} · {ownerName}</p></button>)}
+              {games.map((game, index) => (
+                <div
+                  key={game.summary.gameId}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => setSelectedGameId(game.summary.gameId)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") setSelectedGameId(game.summary.gameId);
+                  }}
+                  className={`w-full rounded-xl border p-3 text-left transition ${game.summary.gameId === selectedGame.summary.gameId ? "border-primary bg-primary/5" : "hover:bg-muted/60"}`}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <label className="mt-0.5 flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={selectedGameIdSet.has(game.summary.gameId)}
+                        onClick={(event) => event.stopPropagation()}
+                        onChange={() => toggleSelectedGame(game.summary.gameId)}
+                        aria-label={`Seleccionar partida ${game.summary.gameId}`}
+                      />
+                      <span className="sr-only">Seleccionar</span>
+                    </label>
+                    <Badge variant="outline">{index + 1}</Badge>
+                  </div>
+
+                  <p className="mt-2 font-medium">Partida #{game.summary.gameId}</p>
+                  <p className="mt-1 text-xs font-medium">{formatGameDate(game.summary.startedAt)}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">{game.summary.deckName} · {game.players.length} jugadores · {game.turns.length} turnos</p>
+                  <p className="mt-2 text-xs text-muted-foreground">{deviceDisplayName} · {institutionName} · {ownerName}</p>
+                </div>
+              ))}
             </CardContent>
           </Card>
 
@@ -498,7 +558,7 @@ export function DeviceImportCenter() {
             <CardHeader>
               <div className="flex flex-wrap items-start justify-between gap-3"><div><CardTitle>Partida #{selectedGame.summary.gameId}</CardTitle><CardDescription>{selectedGame.summary.deckName} · {selectedGame.players.length} jugadores · {selectedGame.turns.length} turnos{selectedGame.turns.length === 0 ? " · finalizada sin jugadas" : ""}</CardDescription></div><div className="flex items-center gap-2"><Button size="sm" className="size-9 p-0" variant="outline" aria-label="Partida anterior" onClick={() => selectRelativeGame(-1)} disabled={selectedIndex <= 0}><ChevronLeft className="size-4" /></Button><span className="text-sm text-muted-foreground">{selectedIndex + 1} de {games.length}</span><Button size="sm" className="size-9 p-0" variant="outline" aria-label="Partida siguiente" onClick={() => selectRelativeGame(1)} disabled={selectedIndex >= games.length - 1}><ChevronRight className="size-4" /></Button></div></div>
               <div className="mt-4 grid gap-3 rounded-xl border bg-muted/20 p-3 text-sm sm:grid-cols-2 lg:grid-cols-4"><div><p className="text-xs text-muted-foreground">Fecha</p><p className="font-medium">{formatGameDate(selectedGame.summary.startedAt)}</p></div><div><p className="text-xs text-muted-foreground">Dispositivo</p><p className="font-medium">{deviceDisplayName}</p><p className="font-mono text-xs text-muted-foreground">{normalizedDeviceId}</p></div><div><p className="text-xs text-muted-foreground">Institución</p><p className="font-medium">{institutionName}</p></div><div><p className="text-xs text-muted-foreground">Owner</p><p className="font-medium">{ownerName}</p></div></div>
-              <div className="mt-4"><label className="text-sm font-medium" htmlFor={`deck-name-${selectedGame.summary.gameId}`}>Nombre del mazo utilizado</label><Input id={`deck-name-${selectedGame.summary.gameId}`} className="mt-2" value={selectedGame.summary.deckName} onChange={(event) => updateDeckName(selectedGame.summary.gameId, event.target.value)} placeholder="Nombre del mazo" maxLength={100} disabled={phase === "uploading" || allGamesUploaded} /><p className="mt-1 text-xs text-muted-foreground">Se precarga según los números de las cartas utilizadas y podés corregirlo antes de subir.</p></div>
+              <div className="mt-4"><label className="text-sm font-medium" htmlFor={`deck-name-${selectedGame.summary.gameId}`}>Nombre del mazo utilizado</label><Input id={`deck-name-${selectedGame.summary.gameId}`} className="mt-2" value={selectedGame.summary.deckName} onChange={(event) => updateDeckName(selectedGame.summary.gameId, event.target.value)} placeholder="Nombre del mazo" maxLength={100} disabled={phase === "uploading" || uploadedGameIds.has(selectedGame.summary.gameId)} /><p className="mt-1 text-xs text-muted-foreground">Se precarga según los números de las cartas utilizadas y podés corregirlo antes de subir.</p></div>
               <div className="mt-4 flex gap-2 overflow-x-auto rounded-xl bg-muted/50 p-1">
                 <Button type="button" size="sm" variant={gameView === "players" ? "default" : "ghost"} onClick={() => setGameView("players")}><Users className="size-4" />Jugadores</Button>
                 <Button type="button" size="sm" variant={gameView === "analytics" ? "default" : "ghost"} onClick={() => setGameView("analytics")}><BarChart3 className="size-4" />Rondas y aciertos</Button>
