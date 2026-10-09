@@ -46,11 +46,12 @@ function formatGameDate(value: string) {
 export function DeviceImportCenter() {
   const { tokens, user } = useAuth();
   const queryClient = useQueryClient();
-  const students = useAllStudents(tokens?.accessToken, { institutionId: user?.educationalCenterId || undefined });
+  const institutionScopedAccessToken = user?.educationalCenterId ? tokens?.accessToken : undefined;
+  const students = useAllStudents(institutionScopedAccessToken, { institutionId: user?.educationalCenterId || undefined });
   const profiles = useProfilesOverview(tokens?.accessToken);
-  const devicesQuery = useDevices(tokens?.accessToken);
-  const institutionsQuery = useInstitutions(tokens?.accessToken);
-  const otaRelease = useOtaRelease(tokens?.accessToken);
+  const devicesQuery = useDevices(institutionScopedAccessToken);
+  const institutionsQuery = useInstitutions(institutionScopedAccessToken);
+  const otaRelease = useOtaRelease(institutionScopedAccessToken);
   const cableRelease = resolveCableFirmwareRelease(otaRelease.data ? {
     downloadUrl: otaRelease.data.downloadUrl || "",
     sha256: otaRelease.data.sha256,
@@ -89,7 +90,7 @@ export function DeviceImportCenter() {
   const selectedGame = selectedIndex >= 0 ? games[selectedIndex] : games[0] ?? null;
   const normalizedDeviceId = cleanDeviceId(deviceId);
   const validDeviceId = normalizedDeviceId.length === 12;
-  const exactDeviceQuery = useDeviceByDeviceId(tokens?.accessToken, validDeviceId ? normalizedDeviceId : undefined);
+  const exactDeviceQuery = useDeviceByDeviceId(institutionScopedAccessToken, validDeviceId ? normalizedDeviceId : undefined);
   const matchedDevice = useMemo(
     () => exactDeviceQuery.data
       ?? devicesQuery.data?.data.find((device) => cleanDeviceId(device.deviceId) === normalizedDeviceId)

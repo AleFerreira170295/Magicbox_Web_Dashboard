@@ -15,7 +15,7 @@ export function buildGamesBatchPayload(deviceId: string, games: ImportedGame[], 
   const normalizedDeviceId = normalizeDeviceId(deviceId);
 
   return {
-    ...(educationalCenterId !== undefined ? { educational_center_id: educationalCenterId } : {}),
+    ...(educationalCenterId != null ? { educational_center_id: educationalCenterId } : {}),
     games: games.map((game) => {
       const players = game.players.map((player) => {
         const target = game.assignments[player.uid] ?? { kind: "manual" as const, id: player.uid, name: player.name || `Jugador ${player.position}` };
@@ -47,7 +47,7 @@ export function buildGamesBatchPayload(deviceId: string, games: ImportedGame[], 
         };
       });
       return {
-        ...(educationalCenterId !== undefined ? { educational_center_id: educationalCenterId } : {}),
+        ...(educationalCenterId != null ? { educational_center_id: educationalCenterId } : {}),
         device_id: normalizedDeviceId,
         game_id: game.summary.gameId,
         deck_name: game.summary.deckName || "UNKNOWN",
@@ -84,7 +84,7 @@ export function buildRawSyncEnvelopes(deviceId: string, games: ImportedGame[], e
       total_players: gamePayload.total_players,
       started_at: gamePayload.start_date,
       session_metadata: {
-        ...(educationalCenterId !== undefined ? { educational_center_id: educationalCenterId } : {}),
+        ...(educationalCenterId != null ? { educational_center_id: educationalCenterId } : {}),
         relay_origin: "web_serial",
         source_game_id: gamePayload.game_id,
       },
