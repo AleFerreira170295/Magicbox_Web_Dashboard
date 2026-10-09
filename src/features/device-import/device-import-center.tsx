@@ -383,7 +383,7 @@ export function DeviceImportCenter() {
     setFeedback(null);
     setPhase("uploading");
     try {
-      const educationalCenterId = matchedDevice?.educationalCenterId ?? user?.educationalCenterId;
+      const educationalCenterId = matchedDevice?.educationalCenterId ?? user?.educationalCenterId ?? null;
       const rawEnvelopes = buildRawSyncEnvelopes(deviceId, selectedGames, educationalCenterId);
       const payload = buildGamesBatchPayload(deviceId, selectedGames, educationalCenterId);
       for (const envelope of rawEnvelopes) await uploadRawGameSync(tokens.accessToken, envelope);
