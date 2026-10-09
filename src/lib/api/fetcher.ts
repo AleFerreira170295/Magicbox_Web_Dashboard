@@ -151,7 +151,11 @@ export async function apiRequest<T>(
     if (!options.suppressAuthExpiredEvent) {
       notifyExpiredSession(response.status);
     }
-    const message = payload?.error?.message || `Request failed with status ${response.status}`;
+    const requestMethod = options.method || "GET";
+    const requestInfo = `${requestMethod} ${path}`;
+
+    const baseMessage = payload?.error?.message || `Request failed with status ${response.status}`;
+    const message = response.status === 405 ? `${baseMessage} (${requestInfo})` : baseMessage;
     throw new ApiError(message, response.status, payload);
   }
 
