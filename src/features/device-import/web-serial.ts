@@ -1,4 +1,4 @@
-import { buildDownloadedGame, encodeProtocolCommand, normalizeDeviceInfo, normalizeGameSummary, parseProtocolLine, type ProtocolMessage } from "@/features/device-import/protocol";
+import { buildDownloadedGame, encodeProtocolCommand, normalizeDeviceInfo, normalizeGameSummary, normalizeProtocolMessage, parseProtocolLine, type ProtocolMessage } from "@/features/device-import/protocol";
 import type { DeviceGameDownload, DeviceGameSummary, MagicBoxDeviceInfo } from "@/features/device-import/types";
 
 interface SerialPortLike {
@@ -38,6 +38,7 @@ export class MagicBoxSerialClient {
   }> = [];
   private readError: Error | null = null;
   private disconnectPromise: Promise<void> | null = null;
+  private operationInFlight = false;
 
   constructor(private readonly onUnexpectedDisconnect?: () => void) {}
 
@@ -181,65 +182,116 @@ export class MagicBoxSerialClient {
     });
   }
 
+
+  private async runOperation<T>(label: string, operation: () => Promise<T>): Promise<T> {
+    if (this.operationInFlight) throw new Error("Ya hay otra operación en curso: " + label + ".");
+    this.operationInFlight = true;
+    this.pendingMessages = [];
+    try {
+      return await operation();
+    } finally {
+      this.operationInFlight = false;
+    }
+  }
+
   async listGames(): Promise<DeviceGameSummary[]> {
-    const games = new Map<number, DeviceGameSummary>();
-    for (let attempt = 1; attempt <= 3; attempt++) {
-      await this.send({ type: "savedGamesListRequest" });
-      try {
-        while (true) {
-          const message = await this.nextMessage(12_000);
-          if (message.type !== "savedGamesList") continue;
-          if (message.status === "error") throw new Error(`La MagicBox rechazó la lectura: ${String(message.reason || "unknown")}.`);
-          const chunk = Array.isArray(message.games) ? message.games : [];
-          chunk.forEach((entry) => {
-            const game = normalizeGameSummary(entry);
-            if (game) games.set(game.gameId, game);
-          });
-          if (message.isLastChunk === true) {
-            // V2.3.21 emits the final list frame just before clearing its busy
-            // flag. Avoid racing the first download command against cleanup.
+    return this.runOperation("listado de partidas", async () => {
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        const games = new Map<number, DeviceGameSummary>();
+        const chunkIndexes = new Set<number>();
+        this.pendingMessages = [];
+        await this.send({ type: "savedGamesListRequest" });
+        try {
+          while (true) {
+            const message = normalizeProtocolMessage(await this.nextMessage(12_000));
+            if (message.type !== "savedGamesList") continue;
+            if (message.status === "error") throw new Error("La MagicBox rechazó la lectura: " + String(message.reason || "unknown") + ".");
+            const chunkIndex = Number(message.chunkIndex ?? message.chunk_index);
+            if (Number.isInteger(chunkIndex) && chunkIndex >= 0) {
+              if (chunkIndexes.has(chunkIndex)) continue;
+              chunkIndexes.add(chunkIndex);
+            }
+            const chunk = Array.isArray(message.games) ? message.games : [];
+            chunk.forEach((entry) => {
+              const game = normalizeGameSummary(entry);
+              if (game) games.set(game.gameId, game);
+            });
+            if (message.isLastChunk !== true && message.is_last_chunk !== true) continue;
+            if (Number.isInteger(chunkIndex) && chunkIndex >= 0) {
+              for (let index = 0; index <= chunkIndex; index++) {
+                if (!chunkIndexes.has(index)) throw new Error("El listado llegó incompleto: falta el bloque " + index + ".");
+              }
+            }
+            const expectedCount = Number(message.count);
+            if (Number.isFinite(expectedCount) && expectedCount >= 0 && games.size !== expectedCount) {
+              throw new Error("El listado llegó incompleto: " + games.size + "/" + expectedCount + " partidas.");
+            }
             await new Promise((resolve) => setTimeout(resolve, 100));
             return [...games.values()].sort((a, b) => b.gameId - a.gameId);
           }
+        } catch (cause) {
+          const retryable = cause instanceof Error && cause.message === "La MagicBox no respondió a tiempo.";
+          if (!retryable || attempt === 3) throw cause;
         }
-      } catch (cause) {
-        const retryable = cause instanceof Error && cause.message === "La MagicBox no respondió a tiempo.";
-        if (!retryable || attempt === 3) throw cause;
       }
-    }
-    return [];
+      return [];
+    });
   }
 
   async getDeviceInfo(): Promise<MagicBoxDeviceInfo> {
-    await this.send({ type: "deviceInfoRequest" });
-    while (true) {
-      const message = await this.nextMessage(3_000);
-      const info = normalizeDeviceInfo(message);
-      if (info) return info;
-    }
+    return this.runOperation("identificación del dispositivo", async () => {
+      await this.send({ type: "deviceInfoRequest" });
+      while (true) {
+        const message = await this.nextMessage(3_000);
+        const info = normalizeDeviceInfo(message);
+        if (info) return info;
+      }
+    });
   }
 
   async downloadGame(gameId: number): Promise<DeviceGameDownload> {
-    await this.send({ type: "savedGameDownloadRequest", gameId: String(gameId) });
-    const messages: ProtocolMessage[] = [];
-    while (true) {
-      const message = await this.nextMessage(60_000);
-      const receivedGameId = Number(message.gameId || 0);
-      if (receivedGameId && receivedGameId !== gameId) continue;
-      messages.push(message);
-      if (message.type !== "savedGameTransferComplete") continue;
-      if (message.status !== "ok") throw new Error(`No se pudo descargar la partida ${gameId}: ${String(message.reason || "unknown")}.`);
-      return buildDownloadedGame(messages);
-    }
+    return this.runOperation("descarga de partida", async () => {
+      await this.send({ type: "savedGameDownloadRequest", gameId: String(gameId) });
+      const messages: ProtocolMessage[] = [];
+      const contractTypes = new Set(["savedGameTransferStart", "savedGameMeta", "savedGamePlayer", "savedGameTurnsChunk", "savedGameTransferComplete"]);
+      let activeTransferId = "";
+      while (true) {
+        const message = normalizeProtocolMessage(await this.nextMessage(60_000));
+        const type = String(message.type || "");
+        if (!contractTypes.has(type)) continue;
+        const receivedGameId = Number(message.gameId || 0);
+        if (receivedGameId && receivedGameId !== gameId) continue;
+        const transferId = String(message.transferId || "").trim();
+        if (!transferId) continue;
+        if (!activeTransferId) {
+          if (type !== "savedGameTransferStart" || receivedGameId !== gameId) continue;
+          activeTransferId = transferId;
+        }
+        if (transferId !== activeTransferId) continue;
+        messages.push(message);
+        if (type !== "savedGameTransferComplete") continue;
+        if (message.status !== "ok") throw new Error("No se pudo descargar la partida " + gameId + ": " + String(message.reason || "unknown") + ".");
+        return buildDownloadedGame(messages);
+      }
+    });
   }
 
   async deleteGames(gameIds: number[]) {
-    await this.send({ command: "deleteGames", gameIds });
-    while (true) {
-      const message = await this.nextMessage(60_000);
-      if (message.type !== "deleteGamesEnd") continue;
-      if (Number(message.errors || 0) > 0) throw new Error(`La MagicBox informó ${message.errors} errores al borrar.`);
-      return;
-    }
+    return this.runOperation("borrado de partidas", async () => {
+      const requestedIds = [...new Set(gameIds.filter((gameId) => Number.isInteger(gameId) && gameId > 0))].sort((a, b) => a - b);
+      if (requestedIds.length === 0) throw new Error("No hay partidas válidas para borrar.");
+      await this.send({ command: "deleteGames", gameIds: requestedIds });
+      while (true) {
+        const message = normalizeProtocolMessage(await this.nextMessage(60_000));
+        if (message.type !== "deleteGamesEnd") continue;
+        const errors = Number(message.errors || 0);
+        const deleted = Number(message.deleted || 0);
+        const notFound = Number(message.notFound ?? message.not_found ?? 0);
+        if (String(message.status || "").toLowerCase() !== "complete") throw new Error("La MagicBox no confirmó el borrado completo.");
+        if (errors > 0) throw new Error("La MagicBox informó " + errors + " errores al borrar.");
+        if (deleted + notFound !== requestedIds.length) throw new Error("La confirmación de borrado quedó incompleta: " + (deleted + notFound) + "/" + requestedIds.length + ".");
+        return { deleted, notFound };
+      }
+    });
   }
 }

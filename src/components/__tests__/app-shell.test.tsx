@@ -284,8 +284,8 @@ describe("AppShell navigation", () => {
           roles: ["government-viewer"],
           permissions: ["feature:read"],
         },
-        visible: ["Dashboard", "Alertas territoriales", "Territorios e instituciones"],
-        hidden: ["Sincronizaciones", "Partidas", "Dispositivos", "Usuarios", "Permisos", "Instituciones", "Salud", "Perfiles", "Configuración"],
+        visible: ["Dashboard", "Sincronizaciones", "Alertas territoriales", "Territorios e instituciones"],
+        hidden: ["Partidas", "Dispositivos", "Usuarios", "Permisos", "Instituciones", "Salud", "Perfiles", "Configuración"],
       },
     ];
 

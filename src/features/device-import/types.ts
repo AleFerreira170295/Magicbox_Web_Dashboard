@@ -4,6 +4,7 @@ export interface DeviceGameSummary {
   gameId: number;
   startedAt: string;
   sourceStartedAt?: string;
+  timestampQuality?: "exact" | "estimated" | "unknown";
   durationSeconds: number;
   totalPlayers: number;
   deckName: string;

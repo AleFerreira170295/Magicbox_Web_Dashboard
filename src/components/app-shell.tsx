@@ -127,7 +127,7 @@ function buildNavigation(t: ReturnType<typeof useLanguage>["t"]): NavigationItem
     summary: t.appShell.navigation.syncs.summary,
     section: "operation",
     icon: Cable,
-    roles: ["teacher", "director", "researcher", "family", "admin", "institution-admin"] satisfies NavigationRole[],
+    roles: ["teacher", "director", "researcher", "family", "admin", "institution-admin", "government-viewer"] satisfies NavigationRole[],
   },
   {
     href: "/users",

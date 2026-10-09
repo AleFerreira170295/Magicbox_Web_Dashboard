@@ -14,7 +14,7 @@ const messages = {
   pt: { history: "Histórico de syncs", cable: "Sync por cabo" },
 };
 
-const cableRoles = new Set(["teacher", "director", "family", "admin", "institution-admin"]);
+const cableRoles = new Set(["teacher", "director", "researcher", "family", "admin", "institution-admin", "government-viewer"]);
 
 export function SyncNavigation() {
   const pathname = usePathname();

@@ -61,4 +61,28 @@ describe("MagicBox cable protocol", () => {
     expect(game.players).toHaveLength(1);
     expect(game.turns).toEqual([]);
   });
+  it("normalizes nested and legacy firmware aliases without losing players or turns", () => {
+    const game = buildDownloadedGame([
+      { type: "savedGameTransferStart", transfer_id: "tx-9", gid: 9, playersCount: 1, turnsCount: 1 },
+      { payload: { type: "savedGameMeta", transferId: "tx-9", gameInfo: { id: 9, startDate: "2026-09-10T12:00:00Z", durationMs: 2500, deck: "3.1" } } },
+      { type: "savedGamePlayer", transferId: "tx-9", gameId: 9, index: 1, id: "P1", color: "ve", playerName: "Ana" },
+      { type: "savedGameTurnsChunk", transferId: "tx-9", gameId: 9, chunk: [{ turn_number: 1, playerId: "P1", card_id: "C1", success: 1, timestamp: 1500 }] },
+      { type: "savedGameTransferComplete", transferId: "tx-9", gameId: 9, status: "ok" },
+    ], Date.parse("2026-09-10T12:00:05Z"));
+
+    expect(game.summary).toMatchObject({ gameId: 9, deckName: "3.1", durationSeconds: 2.5, timestampQuality: "exact" });
+    expect(game.players).toEqual([{ position: 1, uid: "P1", colorCode: "VE", name: "Ana" }]);
+    expect(game.turns).toEqual([{ turnNumber: 1, playerUid: "P1", cardId: "C1", correct: true, difficulty: "UNKNOWN", timestamp: 1500, playTimeSeconds: 1.5 }]);
+  });
+
+  it("rejects a transfer whose declared player or turn counts are incomplete", () => {
+    expect(() => buildDownloadedGame([
+      { type: "savedGameTransferStart", transferId: "tx-incomplete", gameId: 10, playersCount: 1, turnsCount: 2 },
+      { type: "savedGameMeta", transferId: "tx-incomplete", gameId: 10, startedAt: "2026-09-10T12:00:00Z" },
+      { type: "savedGamePlayer", transferId: "tx-incomplete", gameId: 10, player: { position: 1, uid: "P1", colorCode: "AM", name: "Ana" } },
+      { type: "savedGameTurnsChunk", transferId: "tx-incomplete", gameId: 10, turns: [{ turnNumber: 1, playerUid: "P1", cardId: "C1", correct: true }] },
+      { type: "savedGameTransferComplete", transferId: "tx-incomplete", gameId: 10, status: "ok" },
+    ])).toThrow("1/2 turnos");
+  });
+
 });

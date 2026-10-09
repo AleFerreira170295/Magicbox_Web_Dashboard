@@ -70,4 +70,42 @@ describe("MagicBoxSerialClient session cleanup", () => {
     expect(port.readable.locked).toBe(false);
     expect(port.writable.locked).toBe(false);
   });
+  it("ignores frames from another transfer while downloading a game", async () => {
+    const client = new MagicBoxSerialClient();
+    const send = vi.fn().mockResolvedValue(undefined);
+    const nextMessage = vi.fn()
+      .mockResolvedValueOnce({ type: "savedGameTransferStart", transferId: "foreign", gameId: 99, playersCount: 1, turnsCount: 0 })
+      .mockResolvedValueOnce({ type: "savedGameTransferStart", transferId: "target", gameId: 7, playersCount: 1, turnsCount: 0 })
+      .mockResolvedValueOnce({ type: "savedGameMeta", transferId: "target", gameId: 7, startedAt: "2026-09-10T12:00:00Z" })
+      .mockResolvedValueOnce({ type: "savedGamePlayer", transferId: "target", gameId: 7, player: { position: 1, uid: "P1", colorCode: "AM", name: "Ana" } })
+      .mockResolvedValueOnce({ type: "savedGameTransferComplete", transferId: "foreign", gameId: 7, status: "ok" })
+      .mockResolvedValueOnce({ type: "savedGameTransferComplete", transferId: "target", gameId: 7, status: "ok" });
+    Object.assign(client, { send, nextMessage });
+
+    const game = await client.downloadGame(7);
+
+    expect(game.summary.gameId).toBe(7);
+    expect(game.players).toHaveLength(1);
+  });
+
+  it("rejects a saved-games list with missing chunks", async () => {
+    const client = new MagicBoxSerialClient();
+    Object.assign(client, {
+      send: vi.fn().mockResolvedValue(undefined),
+      nextMessage: vi.fn().mockResolvedValue({ type: "savedGamesList", chunkIndex: 1, isLastChunk: true, count: 1, games: [{ gameId: 7 }] }),
+    });
+
+    await expect(client.listGames()).rejects.toThrow("falta el bloque 0");
+  });
+
+  it("rejects an incomplete delete acknowledgement", async () => {
+    const client = new MagicBoxSerialClient();
+    Object.assign(client, {
+      send: vi.fn().mockResolvedValue(undefined),
+      nextMessage: vi.fn().mockResolvedValue({ type: "deleteGamesEnd", status: "complete", deleted: 1, notFound: 0, errors: 0 }),
+    });
+
+    await expect(client.deleteGames([7, 8])).rejects.toThrow("1/2");
+  });
+
 });

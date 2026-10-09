@@ -204,7 +204,7 @@ describe("operational route guards", () => {
     },
     {
       role: "researcher",
-      visible: ["dashboard-home", "games-table", "game-detail-page", "syncs-table"],
+      visible: ["dashboard-home", "games-table", "game-detail-page", "syncs-table", "device-import-center"],
     },
     {
       role: "family",
@@ -212,7 +212,7 @@ describe("operational route guards", () => {
     },
     {
       role: "government-viewer",
-      visible: ["dashboard-home", "territorial-alerts-center", "territorial-overview-center"],
+      visible: ["dashboard-home", "syncs-table", "device-import-center", "territorial-alerts-center", "territorial-overview-center"],
     },
   ])("applies the full screen contract for %s", ({ role, visible }) => {
     useAuthMock.mockReturnValue({

@@ -30,12 +30,12 @@ describe("SyncNavigation", () => {
     expect(screen.getByRole("link", { name: "Sync por cable" })).toHaveAttribute("href", "/syncs/cable");
   });
 
-  it("keeps cable sync hidden for researcher-only access", () => {
+  it("allows cable sync for researcher accounts", () => {
     usePathnameMock.mockReturnValue("/syncs");
     useAuthMock.mockReturnValue({ user: { roles: ["researcher"] } });
 
     render(<SyncNavigation />);
 
-    expect(screen.queryByRole("link", { name: "Sync por cable" })).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Sync por cable" })).toBeInTheDocument();
   });
 });
