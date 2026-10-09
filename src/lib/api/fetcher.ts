@@ -136,7 +136,7 @@ export async function apiRequest<T>(
     headers: {
       Accept: "application/json",
       ...(!isFormData && options.body ? { "Content-Type": "application/json" } : {}),
-      ...(options.token ? { Authorization: `Bearer ${options.token}` } : {}),
+      ...(options.token != null ? { Authorization: `Bearer ${options.token}` } : {}),
       ...options.headers,
     },
     body: isFormData ? (options.body as FormData) : options.body ? JSON.stringify(options.body) : undefined,
