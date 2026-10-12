@@ -5,17 +5,14 @@ import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxi
 import { BarChart3, Target, TimerReset } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { buildPlayerOutcomeSeries, buildRoundOutcomeSeries } from "@/features/device-import/game-analytics";
+import { buildGameOutcomeSummary } from "@/features/device-import/game-analytics";
 import type { ImportedGame } from "@/features/device-import/types";
 
 const COLOR_LABELS: Record<string, string> = { AM: "Amarillo", NA: "Naranja", VE: "Verde", VI: "Violeta", CI: "Celeste", MA: "Rojo" };
 
 export function ImportedGameCharts({ game, embedded = false }: { game: ImportedGame; embedded?: boolean }) {
-  const rounds = useMemo(() => buildRoundOutcomeSeries(game), [game]);
-  const players = useMemo(() => buildPlayerOutcomeSeries(game), [game]);
-  const hits = game.turns.filter((turn) => turn.correct).length;
-  const misses = game.turns.length - hits;
-  const accuracy = game.turns.length > 0 ? Math.round((hits / game.turns.length) * 100) : 0;
+  const summary = useMemo(() => buildGameOutcomeSummary(game), [game]);
+  const { rounds, players, hits, misses, accuracy } = summary;
 
   const content = (
     <div className="space-y-5">

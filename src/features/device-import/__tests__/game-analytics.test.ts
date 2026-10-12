@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildPlayerOutcomeSeries, buildRoundOutcomeSeries } from "@/features/device-import/game-analytics";
+import { buildGameOutcomeSummary, buildPlayerOutcomeSeries, buildRoundOutcomeSeries } from "@/features/device-import/game-analytics";
 import type { ImportedGame } from "@/features/device-import/types";
 
 const game: ImportedGame = {
@@ -29,5 +29,16 @@ describe("cable-import game analytics", () => {
       { playerUid: "p1", label: "Ana", colorCode: "AM", hits: 2, misses: 0, total: 2, accuracy: 100 },
       { playerUid: "p2", label: "Jugador 2", colorCode: "VE", hits: 0, misses: 1, total: 1, accuracy: 0 },
     ]);
+  });
+
+  it("builds a one-pass summary with overall accuracy", () => {
+    expect(buildGameOutcomeSummary(game)).toMatchObject({
+      hits: 2,
+      misses: 1,
+      total: 3,
+      accuracy: 67,
+      rounds: expect.any(Array),
+      players: expect.any(Array),
+    });
   });
 });

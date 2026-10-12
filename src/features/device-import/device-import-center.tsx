@@ -26,6 +26,7 @@ import { useInstitutions } from "@/features/institutions/api";
 import { createHomeProfile, useProfilesOverview } from "@/features/profiles/api";
 import { useOtaRelease } from "@/features/settings/api";
 import { useAllStudents } from "@/features/students/api";
+import { ApiError } from "@/lib/api/fetcher";
 import { getErrorMessage } from "@/lib/utils";
 
 type Phase = "idle" | "connected" | "reading" | "ready" | "uploading";
@@ -114,7 +115,12 @@ export function DeviceImportCenter() {
     || matchedDevice?.ownerUserEmail
     || (deviceRecordLoading ? "Consultando registro…" : deviceRecordUnavailable ? "No disponible para esta cuenta" : "Sin owner registrado");
   const deviceDisplayName = matchedDevice?.name
+    || deviceInfo?.hardware
     || (normalizedDeviceId ? `MagicBox ${normalizedDeviceId.slice(-6)}` : "MagicBox sin identificar");
+  const deviceDetectedLabel = deviceInfo
+    ? `${deviceInfo.hardware} · ${deviceInfo.firmwareVersion} · ${deviceInfo.deviceId}`
+    : normalizedDeviceId || "Sin identificación automática";
+  const detectedDeviceId = deviceInfo?.deviceId || normalizedDeviceId || null;
   const uploadedGameIds = useMemo(() => new Set(uploadedGames.map((game) => game.gameId)), [uploadedGames]);
 
   const [selectedGameIds, setSelectedGameIds] = useState<number[]>([]);
@@ -130,6 +136,22 @@ export function DeviceImportCenter() {
 
   function showError(cause: unknown, title = "No se pudo completar la acción") {
     setFeedback({ kind: "error", title, message: getErrorMessage(cause) });
+  }
+
+  function showUploadError(cause: unknown) {
+    const baseMessage = getErrorMessage(cause);
+    const detectedIdLabel = detectedDeviceId ? `ID detectado: ${detectedDeviceId}` : null;
+
+    if (cause instanceof ApiError && detectedIdLabel) {
+      setFeedback({
+        kind: "error",
+        title: "No se pudieron subir las partidas",
+        message: `${baseMessage}. ${detectedIdLabel}`,
+      });
+      return;
+    }
+
+    showError(cause, "No se pudieron subir las partidas");
   }
 
   function isCurrentSession(generation: number, client?: MagicBoxSerialClient) {
@@ -385,7 +407,7 @@ export function DeviceImportCenter() {
     setPhase("uploading");
     try {
       const educationalCenterId = matchedDevice?.educationalCenterId ?? user?.educationalCenterId ?? null;
-      const rawEnvelopes = buildRawSyncEnvelopes(deviceId, selectedGames, educationalCenterId);
+      const rawEnvelopes = buildRawSyncEnvelopes(deviceId, selectedGames, educationalCenterId, deviceInfo);
       const payload = buildGamesBatchPayload(deviceId, selectedGames, educationalCenterId);
       for (const envelope of rawEnvelopes) await uploadRawGameSync(tokens.accessToken, envelope);
       const uploaded = await uploadGamesBatch(tokens.accessToken, payload);
@@ -420,7 +442,7 @@ export function DeviceImportCenter() {
       });
     } catch (cause) {
       if (!isCurrentSession(generation, client)) return;
-      showError(cause, "No se pudieron subir las partidas");
+      showUploadError(cause);
       setPhase("ready");
     }
   }
@@ -558,7 +580,7 @@ export function DeviceImportCenter() {
           <Card id="cable-players" className="scroll-mt-28">
             <CardHeader>
               <div className="flex flex-wrap items-start justify-between gap-3"><div><CardTitle>Partida #{selectedGame.summary.gameId}</CardTitle><CardDescription>{selectedGame.summary.deckName} · {selectedGame.players.length} jugadores · {selectedGame.turns.length} turnos{selectedGame.turns.length === 0 ? " · finalizada sin jugadas" : ""}</CardDescription></div><div className="flex items-center gap-2"><Button size="sm" className="size-9 p-0" variant="outline" aria-label="Partida anterior" onClick={() => selectRelativeGame(-1)} disabled={selectedIndex <= 0}><ChevronLeft className="size-4" /></Button><span className="text-sm text-muted-foreground">{selectedIndex + 1} de {games.length}</span><Button size="sm" className="size-9 p-0" variant="outline" aria-label="Partida siguiente" onClick={() => selectRelativeGame(1)} disabled={selectedIndex >= games.length - 1}><ChevronRight className="size-4" /></Button></div></div>
-              <div className="mt-4 grid gap-3 rounded-xl border bg-muted/20 p-3 text-sm sm:grid-cols-2 lg:grid-cols-4"><div><p className="text-xs text-muted-foreground">Fecha</p><p className="font-medium">{formatGameDate(selectedGame.summary.startedAt)}</p></div><div><p className="text-xs text-muted-foreground">Dispositivo</p><p className="font-medium">{deviceDisplayName}</p><p className="font-mono text-xs text-muted-foreground">{normalizedDeviceId}</p></div><div><p className="text-xs text-muted-foreground">Institución</p><p className="font-medium">{institutionName}</p></div><div><p className="text-xs text-muted-foreground">Owner</p><p className="font-medium">{ownerName}</p></div></div>
+              <div className="mt-4 grid gap-3 rounded-xl border bg-muted/20 p-3 text-sm sm:grid-cols-2 lg:grid-cols-4"><div><p className="text-xs text-muted-foreground">Fecha</p><p className="font-medium">{formatGameDate(selectedGame.summary.startedAt)}</p></div><div><p className="text-xs text-muted-foreground">Dispositivo</p><p className="font-medium">{deviceDisplayName}</p><p className="mt-1 font-mono text-xs text-muted-foreground">{normalizedDeviceId}</p><p className="mt-1 text-xs text-muted-foreground">{deviceDetectedLabel}</p></div><div><p className="text-xs text-muted-foreground">Institución</p><p className="font-medium">{institutionName}</p></div><div><p className="text-xs text-muted-foreground">Owner</p><p className="font-medium">{ownerName}</p></div></div>
               <div className="mt-4"><label className="text-sm font-medium" htmlFor={`deck-name-${selectedGame.summary.gameId}`}>Nombre del mazo utilizado</label><Input id={`deck-name-${selectedGame.summary.gameId}`} className="mt-2" value={selectedGame.summary.deckName} onChange={(event) => updateDeckName(selectedGame.summary.gameId, event.target.value)} placeholder="Nombre del mazo" maxLength={100} disabled={phase === "uploading" || uploadedGameIds.has(selectedGame.summary.gameId)} /><p className="mt-1 text-xs text-muted-foreground">Se precarga según los números de las cartas utilizadas y podés corregirlo antes de subir.</p></div>
               <div className="mt-4 flex gap-2 overflow-x-auto rounded-xl bg-muted/50 p-1">
                 <Button type="button" size="sm" variant={gameView === "players" ? "default" : "ghost"} onClick={() => setGameView("players")}><Users className="size-4" />Jugadores</Button>

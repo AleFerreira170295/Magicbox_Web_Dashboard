@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { StrictMode, type ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DeviceImportCenter } from "@/features/device-import/device-import-center";
+import { ApiError } from "@/lib/api/fetcher";
 
 const mocks = vi.hoisted(() => ({
   connect: vi.fn(),
@@ -184,6 +185,29 @@ describe("DeviceImportCenter cable actions", () => {
     fireEvent.click(screen.getByRole("button", { name: "Borrar originales" }));
     expect(await screen.findByRole("dialog", { name: "Borrado completado" })).toBeInTheDocument();
     expect(mocks.deleteGames).toHaveBeenCalledWith([7]);
+  });
+
+  it("includes the detected device id when the upload fails because the device is not registered", async () => {
+    mocks.uploadRawGameSync.mockRejectedValueOnce(new ApiError("BLE device not found", 404, {
+      error: { code: "DEVICE_NOT_FOUND", message: "BLE device not found" },
+      status: "error",
+      code: 404,
+      timestamp: "2026-10-12T20:00:00Z",
+    }));
+
+    render(<DeviceImportCenter />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Conectar" }));
+    await screen.findByText("MagicBox Aula Norte");
+
+    fireEvent.click(screen.getByRole("button", { name: "Leer partidas" }));
+    expect(await screen.findByRole("button", { name: /Subir 1 partidas/ })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /Subir 1 partidas/ }));
+
+    expect(await screen.findByRole("dialog", { name: "No se pudieron subir las partidas" })).toBeInTheDocument();
+    expect(screen.getByText(/BLE device not found/i)).toBeInTheDocument();
+    expect(screen.getByText(/ID detectado: AABBCCDDEEFF/i)).toBeInTheDocument();
   });
 
   it("loads the authoritative device record by the fresh USB ID even when it is outside the first list page", async () => {

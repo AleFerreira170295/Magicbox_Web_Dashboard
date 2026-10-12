@@ -1,5 +1,5 @@
 import { turnDateFromGameStart } from "@/features/device-import/protocol";
-import type { ImportedGame } from "@/features/device-import/types";
+import type { ImportedGame, MagicBoxDeviceInfo } from "@/features/device-import/types";
 
 const COLOR_NAMES: Record<string, string> = {
   AM: "yellow", NA: "orange", VE: "green", VI: "violet", CI: "blue", MA: "red",
@@ -60,7 +60,12 @@ export function buildGamesBatchPayload(deviceId: string, games: ImportedGame[], 
   };
 }
 
-export function buildRawSyncEnvelopes(deviceId: string, games: ImportedGame[], educationalCenterId?: string | null) {
+export function buildRawSyncEnvelopes(
+  deviceId: string,
+  games: ImportedGame[],
+  educationalCenterId?: string | null,
+  deviceInfo?: MagicBoxDeviceInfo | null,
+) {
   const normalizedDeviceId = normalizeDeviceId(deviceId);
   const batch = buildGamesBatchPayload(normalizedDeviceId, games, educationalCenterId);
 
@@ -97,6 +102,13 @@ export function buildRawSyncEnvelopes(deviceId: string, games: ImportedGame[], e
         flow: "device_cable_import",
         transport: "web_serial",
       },
+      ...(deviceInfo ? {
+        device_info: {
+          device_id: deviceInfo.deviceId,
+          firmware_version: deviceInfo.firmwareVersion,
+          hardware: deviceInfo.hardware,
+        },
+      } : {}),
     };
   });
 }

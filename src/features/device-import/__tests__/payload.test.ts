@@ -65,4 +65,24 @@ describe("device import payload", () => {
     expect(envelope.payload.game_data_payload.turns[0].turn_start_date).toBe("2026-09-11T12:51:36.870Z");
   });
 
+  it("includes the detected device identity in the raw sync envelope", () => {
+    const envelope = buildRawSyncEnvelopes(
+      "CC88311D16F0",
+      [{
+        summary: { gameId: 2356, startedAt: "2026-09-11T12:51:33.000Z", durationSeconds: 87, totalPlayers: 1, deckName: "3.1 Geometría | Fácil" },
+        players: [{ position: 1, uid: "P1", colorCode: "AM", name: "Uno" }],
+        turns: [{ turnNumber: 1, playerUid: "P1", cardId: "C1", correct: true, difficulty: "3102", timestamp: 3870, playTimeSeconds: 0 }],
+        assignments: {},
+      }],
+      undefined,
+      { deviceId: "CC88311D16F0", firmwareVersion: "V2.3.22", hardware: "MagicBox V3" },
+    )[0];
+
+    expect(envelope.device_info).toEqual({
+      device_id: "CC88311D16F0",
+      firmware_version: "V2.3.22",
+      hardware: "MagicBox V3",
+    });
+  });
+
 });
