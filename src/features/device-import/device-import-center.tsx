@@ -407,8 +407,8 @@ export function DeviceImportCenter() {
     }
   }
 
-  function isAuthRelatedStatus(status: number | undefined) {
-    return status === 401 || status === 403 || status === 405;
+  function isRawIngestionSkippableStatus(status: number | undefined) {
+    return status === 401 || status === 403 || status === 405 || status === 409;
   }
 
   async function processUploadRecord(record: UploadQueueRecord, options: { selectedGamesForUi?: ImportedGame[]; shouldUpdateUploadedGames: boolean; accessToken: string }) {
@@ -428,7 +428,7 @@ export function DeviceImportCenter() {
       try {
         await uploadRawGameSync(accessToken, envelope);
       } catch (cause) {
-        if (cause instanceof ApiError && isAuthRelatedStatus(cause.status)) {
+        if (cause instanceof ApiError && isRawIngestionSkippableStatus(cause.status)) {
           rawAuthSkipped = true;
           rawAuthStatus = cause.status;
           break;

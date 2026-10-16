@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { StrictMode, type ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { ApiError } from "@/lib/api/fetcher";
 import { DeviceImportCenter } from "@/features/device-import/device-import-center";
 import { ApiError } from "@/lib/api/fetcher";
 
@@ -210,6 +211,23 @@ describe("DeviceImportCenter cable actions", () => {
     expect(screen.getByText(/BLE device not found/i)).toBeInTheDocument();
     expect(screen.getByText(/ID detectado: AABBCCDDEEFF/i)).toBeInTheDocument();
   });
+  it("continues with batch-only when raw-syncs returns 409 (idempotency conflict)", async () => {
+    mocks.uploadRawGameSync.mockRejectedValueOnce(new ApiError("idempotency conflict", 409, { error: { message: "conflict" } } as any));
+
+    render(<DeviceImportCenter />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Conectar" }));
+    expect(await screen.findByText("MagicBox Aula Norte")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Leer partidas" }));
+    expect(await screen.findByRole("button", { name: /Subir 1 partidas/ })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /Subir 1 partidas/ }));
+
+    expect(await screen.findByRole("dialog", { name: "Subida completada" })).toBeInTheDocument();
+    expect(mocks.uploadGamesBatch).toHaveBeenCalledTimes(1);
+  });
+
 
   it("loads the authoritative device record by the fresh USB ID even when it is outside the first list page", async () => {
     mocks.getDeviceInfo.mockResolvedValue({ deviceId: "CC88311D16F0", firmwareVersion: "V2.3.22", hardware: "V3" });
