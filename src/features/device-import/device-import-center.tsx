@@ -26,7 +26,9 @@ import { useInstitutions } from "@/features/institutions/api";
 import { createHomeProfile, useProfilesOverview } from "@/features/profiles/api";
 import { useOtaRelease } from "@/features/settings/api";
 import { useAllStudents } from "@/features/students/api";
+
 import { ApiError } from "@/lib/api/fetcher";
+import { enqueueUpload, loadUploadQueue, removeUploadRecord, updateUploadRecord, type UploadQueueRecord } from "@/features/device-import/upload-queue";
 import { getErrorMessage } from "@/lib/utils";
 
 type Phase = "idle" | "connected" | "reading" | "ready" | "uploading";
@@ -81,6 +83,12 @@ export function DeviceImportCenter() {
   const [firmwareStatus, setFirmwareStatus] = useState("");
   const [confirmedV3, setConfirmedV3] = useState(false);
   const supported = supportsWebSerial();
+
+  const [pendingUploads, setPendingUploads] = useState<UploadQueueRecord[]>([]);
+
+  useEffect(() => {
+    setPendingUploads(loadUploadQueue());
+  }, [tokens?.accessToken]);
 
   const ownerIds = useMemo(() => new Set([user?.id, user?.identityId].filter(Boolean)), [user?.id, user?.identityId]);
   const assignedProfiles = useMemo(
@@ -200,7 +208,7 @@ export function DeviceImportCenter() {
     if (previousClient) await previousClient.disconnect().catch(() => undefined);
 
     const client = new MagicBoxSerialClient(() => {
-      if (!isCurrentSession(generation, client)) return;
+      if (!isCurrentSession(generation, client ?? undefined)) return;
       sessionGenerationRef.current += 1;
       clientRef.current = null;
       clearDeviceSession("Desconectada");
@@ -208,23 +216,23 @@ export function DeviceImportCenter() {
     clientRef.current = client;
     try {
       await client.connect();
-      if (!isCurrentSession(generation, client)) {
+      if (!isCurrentSession(generation, client ?? undefined)) {
         await client.disconnect();
         return;
       }
       setPhase("connected");
       try {
         const info = await client.getDeviceInfo();
-        if (!isCurrentSession(generation, client)) return;
+        if (!isCurrentSession(generation, client ?? undefined)) return;
         setDeviceInfo(info);
         setDeviceId(info.deviceId);
         setDeviceStatus(`${info.hardware} · ${info.firmwareVersion} · ID detectado automáticamente`);
       } catch {
-        if (!isCurrentSession(generation, client)) return;
+        if (!isCurrentSession(generation, client ?? undefined)) return;
         setDeviceStatus("Conectada. Este firmware no informa el ID automáticamente; ingresalo manualmente o actualizá a V2.3.22.");
       }
     } catch (cause) {
-      if (!isCurrentSession(generation, client)) return;
+      if (!isCurrentSession(generation, client ?? undefined)) return;
       clientRef.current = null;
       await client.disconnect().catch(() => undefined);
       clearDeviceSession();
@@ -245,7 +253,7 @@ export function DeviceImportCenter() {
     setPhase("reading");
     try {
       const summaries = await client.listGames();
-      if (!isCurrentSession(generation, client)) return;
+      if (!isCurrentSession(generation, client ?? undefined)) return;
       const sortedSummaries = [...summaries].sort((a, b) => {
         const aTime = Date.parse(a.startedAt);
         const bTime = Date.parse(b.startedAt);
@@ -261,7 +269,7 @@ export function DeviceImportCenter() {
       for (const summary of sortedSummaries) {
         try {
           const game = await client.downloadGame(summary.gameId);
-          if (!isCurrentSession(generation, client)) return;
+          if (!isCurrentSession(generation, client ?? undefined)) return;
           const importedGame: ImportedGame = {
             ...game,
             summary: {
@@ -277,14 +285,14 @@ export function DeviceImportCenter() {
           failedGameIds.push(summary.gameId);
         }
       }
-      if (!isCurrentSession(generation, client)) return;
+      if (!isCurrentSession(generation, client ?? undefined)) return;
       if (failedGameIds.length > 0) {
         setFeedback({ kind: "error", title: "Lectura incompleta", message: `Se extrajeron ${downloaded.length} partidas. No se pudieron leer: ${failedGameIds.join(", ")}. Permanecen guardadas en la MagicBox.` });
       }
       setSelectedGameIds(downloaded.map((game) => game.summary.gameId));
       setPhase(downloaded.length > 0 ? "ready" : "connected");
     } catch (cause) {
-      if (!isCurrentSession(generation, client)) return;
+      if (!isCurrentSession(generation, client ?? undefined)) return;
       showError(cause, "No se pudieron leer las partidas");
       setPhase("connected");
     }
@@ -399,49 +407,166 @@ export function DeviceImportCenter() {
     }
   }
 
-  async function uploadGames() {
-    const client = clientRef.current;
-    if (!tokens?.accessToken || !client || selectedGames.length === 0) return;
-    const generation = sessionGenerationRef.current;
-    setFeedback(null);
-    setPhase("uploading");
-    try {
-      const educationalCenterId = matchedDevice?.educationalCenterId ?? user?.educationalCenterId ?? null;
-      const rawEnvelopes = buildRawSyncEnvelopes(deviceId, selectedGames, educationalCenterId, deviceInfo);
-      const payload = buildGamesBatchPayload(deviceId, selectedGames, educationalCenterId);
-      for (const envelope of rawEnvelopes) await uploadRawGameSync(tokens.accessToken, envelope);
-      const uploaded = await uploadGamesBatch(tokens.accessToken, payload);
-      if (!isCurrentSession(generation, client)) return;
-      const uploadedByGameId = new Map(uploaded.map((game) => [game.gameId, game]));
-      const missing = selectedGames.map((game) => game.summary.gameId).filter((gameId) => !uploadedByGameId.has(gameId));
-      if (missing.length > 0) {
-        throw new Error(`El servidor no confirmó las partidas ${missing.join(", ")}. Las partidas permanecen guardadas en la MagicBox.`);
-      }
+  function isAuthRelatedStatus(status: number | undefined) {
+    return status === 401 || status === 403 || status === 405;
+  }
 
+  async function processUploadRecord(record: UploadQueueRecord, options: { selectedGamesForUi?: ImportedGame[]; shouldUpdateUploadedGames: boolean; accessToken: string }) {
+    const { selectedGamesForUi, shouldUpdateUploadedGames, accessToken } = options;
+
+    updateUploadRecord(record.id, (r) => ({
+      ...r,
+      state: "uploading_raw",
+      lastError: undefined,
+      attemptsRaw: r.attemptsRaw + 1,
+    }));
+
+    let rawAuthSkipped = false;
+    let rawAuthStatus: number | undefined = undefined;
+
+    for (const envelope of record.rawEnvelopes) {
+      try {
+        await uploadRawGameSync(accessToken, envelope);
+      } catch (cause) {
+        if (cause instanceof ApiError && isAuthRelatedStatus(cause.status)) {
+          rawAuthSkipped = true;
+          rawAuthStatus = cause.status;
+          break;
+        }
+        updateUploadRecord(record.id, (r) => ({
+          ...r,
+          state: "failed",
+          lastError: {
+            title: "No se pudo subir los originales",
+            message: "Fallo durante /ingestion/raw-syncs",
+            status: cause instanceof ApiError ? cause.status : undefined,
+            endpoint: "/ingestion/raw-syncs",
+            method: "POST",
+          },
+        }));
+        throw cause;
+      }
+    }
+
+    updateUploadRecord(record.id, (r) => ({
+      ...r,
+      state: "uploading_batch",
+      lastError: rawAuthSkipped ? {
+        title: "Continuando sin originales",
+        message: "El servidor no aceptó los originales (raw-syncs). Continuamos con batch-only.",
+        status: rawAuthStatus,
+        endpoint: "/ingestion/raw-syncs",
+        method: "POST",
+      } : undefined,
+      attemptsBatch: r.attemptsBatch + 1,
+    }));
+
+    const uploaded = await uploadGamesBatch(accessToken, record.batchPayload);
+
+    const uploadedByGameId = new Map(uploaded.map((game) => [game.gameId, game] as const));
+    const missing = record.selectedGameIds.filter((gameId) => !uploadedByGameId.has(gameId));
+    if (missing.length > 0) {
+      throw new Error("El servidor no confirmó las partidas " + missing.join(", ") + ". Las partidas permanecen guardadas en la MagicBox.");
+    }
+
+    if (shouldUpdateUploadedGames && selectedGamesForUi) {
       setUploadedGames((current) => {
         const byId = new Map(current.map((game) => [game.gameId, game] as const));
-        for (const game of selectedGames) {
+        for (const game of selectedGamesForUi) {
           const uploadedGame = uploadedByGameId.get(game.summary.gameId);
           if (uploadedGame) byId.set(uploadedGame.gameId, uploadedGame);
         }
         return [...byId.values()];
       });
+    }
 
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["games"] }),
-        queryClient.invalidateQueries({ queryKey: ["devices"] }),
-        queryClient.invalidateQueries({ queryKey: ["syncs"] }),
-      ]);
-      if (!isCurrentSession(generation, client)) return;
+    await queryClient.invalidateQueries({ queryKey: ["games"] });
+    await queryClient.invalidateQueries({ queryKey: ["devices"] });
+    await queryClient.invalidateQueries({ queryKey: ["syncs"] });
+
+    updateUploadRecord(record.id, (r) => ({ ...r, state: "confirmed" }));
+    removeUploadRecord(record.id);
+    setPendingUploads(loadUploadQueue());
+
+    return uploaded;
+  }
+
+  async function retryPendingUploads() {
+    if (!tokens?.accessToken) return;
+    const client = clientRef.current;
+    const generation = sessionGenerationRef.current;
+    const pending = loadUploadQueue().filter((r) => r.state === "queued" || r.state === "failed");
+    if (pending.length === 0) return;
+
+    setFeedback(null);
+    setPhase("uploading");
+    try {
+      for (const record of pending) {
+        await processUploadRecord(record, {
+          shouldUpdateUploadedGames: false,
+          accessToken: tokens.accessToken as string,
+        });
+      }
+      if (isCurrentSession(generation, client ?? undefined)) {
+        setFeedback({
+          kind: "success",
+          title: "Subida completada",
+          message: pending.length + " subida(s) pendiente(s) fueron procesadas.",
+        });
+      }
+    } catch (cause) {
+      if (isCurrentSession(generation, client ?? undefined)) {
+        showError(cause, "No se pudieron procesar las subidas pendientes");
+        setPhase("ready");
+      }
+      return;
+    }
+
+    if (isCurrentSession(generation, client ?? undefined)) {
+      setPhase("ready");
+    }
+  }
+
+  async function uploadGames() {
+    const client = clientRef.current;
+    if (!tokens?.accessToken || !client || selectedGames.length === 0) return;
+
+    const generation = sessionGenerationRef.current;
+    setFeedback(null);
+    setPhase("uploading");
+
+    try {
+      const educationalCenterId = matchedDevice?.educationalCenterId ?? user?.educationalCenterId ?? null;
+      const rawEnvelopes = buildRawSyncEnvelopes(deviceId, selectedGames, educationalCenterId);
+      const payload = buildGamesBatchPayload(deviceId, selectedGames, educationalCenterId);
+
+      const record = enqueueUpload({
+        deviceId,
+        educationalCenterId,
+        selectedGameIds: selectedGames.map((game) => game.summary.gameId),
+        rawEnvelopes,
+        batchPayload: payload,
+        uploaderUserId: user?.id,
+        uploaderIdentityId: user?.identityId,
+      });
+      setPendingUploads(loadUploadQueue());
+
+      await processUploadRecord(record, {
+        selectedGamesForUi: selectedGames,
+        shouldUpdateUploadedGames: true,
+        accessToken: tokens.accessToken as string,
+      });
+
+      if (!isCurrentSession(generation, client ?? undefined)) return;
       setPhase("ready");
       setFeedback({
         kind: "success",
         title: "Subida completada",
-        message: `Las ${selectedGames.length} partidas seleccionadas quedaron cargadas en la cuenta. Los originales siguen guardados en la MagicBox hasta que elijas borrarlos.`,
+        message: "Las " + selectedGames.length + " partidas seleccionadas quedaron cargadas en la cuenta. Los originales siguen guardados en la MagicBox hasta que elijas borrarlos.",
         showGameLinks: true,
       });
     } catch (cause) {
-      if (!isCurrentSession(generation, client)) return;
+      if (!isCurrentSession(generation, client ?? undefined)) return;
       showUploadError(cause);
       setPhase("ready");
     }
@@ -457,14 +582,14 @@ export function DeviceImportCenter() {
     try {
       const gameIds = selectedGames.map((game) => game.summary.gameId);
       await client.deleteGames(gameIds);
-      if (!isCurrentSession(generation, client)) return;
+      if (!isCurrentSession(generation, client ?? undefined)) return;
       setDeletedGameIds((current) => Array.from(new Set([...current, ...gameIds])));
       setFeedback({ kind: "success", title: "Borrado completado", message: `Se confirmó el borrado de ${gameIds.length} partidas originales en la MagicBox. Las copias cargadas en la cuenta permanecen disponibles.` });
     } catch (cause) {
-      if (!isCurrentSession(generation, client)) return;
+      if (!isCurrentSession(generation, client ?? undefined)) return;
       showError(cause, "No se pudieron borrar las partidas");
     } finally {
-      if (isCurrentSession(generation, client)) setIsDeleting(false);
+      if (isCurrentSession(generation, client ?? undefined)) setIsDeleting(false);
     }
   }
 
@@ -535,7 +660,7 @@ export function DeviceImportCenter() {
         </CardContent>
       </Card>
 
-      {games.length > 0 ? <Card id="cable-upload" className="scroll-mt-28 border-primary/30 bg-primary/5"><CardHeader><CardTitle className="flex items-center gap-2"><UploadCloud className="size-5" />Subir y administrar originales</CardTitle><CardDescription>La subida y el borrado son acciones separadas. Primero se confirma la copia en el servidor; después podés decidir cuándo borrar los originales de la MagicBox.</CardDescription></CardHeader><CardContent className="space-y-3"><div className="flex flex-wrap items-center gap-3"><Button onClick={uploadGames} disabled={phase !== "ready" || !validDeviceId || isDeleting || selectedGames.length === 0}><UploadCloud className="size-4" />Subir {selectedGames.length} partidas</Button><Button variant="destructive" onClick={() => setConfirmDeleteOpen(true)} disabled={!allSelectedGamesUploaded || allSelectedGamesDeleted || phase === "uploading" || isDeleting}><Trash2 className="size-4" />{isDeleting ? "Borrando…" : allSelectedGamesDeleted ? "Originales borrados" : `Borrar ${selectedGames.length} originales`}</Button>{phase === "uploading" ? <span className="text-sm text-muted-foreground"><LoaderCircle className="mr-1 inline size-4 animate-spin" />Subiendo…</span> : null}</div>{!validDeviceId ? <p className="text-sm text-amber-700">Falta un ID válido de 12 caracteres para vincular las partidas.</p> : null}{!allSelectedGamesUploaded ? <p className="text-sm text-muted-foreground">El borrado se habilita cuando el servidor confirma todas las partidas seleccionadas.</p> : <p className="text-sm text-emerald-700">Carga confirmada para la selección. Los originales siguen en la MagicBox hasta que pulses borrar.</p>}</CardContent></Card> : null}
+      {games.length > 0 ? <Card id="cable-upload" className="scroll-mt-28 border-primary/30 bg-primary/5"><CardHeader><CardTitle className="flex items-center gap-2"><UploadCloud className="size-5" />Subir y administrar originales</CardTitle><CardDescription>La subida y el borrado son acciones separadas. Primero se confirma la copia en el servidor; después podés decidir cuándo borrar los originales de la MagicBox.</CardDescription></CardHeader><CardContent className="space-y-3"><div className="flex flex-wrap items-center gap-3">{pendingUploads.length > 0 ? <Button variant="outline" onClick={retryPendingUploads} disabled={phase === "uploading" || isDeleting}><UploadCloud className="size-4" />Reintentar {pendingUploads.length} pendientes</Button> : null}<Button onClick={uploadGames} disabled={phase !== "ready" || !validDeviceId || isDeleting || selectedGames.length === 0}><UploadCloud className="size-4" />Subir {selectedGames.length} partidas</Button><Button variant="destructive" onClick={() => setConfirmDeleteOpen(true)} disabled={!allSelectedGamesUploaded || allSelectedGamesDeleted || phase === "uploading" || isDeleting}><Trash2 className="size-4" />{isDeleting ? "Borrando…" : allSelectedGamesDeleted ? "Originales borrados" : `Borrar ${selectedGames.length} originales`}</Button>{phase === "uploading" ? <span className="text-sm text-muted-foreground"><LoaderCircle className="mr-1 inline size-4 animate-spin" />Subiendo…</span> : null}</div>{!validDeviceId ? <p className="text-sm text-amber-700">Falta un ID válido de 12 caracteres para vincular las partidas.</p> : null}{!allSelectedGamesUploaded ? <p className="text-sm text-muted-foreground">El borrado se habilita cuando el servidor confirma todas las partidas seleccionadas.</p> : <p className="text-sm text-emerald-700">Carga confirmada para la selección. Los originales siguen en la MagicBox hasta que pulses borrar.</p>}</CardContent></Card> : null}
 
       {selectedGame ? (
         <>

@@ -121,6 +121,7 @@ describe("DeviceImportCenter cable actions", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    globalThis.localStorage?.clear?.();
     mocks.unexpectedDisconnects.length = 0;
     mocks.connect.mockResolvedValue(undefined);
     mocks.getDeviceInfo.mockResolvedValue({ deviceId: "AABBCCDDEEFF", firmwareVersion: "V2.3.22", hardware: "MagicBox V3" });
