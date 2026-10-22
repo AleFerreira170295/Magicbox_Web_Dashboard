@@ -3,7 +3,6 @@ import { StrictMode, type ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiError } from "@/lib/api/fetcher";
 import { DeviceImportCenter } from "@/features/device-import/device-import-center";
-import { ApiError } from "@/lib/api/fetcher";
 
 const mocks = vi.hoisted(() => ({
   connect: vi.fn(),
