@@ -17,7 +17,9 @@ export interface ResolvedCableFirmwareRelease extends FirmwareReleaseInput {
   source: "published" | "bundled";
 }
 
-export const VERIFIED_CABLE_FIRMWARE: ResolvedCableFirmwareRelease = {
+export type CableHardwareTarget = "v2" | "v3";
+
+const VERIFIED_V3_CABLE_FIRMWARE: ResolvedCableFirmwareRelease = {
   downloadUrl: "/firmware/esp32/magicbox-v3-V2.3.22.bin",
   sha256: "46239b0c927a4d1bfebcfb8adb6ee5bd78c1b15bd9a71ff3237a4ffb951a7e59",
   sizeBytes: 1_349_040,
@@ -40,11 +42,34 @@ function isAtLeastVersion(value: string | null | undefined, minimum: string) {
   return true;
 }
 
+function doesDownloadUrlMatchTarget(downloadUrl: string, target: CableHardwareTarget) {
+  const lower = downloadUrl.toLowerCase();
+  if (target === "v2") return lower.includes("magicbox-v2") || lower.includes("-v2-") || lower.includes("/v2");
+  return lower.includes("magicbox-v3") || lower.includes("-v3-") || lower.includes("/v3");
+}
+
 export function resolveCableFirmwareRelease(release?: FirmwareReleaseInput | null): ResolvedCableFirmwareRelease {
-  if (release?.downloadUrl && release.sha256 && isAtLeastVersion(release.version, MINIMUM_CABLE_FIRMWARE_VERSION)) {
-    return { ...release, source: "published" };
+  return resolveCableFirmwareReleaseForTarget(release, "v3")!;
+}
+
+export function resolveCableFirmwareReleaseForTarget(
+  release: FirmwareReleaseInput | null | undefined,
+  target: CableHardwareTarget,
+): ResolvedCableFirmwareRelease | null {
+  const isPublishedValid = Boolean(
+    release?.downloadUrl
+    && release.sha256
+    && isAtLeastVersion(release.version, MINIMUM_CABLE_FIRMWARE_VERSION),
+  );
+
+  if (isPublishedValid && release) {
+    if (target === "v3" || doesDownloadUrlMatchTarget(release.downloadUrl, target)) {
+      return { ...release, source: "published" };
+    }
   }
-  return VERIFIED_CABLE_FIRMWARE;
+
+  if (target === "v3") return VERIFIED_V3_CABLE_FIRMWARE;
+  return null;
 }
 
 interface FlashFirmwareOptions {

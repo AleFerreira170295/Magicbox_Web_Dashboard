@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { resetMagicBoxToApplication, resolveCableFirmwareRelease, settleWithin, sha256Hex, validateFirmwareImage } from "@/features/device-import/firmware-updater";
+import { resetMagicBoxToApplication, resolveCableFirmwareRelease, resolveCableFirmwareReleaseForTarget, settleWithin, sha256Hex, validateFirmwareImage } from "@/features/device-import/firmware-updater";
 
 describe("firmware updater validation", () => {
   it("bounds serial cleanup waits", async () => {
@@ -41,6 +41,20 @@ describe("firmware updater validation", () => {
       sha256: "b".repeat(64),
       version: "V2.3.20",
     })).toMatchObject({ version: "V2.3.22", source: "bundled" });
+
+    expect(resolveCableFirmwareReleaseForTarget({
+      downloadUrl: "/firmware/esp32/magicbox-v2-V2.3.23.bin",
+      sha256: "a".repeat(64),
+      sizeBytes: 123,
+      version: "V2.3.23",
+    }, "v2")).toMatchObject({ downloadUrl: "/firmware/esp32/magicbox-v2-V2.3.23.bin", source: "published" });
+
+    expect(resolveCableFirmwareReleaseForTarget({
+      downloadUrl: "/firmware/esp32/magicbox-v2-V2.3.20.bin",
+      sha256: "b".repeat(64),
+      sizeBytes: 123,
+      version: "V2.3.20",
+    }, "v2")).toBeNull();
   });
 
   it("rejects an empty or altered firmware image", async () => {

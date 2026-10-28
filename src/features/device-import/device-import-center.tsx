@@ -13,7 +13,7 @@ import { Modal } from "@/components/ui/modal";
 import { useAuth } from "@/features/auth/auth-context";
 import { inferDeckNameFromTurns } from "@/features/device-import/deck-inference";
 import { buildGamesBatchPayload, buildRawSyncEnvelopes } from "@/features/device-import/payload";
-import { flashMagicBoxFirmware, resolveCableFirmwareRelease } from "@/features/device-import/firmware-updater";
+import { flashMagicBoxFirmware, resolveCableFirmwareReleaseForTarget, type CableHardwareTarget } from "@/features/device-import/firmware-updater";
 import { ImportedGameCharts } from "@/features/device-import/imported-game-charts";
 import { SyncNavigation } from "@/features/syncs/sync-navigation";
 import type { ImportedGame, MagicBoxDeviceInfo, ParticipantTarget } from "@/features/device-import/types";
@@ -46,6 +46,14 @@ function formatGameDate(value: string) {
   return new Intl.DateTimeFormat("es-UY", { dateStyle: "medium", timeStyle: "short" }).format(date);
 }
 
+function inferCableTargetFromHardware(hardware?: string | null): CableHardwareTarget | null {
+  const normalized = hardware?.toUpperCase();
+  if (!normalized) return null;
+  if (normalized.includes('V2')) return 'v2';
+  if (normalized.includes('V3')) return 'v3';
+  return null;
+}
+
 export function DeviceImportCenter() {
   const { tokens, user } = useAuth();
   const queryClient = useQueryClient();
@@ -55,12 +63,6 @@ export function DeviceImportCenter() {
   const devicesQuery = useDevices(institutionScopedAccessToken);
   const institutionsQuery = useInstitutions(institutionScopedAccessToken);
   const otaRelease = useOtaRelease(institutionScopedAccessToken);
-  const cableRelease = resolveCableFirmwareRelease(otaRelease.data ? {
-    downloadUrl: otaRelease.data.downloadUrl || "",
-    sha256: otaRelease.data.sha256,
-    sizeBytes: otaRelease.data.sizeBytes,
-    version: otaRelease.data.latestVersion,
-  } : null);
   const clientRef = useRef<MagicBoxSerialClient | null>(null);
   const sessionGenerationRef = useRef(0);
   const mountedRef = useRef(true);
@@ -81,8 +83,19 @@ export function DeviceImportCenter() {
   const [isUpdatingFirmware, setIsUpdatingFirmware] = useState(false);
   const [firmwareProgress, setFirmwareProgress] = useState(0);
   const [firmwareStatus, setFirmwareStatus] = useState("");
-  const [confirmedV3, setConfirmedV3] = useState(false);
+  const [selectedCableTarget, setSelectedCableTarget] = useState<CableHardwareTarget>("v3");
+  const [confirmedCableTarget, setConfirmedCableTarget] = useState(false);
   const supported = supportsWebSerial();
+
+  const cableRelease = resolveCableFirmwareReleaseForTarget(
+    otaRelease.data ? {
+      downloadUrl: otaRelease.data.downloadUrl || "",
+      sha256: otaRelease.data.sha256,
+      sizeBytes: otaRelease.data.sizeBytes,
+      version: otaRelease.data.latestVersion,
+    } : null,
+    selectedCableTarget,
+  );
 
   const [pendingUploads, setPendingUploads] = useState<UploadQueueRecord[]>([]);
 
@@ -184,7 +197,8 @@ export function DeviceImportCenter() {
     setFeedback(null);
     setFirmwareProgress(0);
     setFirmwareStatus("");
-    setConfirmedV3(false);
+    setSelectedCableTarget("v3");
+    setConfirmedCableTarget(false);
   }
 
   useEffect(() => {
@@ -226,6 +240,11 @@ export function DeviceImportCenter() {
         if (!isCurrentSession(generation, client ?? undefined)) return;
         setDeviceInfo(info);
         setDeviceId(info.deviceId);
+        const inferredTarget = inferCableTargetFromHardware(info.hardware);
+        if (inferredTarget) {
+          setSelectedCableTarget(inferredTarget);
+          setConfirmedCableTarget(false);
+        }
         setDeviceStatus(`${info.hardware} · ${info.firmwareVersion} · ID detectado automáticamente`);
       } catch {
         if (!isCurrentSession(generation, client ?? undefined)) return;
@@ -315,7 +334,7 @@ export function DeviceImportCenter() {
 
   async function updateFirmware() {
     const release = cableRelease;
-    if (!confirmedV3) return;
+    if (!confirmedCableTarget || !release) return;
     const generation = sessionGenerationRef.current + 1;
     sessionGenerationRef.current = generation;
     const client = clientRef.current;
@@ -650,13 +669,13 @@ export function DeviceImportCenter() {
         <CardHeader><CardTitle className="flex items-center gap-2"><Cpu className="size-5" />Actualizar firmware por cable</CardTitle><CardDescription>Valida tamaño y SHA-256 y actualiza únicamente la aplicación y el selector OTA. No borra NVS ni LittleFS.</CardDescription></CardHeader>
         <CardContent className="space-y-4">
           <div className="grid gap-3 rounded-xl border p-4 md:grid-cols-3">
-            <div><p className="text-xs text-muted-foreground">Hardware habilitado</p><p className="font-medium">MagicBox V3</p></div>
-            <div><p className="text-xs text-muted-foreground">Firmware seleccionado</p><p className="font-medium">{cableRelease.version} · {cableRelease.source === "published" ? "release activa" : "release segura integrada"}</p></div>
-            <div><p className="text-xs text-muted-foreground">Integridad</p><p className="font-medium">SHA-256 verificado</p></div>
+            <div><p className="text-xs text-muted-foreground">Hardware habilitado</p><p className="font-medium">MagicBox {selectedCableTarget === "v2" ? "V2" : "V3"}</p><select className="mt-2 h-9 w-full rounded-md border bg-background px-3 text-sm" value={selectedCableTarget} disabled={isUpdatingFirmware} onChange={(event) => { setSelectedCableTarget(event.target.value as CableHardwareTarget); setConfirmedCableTarget(false); }}><option value="v2">MagicBox V2</option><option value="v3">MagicBox V3</option></select></div>
+            <div><p className="text-xs text-muted-foreground">Firmware seleccionado</p><p className="font-medium">{cableRelease ? `${cableRelease.version} · ${cableRelease.source === "published" ? "release activa" : "release segura integrada"}` : "No hay release publicada para V2"}</p></div>
+            <div><p className="text-xs text-muted-foreground">Integridad</p><p className="font-medium">{cableRelease ? "SHA-256 verificado" : "Pendiente"}</p></div>
           </div>
-          <label className="flex items-start gap-3 text-sm"><input type="checkbox" className="mt-1" checked={confirmedV3} onChange={(event) => setConfirmedV3(event.target.checked)} disabled={isUpdatingFirmware} /><span>Confirmo que es una MagicBox V3 y mantendré el cable conectado durante toda la actualización.</span></label>
+          <label className="flex items-start gap-3 text-sm"><input type="checkbox" className="mt-1" checked={confirmedCableTarget} onChange={(event) => setConfirmedCableTarget(event.target.checked)} disabled={isUpdatingFirmware || !cableRelease} /><span>Confirmo que es una MagicBox {selectedCableTarget === "v2" ? "V2" : "V3"} y mantendré el cable conectado durante toda la actualización.</span></label>
           {(isUpdatingFirmware || firmwareStatus) ? <div className="space-y-2"><div className="h-2 overflow-hidden rounded-full bg-muted"><div className="h-full bg-primary transition-all" style={{ width: `${firmwareProgress}%` }} /></div><p className="text-sm text-muted-foreground">{firmwareStatus}</p></div> : null}
-          <Button onClick={updateFirmware} disabled={!supported || !confirmedV3 || isUpdatingFirmware}>{isUpdatingFirmware ? <LoaderCircle className="size-4 animate-spin" /> : <Cpu className="size-4" />}{isUpdatingFirmware ? "Actualizando…" : `Actualizar a ${cableRelease.version}`}</Button>
+          <Button onClick={updateFirmware} disabled={!supported || !confirmedCableTarget || isUpdatingFirmware || !cableRelease}>{isUpdatingFirmware ? <LoaderCircle className="size-4 animate-spin" /> : <Cpu className="size-4" />}{isUpdatingFirmware ? "Actualizando…" : `Actualizar a ${cableRelease?.version}`}</Button>
         </CardContent>
       </Card>
 

@@ -50,7 +50,7 @@ vi.mock("@/features/device-import/web-serial", () => ({
 }));
 
 vi.mock("@/features/device-import/firmware-updater", () => ({
-  resolveCableFirmwareRelease: () => ({
+  resolveCableFirmwareReleaseForTarget: () => ({
     downloadUrl: "/firmware.bin",
     sha256: "a".repeat(64),
     sizeBytes: 123,
@@ -322,7 +322,7 @@ describe("DeviceImportCenter cable actions", () => {
     expect((await screen.findAllByText("Partida #8")).length).toBeGreaterThan(0);
     expect(screen.queryAllByText("Partida #7")).toHaveLength(0);
 
-    fireEvent.click(screen.getByRole("checkbox", { name: /Confirmo que es una MagicBox V3/i }));
+    fireEvent.click(screen.getByRole("checkbox", { name: /Confirmo que es una MagicBox V2/i }));
     fireEvent.click(screen.getByRole("button", { name: "Actualizar a V2.3.22" }));
     await waitFor(() => expect(mocks.flashMagicBoxFirmware).toHaveBeenCalledTimes(2));
     expect(mocks.disconnect).toHaveBeenCalledTimes(2);
