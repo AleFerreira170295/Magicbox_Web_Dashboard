@@ -27,6 +27,14 @@ const VERIFIED_V3_CABLE_FIRMWARE: ResolvedCableFirmwareRelease = {
   source: "bundled",
 };
 
+const VERIFIED_V2_CABLE_FIRMWARE: ResolvedCableFirmwareRelease = {
+  downloadUrl: "/firmware/esp32/magicbox-v2-V2.3.18.bin",
+  sha256: "aea43cc1dedce2f59d6ac1623393d324f5df3e419e6a0a15353f0b06e886efe8",
+  sizeBytes: 4_194_304,
+  version: "V2.3.18",
+  source: "bundled",
+};
+
 function versionParts(value?: string | null) {
   return (value?.match(/\d+/g) || []).map(Number);
 }
@@ -69,7 +77,7 @@ export function resolveCableFirmwareReleaseForTarget(
   }
 
   if (target === "v3") return VERIFIED_V3_CABLE_FIRMWARE;
-  return null;
+  return VERIFIED_V2_CABLE_FIRMWARE;
 }
 
 interface FlashFirmwareOptions {

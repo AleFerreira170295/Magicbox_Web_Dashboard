@@ -54,7 +54,11 @@ describe("firmware updater validation", () => {
       sha256: "b".repeat(64),
       sizeBytes: 123,
       version: "V2.3.20",
-    }, "v2")).toBeNull();
+    }, "v2")).toMatchObject({
+      downloadUrl: "/firmware/esp32/magicbox-v2-V2.3.18.bin",
+      source: "bundled",
+      version: "V2.3.18",
+    });
   });
 
   it("rejects an empty or altered firmware image", async () => {
