@@ -19,7 +19,7 @@ import { SyncNavigation } from "@/features/syncs/sync-navigation";
 import type { ImportedGame, MagicBoxDeviceInfo, ParticipantTarget } from "@/features/device-import/types";
 import { MagicBoxSerialClient, supportsWebSerial } from "@/features/device-import/web-serial";
 import { useDeviceByDeviceId, useDevices } from "@/features/devices/api";
-import { uploadGamesBatch, uploadRawGameSync } from "@/features/games/api";
+import { getGame, uploadGamesBatch, uploadRawGameSync } from "@/features/games/api";
 import { buildGameDetailHref, buildGamesOverviewHref } from "@/features/games/game-route";
 import type { GameRecord } from "@/features/games/types";
 import { useInstitutions } from "@/features/institutions/api";
@@ -480,7 +480,33 @@ export function DeviceImportCenter() {
       attemptsBatch: r.attemptsBatch + 1,
     }));
 
-    const uploaded = await uploadGamesBatch(accessToken, record.batchPayload);
+    let uploaded: Awaited<ReturnType<typeof uploadGamesBatch>> | null = null;
+    try {
+      uploaded = await uploadGamesBatch(accessToken, record.batchPayload);
+    } catch (cause) {
+      if (cause instanceof ApiError && cause.status === 409) {
+        const fetched = await Promise.all(
+          record.selectedGameIds.map(async (gameId) => {
+            try {
+              return await getGame(accessToken, String(gameId));
+            } catch {
+              return null;
+            }
+          }),
+        );
+        const resolved = fetched.filter((g): g is GameRecord => g != null);
+        const missing = record.selectedGameIds.filter(
+          (gameId) => !resolved.some((game) => game.gameId === gameId),
+        );
+        if (missing.length > 0) throw cause;
+        uploaded = resolved;
+      } else {
+        throw cause;
+      }
+    }
+
+    if (!uploaded) throw new Error("No se pudo obtener el resultado del batch.");
+
 
     const uploadedByGameId = new Map(uploaded.map((game) => [game.gameId, game] as const));
     const missing = record.selectedGameIds.filter((gameId) => !uploadedByGameId.has(gameId));
