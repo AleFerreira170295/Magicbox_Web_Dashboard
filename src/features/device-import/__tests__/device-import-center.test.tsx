@@ -50,12 +50,13 @@ vi.mock("@/features/device-import/web-serial", () => ({
 }));
 
 vi.mock("@/features/device-import/firmware-updater", () => ({
-  resolveCableFirmwareReleaseForTarget: () => ({
+  resolveCableFirmwareReleaseForTarget: (...args: [unknown, "v2" | "v3"]) => ({
     downloadUrl: "/firmware.bin",
     sha256: "a".repeat(64),
     sizeBytes: 123,
     version: "V2.3.22",
     source: "bundled",
+    hardwareTarget: args[1],
   }),
   flashMagicBoxFirmware: mocks.flashMagicBoxFirmware,
 }));
@@ -211,7 +212,7 @@ describe("DeviceImportCenter cable actions", () => {
     expect(screen.getByText(/ID detectado: AABBCCDDEEFF/i)).toBeInTheDocument();
   });
   it("continues with batch-only when raw-syncs returns 409 (idempotency conflict)", async () => {
-    mocks.uploadRawGameSync.mockRejectedValueOnce(new ApiError("idempotency conflict", 409, { error: { message: "conflict" } } as any));
+    mocks.uploadRawGameSync.mockRejectedValueOnce(new ApiError("idempotency conflict", 409, { error: { message: "conflict" } }));
 
     render(<DeviceImportCenter />);
 
@@ -336,6 +337,7 @@ describe("DeviceImportCenter cable actions", () => {
     fireEvent.click(screen.getByRole("button", { name: "Actualizar a V2.3.22" }));
     expect(await screen.findByRole("dialog", { name: "Firmware cargado correctamente" })).toHaveTextContent("MagicBox V2");
     expect(screen.getByRole("combobox")).toHaveValue("v2");
+    expect(mocks.flashMagicBoxFirmware.mock.calls[0][0].release.hardwareTarget).toBe("v2");
     expect(screen.getByRole("progressbar")).toHaveAttribute("aria-valuenow", "100");
     fireEvent.click(screen.getByRole("button", { name: "Cerrar" }));
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
