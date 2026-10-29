@@ -83,6 +83,7 @@ export function DeviceImportCenter() {
   const [isUpdatingFirmware, setIsUpdatingFirmware] = useState(false);
   const [firmwareProgress, setFirmwareProgress] = useState(0);
   const [firmwareStatus, setFirmwareStatus] = useState("");
+  const [firmwareResult, setFirmwareResult] = useState<Feedback | null>(null);
   const [selectedCableTarget, setSelectedCableTarget] = useState<CableHardwareTarget>("v3");
   const [confirmedCableTarget, setConfirmedCableTarget] = useState(false);
   const supported = supportsWebSerial();
@@ -197,6 +198,7 @@ export function DeviceImportCenter() {
     setFeedback(null);
     setFirmwareProgress(0);
     setFirmwareStatus("");
+    setFirmwareResult(null);
     setSelectedCableTarget("v3");
     setConfirmedCableTarget(false);
   }
@@ -334,19 +336,21 @@ export function DeviceImportCenter() {
 
   async function updateFirmware() {
     const release = cableRelease;
+    const target = selectedCableTarget;
     if (!confirmedCableTarget || !release) return;
     const generation = sessionGenerationRef.current + 1;
     sessionGenerationRef.current = generation;
     const client = clientRef.current;
     clientRef.current = null;
     clearDeviceSession();
+    setSelectedCableTarget(target);
     setIsUpdatingFirmware(true);
     setFirmwareProgress(0);
     setFirmwareStatus("Preparando actualización…");
     try {
       await client?.disconnect();
       if (!isCurrentSession(generation)) return;
-      await flashMagicBoxFirmware({
+      const result = await flashMagicBoxFirmware({
         release: {
           downloadUrl: release.downloadUrl,
           sha256: release.sha256,
@@ -355,16 +359,30 @@ export function DeviceImportCenter() {
         },
         onProgress: (progress, message) => {
           if (!isCurrentSession(generation)) return;
-          setFirmwareProgress(progress);
+          setFirmwareProgress(Math.min(99, progress));
           setFirmwareStatus(message);
         },
       });
       if (!isCurrentSession(generation)) return;
-      setFirmwareStatus(`Actualización ${release.version || "completada"}. Volvé a conectar la MagicBox para leer partidas.`);
+      const completed: Feedback = {
+        kind: result?.requiresReconnect ? "info" : "success",
+        title: result?.requiresReconnect ? "Firmware cargado: reconectá el cable" : "Firmware cargado correctamente",
+        message: `La carga de ${release.version || "firmware"} en MagicBox ${target.toUpperCase()} terminó. ${result?.requiresReconnect ? "No se pudo confirmar el reinicio automático o la liberación del puerto USB. " : ""}Ya podés desconectar y volver a conectar el cable USB. Luego presioná «Conectar» para comprobar que la MagicBox responde.`,
+      };
+      setFirmwareProgress(100);
+      setFirmwareStatus("Carga completada · 100%");
+      setFirmwareResult(completed);
+      setFeedback(completed);
     } catch (cause) {
       if (!isCurrentSession(generation)) return;
-      showError(cause, "No se pudo actualizar el firmware");
-      setFirmwareStatus("La actualización no se completó. No desconectes la MagicBox hasta revisar el error.");
+      const failed: Feedback = {
+        kind: "error",
+        title: "No se pudo actualizar el firmware",
+        message: `${getErrorMessage(cause)} No se confirmó una carga completa. Revisá el cable USB y el puerto seleccionado; luego confirmá el modelo y volvé a intentar.`,
+      };
+      setFirmwareStatus("Actualización no completada");
+      setFirmwareResult(failed);
+      setFeedback(failed);
     } finally {
       if (isCurrentSession(generation)) setIsUpdatingFirmware(false);
     }
@@ -700,7 +718,8 @@ export function DeviceImportCenter() {
             <div><p className="text-xs text-muted-foreground">Integridad</p><p className="font-medium">{cableRelease ? "SHA-256 verificado" : "Pendiente"}</p></div>
           </div>
           <label className="flex items-start gap-3 text-sm"><input type="checkbox" className="mt-1" checked={confirmedCableTarget} onChange={(event) => setConfirmedCableTarget(event.target.checked)} disabled={isUpdatingFirmware || !cableRelease} /><span>Confirmo que es una MagicBox {selectedCableTarget === "v2" ? "V2" : "V3"} y mantendré el cable conectado durante toda la actualización.</span></label>
-          {(isUpdatingFirmware || firmwareStatus) ? <div className="space-y-2"><div className="h-2 overflow-hidden rounded-full bg-muted"><div className="h-full bg-primary transition-all" style={{ width: `${firmwareProgress}%` }} /></div><p className="text-sm text-muted-foreground">{firmwareStatus}</p></div> : null}
+          {(isUpdatingFirmware || firmwareStatus) ? <div className="space-y-2"><div role="progressbar" aria-label="Progreso de actualización" aria-valuemin={0} aria-valuemax={100} aria-valuenow={firmwareProgress} className="h-2 overflow-hidden rounded-full bg-muted"><div className={`h-full transition-all ${firmwareResult?.kind === "error" ? "bg-destructive" : "bg-primary"}`} style={{ width: `${firmwareProgress}%` }} /></div><p aria-live="polite" className="text-sm text-muted-foreground">{firmwareStatus}{isUpdatingFirmware ? ` (${firmwareProgress}%) · Mantené el cable conectado.` : ""}</p></div> : null}
+          {firmwareResult ? <div role={firmwareResult.kind === "error" ? "alert" : "status"} className={`rounded-xl border p-4 ${firmwareResult.kind === "error" ? "border-destructive/40 bg-destructive/5" : firmwareResult.kind === "success" ? "border-emerald-300 bg-emerald-50 text-emerald-900" : "border-amber-300 bg-amber-50 text-amber-900"}`}><p className="flex items-center gap-2 font-semibold">{firmwareResult.kind === "success" ? <CheckCircle2 className="size-5" /> : <AlertTriangle className="size-5" />}{firmwareResult.title}</p><p className="mt-2 text-sm">{firmwareResult.message}</p><Button className="mt-3" variant="outline" onClick={() => setFeedback(firmwareResult)}>Ver resultado</Button></div> : null}
           <Button onClick={updateFirmware} disabled={!supported || !confirmedCableTarget || isUpdatingFirmware || !cableRelease}>{isUpdatingFirmware ? <LoaderCircle className="size-4 animate-spin" /> : <Cpu className="size-4" />}{isUpdatingFirmware ? "Actualizando…" : `Actualizar a ${cableRelease?.version}`}</Button>
         </CardContent>
       </Card>

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { StrictMode, type ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiError } from "@/lib/api/fetcher";
@@ -120,7 +120,7 @@ describe("DeviceImportCenter cable actions", () => {
   });
 
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
     globalThis.localStorage?.clear?.();
     mocks.unexpectedDisconnects.length = 0;
     mocks.connect.mockResolvedValue(undefined);
@@ -328,6 +328,38 @@ describe("DeviceImportCenter cable actions", () => {
     expect(mocks.disconnect).toHaveBeenCalledTimes(2);
   });
 
+  it("confirms completion, preserves V2 and keeps the result after closing the dialog", async () => {
+    mocks.flashMagicBoxFirmware.mockResolvedValueOnce({ requiresReconnect: false });
+    render(<DeviceImportCenter />);
+    fireEvent.change(screen.getByRole("combobox"), { target: { value: "v2" } });
+    fireEvent.click(screen.getByRole("checkbox", { name: /Confirmo que es una MagicBox V2/i }));
+    fireEvent.click(screen.getByRole("button", { name: "Actualizar a V2.3.22" }));
+    expect(await screen.findByRole("dialog", { name: "Firmware cargado correctamente" })).toHaveTextContent("MagicBox V2");
+    expect(screen.getByRole("combobox")).toHaveValue("v2");
+    expect(screen.getByRole("progressbar")).toHaveAttribute("aria-valuenow", "100");
+    fireEvent.click(screen.getByRole("button", { name: "Cerrar" }));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent("Firmware cargado correctamente");
+    fireEvent.click(screen.getByRole("button", { name: "Ver resultado" }));
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+  });
+
+  it("does not show 100 percent before cleanup finishes and warns when reconnection is required", async () => {
+    let finish!: (result: { requiresReconnect: boolean }) => void;
+    mocks.flashMagicBoxFirmware.mockImplementationOnce(({ onProgress }) => {
+      onProgress(100, "Finalizando…");
+      return new Promise((resolve) => { finish = resolve; });
+    });
+    render(<DeviceImportCenter />);
+    fireEvent.click(screen.getByRole("checkbox", { name: /Confirmo que es una MagicBox V3/i }));
+    fireEvent.click(screen.getByRole("button", { name: "Actualizar a V2.3.22" }));
+    await waitFor(() => expect(screen.getByRole("progressbar")).toHaveAttribute("aria-valuenow", "99"));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    await act(async () => finish({ requiresReconnect: true }));
+    expect(await screen.findByRole("dialog", { name: "Firmware cargado: reconectá el cable" })).toHaveTextContent("No se pudo confirmar el reinicio automático");
+    expect(screen.getByRole("progressbar")).toHaveAttribute("aria-valuenow", "100");
+  });
+
   it("recovers from a cable loss during update and ignores late progress from device A", async () => {
     mocks.getDeviceInfo
       .mockResolvedValueOnce({ deviceId: "AABBCCDDEEFF", firmwareVersion: "V2.3.22", hardware: "MagicBox V3" })
@@ -344,7 +376,7 @@ describe("DeviceImportCenter cable actions", () => {
     fireEvent.click(screen.getByRole("button", { name: "Actualizar a V2.3.22" }));
 
     expect(await screen.findByRole("dialog", { name: "No se pudo actualizar el firmware" })).toBeInTheDocument();
-    expect(screen.getByText("device has been lost")).toBeInTheDocument();
+    expect(screen.getByRole("alert")).toHaveTextContent("device has been lost");
     expect(screen.queryByText("MagicBox Aula Norte")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Conectar" })).toBeEnabled();
 

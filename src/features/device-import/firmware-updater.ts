@@ -158,6 +158,10 @@ export async function resetMagicBoxToApplication(control: ResetControlLines) {
   await control.setDTR(false);
 }
 
+export interface FirmwareFlashResult {
+  requiresReconnect: boolean;
+}
+
 export async function flashMagicBoxFirmware({ release, onProgress, onLog }: FlashFirmwareOptions) {
   const serial = (navigator as Navigator & SerialNavigator).serial;
   if (!serial) throw new Error("Web Serial no está disponible en este navegador.");
@@ -181,6 +185,7 @@ export async function flashMagicBoxFirmware({ release, onProgress, onLog }: Flas
   };
   const loader = new ESPLoader({ transport, baudrate: 115200, terminal, debugLogging: false });
 
+  let requiresReconnect = false;
   try {
     onProgress?.(12, "Entrando al cargador seguro del ESP32…");
     const chip = await loader.main();
@@ -214,13 +219,19 @@ export async function flashMagicBoxFirmware({ release, onProgress, onLog }: Flas
     onProgress?.(97, "Reiniciando MagicBox…");
     const resetCompleted = await settleWithin(resetMagicBoxToApplication(transport), 2_500);
     if (!resetCompleted) {
+      requiresReconnect = true;
       onLog?.("La escritura terminó, pero el controlador serie no confirmó el reset. La MagicBox puede reiniciarse al desconectar el cable.");
     }
-    onProgress?.(100, `Firmware ${release.version || "nuevo"} instalado. Ya podés reconectar la MagicBox.`);
+    onProgress?.(99, "Carga terminada. Liberando el puerto USB…");
   } finally {
     // Chromium/macOS can leave esptool-js' read loop locked after the ESP32
     // resets. Never keep the UI waiting forever after a completed flash.
     const disconnected = await settleWithin(transport.disconnect(), 2_000);
-    if (!disconnected) onLog?.("El puerto quedó pendiente de liberación; desconectá y reconectá el cable antes de continuar.");
+    if (!disconnected) {
+      requiresReconnect = true;
+      onLog?.("El puerto quedó pendiente de liberación; desconectá y reconectá el cable antes de continuar.");
+    }
   }
+  onProgress?.(100, `Firmware ${release.version || "nuevo"} cargado correctamente.`);
+  return { requiresReconnect } satisfies FirmwareFlashResult;
 }
