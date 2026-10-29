@@ -61,10 +61,16 @@ services:
 Then run the base compose plus that override using `up -d --no-deps --no-build web`.
 Check the image ID, public route, V3 hash and that the old V2 asset is NOT downloadable.
 
-## Remaining physical gate
+## Physical acceptance and production promotion — 2026-10-29
 
-No attached device was reset or flashed: its PCB identity was not confirmed.
-V2 physical boot, PWM audio, LEDs, RFID, full game, BLE, USB stored-game preservation,
-battery and sleep remain unverified. Inspect and back up an affected V2 before
-repair; never erase/format to work around the previous incompatible write.
-See `firmware-v2-pcb-audit-20261029.md` for the electrical and behavioral comparison.
+An operator-confirmed PCB V2 was backed up, recovered and verified over USB.
+The operator subsequently reported “El firmware funciona perfecto” and authorized
+production publication. This is operator acceptance, not an itemized report of
+all RFID/BLE/battery scenarios. Browser flashing was not physically exercised.
+See `RECOVERY_V2_FLASH.md` and `firmware-v2-pcb-audit-20261029.md`.
+
+The accepted application is byte-identical to the already deployed V2.3.23 asset.
+No firmware rebuild, device rewrite, API deployment or V3 change is required.
+Promotion retains the active image and compose configuration above, synchronizes
+release documentation and verifies public assets again. The safe rollback remains
+unchanged. Historical “physical pending” statements above are superseded here.

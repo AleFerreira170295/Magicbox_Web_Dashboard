@@ -1,6 +1,6 @@
 # Auditoría PCB V2 / firmware V0.14 / comportamiento V3
 
-Fecha: 2026-10-29. Estado: código y compilación verificados; prueba física V2 pendiente.
+Fecha: 2026-10-29. Estado: código, compilación, arranque y USB verificados en una PCB V2; funcionamiento físico confirmado por el operador el 2026-10-29. Ver `RECOVERY_V2_FLASH.md`.
 
 ## Incidente confirmado
 
@@ -123,11 +123,12 @@ Regrabar únicamente la app V2 si la tabla lo permite. Un filesystem dañado por
 el archivo anterior no se arregla formateándolo; preservar evidencia y buscar
 backup. No prometer recuperación de partidas sin comprobarlas.
 
-## Validación física pendiente
+## Validación física posterior
 
-No se grabó ni se reinició el puerto conectado, cuya PCB no fue confirmada.
-Falta: arranque y wake por botón; sonido PWM; aro y consumo; ambos lectores;
-registro/configuración de jugadores/mazo; aciertos/fallos/fin; pausa/reanudación;
-BLE; guardar/listar/descargar una partida; reconexión USB; carga/batería/sleep.
-Las pruebas software y el build no prueban esos circuitos ni el estado de las
-cajas que recibieron la imagen anterior.
+Tras confirmar el operador que el equipo conectado era V2, se respaldó y recuperó su flash. Arranque V2.3.23, identidad V2, montaje LittleFS y listado USB vacío fueron verificados; ver `RECOVERY_V2_FLASH.md`.
+El 2026-10-29, tras la recuperación y la solicitud de prueba sin USB, el operador
+confirmó: «El firmware funciona perfecto» y autorizó la publicación en producción.
+Esta confirmación valida el funcionamiento observado de esta unidad; no constituye
+un registro individual de pruebas de ambos lectores, BLE, descarga de partidas,
+consumo o ciclos prolongados de batería. El flasheo físico se hizo por consola;
+no se verificó una actualización desde navegador en esta sesión.
