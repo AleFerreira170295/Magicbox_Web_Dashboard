@@ -74,3 +74,21 @@ No firmware rebuild, device rewrite, API deployment or V3 change is required.
 Promotion retains the active image and compose configuration above, synchronizes
 release documentation and verifies public assets again. The safe rollback remains
 unchanged. Historical “physical pending” statements above are superseded here.
+
+## Promotion results
+
+- Firmware stable branch `legacy/v2.3.10-old-hardware`: `435d4c7`; immutable tag
+  `old-hardware-v2.3.23`. V3 main and latest release unchanged.
+- Official release: https://github.com/AleFerreira170295/Magicbox_Firmware/releases/tag/old-hardware-v2.3.23
+  Release links to production binaries with SHA-256 values; GitHub attachment
+  uploads were blocked by the session egress proxy (HTTP CONNECT 403).
+- Dashboard main promoted by fast-forward, including runtime corrections and
+  acceptance docs (`48e603b`); subsequent documentation-only verification update.
+- Re-ran 5 firmware contract tests and 192 dashboard tests: all passed.
+- Running production image unchanged; exact V2, V3 and boot_app0 hashes verified
+  inside `magicbox-web`. `/syncs/cable` and V2 download returned HTTP 200,
+  withdrawn V2.3.18 download returned 404 via container-local HTTP.
+- Fresh external HTTP verification from this session was blocked by its proxy
+  (CONNECT 403); do not describe the internal check as a new public network check.
+- Updated deployment, audit and recovery docs synchronized to the active release
+  directory. No restart necessary for documentation-only promotion.
