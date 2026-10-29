@@ -1,8 +1,7 @@
 import { ESPLoader, Transport, type IEspLoaderTerminal } from "esptool-js";
 import { resolveApiBaseUrl } from "@/lib/api/fetcher";
 
-const APP0_ADDRESS = 0x10000;
-const OTA_SELECTOR_ADDRESS = 0xe000;
+import { APP0_ADDRESS, OTA_SELECTOR_ADDRESS, inspectEsp32Application, validateCablePartitionTable } from "./firmware-image";
 const OTA_SELECTOR_URL = "/firmware/esp32/boot_app0.bin";
 const MINIMUM_CABLE_FIRMWARE_VERSION = "V2.3.22";
 
@@ -15,6 +14,7 @@ export interface FirmwareReleaseInput {
 
 export interface ResolvedCableFirmwareRelease extends FirmwareReleaseInput {
   source: "published" | "bundled";
+  hardwareTarget: CableHardwareTarget;
 }
 
 export type CableHardwareTarget = "v2" | "v3";
@@ -25,14 +25,16 @@ const VERIFIED_V3_CABLE_FIRMWARE: ResolvedCableFirmwareRelease = {
   sizeBytes: 1_349_040,
   version: MINIMUM_CABLE_FIRMWARE_VERSION,
   source: "bundled",
+  hardwareTarget: "v3",
 };
 
 const VERIFIED_V2_CABLE_FIRMWARE: ResolvedCableFirmwareRelease = {
-  downloadUrl: "/firmware/esp32/magicbox-v2-V2.3.18.bin",
-  sha256: "aea43cc1dedce2f59d6ac1623393d324f5df3e419e6a0a15353f0b06e886efe8",
-  sizeBytes: 4_194_304,
-  version: "V2.3.18",
+  downloadUrl: "/firmware/esp32/magicbox-v2-V2.3.23.bin",
+  sha256: "c96db95668f653a02451a7b932944210e13eab067cd87d2daad204b00a730327",
+  sizeBytes: 1_357_536,
+  version: "V2.3.23",
   source: "bundled",
+  hardwareTarget: "v2",
 };
 
 function versionParts(value?: string | null) {
@@ -67,12 +69,12 @@ export function resolveCableFirmwareReleaseForTarget(
   const isPublishedValid = Boolean(
     release?.downloadUrl
     && release.sha256
-    && isAtLeastVersion(release.version, MINIMUM_CABLE_FIRMWARE_VERSION),
+    && isAtLeastVersion(release.version, target === "v2" ? "V2.3.23" : MINIMUM_CABLE_FIRMWARE_VERSION),
   );
 
   if (isPublishedValid && release) {
-    if (target === "v3" || doesDownloadUrlMatchTarget(release.downloadUrl, target)) {
-      return { ...release, source: "published" };
+    if (doesDownloadUrlMatchTarget(release.downloadUrl, target)) {
+      return { ...release, source: "published", hardwareTarget: target };
     }
   }
 
@@ -81,7 +83,7 @@ export function resolveCableFirmwareReleaseForTarget(
 }
 
 interface FlashFirmwareOptions {
-  release: FirmwareReleaseInput;
+  release: ResolvedCableFirmwareRelease;
   onProgress?: (progress: number, message: string) => void;
   onLog?: (message: string) => void;
 }
@@ -106,7 +108,7 @@ export async function sha256Hex(data: Uint8Array) {
   return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
-export async function validateFirmwareImage(data: Uint8Array, release: FirmwareReleaseInput) {
+export async function validateFirmwareImage(data: Uint8Array, release: FirmwareReleaseInput, target?: CableHardwareTarget) {
   if (data.byteLength === 0) throw new Error("El binario de firmware está vacío.");
   if (release.sizeBytes && data.byteLength !== release.sizeBytes) {
     throw new Error(`El firmware descargado mide ${data.byteLength} bytes; se esperaban ${release.sizeBytes}.`);
@@ -116,6 +118,17 @@ export async function validateFirmwareImage(data: Uint8Array, release: FirmwareR
     if (actualHash.toLowerCase() !== release.sha256.toLowerCase()) {
       throw new Error("El hash SHA-256 del firmware no coincide con la release publicada.");
     }
+  }
+  const { checksumEnd } = inspectEsp32Application(data);
+  const internalHash = await sha256Hex(data.subarray(0, checksumEnd));
+  const embeddedHash = Array.from(data.subarray(checksumEnd), (byte) => byte.toString(16).padStart(2, "0")).join("");
+  if (internalHash !== embeddedHash) throw new Error("El hash interno de la aplicación ESP32 no coincide.");
+  const text = new TextDecoder().decode(data);
+  if (target === "v2" && !text.includes("MAGICBOX_HW_V2_PWM32")) {
+    throw new Error("La aplicación no acredita compatibilidad con la PCB V2 y su buzzer PWM. No se escribió nada.");
+  }
+  if (target === "v3" && text.includes("MAGICBOX_HW_V2_PWM32")) {
+    throw new Error("No se puede cargar firmware de PCB V2 en una MagicBox V3.");
   }
 }
 
@@ -167,13 +180,19 @@ export async function flashMagicBoxFirmware({ release, onProgress, onLog }: Flas
   if (!serial) throw new Error("Web Serial no está disponible en este navegador.");
   if (!window.isSecureContext) throw new Error("La actualización requiere HTTPS o localhost.");
   if (!release.downloadUrl) throw new Error("No hay una release de firmware publicada.");
+  if (release.hardwareTarget !== "v2" && release.hardwareTarget !== "v3") {
+    throw new Error("Falta confirmar el modelo de PCB antes de actualizar.");
+  }
 
   onProgress?.(2, "Descargando firmware publicado…");
   const [firmware, otaSelector] = await Promise.all([
     downloadBinary(resolveDownloadUrl(release.downloadUrl)),
     downloadBinary(OTA_SELECTOR_URL),
   ]);
-  await validateFirmwareImage(firmware, release);
+  await validateFirmwareImage(firmware, release, release.hardwareTarget);
+  if (otaSelector.byteLength !== 8192 || await sha256Hex(otaSelector) !== "f94c5d786a7a8fab06ac5d10e33bf37711a6697636dc037559ea19cc410a17f0") {
+    throw new Error("El selector de arranque OTA no es válido; no se escribió nada.");
+  }
 
   onProgress?.(8, "Seleccioná el puerto USB de la MagicBox…");
   const port = await serial.requestPort();
@@ -189,10 +208,12 @@ export async function flashMagicBoxFirmware({ release, onProgress, onLog }: Flas
   try {
     onProgress?.(12, "Entrando al cargador seguro del ESP32…");
     const chip = await loader.main();
-    if (!chip.toUpperCase().includes("ESP32")) {
+    if (!/^ESP32(?:[- ](?:D0WD|D2WD|D0WDR2|PICO|U4WDH)|$)/i.test(chip)) {
       throw new Error(`El puerto seleccionado no corresponde a una MagicBox ESP32 (${chip}).`);
     }
 
+    onProgress?.(15, "Verificando particiones para preservar configuración y partidas…");
+    validateCablePartitionTable(await loader.readFlash(0x8000, 0xc00), firmware.byteLength);
     const totalBytes = firmware.byteLength + otaSelector.byteLength;
     onProgress?.(18, `Dispositivo detectado: ${chip}. Escribiendo firmware…`);
     await loader.writeFlash({
@@ -223,6 +244,11 @@ export async function flashMagicBoxFirmware({ release, onProgress, onLog }: Flas
       onLog?.("La escritura terminó, pero el controlador serie no confirmó el reset. La MagicBox puede reiniciarse al desconectar el cable.");
     }
     onProgress?.(99, "Carga terminada. Liberando el puerto USB…");
+  } catch (error) {
+    // A rejected partition table must not leave an otherwise healthy device
+    // running the ROM flasher stub. Preserve the original error for the UI.
+    await settleWithin(resetMagicBoxToApplication(transport), 2_500);
+    throw error;
   } finally {
     // Chromium/macOS can leave esptool-js' read loop locked after the ESP32
     // resets. Never keep the UI waiting forever after a completed flash.

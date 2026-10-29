@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { resetMagicBoxToApplication, resolveCableFirmwareRelease, resolveCableFirmwareReleaseForTarget, settleWithin, sha256Hex, validateFirmwareImage } from "@/features/device-import/firmware-updater";
 
@@ -18,7 +20,7 @@ describe("firmware updater validation", () => {
   });
 
   it("validates published size and SHA-256", async () => {
-    const firmware = new TextEncoder().encode("magicbox-firmware");
+    const firmware = new Uint8Array(readFileSync(resolve("public/firmware/esp32/magicbox-v3-V2.3.22.bin")));
     const hash = await sha256Hex(firmware);
 
     await expect(validateFirmwareImage(firmware, {
@@ -30,11 +32,11 @@ describe("firmware updater validation", () => {
 
   it("uses only a published release new enough for cable import", () => {
     expect(resolveCableFirmwareRelease({
-      downloadUrl: "/published.bin",
+      downloadUrl: "/magicbox-v3-published.bin",
       sha256: "a".repeat(64),
       sizeBytes: 123,
       version: "V2.3.23",
-    })).toMatchObject({ downloadUrl: "/published.bin", source: "published" });
+    })).toMatchObject({ downloadUrl: "/magicbox-v3-published.bin", source: "published" });
 
     expect(resolveCableFirmwareRelease({
       downloadUrl: "/old.bin",
@@ -55,9 +57,9 @@ describe("firmware updater validation", () => {
       sizeBytes: 123,
       version: "V2.3.20",
     }, "v2")).toMatchObject({
-      downloadUrl: "/firmware/esp32/magicbox-v2-V2.3.18.bin",
+      downloadUrl: "/firmware/esp32/magicbox-v2-V2.3.23.bin",
       source: "bundled",
-      version: "V2.3.18",
+      version: "V2.3.23",
     });
   });
 

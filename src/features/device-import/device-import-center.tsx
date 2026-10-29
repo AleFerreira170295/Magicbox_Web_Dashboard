@@ -351,12 +351,7 @@ export function DeviceImportCenter() {
       await client?.disconnect();
       if (!isCurrentSession(generation)) return;
       const result = await flashMagicBoxFirmware({
-        release: {
-          downloadUrl: release.downloadUrl,
-          sha256: release.sha256,
-          sizeBytes: release.sizeBytes,
-          version: release.version,
-        },
+        release,
         onProgress: (progress, message) => {
           if (!isCurrentSession(generation)) return;
           setFirmwareProgress(Math.min(99, progress));
@@ -714,7 +709,7 @@ export function DeviceImportCenter() {
         <CardContent className="space-y-4">
           <div className="grid gap-3 rounded-xl border p-4 md:grid-cols-3">
             <div><p className="text-xs text-muted-foreground">Hardware habilitado</p><p className="font-medium">MagicBox {selectedCableTarget === "v2" ? "V2" : "V3"}</p><select className="mt-2 h-9 w-full rounded-md border bg-background px-3 text-sm" value={selectedCableTarget} disabled={isUpdatingFirmware} onChange={(event) => { setSelectedCableTarget(event.target.value as CableHardwareTarget); setConfirmedCableTarget(false); }}><option value="v2">MagicBox V2</option><option value="v3">MagicBox V3</option></select></div>
-            <div><p className="text-xs text-muted-foreground">Firmware seleccionado</p><p className="font-medium">{cableRelease ? `${cableRelease.version} · ${cableRelease.source === "published" ? "release activa" : "release segura integrada"}` : "No hay release publicada para V2"}</p></div>
+            <div><p className="text-xs text-muted-foreground">Firmware seleccionado</p><p className="font-medium">{cableRelease ? `${cableRelease.version} · ${cableRelease.source === "published" ? "release activa" : "release integrada"}` : "No hay release publicada para V2"}</p></div>
             <div><p className="text-xs text-muted-foreground">Integridad</p><p className="font-medium">{cableRelease ? "SHA-256 verificado" : "Pendiente"}</p></div>
           </div>
           <label className="flex items-start gap-3 text-sm"><input type="checkbox" className="mt-1" checked={confirmedCableTarget} onChange={(event) => setConfirmedCableTarget(event.target.checked)} disabled={isUpdatingFirmware || !cableRelease} /><span>Confirmo que es una MagicBox {selectedCableTarget === "v2" ? "V2" : "V3"} y mantendré el cable conectado durante toda la actualización.</span></label>
