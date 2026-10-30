@@ -3,7 +3,7 @@ import { resolveApiBaseUrl } from "@/lib/api/fetcher";
 
 import { APP0_ADDRESS, OTA_SELECTOR_ADDRESS, inspectEsp32Application, validateInstalledDeviceForNormalUpdate } from "./firmware-image";
 const OTA_SELECTOR_URL = "/firmware/esp32/boot_app0.bin";
-const MINIMUM_CABLE_FIRMWARE_VERSION = "V2.3.22";
+const MINIMUM_CABLE_FIRMWARE_VERSION = "V2.3.23";
 
 export interface FirmwareReleaseInput {
   downloadUrl: string;
@@ -21,23 +21,23 @@ export interface ResolvedCableFirmwareRelease extends FirmwareReleaseInput {
 export type CableHardwareTarget = "v2" | "v3";
 
 const VERIFIED_V3_CABLE_FIRMWARE: ResolvedCableFirmwareRelease = {
-  downloadUrl: "/firmware/esp32/magicbox-v3-V2.3.22.bin",
-  sha256: "46239b0c927a4d1bfebcfb8adb6ee5bd78c1b15bd9a71ff3237a4ffb951a7e59",
-  sizeBytes: 1_349_040,
+  downloadUrl: "/firmware/esp32/magicbox-v3-V2.3.23.bin",
+  sha256: "74f36265d6d26dd1f0230622a5792747285e0ef4fab06033cff8c5fd11cfa27f",
+  sizeBytes: 1_349_920,
   version: MINIMUM_CABLE_FIRMWARE_VERSION,
   source: "bundled",
   hardwareTarget: "v3",
-  md5: "10df0cde530acc224ff26382e86f88f1",
+  md5: "42b1e108d128e48ba8eddade02d5f123",
 };
 
 const VERIFIED_V2_CABLE_FIRMWARE: ResolvedCableFirmwareRelease = {
-  downloadUrl: "/firmware/esp32/magicbox-v2-V2.3.23.bin",
-  sha256: "c96db95668f653a02451a7b932944210e13eab067cd87d2daad204b00a730327",
-  sizeBytes: 1_357_536,
-  version: "V2.3.23",
+  downloadUrl: "/firmware/esp32/magicbox-v2-V2.3.24.bin",
+  sha256: "7f134519c761e299b50176248feeac4d818bb3be262318f11d087c104a874b0a",
+  sizeBytes: 1_358_368,
+  version: "V2.3.24",
   source: "bundled",
   hardwareTarget: "v2",
-  md5: "3542585f35333a9c40e81b21ac3e319a",
+  md5: "a7d262ef06226499e3ba9fcd216413a0",
 };
 
 function versionParts(value?: string | null) {
@@ -72,7 +72,7 @@ export function resolveCableFirmwareReleaseForTarget(
   const isPublishedValid = Boolean(
     release?.downloadUrl
     && release.sha256
-    && isAtLeastVersion(release.version, target === "v2" ? "V2.3.23" : MINIMUM_CABLE_FIRMWARE_VERSION),
+    && isAtLeastVersion(release.version, target === "v2" ? "V2.3.24" : MINIMUM_CABLE_FIRMWARE_VERSION),
   );
 
   const trusted = target === "v3" ? VERIFIED_V3_CABLE_FIRMWARE : VERIFIED_V2_CABLE_FIRMWARE;

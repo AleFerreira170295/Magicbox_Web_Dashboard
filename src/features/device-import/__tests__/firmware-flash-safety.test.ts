@@ -19,7 +19,7 @@ beforeEach(()=>{
   vi.clearAllMocks();Object.defineProperty(window,"isSecureContext",{configurable:true,value:true});Object.defineProperty(navigator,"serial",{configurable:true,value:{requestPort:mock.requestPort}});vi.stubGlobal("fetch",mock.fetch);
   mock.fetch.mockImplementation(async(url:string)=>{const pathname=new URL(url,"https://test.local").pathname;const bytes=new Uint8Array(readFileSync(resolve("public"+pathname)));return{ok:true,arrayBuffer:async()=>bytes.buffer};});
   mock.main.mockResolvedValue("ESP32-PICO-D4 (revision 1)");mock.readFlash.mockImplementation(async(address:number)=>address===0x8000?layout():imageHeader());
-  mock.flashMd5sum.mockImplementation(async(address:number)=>address===0x10000?"3542585f35333a9c40e81b21ac3e319a":"e6327541e2dc394ca2c3b3280ac0f39f");
+  mock.flashMd5sum.mockImplementation(async(address:number)=>address===0x10000?"a7d262ef06226499e3ba9fcd216413a0":"e6327541e2dc394ca2c3b3280ac0f39f");
   mock.requestPort.mockResolvedValue({});mock.writeFlash.mockResolvedValue(undefined);mock.disconnect.mockResolvedValue(undefined);
 });
 describe("flashing safety before mutation",()=>{
@@ -27,7 +27,7 @@ describe("flashing safety before mutation",()=>{
     await flashMagicBoxFirmware({release:resolveCableFirmwareReleaseForTarget(null,"v2")!});
     expect(mock.readFlash).toHaveBeenCalledWith(0x1000,64);expect(mock.readFlash).toHaveBeenCalledWith(0x8000,0xc00);expect(mock.readFlash).toHaveBeenCalledWith(0x10000,64);
     expect(mock.readFlash.mock.invocationCallOrder.at(-1)).toBeLessThan(mock.writeFlash.mock.invocationCallOrder[0]);expect(mock.writeFlash).toHaveBeenCalledTimes(2);
-    expect(mock.writeFlash.mock.calls[0][0].fileArray.map((f:{address:number})=>f.address)).toEqual([0x10000]);expect(mock.flashMd5sum).toHaveBeenNthCalledWith(1,0x10000,1_357_536);
+    expect(mock.writeFlash.mock.calls[0][0].fileArray.map((f:{address:number})=>f.address)).toEqual([0x10000]);expect(mock.flashMd5sum).toHaveBeenNthCalledWith(1,0x10000,1_358_368);
     expect(mock.writeFlash.mock.calls[1][0].fileArray.map((f:{address:number})=>f.address)).toEqual([0xe000]);expect(mock.flashMd5sum).toHaveBeenNthCalledWith(2,0xe000,8192);expect(mock.writeFlash.mock.calls.every(([o])=>o.eraseAll===false)).toBe(true);
   });
   it("classifies an erased table as recovery and never writes",async()=>{mock.readFlash.mockImplementation(async(address:number)=>address===0x8000?new Uint8Array(0xc00).fill(0xff):imageHeader());await expect(flashMagicBoxFirmware({release:resolveCableFirmwareReleaseForTarget(null,"v2")!})).rejects.toMatchObject({code:"PARTITION_TABLE_MISSING",recoveryRequired:true});expect(mock.writeFlash).not.toHaveBeenCalled();});
