@@ -87,11 +87,14 @@ export function validateCablePartitionTable(data: Uint8Array, imageSize: number)
   const hasMd5Record = terminalOffset + 32 <= data.length && view.getUint16(terminalOffset, true) === 0xebeb;
   const exactLayout = partitions.length === EXPECTED_PARTITIONS.length && partitions.every((partition, index) => {
     const expected = EXPECTED_PARTITIONS[index];
-    return partition.label === expected.label && partition.type === expected.type && partition.subtype === expected.subtype
+    const subtypeMatches = partition.label === "spiffs"
+      ? partition.subtype === 0x82 || partition.subtype === 0x83
+      : partition.subtype === expected.subtype;
+    return partition.label === expected.label && partition.type === expected.type && subtypeMatches
       && partition.offset === expected.offset && partition.size === expected.size && partition.flags === expected.flags;
   });
   if (imageSize > APP0_SIZE || !exactLayout || !hasMd5Record) {
-    throw new FirmwareSafetyError("PARTITION_TABLE_INCOMPATIBLE", "La tabla de particiones no es compatible: no coincide exactamente con el layout seguro de MagicBox. Requiere diagnóstico o recuperación con respaldo; no se escribió nada.");
+    throw new FirmwareSafetyError("PARTITION_TABLE_INCOMPATIBLE", "La tabla de particiones no es compatible: no coincide con uno de los layouts históricos seguros de MagicBox. Requiere diagnóstico o recuperación con respaldo; no se escribió nada.");
   }
   for (let i = 0; i < partitions.length; i++) {
     const a = partitions[i];

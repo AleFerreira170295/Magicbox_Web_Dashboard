@@ -24,7 +24,7 @@ continúa siendo un procedimiento separado por consola.
    bootloader (0x1000), tabla (0x8000) y app0 (0x10000). Cabeceras borradas o
    inválidas bloquean el flujo normal como recuperación requerida.
 5. La tabla debe tener exactamente seis entradas, orden, etiquetas, tipos,
-   subtipos, offsets, tamaños y flags conocidos, incluido LittleFS 0x83 y el
+   subtipos, offsets, tamaños y flags conocidos, incluido el subtipo histórico 0x82 o LittleFS 0x83 y el
    registro MD5 de tabla. Extras, ausencia, SPIFFS 0x82, solapamientos o cambios
    de tamaño se rechazan sin escribir.
 
@@ -47,7 +47,7 @@ continúa siendo un procedimiento separado por consola.
 ## Cobertura automatizada
 
 Las pruebas cubren binarios reales V2/V3, full-flash de 4 MB, cruce V2/V3,
-hashes internos/externos, bootloader y tabla borrados, layout exacto, MD5 de tabla,
+hashes internos/externos, bootloader y tabla borrados, layouts históricos exactos 0x82/0x83, MD5 de tabla,
 activación en dos fases, fallo de MD5 sin tocar selector, otros ESP32 y ausencia de
 eraseAll. La suite completa del dashboard debe pasar, además de TypeScript y lint.
 El build Linux de producción es la puerta final cuando SWC local no está disponible.
