@@ -62,3 +62,30 @@ Los cambios de compatibilidad y firmware están en ramas de trabajo, compilan y
 sus contratos pasan. No deben incorporarse a releases ni desplegarse hasta
 completar la matriz física y definir el respaldo raw para datos estructuralmente
 corruptos.
+
+## Despliegue autorizado — 2026-10-30
+
+El propietario autorizó promover los cambios a producción antes de completar la
+matriz física. La limitación de validación física sigue vigente y no debe
+interpretarse como prueba end-to-end de una partida real.
+
+- Dashboard commit: 664ed80.
+- API commit: a3b7cbc (incluye corrección del import del guard de autenticación
+  detectada por el test dentro de la imagen).
+- Firmware PCB V2: V2.3.24, tag old-hardware-v2.3.24,
+  SHA-256 7f134519c761e299b50176248feeac4d818bb3be262318f11d087c104a874b0a.
+- Firmware PCB V3: V2.3.23, tag new-hardware-v2.3.23,
+  SHA-256 74f36265d6d26dd1f0230622a5792747285e0ef4fab06033cff8c5fd11cfa27f.
+- Imagen web activa: f63e81f7cd9e9fa6c8cf86160ac4c43b97ee3c8c90275c4f7c2eab88890b4a0d.
+- Imagen API activa: ba7fbb2e465e168fbdfb0ba55b007bb5c5dee2dfd9612c5fae1ce5ef404a18bc.
+- Rollback web: 6fdd7f42866824d3b61775d96c0054f909d63998c485f6acec8b88f94960ce08.
+- Rollback API: e9df2da77494c92457d0cc5e8b7e806e24f7c5867d07fd24ce8528f690287c3c.
+- Respaldos off-host de ambas imágenes verificados con gzip.
+- Dashboard: 47 archivos / 194 tests, TypeScript y lint sin errores.
+- API: 44 tests focalizados de ingestión, privacidad Home, scope e idempotencia
+  aprobados. El discovery global conserva fallos ajenos a este release: cuatro
+  módulos de test requieren pytest no incluido en la imagen productiva y un test
+  legacy de creación BLE espera 200 pero obtiene 500.
+- Producción: health API 200; rutas de ingestión, batch y sync/raw presentes y
+  protegidas (401 sin token); página cable y ambos binarios responden 200 con
+  tamaño y SHA-256 exactos.
