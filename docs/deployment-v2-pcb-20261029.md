@@ -100,3 +100,19 @@ release fingerprints, installed bootloader/app preflight, exact partition layout
 and two-phase app/selector writes with device-side MD5 verification. Damaged
 boxes are classified as recovery-required and remain blocked from web flashing.
 This changes the dashboard only; V2 and V3 firmware binaries remain byte-identical.
+
+### Production result
+
+- Commit: a011642.
+- Isolated release: /opt/magicbox/releases/web-fw-safety-20261030.
+- Compose override: docker-compose.web-fw-safety.yml with docker-compose.ec2.yml.
+- Running web image: sha256:6fdd7f42866824d3b61775d96c0054f909d63998c485f6acec8b88f94960ce08.
+- Rollback image: magicbox-bridge-web:rollback-pre-fw-safety-20261030,
+  sha256:23a39faee79357151fe8f5c1d117d10972cb19d5c73f7f9215e77dd6aa207144.
+- Off-host rollback archive: pre-fw-safety-20261030.tar.gz; gzip verified.
+- Verification: 47 test files / 194 tests passed; TypeScript and focused lint passed.
+  Local Next build was blocked only by unavailable darwin/arm64 SWC; the Linux
+  Docker production build, Next compilation and TypeScript completed successfully.
+- Production checks: web ready, API health 200, cable route 200, V2/V3 assets 200,
+  withdrawn V2.3.18 asset 404, deployed safety strings present, firmware hashes unchanged.
+- Only magicbox-web was recreated; API, Caddy and other services were untouched.
