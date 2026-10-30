@@ -1,7 +1,7 @@
 import { ESPLoader, Transport, type IEspLoaderTerminal } from "esptool-js";
 import { resolveApiBaseUrl } from "@/lib/api/fetcher";
 
-import { APP0_ADDRESS, OTA_SELECTOR_ADDRESS, inspectEsp32Application, validateCablePartitionTable } from "./firmware-image";
+import { APP0_ADDRESS, OTA_SELECTOR_ADDRESS, inspectEsp32Application, validateInstalledDeviceForNormalUpdate } from "./firmware-image";
 const OTA_SELECTOR_URL = "/firmware/esp32/boot_app0.bin";
 const MINIMUM_CABLE_FIRMWARE_VERSION = "V2.3.22";
 
@@ -15,6 +15,7 @@ export interface FirmwareReleaseInput {
 export interface ResolvedCableFirmwareRelease extends FirmwareReleaseInput {
   source: "published" | "bundled";
   hardwareTarget: CableHardwareTarget;
+  md5: string;
 }
 
 export type CableHardwareTarget = "v2" | "v3";
@@ -26,6 +27,7 @@ const VERIFIED_V3_CABLE_FIRMWARE: ResolvedCableFirmwareRelease = {
   version: MINIMUM_CABLE_FIRMWARE_VERSION,
   source: "bundled",
   hardwareTarget: "v3",
+  md5: "10df0cde530acc224ff26382e86f88f1",
 };
 
 const VERIFIED_V2_CABLE_FIRMWARE: ResolvedCableFirmwareRelease = {
@@ -35,6 +37,7 @@ const VERIFIED_V2_CABLE_FIRMWARE: ResolvedCableFirmwareRelease = {
   version: "V2.3.23",
   source: "bundled",
   hardwareTarget: "v2",
+  md5: "3542585f35333a9c40e81b21ac3e319a",
 };
 
 function versionParts(value?: string | null) {
@@ -72,14 +75,15 @@ export function resolveCableFirmwareReleaseForTarget(
     && isAtLeastVersion(release.version, target === "v2" ? "V2.3.23" : MINIMUM_CABLE_FIRMWARE_VERSION),
   );
 
-  if (isPublishedValid && release) {
-    if (doesDownloadUrlMatchTarget(release.downloadUrl, target)) {
-      return { ...release, source: "published", hardwareTarget: target };
-    }
+  const trusted = target === "v3" ? VERIFIED_V3_CABLE_FIRMWARE : VERIFIED_V2_CABLE_FIRMWARE;
+  const matchesTrustedFingerprint = release?.sha256?.toLowerCase() === trusted.sha256?.toLowerCase()
+    && release?.sizeBytes === trusted.sizeBytes
+    && release?.version === trusted.version;
+  if (isPublishedValid && matchesTrustedFingerprint && release && doesDownloadUrlMatchTarget(release.downloadUrl, target)) {
+    return { ...release, source: "published", hardwareTarget: target, md5: trusted.md5 };
   }
 
-  if (target === "v3") return VERIFIED_V3_CABLE_FIRMWARE;
-  return VERIFIED_V2_CABLE_FIRMWARE;
+  return trusted;
 }
 
 interface FlashFirmwareOptions {
@@ -212,30 +216,46 @@ export async function flashMagicBoxFirmware({ release, onProgress, onLog }: Flas
       throw new Error(`El puerto seleccionado no corresponde a una MagicBox ESP32 (${chip}).`);
     }
 
-    onProgress?.(15, "Verificando particiones para preservar configuración y partidas…");
-    validateCablePartitionTable(await loader.readFlash(0x8000, 0xc00), firmware.byteLength);
+    onProgress?.(15, "Verificando arranque, aplicación y particiones antes de escribir…");
+    // esptool uses one serial stream: keep preflight reads strictly sequential.
+    const bootloaderHeader = await loader.readFlash(0x1000, 64);
+    const partitionTable = await loader.readFlash(0x8000, 0xc00);
+    const currentAppHeader = await loader.readFlash(APP0_ADDRESS, 64);
+    validateInstalledDeviceForNormalUpdate({ bootloaderHeader, partitionTable, currentAppHeader, incomingImageSize: firmware.byteLength });
     const totalBytes = firmware.byteLength + otaSelector.byteLength;
-    onProgress?.(18, `Dispositivo detectado: ${chip}. Escribiendo firmware…`);
+    onProgress?.(18, "Dispositivo detectado: " + chip + ". Escribiendo aplicación…");
     await loader.writeFlash({
-      // Primero se escribe la aplicación. El selector OTA se actualiza al final
-      // para que un corte previo no cambie el slot de arranque.
-      fileArray: [
-        { data: firmware, address: APP0_ADDRESS },
-        { data: otaSelector, address: OTA_SELECTOR_ADDRESS },
-      ],
+      // La aplicación se escribe y verifica antes de tocar el selector OTA.
+      fileArray: [{ data: firmware, address: APP0_ADDRESS }],
       flashMode: "keep",
       flashFreq: "keep",
       flashSize: "keep",
       eraseAll: false,
       compress: true,
-      reportProgress(fileIndex, written, total) {
-        const completedBefore = fileIndex === 0 ? 0 : firmware.byteLength;
-        const currentTotal = fileIndex === 0 ? firmware.byteLength : otaSelector.byteLength;
-        const normalizedWritten = total > 0 ? Math.min(currentTotal, (written / total) * currentTotal) : written;
-        const percent = 18 + Math.round(((completedBefore + normalizedWritten) / totalBytes) * 77);
-        onProgress?.(Math.min(95, percent), fileIndex === 0 ? "Escribiendo aplicación…" : "Activando nuevo firmware…");
+      reportProgress(_fileIndex, written, total) {
+        const normalizedWritten = total > 0 ? Math.min(firmware.byteLength, (written / total) * firmware.byteLength) : written;
+        onProgress?.(Math.min(88, 18 + Math.round((normalizedWritten / totalBytes) * 70)), "Escribiendo aplicación…");
       },
     });
+    onProgress?.(89, "Verificando aplicación escrita…");
+    const appMd5 = (await loader.flashMd5sum(APP0_ADDRESS, firmware.byteLength)).toLowerCase();
+    if (appMd5 !== release.md5) throw new Error("La verificación MD5 de la aplicación escrita falló. El selector de arranque no fue modificado.");
+
+    onProgress?.(91, "Activando aplicación verificada…");
+    await loader.writeFlash({
+      fileArray: [{ data: otaSelector, address: OTA_SELECTOR_ADDRESS }],
+      flashMode: "keep",
+      flashFreq: "keep",
+      flashSize: "keep",
+      eraseAll: false,
+      compress: true,
+      reportProgress(_fileIndex, written, total) {
+        const percent = total > 0 ? Math.round((written / total) * 3) : 0;
+        onProgress?.(91 + Math.min(3, percent), "Activando aplicación verificada…");
+      },
+    });
+    const selectorMd5 = (await loader.flashMd5sum(OTA_SELECTOR_ADDRESS, otaSelector.byteLength)).toLowerCase();
+    if (selectorMd5 !== "e6327541e2dc394ca2c3b3280ac0f39f") throw new Error("La verificación MD5 del selector de arranque falló.");
 
     onProgress?.(97, "Reiniciando MagicBox…");
     const resetCompleted = await settleWithin(resetMagicBoxToApplication(transport), 2_500);

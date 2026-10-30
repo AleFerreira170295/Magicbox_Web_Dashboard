@@ -11,15 +11,10 @@ function bundled(target: "v2" | "v3") {
 }
 
 function partitions() {
-  const bytes = new Uint8Array(0xc00).fill(0xff);
-  const view = new DataView(bytes.buffer);
-  [[1, 2, 0x9000, 0x5000], [1, 0, 0xe000, 0x2000], [0, 0x10, 0x10000, 0x1e0000],
-    [0, 0x11, 0x1f0000, 0x1e0000], [1, 0x83, 0x3d0000, 0x20000]].forEach(([type, subtype, offset, size], i) => {
-    const pos = i * 32;
-    view.setUint16(pos, 0x50aa, true); bytes[pos + 2] = type; bytes[pos + 3] = subtype;
-    view.setUint32(pos + 4, offset, true); view.setUint32(pos + 8, size, true);
-  });
-  return bytes;
+  const bytes = new Uint8Array(0xc00).fill(0xff); const view = new DataView(bytes.buffer); const encoder = new TextEncoder();
+  const entries: Array<[string, number, number, number, number]> = [["nvs",1,2,0x9000,0x5000],["otadata",1,0,0xe000,0x2000],["app0",0,0x10,0x10000,0x1e0000],["app1",0,0x11,0x1f0000,0x1e0000],["spiffs",1,0x83,0x3d0000,0x20000],["coredump",1,3,0x3f0000,0x10000]];
+  entries.forEach(([label,type,subtype,offset,size],i)=>{const pos=i*32;view.setUint16(pos,0x50aa,true);bytes[pos+2]=type;bytes[pos+3]=subtype;view.setUint32(pos+4,offset,true);view.setUint32(pos+8,size,true);bytes.set(encoder.encode(label),pos+12);bytes[pos+12+encoder.encode(label).length]=0;view.setUint32(pos+28,0,true);});
+  view.setUint16(entries.length*32,0xebeb,true); return bytes;
 }
 
 describe("real bundled applications and preservation gates", () => {
@@ -75,5 +70,9 @@ describe("real bundled applications and preservation gates", () => {
     expect(() => validateCablePartitionTable(small, 1357536)).toThrow("compatible");
     const shifted = partitions(); new DataView(shifted.buffer).setUint32(4 * 32 + 4, 0x290000, true);
     expect(() => validateCablePartitionTable(shifted, 1357536)).toThrow("compatible");
+    const noMd5 = partitions(); new DataView(noMd5.buffer).setUint16(6 * 32, 0xffff, true);
+    expect(() => validateCablePartitionTable(noMd5, 1357536)).toThrow("exactamente");
+    const wrongLabel = partitions(); wrongLabel.set(new TextEncoder().encode("data"), 4 * 32 + 12);
+    expect(() => validateCablePartitionTable(wrongLabel, 1357536)).toThrow("exactamente");
   });
 });

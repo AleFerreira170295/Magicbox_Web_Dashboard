@@ -14,6 +14,7 @@ import { useAuth } from "@/features/auth/auth-context";
 import { inferDeckNameFromTurns } from "@/features/device-import/deck-inference";
 import { buildGamesBatchPayload, buildRawSyncEnvelopes } from "@/features/device-import/payload";
 import { flashMagicBoxFirmware, resolveCableFirmwareReleaseForTarget, type CableHardwareTarget } from "@/features/device-import/firmware-updater";
+import { FirmwareSafetyError } from "@/features/device-import/firmware-image";
 import { ImportedGameCharts } from "@/features/device-import/imported-game-charts";
 import { SyncNavigation } from "@/features/syncs/sync-navigation";
 import type { ImportedGame, MagicBoxDeviceInfo, ParticipantTarget } from "@/features/device-import/types";
@@ -370,10 +371,13 @@ export function DeviceImportCenter() {
       setFeedback(completed);
     } catch (cause) {
       if (!isCurrentSession(generation)) return;
+      const safetyError = cause instanceof FirmwareSafetyError;
       const failed: Feedback = {
         kind: "error",
-        title: "No se pudo actualizar el firmware",
-        message: `${getErrorMessage(cause)} No se confirmó una carga completa. Revisá el cable USB y el puerto seleccionado; luego confirmá el modelo y volvé a intentar.`,
+        title: safetyError && cause.recoveryRequired ? "La MagicBox requiere recuperación" : "No se pudo actualizar el firmware",
+        message: safetyError
+          ? getErrorMessage(cause)
+          : getErrorMessage(cause) + " No se confirmó una carga completa. Revisá el cable USB y el puerto seleccionado; luego confirmá el modelo y volvé a intentar.",
       };
       setFirmwareStatus("Actualización no completada");
       setFirmwareResult(failed);

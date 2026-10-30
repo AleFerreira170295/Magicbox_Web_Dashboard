@@ -92,3 +92,11 @@ unchanged. Historical “physical pending” statements above are superseded her
   (CONNECT 403); do not describe the internal check as a new public network check.
 - Updated deployment, audit and recovery docs synchronized to the active release
   directory. No restart necessary for documentation-only promotion.
+
+## Web updater hardening — 2026-10-30
+
+The normal updater now enforces the invariants in firmware-web-safety.md: exact
+release fingerprints, installed bootloader/app preflight, exact partition layout,
+and two-phase app/selector writes with device-side MD5 verification. Damaged
+boxes are classified as recovery-required and remain blocked from web flashing.
+This changes the dashboard only; V2 and V3 firmware binaries remain byte-identical.
