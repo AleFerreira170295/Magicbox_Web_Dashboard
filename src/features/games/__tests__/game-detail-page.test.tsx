@@ -308,6 +308,19 @@ describe("GameDetailPage", () => {
     );
   });
 
+  it("skips the institution request for a home-owned game", () => {
+    const homeGame = {
+      ...useGamesMock().data.data[0],
+      educationalCenterId: null,
+    };
+    useGameMock.mockReturnValue(okQuery(homeGame));
+
+    renderGameDetailPage();
+
+    expect(useInstitutionsMock).toHaveBeenLastCalledWith("token", {}, { enabled: false });
+    expect(screen.queryByText(/Permission denied/i)).not.toBeInTheDocument();
+  });
+
   it("paginates the turn list inside the detail page", () => {
     renderGameDetailPage();
 

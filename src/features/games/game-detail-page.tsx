@@ -43,7 +43,11 @@ export function GameDetailPage({
   const gameQuery = useGame(tokens?.accessToken, gameRecordId);
   const gamesQuery = useGames(tokens?.accessToken, { limit: 100, sortBy: "start_date", order: "desc" });
   const devicesQuery = useDevices(tokens?.accessToken);
-  const institutionsQuery = useInstitutions(tokens?.accessToken);
+  const institutionsQuery = useInstitutions(
+    tokens?.accessToken,
+    {},
+    { enabled: Boolean(gameQuery.data?.educationalCenterId) },
+  );
   const canReadStudents = hasAnyUserPermission(currentUser, "student:read");
   const canUpdateGames = hasAnyUserPermission(currentUser, "game_data:update");
   const studentsQuery = useAllStudents(
