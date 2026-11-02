@@ -1,14 +1,14 @@
 "use client";
 
 import { useSearchParams } from "next/navigation";
-import { RoleGuard } from "@/components/role-guard";
+import { CapabilityGuard } from "@/components/capability-guard";
 import { DeviceDetailPage } from "@/features/devices/device-detail-page";
 
 export default function DevicesDetailPage() {
   const searchParams = useSearchParams();
 
   return (
-    <RoleGuard allowedRoles={["teacher", "director", "admin", "institution-admin", "family"]}>
+    <CapabilityGuard anyOf={["ble_device:read", "ble-device:read"]} allowOwnedHome>
       <DeviceDetailPage
         deviceRecordId={searchParams.get("deviceRecordId")}
         overviewState={{
@@ -23,6 +23,6 @@ export default function DevicesDetailPage() {
           pageSize: searchParams.get("pageSize"),
         }}
       />
-    </RoleGuard>
+    </CapabilityGuard>
   );
 }

@@ -56,7 +56,7 @@ describe("AppShell navigation", () => {
         fullName: "Ana Admin",
         email: "ana@example.com",
         roles: ["institution-admin"],
-        permissions: [],
+        permissions: ["ble_device:read", "game_data:read", "educational_center:read", "student:read", "evaluation:read", "user:read"],
       },
       logout: vi.fn(),
     });
@@ -98,7 +98,7 @@ describe("AppShell navigation", () => {
         fullName: "Ada Admin",
         email: "admin@example.com",
         roles: ["admin"],
-        permissions: ["feature:read"],
+        permissions: ["feature:read", "ble_device:read"],
       },
       logout: vi.fn(),
     });
@@ -151,13 +151,13 @@ describe("AppShell navigation", () => {
     expect(screen.queryByText("Configuración")).not.toBeInTheDocument();
   });
 
-  it("keeps researcher focused on dashboard, games and syncs", () => {
+  it("keeps researcher focused on permitted research data", () => {
     useAuthMock.mockReturnValue({
       user: {
         fullName: "Rita Researcher",
         email: "research@example.com",
         roles: ["researcher"],
-        permissions: ["game_data:read", "ble_device:read"],
+        permissions: ["game_data:read", "student:read", "evaluation:read"],
       },
       logout: vi.fn(),
     });
@@ -166,7 +166,7 @@ describe("AppShell navigation", () => {
 
     expect(screen.getAllByText("Dashboard").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Partidas").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("Sincronizaciones").length).toBeGreaterThan(0);
+    expect(screen.queryByText("Sincronizaciones")).not.toBeInTheDocument();
     expect(screen.getByText("Vista investigación")).toBeInTheDocument();
 
     expect(screen.queryByText("Dispositivos")).not.toBeInTheDocument();
@@ -181,7 +181,8 @@ describe("AppShell navigation", () => {
         fullName: "Familia Demo",
         email: "family@example.com",
         roles: ["family"],
-        permissions: ["game_data:read"],
+        permissions: [],
+        userType: "mobile",
       },
       logout: vi.fn(),
     });
@@ -194,7 +195,7 @@ describe("AppShell navigation", () => {
     expect(screen.getByText("Vista familia")).toBeInTheDocument();
 
     expect(screen.getAllByText("Dispositivos").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("Usuarios").length).toBeGreaterThan(0);
+    expect(screen.queryByText("Usuarios")).not.toBeInTheDocument();
   });
 
   it("keeps the navigation matrix aligned across the supported profiles", () => {
@@ -205,7 +206,7 @@ describe("AppShell navigation", () => {
           fullName: "Ada Admin",
           email: "admin@example.com",
           roles: ["admin"],
-          permissions: ["feature:read"],
+          permissions: ["feature:read", "ble_device:read", "game_data:read", "educational_center:read", "student:read", "evaluation:read", "user:read"],
         },
         visible: ["Dashboard", "Sincronizaciones", "Partidas", "Usuarios", "Permisos", "Instituciones", "Salud", "Perfiles", "Configuración", "Dispositivos"],
         hidden: ["Alertas territoriales", "Territorios e instituciones"],
@@ -216,10 +217,10 @@ describe("AppShell navigation", () => {
           fullName: "Diana Director",
           email: "director@example.com",
           roles: ["director"],
-          permissions: ["game_data:read"],
+          permissions: ["ble_device:read", "game_data:read", "educational_center:read", "student:read", "evaluation:read", "user:read"],
         },
-        visible: ["Dashboard", "Sincronizaciones", "Partidas", "Instituciones", "Perfiles", "Dispositivos"],
-        hidden: ["Usuarios", "Permisos", "Salud", "Configuración", "Alertas territoriales", "Territorios e instituciones"],
+        visible: ["Dashboard", "Sincronizaciones", "Partidas", "Usuarios", "Instituciones", "Perfiles", "Dispositivos"],
+        hidden: ["Permisos", "Salud", "Configuración", "Alertas territoriales", "Territorios e instituciones"],
       },
       {
         name: "institution-admin with acl read",
@@ -227,7 +228,7 @@ describe("AppShell navigation", () => {
           fullName: "Irene Institution",
           email: "ia@example.com",
           roles: ["institution-admin"],
-          permissions: ["access_control:read", "feature:read"],
+          permissions: ["access_control:read", "feature:read", "ble_device:read", "game_data:read", "educational_center:read", "student:read", "evaluation:read", "user:read"],
         },
         visible: ["Dashboard", "Sincronizaciones", "Partidas", "Usuarios", "Permisos", "Instituciones", "Perfiles", "Dispositivos"],
         hidden: ["Salud", "Configuración", "Alertas territoriales", "Territorios e instituciones"],
@@ -238,7 +239,7 @@ describe("AppShell navigation", () => {
           fullName: "Irene Institution",
           email: "ia@example.com",
           roles: ["institution-admin"],
-          permissions: [],
+          permissions: ["ble_device:read", "game_data:read", "educational_center:read", "student:read", "evaluation:read", "user:read"],
         },
         visible: ["Dashboard", "Sincronizaciones", "Partidas", "Usuarios", "Permisos", "Instituciones", "Perfiles", "Dispositivos"],
         hidden: ["Salud", "Configuración", "Alertas territoriales", "Territorios e instituciones"],
@@ -249,7 +250,7 @@ describe("AppShell navigation", () => {
           fullName: "Teo Teacher",
           email: "teacher@example.com",
           roles: ["teacher"],
-          permissions: ["game_data:read"],
+          permissions: ["ble_device:read", "game_data:read", "student:read", "evaluation:read"],
         },
         visible: ["Dashboard", "Sincronizaciones", "Partidas", "Dispositivos"],
         hidden: ["Usuarios", "Permisos", "Instituciones", "Salud", "Perfiles", "Configuración", "Alertas territoriales", "Territorios e instituciones"],
@@ -260,10 +261,10 @@ describe("AppShell navigation", () => {
           fullName: "Rita Researcher",
           email: "research@example.com",
           roles: ["researcher"],
-          permissions: ["game_data:read", "ble_device:read"],
+          permissions: ["game_data:read", "student:read", "evaluation:read"],
         },
-        visible: ["Dashboard", "Sincronizaciones", "Partidas"],
-        hidden: ["Dispositivos", "Usuarios", "Permisos", "Instituciones", "Salud", "Perfiles", "Configuración", "Alertas territoriales", "Territorios e instituciones"],
+        visible: ["Dashboard", "Partidas"],
+        hidden: ["Sincronizaciones", "Dispositivos", "Usuarios", "Permisos", "Instituciones", "Salud", "Perfiles", "Configuración", "Alertas territoriales", "Territorios e instituciones"],
       },
       {
         name: "family",
@@ -271,10 +272,11 @@ describe("AppShell navigation", () => {
           fullName: "Familia Demo",
           email: "family@example.com",
           roles: ["family"],
-          permissions: ["game_data:read"],
+          permissions: [],
+          userType: "mobile",
         },
-        visible: ["Dashboard", "Sincronizaciones", "Partidas", "Dispositivos", "Usuarios"],
-        hidden: ["Permisos", "Instituciones", "Salud", "Perfiles", "Configuración", "Alertas territoriales", "Territorios e instituciones"],
+        visible: ["Dashboard", "Sincronizaciones", "Partidas", "Dispositivos"],
+        hidden: ["Usuarios", "Permisos", "Instituciones", "Salud", "Perfiles", "Configuración", "Alertas territoriales", "Territorios e instituciones"],
       },
       {
         name: "government-viewer",
@@ -284,8 +286,8 @@ describe("AppShell navigation", () => {
           roles: ["government-viewer"],
           permissions: ["feature:read"],
         },
-        visible: ["Dashboard", "Sincronizaciones", "Alertas territoriales", "Territorios e instituciones"],
-        hidden: ["Partidas", "Dispositivos", "Usuarios", "Permisos", "Instituciones", "Salud", "Perfiles", "Configuración"],
+        visible: ["Dashboard", "Alertas territoriales", "Territorios e instituciones"],
+        hidden: ["Sincronizaciones", "Partidas", "Dispositivos", "Usuarios", "Permisos", "Instituciones", "Salud", "Perfiles", "Configuración"],
       },
     ];
 
@@ -293,8 +295,12 @@ describe("AppShell navigation", () => {
       cleanup();
       useAuthMock.mockReturnValue({ user, logout: vi.fn() });
       renderShell();
-      expectVisibleLabels(visible);
-      expectHiddenLabels(hidden);
+      try {
+        expectVisibleLabels(visible);
+        expectHiddenLabels(hidden);
+      } catch (error) {
+        throw new Error(`${user.roles.join(",")}: ${String(error)}`, { cause: error });
+      }
     });
   });
 });

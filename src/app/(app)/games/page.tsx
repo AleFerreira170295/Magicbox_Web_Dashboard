@@ -1,10 +1,10 @@
-import { RoleGuard } from "@/components/role-guard";
+import { CapabilityGuard } from "@/components/capability-guard";
 import { GamesTable } from "@/features/games/games-table";
 
 export default function GamesPage() {
   return (
-    <RoleGuard allowedRoles={["teacher", "director", "researcher", "family", "admin", "institution-admin"]}>
+    <CapabilityGuard anyOf={["game_data:read", "game-data:read"]} allowOwnedHome>
       <GamesTable />
-    </RoleGuard>
+    </CapabilityGuard>
   );
 }
