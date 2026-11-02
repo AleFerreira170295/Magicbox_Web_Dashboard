@@ -1,10 +1,10 @@
-import { RoleGuard } from "@/components/role-guard";
+import { CapabilityGuard } from "@/components/capability-guard";
 import { RelevantProfiles } from "@/features/profiles/relevant-profiles";
 
 export default function ProfilesPage() {
   return (
-    <RoleGuard allowedRoles={["admin", "institution-admin", "director"]}>
+    <CapabilityGuard anyOf={["user:read"]}>
       <RelevantProfiles />
-    </RoleGuard>
+    </CapabilityGuard>
   );
 }

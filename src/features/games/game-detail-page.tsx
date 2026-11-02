@@ -16,7 +16,7 @@ import { ListPaginationControls, useListPagination } from "@/components/ui/list-
 import { Skeleton } from "@/components/ui/skeleton";
 import { useNotifications } from "@/components/ui/notifications";
 import { useAuth } from "@/features/auth/auth-context";
-import { hasAnyUserPermission } from "@/features/auth/permission-contract";
+import { canReadFeature, canReadFeatureOrOwnedHome, hasAnyUserPermission } from "@/features/auth/permission-contract";
 import { useDevices } from "@/features/devices/api";
 import { assignGamePlayerStudent, deleteGame, updateGameDeckName, useGame, useGames } from "@/features/games/api";
 import { buildGameDetailHref, buildGamesOverviewHref, type GamesOverviewRouteState } from "@/features/games/game-route";
@@ -40,11 +40,17 @@ export function GameDetailPage({
   const [studentSelectionByPlayer, setStudentSelectionByPlayer] = useState<Record<string, string>>({});
   const [deckNameDraftByGame, setDeckNameDraftByGame] = useState<Record<string, string>>({});
 
+  const canReadDevices = canReadFeatureOrOwnedHome(currentUser, "ble_device");
+  const canReadInstitutions = canReadFeature(currentUser, "educational_center");
+  const canReadStudents = canReadFeature(currentUser, "student");
   const gameQuery = useGame(tokens?.accessToken, gameRecordId);
   const gamesQuery = useGames(tokens?.accessToken, { limit: 100, sortBy: "start_date", order: "desc" });
-  const devicesQuery = useDevices(tokens?.accessToken);
-  const institutionsQuery = useInstitutions(tokens?.accessToken);
-  const canReadStudents = hasAnyUserPermission(currentUser, "student:read");
+  const devicesQuery = useDevices(canReadDevices ? tokens?.accessToken : undefined);
+  const institutionsQuery = useInstitutions(
+    canReadInstitutions ? tokens?.accessToken : undefined,
+    {},
+    { enabled: canReadInstitutions && Boolean(gameQuery.data?.educationalCenterId) },
+  );
   const canUpdateGames = hasAnyUserPermission(currentUser, "game_data:update");
   const studentsQuery = useAllStudents(
     canReadStudents ? tokens?.accessToken : undefined,
@@ -84,8 +90,8 @@ export function GameDetailPage({
   const institutionPagination = useListPagination(sameInstitutionGames, 10, 1);
 
   const backHref = buildGamesOverviewHref(overviewState);
-  const isLoading = gameQuery.isLoading || gamesQuery.isLoading || devicesQuery.isLoading || institutionsQuery.isLoading;
-  const hasFatalError = gameQuery.error || gamesQuery.error || devicesQuery.error || institutionsQuery.error;
+  const isLoading = gameQuery.isLoading;
+  const hasFatalError = gameQuery.error;
   const canDeleteGames = hasAnyUserPermission(currentUser, "game_data:delete");
 
   const updateDeckNameMutation = useMutation({

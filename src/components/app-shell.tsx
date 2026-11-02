@@ -26,7 +26,7 @@ import { AuthGuard } from "@/components/auth-guard";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/features/auth/auth-context";
-import { canAccessPermissionsModule } from "@/features/auth/permission-contract";
+import { canAccessPermissionsModule, canReadFeature, canReadFeatureOrOwnedHome } from "@/features/auth/permission-contract";
 import { useLanguage } from "@/features/i18n/i18n-context";
 import { LanguageSwitcher } from "@/features/i18n/language-switcher";
 import type { AppRole } from "@/features/auth/types";
@@ -45,7 +45,7 @@ type NavigationItem = {
   section: NavigationSection;
   icon: ComponentType<{ className?: string }>;
   roles: NavigationRole[];
-  isVisible?: (user: { roles?: string[]; permissions?: string[] } | null | undefined) => boolean;
+  isVisible?: (user: { roles?: string[]; permissions?: string[]; userType?: string | null } | null | undefined) => boolean;
 };
 
 const navigationSections: NavigationSection[] = ["summary", "operation", "governance", "technical"];
@@ -103,6 +103,7 @@ function buildNavigation(t: ReturnType<typeof useLanguage>["t"]): NavigationItem
     summary: t.appShell.navigation.devices.summary,
     section: "operation",
     icon: Smartphone,
+    isVisible: (user) => canReadFeatureOrOwnedHome(user, "ble_device"),
     roles: ["teacher", "director", "admin", "institution-admin", "family"] satisfies NavigationRole[],
   },
   {
@@ -111,6 +112,7 @@ function buildNavigation(t: ReturnType<typeof useLanguage>["t"]): NavigationItem
     summary: t.appShell.navigation.games.summary,
     section: "operation",
     icon: Database,
+    isVisible: (user) => canReadFeatureOrOwnedHome(user, "game_data"),
     roles: ["teacher", "director", "researcher", "family", "admin", "institution-admin"] satisfies NavigationRole[],
   },
   {
@@ -119,6 +121,7 @@ function buildNavigation(t: ReturnType<typeof useLanguage>["t"]): NavigationItem
     summary: t.appShell.navigation.evaluations.summary,
     section: "operation",
     icon: ClipboardCheck,
+    isVisible: (user) => canReadFeature(user, "evaluation"),
     roles: ["teacher", "director", "researcher", "admin", "institution-admin"] satisfies NavigationRole[],
   },
   {
@@ -127,6 +130,7 @@ function buildNavigation(t: ReturnType<typeof useLanguage>["t"]): NavigationItem
     summary: t.appShell.navigation.syncs.summary,
     section: "operation",
     icon: Cable,
+    isVisible: (user) => canReadFeatureOrOwnedHome(user, "ble_device"),
     roles: ["teacher", "director", "researcher", "family", "admin", "institution-admin", "government-viewer"] satisfies NavigationRole[],
   },
   {
@@ -135,6 +139,7 @@ function buildNavigation(t: ReturnType<typeof useLanguage>["t"]): NavigationItem
     summary: t.appShell.navigation.users.summary,
     section: "governance",
     icon: Users,
+    isVisible: (user) => canReadFeature(user, "user"),
     roles: ["admin", "institution-admin", "family"] satisfies NavigationRole[],
   },
   {
@@ -143,6 +148,7 @@ function buildNavigation(t: ReturnType<typeof useLanguage>["t"]): NavigationItem
     summary: t.appShell.navigation.institutions.summary,
     section: "governance",
     icon: Building2,
+    isVisible: (user) => canReadFeature(user, "educational_center"),
     roles: ["admin", "institution-admin", "director"] satisfies NavigationRole[],
   },
   {
@@ -151,6 +157,7 @@ function buildNavigation(t: ReturnType<typeof useLanguage>["t"]): NavigationItem
     summary: t.appShell.navigation.profiles.summary,
     section: "governance",
     icon: UserRound,
+    isVisible: (user) => canReadFeature(user, "user"),
     roles: ["admin", "institution-admin", "director"] satisfies NavigationRole[],
   },
   {
@@ -195,9 +202,8 @@ export function AppShell({ children }: { children: ReactNode }) {
   const visibleNavigation = useMemo(
     () =>
       navigation.filter((item) => {
-        const allowedByRole = item.roles.some((role) => user?.roles.includes(role));
-        if (!allowedByRole) return false;
-        return item.isVisible ? item.isVisible(user) : true;
+        if (item.isVisible) return item.isVisible(user);
+        return item.roles.some((role) => user?.roles.includes(role));
       }),
     [navigation, user],
   );

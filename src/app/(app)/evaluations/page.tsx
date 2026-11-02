@@ -1,11 +1,11 @@
-import { RoleGuard } from "@/components/role-guard";
+import { CapabilityGuard } from "@/components/capability-guard";
 import { EvaluationsCenter } from "@/features/evaluations/evaluations-center";
 
 export default function EvaluationsPage() {
   return (
-    <RoleGuard allowedRoles={["teacher", "director", "researcher", "admin", "institution-admin"]}>
+    <CapabilityGuard anyOf={["evaluation:read"]}>
       <EvaluationsCenter />
-    </RoleGuard>
+    </CapabilityGuard>
   );
 }
 

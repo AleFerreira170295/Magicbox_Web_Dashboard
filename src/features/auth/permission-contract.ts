@@ -1,9 +1,10 @@
 const ACL_READ_KEYS = ["access_control:read", "access-control:read"] as const;
 const FEATURE_READ_KEYS = ["feature:read", "feature:read:any"] as const;
 
-type PermissionContractUser = {
+export type PermissionContractUser = {
   roles?: string[];
   permissions?: string[];
+  userType?: string | null;
 } | null | undefined;
 
 function hasRole(user: PermissionContractUser, role: string) {
@@ -36,6 +37,33 @@ export function canReadAclContract(user: PermissionContractUser) {
 
 export function canReadFeatureContract(user: PermissionContractUser) {
   return isAdminSession(user) || hasAnyUserPermission(user, ...FEATURE_READ_KEYS);
+}
+
+export function canReadFeature(
+  user: PermissionContractUser,
+  featureCode: string,
+  actionCode = "read",
+) {
+  return hasAnyUserPermission(
+    user,
+    `${featureCode}:${actionCode}`,
+    `${featureCode}:${actionCode}:any`,
+  );
+}
+
+export function canAccessOwnedHomeResources(user: PermissionContractUser) {
+  const userTypes = (user?.userType || "")
+    .split("|")
+    .map((value) => value.trim().toLowerCase())
+    .filter(Boolean);
+  return Boolean(user?.roles?.includes("family") || userTypes.includes("mobile"));
+}
+
+export function canReadFeatureOrOwnedHome(
+  user: PermissionContractUser,
+  featureCode: string,
+) {
+  return canReadFeature(user, featureCode) || canAccessOwnedHomeResources(user);
 }
 
 export function canLoadPermissionsGovernance(user: PermissionContractUser) {

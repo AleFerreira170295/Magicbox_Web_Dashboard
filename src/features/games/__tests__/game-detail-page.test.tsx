@@ -308,6 +308,28 @@ describe("GameDetailPage", () => {
     );
   });
 
+  it("keeps the primary game visible when device enrichment is forbidden", () => {
+    useDevicesMock.mockReturnValue({ data: undefined, isLoading: false, error: new Error("Permission denied") });
+
+    renderGameDetailPage();
+
+    expect(screen.getAllByRole("heading", { name: /Animales/i }).length).toBeGreaterThan(0);
+    expect(screen.queryByText(/No pude preparar la vista de la partida/i)).not.toBeInTheDocument();
+  });
+
+  it("skips the institution request for a home-owned game", () => {
+    const homeGame = {
+      ...useGamesMock().data.data[0],
+      educationalCenterId: null,
+    };
+    useGameMock.mockReturnValue(okQuery(homeGame));
+
+    renderGameDetailPage();
+
+    expect(useInstitutionsMock).toHaveBeenLastCalledWith(undefined, {}, { enabled: false });
+    expect(screen.queryByText(/Permission denied/i)).not.toBeInTheDocument();
+  });
+
   it("paginates the turn list inside the detail page", () => {
     renderGameDetailPage();
 

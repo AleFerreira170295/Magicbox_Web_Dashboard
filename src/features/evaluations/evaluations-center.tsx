@@ -13,6 +13,7 @@ import { useNotifications } from "@/components/ui/notifications";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useAuth } from "@/features/auth/auth-context";
+import { canReadFeature } from "@/features/auth/permission-contract";
 import { useLanguage, type AppLanguage } from "@/features/i18n/i18n-context";
 import { useInstitutions } from "@/features/institutions/api";
 import { useClassGroups, useCreateEvaluation, useEvaluation, useEvaluationDetails, useEvaluations, useStudents } from "@/features/evaluations/api";
@@ -287,9 +288,12 @@ export function EvaluationsCenter() {
   }
 
   const institutionFilter = institutionId || user?.educationalCenterId || "";
-  const institutionsQuery = useInstitutions(tokens?.accessToken);
-  const classGroupsQuery = useClassGroups(tokens?.accessToken, institutionFilter || undefined);
-  const studentsQuery = useStudents(tokens?.accessToken, classGroupId || undefined);
+  const canReadInstitutions = canReadFeature(user, "educational_center");
+  const canReadClassGroups = canReadFeature(user, "class_group");
+  const canReadStudents = canReadFeature(user, "student");
+  const institutionsQuery = useInstitutions(canReadInstitutions ? tokens?.accessToken : undefined);
+  const classGroupsQuery = useClassGroups(canReadClassGroups ? tokens?.accessToken : undefined, institutionFilter || undefined);
+  const studentsQuery = useStudents(canReadStudents ? tokens?.accessToken : undefined, classGroupId || undefined);
   const evaluationsQuery = useEvaluations(tokens?.accessToken, { educationalCenterId: institutionId || undefined, classGroupId: classGroupId || undefined });
   const selectedEvaluationQuery = useEvaluation(tokens?.accessToken, selectedEvaluationId);
   const createEvaluationMutation = useCreateEvaluation(tokens?.accessToken);
@@ -303,7 +307,7 @@ export function EvaluationsCenter() {
   const students = useMemo(() => studentsQuery.data?.data || [], [studentsQuery.data?.data]);
   const evaluations = useMemo(() => evaluationsQuery.data?.data || [], [evaluationsQuery.data?.data]);
   const selectedEvaluation = selectedEvaluationQuery.data || evaluations.find((item) => item.id === selectedEvaluationId) || null;
-  const canCreate = Boolean(user?.roles.some((role) => ["teacher", "director", "admin", "institution-admin"].includes(role)));
+  const canCreate = canReadFeature(user, "evaluation", "create");
 
   const evaluationDetailIds = useMemo(() => (classGroupId ? evaluations.map((evaluation) => evaluation.id).slice(0, 60) : []), [classGroupId, evaluations]);
   const evaluationDetailQueries = useEvaluationDetails(tokens?.accessToken, evaluationDetailIds);

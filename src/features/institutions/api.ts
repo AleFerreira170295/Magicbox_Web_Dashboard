@@ -297,12 +297,16 @@ export function useInstitutionById(token?: string, institutionId?: string | null
   });
 }
 
-export function useInstitutions(token?: string, params: ListInstitutionsParams = {}) {
+export function useInstitutions(
+  token?: string,
+  params: ListInstitutionsParams = {},
+  options: { enabled?: boolean } = {},
+) {
   const name = params.name?.trim() || "";
 
   return useQuery({
     queryKey: ["institutions", token, { name }],
     queryFn: () => listInstitutions(token as string, { name }),
-    enabled: Boolean(token),
+    enabled: Boolean(token) && (options.enabled ?? true),
   });
 }

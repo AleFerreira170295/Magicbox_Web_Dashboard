@@ -305,6 +305,15 @@ describe("DeviceDetailPage", () => {
     );
   });
 
+  it("keeps the primary device visible when institution enrichment is forbidden", () => {
+    useInstitutionsMock.mockReturnValue({ data: undefined, isLoading: false, error: new Error("Permission denied") });
+
+    renderDeviceDetailPage();
+
+    expect(screen.getAllByRole("heading", { name: "MagicBox Aula 1" }).length).toBeGreaterThan(0);
+    expect(screen.queryByText(/No pude preparar la vista del dispositivo/i)).not.toBeInTheDocument();
+  });
+
   it("keeps the editor in read-only mode when update permission is missing", () => {
     renderDeviceDetailPage();
 
