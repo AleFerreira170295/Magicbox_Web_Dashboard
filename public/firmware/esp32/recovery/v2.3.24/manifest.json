@@ -1,0 +1,44 @@
+{
+  "hardware": "V2",
+  "chip": "ESP32",
+  "flash_size": 4194304,
+  "firmware_version": "V2.3.24",
+  "source_commit": "5f2b2218dcd4da0cb04551de8a9614dc0ac6fd4a",
+  "regions": [
+    {
+      "name": "bootloader",
+      "offset": "0x1000",
+      "file": "bootloader.bin",
+      "size": 23552,
+      "sha256": "a227e3ab93f15f1155efb3144810cc06ff7a259e9bc9b4542417afcc6c238214"
+    },
+    {
+      "name": "partitions",
+      "offset": "0x8000",
+      "file": "partitions-littlefs.bin",
+      "size": 4096,
+      "sha256": "39579c5f2c51bf9b587a23618bbcf732a5aaf0a346ce9f50b28a44289af884af"
+    },
+    {
+      "name": "otadata",
+      "offset": "0xe000",
+      "file": "boot_app0.bin",
+      "size": 8192,
+      "sha256": "f94c5d786a7a8fab06ac5d10e33bf37711a6697636dc037559ea19cc410a17f0"
+    },
+    {
+      "name": "application",
+      "offset": "0x10000",
+      "file": "magicbox-v2-V2.3.24-app.bin",
+      "size": 1358368,
+      "sha256": "7f134519c761e299b50176248feeac4d818bb3be262318f11d087c104a874b0a"
+    },
+    {
+      "name": "initial-littlefs",
+      "offset": "0x3d0000",
+      "file": "initial-littlefs.bin",
+      "size": 131072,
+      "sha256": "2bc8f92e586f7ad11afbfcfde69cbca9d47f45225c18f1524b04908990020b4d"
+    }
+  ]
+}

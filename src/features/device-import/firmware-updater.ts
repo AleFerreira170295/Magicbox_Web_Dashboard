@@ -1,7 +1,7 @@
 import { ESPLoader, Transport, type IEspLoaderTerminal } from "esptool-js";
 import { resolveApiBaseUrl } from "@/lib/api/fetcher";
 
-import { APP0_ADDRESS, OTA_SELECTOR_ADDRESS, inspectEsp32Application, validateInstalledDeviceForNormalUpdate } from "./firmware-image";
+import { APP0_ADDRESS, OTA_SELECTOR_ADDRESS, inspectEsp32Application, validateCablePartitionTable, validateInstalledDeviceForNormalUpdate } from "./firmware-image";
 const OTA_SELECTOR_URL = "/firmware/esp32/boot_app0.bin";
 const MINIMUM_CABLE_FIRMWARE_VERSION = "V2.3.23";
 
@@ -19,6 +19,42 @@ export interface ResolvedCableFirmwareRelease extends FirmwareReleaseInput {
 }
 
 export type CableHardwareTarget = "v2" | "v3";
+
+export interface CableRecoveryRegion {
+  name: "bootloader" | "partitions" | "otadata" | "application" | "initial-littlefs";
+  address: number;
+  downloadUrl: string;
+  sizeBytes: number;
+  sha256: string;
+  md5: string;
+}
+
+export interface CableRecoveryRelease {
+  hardwareTarget: CableHardwareTarget;
+  version: string;
+  flashSizeBytes: number;
+  sourceCommit: string;
+  regions: CableRecoveryRegion[];
+}
+
+const V2_RECOVERY_BASE = "/firmware/esp32/recovery/v2.3.24";
+const V2_RECOVERY_RELEASE: CableRecoveryRelease = {
+  hardwareTarget: "v2",
+  version: "V2.3.24",
+  flashSizeBytes: 4 * 1024 * 1024,
+  sourceCommit: "5f2b2218dcd4da0cb04551de8a9614dc0ac6fd4a",
+  regions: [
+    { name: "bootloader", address: 0x1000, downloadUrl: V2_RECOVERY_BASE + "/bootloader.bin", sizeBytes: 23_552, sha256: "a227e3ab93f15f1155efb3144810cc06ff7a259e9bc9b4542417afcc6c238214", md5: "234577789e6bd2dfd21ba02a85c76f0e" },
+    { name: "partitions", address: 0x8000, downloadUrl: V2_RECOVERY_BASE + "/partitions-littlefs.bin", sizeBytes: 4_096, sha256: "39579c5f2c51bf9b587a23618bbcf732a5aaf0a346ce9f50b28a44289af884af", md5: "a787542e1a4ce308d98a03e17203574c" },
+    { name: "otadata", address: OTA_SELECTOR_ADDRESS, downloadUrl: V2_RECOVERY_BASE + "/boot_app0.bin", sizeBytes: 8_192, sha256: "f94c5d786a7a8fab06ac5d10e33bf37711a6697636dc037559ea19cc410a17f0", md5: "e6327541e2dc394ca2c3b3280ac0f39f" },
+    { name: "application", address: APP0_ADDRESS, downloadUrl: V2_RECOVERY_BASE + "/magicbox-v2-V2.3.24-app.bin", sizeBytes: 1_358_368, sha256: "7f134519c761e299b50176248feeac4d818bb3be262318f11d087c104a874b0a", md5: "a7d262ef06226499e3ba9fcd216413a0" },
+    { name: "initial-littlefs", address: 0x3d0000, downloadUrl: V2_RECOVERY_BASE + "/initial-littlefs.bin", sizeBytes: 131_072, sha256: "2bc8f92e586f7ad11afbfcfde69cbca9d47f45225c18f1524b04908990020b4d", md5: "cafed2a73fdbf7894e8b68251dca7d9d" },
+  ],
+};
+
+export function resolveCableRecoveryRelease(target: CableHardwareTarget) {
+  return target === "v2" ? V2_RECOVERY_RELEASE : null;
+}
 
 const VERIFIED_V3_CABLE_FIRMWARE: ResolvedCableFirmwareRelease = {
   downloadUrl: "/firmware/esp32/magicbox-v3-V2.3.23.bin",
@@ -90,6 +126,19 @@ interface FlashFirmwareOptions {
   release: ResolvedCableFirmwareRelease;
   onProgress?: (progress: number, message: string) => void;
   onLog?: (message: string) => void;
+}
+
+interface RecoverFirmwareOptions {
+  release: CableRecoveryRelease;
+  onProgress?: (progress: number, message: string) => void;
+  onLog?: (message: string) => void;
+  onBackupReady?: (backup: Uint8Array, filename: string) => void;
+  skipBackup?: boolean;
+  confirmEraseWithoutBackup?: (cause: unknown) => boolean | Promise<boolean>;
+}
+
+export interface FirmwareRecoveryResult extends FirmwareFlashResult {
+  backupCreated: boolean;
 }
 
 type EsptoolSerialPort = ConstructorParameters<typeof Transport>[0];
@@ -177,6 +226,147 @@ export async function resetMagicBoxToApplication(control: ResetControlLines) {
 
 export interface FirmwareFlashResult {
   requiresReconnect: boolean;
+}
+
+
+export async function recoverMagicBoxFirmware({
+  release,
+  onProgress,
+  onLog,
+  onBackupReady,
+  skipBackup = false,
+  confirmEraseWithoutBackup,
+}: RecoverFirmwareOptions): Promise<FirmwareRecoveryResult> {
+  const serial = (navigator as Navigator & SerialNavigator).serial;
+  if (!serial) throw new Error("Web Serial no está disponible en este navegador.");
+  if (!window.isSecureContext) throw new Error("La recuperación requiere HTTPS o localhost.");
+  if (release.hardwareTarget !== "v2") {
+    throw new Error("Todavía no existe un paquete de recuperación físicamente validado para este modelo.");
+  }
+
+  onProgress?.(1, "Descargando y validando paquete de recuperación…");
+  const downloaded = new Map<CableRecoveryRegion["name"], Uint8Array>();
+  for (const [index, region] of release.regions.entries()) {
+    const data = await downloadBinary(new URL(region.downloadUrl, window.location.origin).toString());
+    if (data.byteLength !== region.sizeBytes) {
+      throw new Error("El archivo " + region.name + " no tiene el tamaño verificado.");
+    }
+    const actualSha = await sha256Hex(data);
+    if (actualSha !== region.sha256) {
+      throw new Error("El archivo " + region.name + " no coincide con el SHA-256 publicado.");
+    }
+    downloaded.set(region.name, data);
+    onProgress?.(2 + Math.round(((index + 1) / release.regions.length) * 8), "Validando " + region.name + "…");
+  }
+
+  const application = downloaded.get("application");
+  const bootloader = downloaded.get("bootloader");
+  const partitions = downloaded.get("partitions");
+  if (!application || !bootloader || !partitions) {
+    throw new Error("El paquete de recuperación está incompleto.");
+  }
+  const applicationRegion = release.regions.find((region) => region.name === "application")!;
+  await validateFirmwareImage(application, applicationRegion, release.hardwareTarget);
+  validateCablePartitionTable(partitions.subarray(0, 0xc00), application.byteLength);
+
+  onProgress?.(11, "Seleccioná el puerto USB de la MagicBox a recuperar.");
+  const port = await serial.requestPort();
+  const transport = new Transport(port, false);
+  const terminal: IEspLoaderTerminal = {
+    clean() {},
+    write(data) { onLog?.(data); },
+    writeLine(data) { onLog?.(data); },
+  };
+  const loader = new ESPLoader({ transport, baudrate: 115200, terminal, debugLogging: false });
+  let connected = false;
+  let requiresReconnect = false;
+  let backupCreated = false;
+  try {
+    const chip = await loader.main("no_reset");
+    connected = true;
+    if (chip !== "ESP32") throw new Error("Chip incompatible: se esperaba ESP32 y se detectó " + chip + ".");
+    const flashId = await loader.readFlashId();
+    const capacityId = (flashId >>> 16) & 0xff;
+    if (capacityId !== 0x16) {
+      throw new Error("La recuperación validada requiere una flash física de 4 MB.");
+    }
+
+    if (skipBackup) {
+      onLog?.("El operador confirmó omitir el respaldo completo antes del borrado.");
+      onProgress?.(25, "Respaldo omitido por confirmación explícita.");
+    } else {
+      onProgress?.(13, "Respaldando los 4 MB actuales antes de borrar…");
+      try {
+        const backup = await loader.readFlash(0, release.flashSizeBytes, (_packet, progress, total) => {
+          const ratio = total > 0 ? progress / total : 0;
+          onProgress?.(13 + Math.min(12, Math.round(ratio * 12)), "Respaldando memoria actual…");
+        });
+        const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+        onBackupReady?.(backup, "magicbox-" + release.hardwareTarget + "-before-recovery-" + stamp + ".bin");
+        backupCreated = true;
+      } catch (cause) {
+        const accepted = await confirmEraseWithoutBackup?.(cause);
+        if (!accepted) {
+          throw new Error("No se pudo crear el respaldo completo; la placa no fue borrada.");
+        }
+        onLog?.("El operador confirmó continuar sin respaldo porque la lectura completa falló.");
+      }
+    }
+
+    onProgress?.(27, "Borrando completamente la memoria flash…");
+    await loader.eraseFlash();
+
+    const selector = release.regions.find((region) => region.name === "otadata");
+    const staged = release.regions.filter((region) => region.name !== "otadata");
+    const writeOrder = ["application", "initial-littlefs", "bootloader", "partitions"];
+    staged.sort((left, right) => writeOrder.indexOf(left.name) - writeOrder.indexOf(right.name));
+    onProgress?.(31, "Escribiendo bootloader, particiones, firmware y filesystem…");
+    await loader.writeFlash({
+      fileArray: staged.map((region) => ({ data: downloaded.get(region.name)!, address: region.address })),
+      flashMode: "keep",
+      flashFreq: "keep",
+      flashSize: "keep",
+      eraseAll: false,
+      compress: true,
+      reportProgress(_fileIndex, written, total) {
+        const ratio = total > 0 ? written / total : 0;
+        onProgress?.(31 + Math.min(45, Math.round(ratio * 45)), "Escribiendo recuperación completa…");
+      },
+    });
+
+    for (const [index, region] of staged.entries()) {
+      onProgress?.(78 + index * 3, "Verificando " + region.name + " en la placa…");
+      const actualMd5 = (await loader.flashMd5sum(region.address, region.sizeBytes)).toLowerCase();
+      if (actualMd5 !== region.md5) {
+        throw new Error("La verificación MD5 de " + region.name + " falló; el selector no fue activado.");
+      }
+    }
+
+    if (!selector) throw new Error("El paquete no contiene selector OTA.");
+    onProgress?.(91, "Activando firmware recuperado…");
+    await loader.writeFlash({
+      fileArray: [{ data: downloaded.get("otadata")!, address: selector.address }],
+      flashMode: "keep",
+      flashFreq: "keep",
+      flashSize: "keep",
+      eraseAll: false,
+      compress: true,
+      reportProgress() { onProgress?.(94, "Activando selector OTA…"); },
+    });
+    const selectorMd5 = (await loader.flashMd5sum(selector.address, selector.sizeBytes)).toLowerCase();
+    if (selectorMd5 !== selector.md5) throw new Error("La verificación MD5 del selector OTA falló.");
+
+    onProgress?.(97, "Reiniciando MagicBox recuperada…");
+    const resetCompleted = await settleWithin(resetMagicBoxToApplication(transport), 2_500);
+    if (!resetCompleted) requiresReconnect = true;
+  } finally {
+    if (connected) {
+      const disconnected = await settleWithin(transport.disconnect(), 2_500);
+      if (!disconnected) requiresReconnect = true;
+    }
+  }
+  onProgress?.(100, "MagicBox " + release.hardwareTarget.toUpperCase() + " recuperada con " + release.version + ".");
+  return { requiresReconnect, backupCreated };
 }
 
 export async function flashMagicBoxFirmware({ release, onProgress, onLog }: FlashFirmwareOptions) {

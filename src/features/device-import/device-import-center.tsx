@@ -13,7 +13,7 @@ import { Modal } from "@/components/ui/modal";
 import { useAuth } from "@/features/auth/auth-context";
 import { inferDeckNameFromTurns } from "@/features/device-import/deck-inference";
 import { buildGamesBatchPayload, buildRawSyncEnvelopes } from "@/features/device-import/payload";
-import { flashMagicBoxFirmware, resolveCableFirmwareReleaseForTarget, type CableHardwareTarget } from "@/features/device-import/firmware-updater";
+import { flashMagicBoxFirmware, recoverMagicBoxFirmware, resolveCableFirmwareReleaseForTarget, resolveCableRecoveryRelease, type CableHardwareTarget } from "@/features/device-import/firmware-updater";
 import { FirmwareSafetyError } from "@/features/device-import/firmware-image";
 import { ImportedGameCharts } from "@/features/device-import/imported-game-charts";
 import { SyncNavigation } from "@/features/syncs/sync-navigation";
@@ -55,6 +55,17 @@ function inferCableTargetFromHardware(hardware?: string | null): CableHardwareTa
   return null;
 }
 
+function downloadFlashBackup(data: Uint8Array, filename: string) {
+  const copy = new Uint8Array(data.byteLength);
+  copy.set(data);
+  const url = URL.createObjectURL(new Blob([copy.buffer], { type: "application/octet-stream" }));
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1_000);
+}
+
 export function DeviceImportCenter() {
   const { tokens, user } = useAuth();
   const queryClient = useQueryClient();
@@ -85,10 +96,12 @@ export function DeviceImportCenter() {
   const [firmwareProgress, setFirmwareProgress] = useState(0);
   const [firmwareStatus, setFirmwareStatus] = useState("");
   const [firmwareResult, setFirmwareResult] = useState<Feedback | null>(null);
+  const [recoveryRequired, setRecoveryRequired] = useState(false);
   const [selectedCableTarget, setSelectedCableTarget] = useState<CableHardwareTarget>("v3");
   const [confirmedCableTarget, setConfirmedCableTarget] = useState(false);
   const supported = supportsWebSerial();
 
+  const recoveryRelease = resolveCableRecoveryRelease(selectedCableTarget);
   const cableRelease = resolveCableFirmwareReleaseForTarget(
     otaRelease.data ? {
       downloadUrl: otaRelease.data.downloadUrl || "",
@@ -345,9 +358,11 @@ export function DeviceImportCenter() {
     clientRef.current = null;
     clearDeviceSession();
     setSelectedCableTarget(target);
+    setConfirmedCableTarget(true);
     setIsUpdatingFirmware(true);
     setFirmwareProgress(0);
     setFirmwareStatus("Preparando actualización…");
+    setRecoveryRequired(false);
     try {
       await client?.disconnect();
       if (!isCurrentSession(generation)) return;
@@ -372,6 +387,7 @@ export function DeviceImportCenter() {
     } catch (cause) {
       if (!isCurrentSession(generation)) return;
       const safetyError = cause instanceof FirmwareSafetyError;
+      setRecoveryRequired(Boolean(safetyError && cause.recoveryRequired && recoveryRelease));
       const failed: Feedback = {
         kind: "error",
         title: safetyError && cause.recoveryRequired ? "La MagicBox requiere recuperación" : "No se pudo actualizar el firmware",
@@ -395,6 +411,71 @@ export function DeviceImportCenter() {
 
   function setManualName(gameId: number, playerUid: string, name: string) {
     updateAssignment(gameId, playerUid, { kind: "manual", id: playerUid, name });
+  }
+
+
+  async function recoverFirmware() {
+    const release = recoveryRelease;
+    const target = selectedCableTarget;
+    if (!confirmedCableTarget || !release || !recoveryRequired) return;
+    const accepted = window.confirm(
+      "RECUPERACIÓN COMPLETA: se borrarán partidas, configuración, NVS, filesystem, firmware y tabla de particiones. Se intentará descargar un respaldo de 4 MB antes del borrado. ¿Querés continuar?",
+    );
+    if (!accepted) return;
+    const attemptBackup = window.confirm(
+      "RESPALDO RECOMENDADO: Aceptar intenta leer y descargar los 4 MB antes de borrar. Cancelar omite el respaldo y continúa con la recuperación de una placa vacía o irrecuperable.",
+    );
+
+    const generation = sessionGenerationRef.current + 1;
+    sessionGenerationRef.current = generation;
+    const client = clientRef.current;
+    clientRef.current = null;
+    clearDeviceSession();
+    setSelectedCableTarget(target);
+    setConfirmedCableTarget(true);
+    setIsUpdatingFirmware(true);
+    setFirmwareProgress(0);
+    setFirmwareStatus("Preparando recuperación completa…");
+    try {
+      await client?.disconnect();
+      if (!isCurrentSession(generation)) return;
+      const result = await recoverMagicBoxFirmware({
+        release,
+        onProgress: (progress, message) => {
+          if (!isCurrentSession(generation)) return;
+          setFirmwareProgress(Math.min(99, progress));
+          setFirmwareStatus(message);
+        },
+        onBackupReady: downloadFlashBackup,
+        skipBackup: !attemptBackup,
+        confirmEraseWithoutBackup: () => window.confirm(
+          "No se pudo leer un respaldo completo de la placa. Si continuás, toda la información existente se perderá sin posibilidad de recuperación. ¿Borrar y recuperar de todos modos?",
+        ),
+      });
+      if (!isCurrentSession(generation)) return;
+      setRecoveryRequired(false);
+      const completed: Feedback = {
+        kind: result.requiresReconnect ? "info" : "success",
+        title: result.requiresReconnect ? "Recuperación terminada: reconectá el cable" : "MagicBox recuperada correctamente",
+        message: "Se borró la flash completa y se grabaron bootloader, tabla de particiones, selector OTA, firmware " + release.version + " y LittleFS inicial. " + (result.backupCreated ? "El respaldo previo se descargó en este equipo. " : "La recuperación continuó sin respaldo por confirmación explícita. ") + "Desconectá y volvé a conectar la MagicBox para comprobar el arranque.",
+      };
+      setFirmwareProgress(100);
+      setFirmwareStatus(completed.title);
+      setFirmwareResult(completed);
+      setFeedback(completed);
+    } catch (cause) {
+      if (!isCurrentSession(generation)) return;
+      const failed: Feedback = {
+        kind: "error",
+        title: "No se pudo completar la recuperación",
+        message: getErrorMessage(cause) + " Si el borrado ya había comenzado, mantené la placa conectada y repetí la recuperación completa.",
+      };
+      setFirmwareStatus("Recuperación no completada");
+      setFirmwareResult(failed);
+      setFeedback(failed);
+    } finally {
+      if (isCurrentSession(generation)) setIsUpdatingFirmware(false);
+    }
   }
 
   function updateDeckName(gameId: number, deckName: string) {
@@ -709,10 +790,10 @@ export function DeviceImportCenter() {
       </Card>
 
       <Card id="cable-firmware" className="scroll-mt-28">
-        <CardHeader><CardTitle className="flex items-center gap-2"><Cpu className="size-5" />Actualizar firmware por cable</CardTitle><CardDescription>Valida tamaño y SHA-256 y actualiza únicamente la aplicación y el selector OTA. No borra NVS ni LittleFS.</CardDescription></CardHeader>
+        <CardHeader><CardTitle className="flex items-center gap-2"><Cpu className="size-5" />Actualizar firmware por cable</CardTitle><CardDescription>La actualización normal valida tamaño y SHA-256 y conserva NVS y LittleFS. Si falta un layout compatible, habilita una recuperación completa separada, con advertencia y respaldo previo.</CardDescription></CardHeader>
         <CardContent className="space-y-4">
           <div className="grid gap-3 rounded-xl border p-4 md:grid-cols-3">
-            <div><p className="text-xs text-muted-foreground">Hardware habilitado</p><p className="font-medium">MagicBox {selectedCableTarget === "v2" ? "V2" : "V3"}</p><select className="mt-2 h-9 w-full rounded-md border bg-background px-3 text-sm" value={selectedCableTarget} disabled={isUpdatingFirmware} onChange={(event) => { setSelectedCableTarget(event.target.value as CableHardwareTarget); setConfirmedCableTarget(false); }}><option value="v2">MagicBox V2</option><option value="v3">MagicBox V3</option></select></div>
+            <div><p className="text-xs text-muted-foreground">Hardware habilitado</p><p className="font-medium">MagicBox {selectedCableTarget === "v2" ? "V2" : "V3"}</p><select className="mt-2 h-9 w-full rounded-md border bg-background px-3 text-sm" value={selectedCableTarget} disabled={isUpdatingFirmware} onChange={(event) => { setSelectedCableTarget(event.target.value as CableHardwareTarget); setConfirmedCableTarget(false); setRecoveryRequired(false); }}><option value="v2">MagicBox V2</option><option value="v3">MagicBox V3</option></select></div>
             <div><p className="text-xs text-muted-foreground">Firmware seleccionado</p><p className="font-medium">{cableRelease ? `${cableRelease.version} · ${cableRelease.source === "published" ? "release activa" : "release integrada"}` : "No hay release publicada para V2"}</p></div>
             <div><p className="text-xs text-muted-foreground">Integridad</p><p className="font-medium">{cableRelease ? "SHA-256 verificado" : "Pendiente"}</p></div>
           </div>
@@ -720,6 +801,25 @@ export function DeviceImportCenter() {
           {(isUpdatingFirmware || firmwareStatus) ? <div className="space-y-2"><div role="progressbar" aria-label="Progreso de actualización" aria-valuemin={0} aria-valuemax={100} aria-valuenow={firmwareProgress} className="h-2 overflow-hidden rounded-full bg-muted"><div className={`h-full transition-all ${firmwareResult?.kind === "error" ? "bg-destructive" : "bg-primary"}`} style={{ width: `${firmwareProgress}%` }} /></div><p aria-live="polite" className="text-sm text-muted-foreground">{firmwareStatus}{isUpdatingFirmware ? ` (${firmwareProgress}%) · Mantené el cable conectado.` : ""}</p></div> : null}
           {firmwareResult ? <div role={firmwareResult.kind === "error" ? "alert" : "status"} className={`rounded-xl border p-4 ${firmwareResult.kind === "error" ? "border-destructive/40 bg-destructive/5" : firmwareResult.kind === "success" ? "border-emerald-300 bg-emerald-50 text-emerald-900" : "border-amber-300 bg-amber-50 text-amber-900"}`}><p className="flex items-center gap-2 font-semibold">{firmwareResult.kind === "success" ? <CheckCircle2 className="size-5" /> : <AlertTriangle className="size-5" />}{firmwareResult.title}</p><p className="mt-2 text-sm">{firmwareResult.message}</p><Button className="mt-3" variant="outline" onClick={() => setFeedback(firmwareResult)}>Ver resultado</Button></div> : null}
           <Button onClick={updateFirmware} disabled={!supported || !confirmedCableTarget || isUpdatingFirmware || !cableRelease}>{isUpdatingFirmware ? <LoaderCircle className="size-4 animate-spin" /> : <Cpu className="size-4" />}{isUpdatingFirmware ? "Actualizando…" : `Actualizar a ${cableRelease?.version}`}</Button>
+          {recoveryRequired ? (
+            <div className="space-y-3 rounded-xl border border-destructive/40 bg-destructive/5 p-4">
+              <div className="flex gap-3">
+                <AlertTriangle className="mt-0.5 size-5 shrink-0 text-destructive" />
+                <div>
+                  <p className="font-semibold text-destructive">La placa no tiene un esquema compatible</p>
+                  <p className="mt-1 text-sm text-muted-foreground">La recuperación completa borra los 4 MB y vuelve a grabar bootloader, tabla de particiones, selector OTA, aplicación y LittleFS. Primero intenta descargar un respaldo binario.</p>
+                </div>
+              </div>
+              {recoveryRelease ? (
+                <Button variant="destructive" onClick={recoverFirmware} disabled={!confirmedCableTarget || isUpdatingFirmware}>
+                  {isUpdatingFirmware ? <LoaderCircle className="size-4 animate-spin" /> : <AlertTriangle className="size-4" />}
+                  Borrar todo y recuperar con {recoveryRelease.version}
+                </Button>
+              ) : (
+                <p className="text-sm font-medium text-destructive">No existe un paquete de recuperación físicamente validado para este modelo. No se realizará ningún borrado.</p>
+              )}
+            </div>
+          ) : null}
         </CardContent>
       </Card>
 

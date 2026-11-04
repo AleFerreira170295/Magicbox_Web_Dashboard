@@ -2,6 +2,7 @@ import { act, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { StrictMode, type ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiError } from "@/lib/api/fetcher";
+import { FirmwareSafetyError } from "@/features/device-import/firmware-image";
 import { DeviceImportCenter } from "@/features/device-import/device-import-center";
 
 const mocks = vi.hoisted(() => ({
@@ -12,6 +13,7 @@ const mocks = vi.hoisted(() => ({
   deleteGames: vi.fn(),
   disconnect: vi.fn(),
   flashMagicBoxFirmware: vi.fn(),
+  recoverMagicBoxFirmware: vi.fn(),
   unexpectedDisconnects: [] as Array<() => void>,
   uploadRawGameSync: vi.fn(),
   uploadGamesBatch: vi.fn(),
@@ -59,6 +61,8 @@ vi.mock("@/features/device-import/firmware-updater", () => ({
     hardwareTarget: args[1],
   }),
   flashMagicBoxFirmware: mocks.flashMagicBoxFirmware,
+  recoverMagicBoxFirmware: mocks.recoverMagicBoxFirmware,
+  resolveCableRecoveryRelease: (target: "v2" | "v3") => target === "v2" ? { hardwareTarget: "v2", version: "V2.3.24", flashSizeBytes: 4 * 1024 * 1024, sourceCommit: "test", regions: [] } : null,
 }));
 
 vi.mock("@/features/devices/api", () => ({
@@ -360,6 +364,28 @@ describe("DeviceImportCenter cable actions", () => {
     await act(async () => finish({ requiresReconnect: true }));
     expect(await screen.findByRole("dialog", { name: "Firmware cargado: reconectá el cable" })).toHaveTextContent("No se pudo confirmar el reinicio automático");
     expect(screen.getByRole("progressbar")).toHaveAttribute("aria-valuenow", "100");
+  });
+
+
+  it("offers explicit full recovery after an incompatible partition layout", async () => {
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
+    mocks.flashMagicBoxFirmware.mockRejectedValueOnce(
+      new FirmwareSafetyError("PARTITION_TABLE_INCOMPATIBLE", "La tabla no es compatible.", true),
+    );
+    mocks.recoverMagicBoxFirmware.mockResolvedValueOnce({ requiresReconnect: false, backupCreated: true });
+
+    render(<DeviceImportCenter />);
+    fireEvent.change(screen.getByRole("combobox"), { target: { value: "v2" } });
+    fireEvent.click(screen.getByRole("checkbox", { name: /Confirmo que es una MagicBox V2/i }));
+    fireEvent.click(screen.getByRole("button", { name: "Actualizar a V2.3.23" }));
+
+    const recoveryButton = await screen.findByRole("button", { name: "Borrar todo y recuperar con V2.3.24" });
+    expect(screen.getByText("La placa no tiene un esquema compatible")).toBeVisible();
+    fireEvent.click(recoveryButton);
+
+    await waitFor(() => expect(mocks.recoverMagicBoxFirmware).toHaveBeenCalledOnce());
+    expect(confirm).toHaveBeenCalledWith(expect.stringContaining("se borrarán partidas"));
+    expect((await screen.findAllByText("MagicBox recuperada correctamente")).length).toBeGreaterThan(0);
   });
 
   it("recovers from a cable loss during update and ignores late progress from device A", async () => {

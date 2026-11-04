@@ -96,3 +96,25 @@ Desconectar USB, esperar unos 12 segundos (detección de retirada en el ciclo de
 carga) y mantener el botón 3–4 segundos. Confirmar sonido y aro. Después probar
 registro de jugadores, cartas en ambos lectores y pausa/reanudación. Reconectar
 USB y descargar la partida resultante, sin borrarla, para verificar persistencia.
+
+## Recuperación completa desde la web (PCB V2)
+
+El dashboard ofrece esta ruta únicamente después de que la actualización normal
+clasifica el bootloader, la tabla o la aplicación instalada como ausente o
+incompatible. No es un reemplazo de la actualización normal.
+
+Garantías del flujo:
+
+1. exige que el operador confirme explícitamente PCB V2;
+2. descarga cinco regiones fijadas por tamaño y SHA-256 del paquete V2.3.24;
+3. valida aplicación ESP32, marcador V2 y tabla exacta antes de abrir el puerto;
+4. comprueba chip ESP32 clásico y flash física de 4 MB;
+5. ofrece leer y descargar un respaldo binario completo de 4 MB; una placa declarada vacía puede omitirlo con confirmación explícita;
+6. si se intenta y el respaldo falla, no borra nada salvo una nueva confirmación explícita;
+7. recién entonces borra toda la flash;
+8. escribe aplicación, LittleFS inicial, bootloader y tabla, y verifica cada MD5;
+9. escribe y verifica el selector OTA únicamente al final.
+
+La recuperación elimina NVS, partidas, configuración y cualquier layout anterior.
+El paquete V3 no se expone porque todavía no tiene una recuperación completa
+físicamente validada. Nunca se escribe una imagen merged/full-flash en app0.
