@@ -1,10 +1,10 @@
-import { RoleGuard } from "@/components/role-guard";
+import { CapabilityGuard } from "@/components/capability-guard";
 import { SyncsTable } from "@/features/syncs/syncs-table";
 
 export default function SyncsPage() {
   return (
-    <RoleGuard allowedRoles={["teacher", "director", "researcher", "family", "admin", "institution-admin", "government-viewer"]}>
+    <CapabilityGuard anyOf={["ble_device:read", "ble-device:read"]} allowOwnedHome>
       <SyncsTable />
-    </RoleGuard>
+    </CapabilityGuard>
   );
 }

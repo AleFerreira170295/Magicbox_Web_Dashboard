@@ -196,27 +196,42 @@ describe("operational route guards", () => {
         "profile-detail-page",
         "syncs-table",
         "device-import-center",
+        "users-table",
       ],
     },
     {
       role: "teacher",
-      visible: ["dashboard-home", "devices-table", "games-table", "game-detail-page", "syncs-table", "device-import-center"],
+      visible: ["dashboard-home", "devices-table", "games-table", "game-detail-page", "institution-student-profile-page", "syncs-table", "device-import-center"],
     },
     {
       role: "researcher",
-      visible: ["dashboard-home", "games-table", "game-detail-page", "syncs-table", "device-import-center"],
+      visible: ["dashboard-home", "games-table", "game-detail-page", "institution-student-profile-page"],
     },
     {
       role: "family",
-      visible: ["dashboard-home", "devices-table", "games-table", "game-detail-page", "syncs-table", "device-import-center", "users-table"],
+      visible: ["dashboard-home", "devices-table", "games-table", "game-detail-page", "syncs-table", "device-import-center"],
     },
     {
       role: "government-viewer",
-      visible: ["dashboard-home", "syncs-table", "device-import-center", "territorial-alerts-center", "territorial-overview-center"],
+      visible: ["dashboard-home", "territorial-alerts-center", "territorial-overview-center"],
     },
   ])("applies the full screen contract for %s", ({ role, visible }) => {
+    const permissionsByRole: Record<string, string[]> = {
+      admin: ["ble_device:read", "game_data:read", "educational_center:read", "student:read", "evaluation:read", "user:read"],
+      "institution-admin": ["ble_device:read", "game_data:read", "educational_center:read", "student:read", "evaluation:read", "user:read"],
+      director: ["ble_device:read", "game_data:read", "educational_center:read", "student:read", "evaluation:read", "user:read"],
+      teacher: ["ble_device:read", "game_data:read", "student:read", "evaluation:read"],
+      researcher: ["game_data:read", "student:read", "evaluation:read"],
+      family: [],
+      "government-viewer": [],
+      guest: [],
+    };
     useAuthMock.mockReturnValue({
-      user: { roles: [role], permissions: [] },
+      user: {
+        roles: [role],
+        permissions: permissionsByRole[role] || [],
+        userType: role === "family" ? "mobile" : "web",
+      },
     });
 
     renderProtectedPages();

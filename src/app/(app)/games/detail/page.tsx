@@ -1,7 +1,7 @@
 "use client";
 
 import { useSearchParams } from "next/navigation";
-import { RoleGuard } from "@/components/role-guard";
+import { CapabilityGuard } from "@/components/capability-guard";
 import { GameDetailPage } from "@/features/games/game-detail-page";
 
 export default function GamesDetailRoute() {
@@ -9,7 +9,7 @@ export default function GamesDetailRoute() {
   const gameRecordId = searchParams.get("gameRecordId");
 
   return (
-    <RoleGuard allowedRoles={["teacher", "director", "researcher", "family", "admin", "institution-admin"]}>
+    <CapabilityGuard anyOf={["game_data:read", "game-data:read"]} allowOwnedHome>
       <GameDetailPage
         key={gameRecordId || "missing-game"}
         gameRecordId={gameRecordId}
@@ -27,6 +27,6 @@ export default function GamesDetailRoute() {
           pageSize: searchParams.get("pageSize"),
         }}
       />
-    </RoleGuard>
+    </CapabilityGuard>
   );
 }

@@ -13,6 +13,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { ListPaginationControls, useListPagination } from "@/components/ui/list-pagination-controls";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/features/auth/auth-context";
+import { canReadFeature, canReadFeatureOrOwnedHome } from "@/features/auth/permission-contract";
 import { deleteDevice, useDevices } from "@/features/devices/api";
 import { DeviceAvatar, DeviceEditorPanel, buildDeviceRelationHref, devicesMessages, locationLabel, scopeBadge, statusLabel } from "@/features/devices/devices-table";
 import { buildDeviceDetailHref, buildDevicesOverviewHref, type DevicesOverviewRouteState } from "@/features/devices/device-route";
@@ -51,11 +52,15 @@ export function DeviceDetailPage({
   const queryClient = useQueryClient();
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
+  const canReadInstitutions = canReadFeature(currentUser, "educational_center");
+  const canReadUsers = canReadFeature(currentUser, "user");
+  const canReadGames = canReadFeatureOrOwnedHome(currentUser, "game_data");
+  const canReadSyncs = canReadFeatureOrOwnedHome(currentUser, "ble_device");
   const devicesQuery = useDevices(tokens?.accessToken);
-  const institutionsQuery = useInstitutions(tokens?.accessToken);
-  const usersQuery = useUsers(tokens?.accessToken);
-  const gamesQuery = useGames(tokens?.accessToken);
-  const syncsQuery = useSyncSessions(tokens?.accessToken);
+  const institutionsQuery = useInstitutions(canReadInstitutions ? tokens?.accessToken : undefined);
+  const usersQuery = useUsers(canReadUsers ? tokens?.accessToken : undefined);
+  const gamesQuery = useGames(canReadGames ? tokens?.accessToken : undefined);
+  const syncsQuery = useSyncSessions(canReadSyncs ? tokens?.accessToken : undefined);
 
   const devices = useMemo(() => devicesQuery.data?.data ?? [], [devicesQuery.data?.data]);
   const institutions = useMemo(() => institutionsQuery.data?.data ?? [], [institutionsQuery.data?.data]);
@@ -156,8 +161,8 @@ export function DeviceDetailPage({
   const siblingPagination = useListPagination(siblingDevices, 10, 1);
   const scopePagination = useListPagination(scopeDevices, 10, 1);
   const backHref = buildDevicesOverviewHref(overviewState);
-  const isLoading = devicesQuery.isLoading || institutionsQuery.isLoading || usersQuery.isLoading || gamesQuery.isLoading || syncsQuery.isLoading;
-  const hasFatalError = devicesQuery.error || institutionsQuery.error || usersQuery.error || gamesQuery.error || syncsQuery.error;
+  const isLoading = devicesQuery.isLoading;
+  const hasFatalError = devicesQuery.error;
 
   const deleteDeviceMutation = useMutation({
     mutationFn: async () => {

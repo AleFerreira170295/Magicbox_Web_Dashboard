@@ -1,10 +1,10 @@
-import { RoleGuard } from "@/components/role-guard";
+import { CapabilityGuard } from "@/components/capability-guard";
 import { InstitutionsOverview } from "@/features/institutions/institutions-overview";
 
 export default function InstitutionsPage() {
   return (
-    <RoleGuard allowedRoles={["admin", "institution-admin", "director"]}>
+    <CapabilityGuard anyOf={["educational_center:read", "educational-center:read"]}>
       <InstitutionsOverview />
-    </RoleGuard>
+    </CapabilityGuard>
   );
 }
