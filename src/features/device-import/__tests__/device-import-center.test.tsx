@@ -388,6 +388,23 @@ describe("DeviceImportCenter cable actions", () => {
     expect((await screen.findAllByText("MagicBox recuperada correctamente")).length).toBeGreaterThan(0);
   });
 
+  it("allows proactive full recovery for an empty or legacy V2 board before trying a normal update", async () => {
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
+    mocks.recoverMagicBoxFirmware.mockResolvedValueOnce({ requiresReconnect: false, backupCreated: false });
+
+    render(<DeviceImportCenter />);
+    fireEvent.change(screen.getByRole("combobox"), { target: { value: "v2" } });
+    fireEvent.click(screen.getByRole("checkbox", { name: /Confirmo que es una MagicBox V2/i }));
+
+    expect(screen.getByText("Placa nueva, vacía o con firmware demasiado antiguo")).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "Borrar todo y grabar desde cero con V2.3.24" }));
+
+    await waitFor(() => expect(mocks.recoverMagicBoxFirmware).toHaveBeenCalledOnce());
+    expect(mocks.flashMagicBoxFirmware).not.toHaveBeenCalled();
+    expect(confirm).toHaveBeenCalledWith(expect.stringContaining("RECUPERACIÓN COMPLETA"));
+    expect((await screen.findAllByText("MagicBox recuperada correctamente")).length).toBeGreaterThan(0);
+  });
+
   it("recovers from a cable loss during update and ignores late progress from device A", async () => {
     mocks.getDeviceInfo
       .mockResolvedValueOnce({ deviceId: "AABBCCDDEEFF", firmwareVersion: "V2.3.22", hardware: "MagicBox V3" })

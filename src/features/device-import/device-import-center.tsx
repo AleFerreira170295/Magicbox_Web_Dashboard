@@ -417,7 +417,7 @@ export function DeviceImportCenter() {
   async function recoverFirmware() {
     const release = recoveryRelease;
     const target = selectedCableTarget;
-    if (!confirmedCableTarget || !release || !recoveryRequired) return;
+    if (!confirmedCableTarget || !release) return;
     const accepted = window.confirm(
       "RECUPERACIÓN COMPLETA: se borrarán partidas, configuración, NVS, filesystem, firmware y tabla de particiones. Se intentará descargar un respaldo de 4 MB antes del borrado. ¿Querés continuar?",
     );
@@ -790,7 +790,7 @@ export function DeviceImportCenter() {
       </Card>
 
       <Card id="cable-firmware" className="scroll-mt-28">
-        <CardHeader><CardTitle className="flex items-center gap-2"><Cpu className="size-5" />Actualizar firmware por cable</CardTitle><CardDescription>La actualización normal valida tamaño y SHA-256 y conserva NVS y LittleFS. Si falta un layout compatible, habilita una recuperación completa separada, con advertencia y respaldo previo.</CardDescription></CardHeader>
+        <CardHeader><CardTitle className="flex items-center gap-2"><Cpu className="size-5" />Actualizar firmware por cable</CardTitle><CardDescription>La actualización normal valida tamaño y SHA-256 y conserva NVS y LittleFS. Para placas vacías, muy antiguas o con un layout incompatible, también podés lanzar una recuperación completa con borrado total, advertencia explícita y respaldo previo.</CardDescription></CardHeader>
         <CardContent className="space-y-4">
           <div className="grid gap-3 rounded-xl border p-4 md:grid-cols-3">
             <div><p className="text-xs text-muted-foreground">Hardware habilitado</p><p className="font-medium">MagicBox {selectedCableTarget === "v2" ? "V2" : "V3"}</p><select className="mt-2 h-9 w-full rounded-md border bg-background px-3 text-sm" value={selectedCableTarget} disabled={isUpdatingFirmware} onChange={(event) => { setSelectedCableTarget(event.target.value as CableHardwareTarget); setConfirmedCableTarget(false); setRecoveryRequired(false); }}><option value="v2">MagicBox V2</option><option value="v3">MagicBox V3</option></select></div>
@@ -801,23 +801,19 @@ export function DeviceImportCenter() {
           {(isUpdatingFirmware || firmwareStatus) ? <div className="space-y-2"><div role="progressbar" aria-label="Progreso de actualización" aria-valuemin={0} aria-valuemax={100} aria-valuenow={firmwareProgress} className="h-2 overflow-hidden rounded-full bg-muted"><div className={`h-full transition-all ${firmwareResult?.kind === "error" ? "bg-destructive" : "bg-primary"}`} style={{ width: `${firmwareProgress}%` }} /></div><p aria-live="polite" className="text-sm text-muted-foreground">{firmwareStatus}{isUpdatingFirmware ? ` (${firmwareProgress}%) · Mantené el cable conectado.` : ""}</p></div> : null}
           {firmwareResult ? <div role={firmwareResult.kind === "error" ? "alert" : "status"} className={`rounded-xl border p-4 ${firmwareResult.kind === "error" ? "border-destructive/40 bg-destructive/5" : firmwareResult.kind === "success" ? "border-emerald-300 bg-emerald-50 text-emerald-900" : "border-amber-300 bg-amber-50 text-amber-900"}`}><p className="flex items-center gap-2 font-semibold">{firmwareResult.kind === "success" ? <CheckCircle2 className="size-5" /> : <AlertTriangle className="size-5" />}{firmwareResult.title}</p><p className="mt-2 text-sm">{firmwareResult.message}</p><Button className="mt-3" variant="outline" onClick={() => setFeedback(firmwareResult)}>Ver resultado</Button></div> : null}
           <Button onClick={updateFirmware} disabled={!supported || !confirmedCableTarget || isUpdatingFirmware || !cableRelease}>{isUpdatingFirmware ? <LoaderCircle className="size-4 animate-spin" /> : <Cpu className="size-4" />}{isUpdatingFirmware ? "Actualizando…" : `Actualizar a ${cableRelease?.version}`}</Button>
-          {recoveryRequired ? (
-            <div className="space-y-3 rounded-xl border border-destructive/40 bg-destructive/5 p-4">
+          {recoveryRelease ? (
+            <div className={`space-y-3 rounded-xl border p-4 ${recoveryRequired ? "border-destructive/40 bg-destructive/5" : "border-amber-300 bg-amber-50/80"}`}>
               <div className="flex gap-3">
-                <AlertTriangle className="mt-0.5 size-5 shrink-0 text-destructive" />
+                <AlertTriangle className={`mt-0.5 size-5 shrink-0 ${recoveryRequired ? "text-destructive" : "text-amber-700"}`} />
                 <div>
-                  <p className="font-semibold text-destructive">La placa no tiene un esquema compatible</p>
-                  <p className="mt-1 text-sm text-muted-foreground">La recuperación completa borra los 4 MB y vuelve a grabar bootloader, tabla de particiones, selector OTA, aplicación y LittleFS. Primero intenta descargar un respaldo binario.</p>
+                  <p className={`font-semibold ${recoveryRequired ? "text-destructive" : "text-amber-900"}`}>{recoveryRequired ? "La placa no tiene un esquema compatible" : "Placa nueva, vacía o con firmware demasiado antiguo"}</p>
+                  <p className="mt-1 text-sm text-muted-foreground">La recuperación completa borra los 4 MB y vuelve a grabar bootloader, tabla de particiones, selector OTA, aplicación y LittleFS. Primero intenta descargar un respaldo binario. Usala si la actualización normal falla o si querés inicializar una placa desde cero.</p>
                 </div>
               </div>
-              {recoveryRelease ? (
-                <Button variant="destructive" onClick={recoverFirmware} disabled={!confirmedCableTarget || isUpdatingFirmware}>
-                  {isUpdatingFirmware ? <LoaderCircle className="size-4 animate-spin" /> : <AlertTriangle className="size-4" />}
-                  Borrar todo y recuperar con {recoveryRelease.version}
-                </Button>
-              ) : (
-                <p className="text-sm font-medium text-destructive">No existe un paquete de recuperación físicamente validado para este modelo. No se realizará ningún borrado.</p>
-              )}
+              <Button variant={recoveryRequired ? "destructive" : "outline"} onClick={recoverFirmware} disabled={!confirmedCableTarget || isUpdatingFirmware}>
+                {isUpdatingFirmware ? <LoaderCircle className="size-4 animate-spin" /> : <AlertTriangle className="size-4" />}
+                {recoveryRequired ? "Borrar todo y recuperar con " : "Borrar todo y grabar desde cero con "}{recoveryRelease.version}
+              </Button>
             </div>
           ) : null}
         </CardContent>

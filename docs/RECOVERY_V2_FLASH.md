@@ -99,9 +99,11 @@ USB y descargar la partida resultante, sin borrarla, para verificar persistencia
 
 ## Recuperación completa desde la web (PCB V2)
 
-El dashboard ofrece esta ruta únicamente después de que la actualización normal
-clasifica el bootloader, la tabla o la aplicación instalada como ausente o
-incompatible. No es un reemplazo de la actualización normal.
+El dashboard ofrece esta ruta directamente al seleccionar y confirmar PCB V2,
+para placas nuevas, vacías o con firmware antiguo, y también después de detectar
+un layout incompatible durante la actualización normal. El botón «Borrar todo y
+grabar desde cero» permite inicializar la placa sin un esquema previo compatible.
+La actualización normal sigue siendo la opción que conserva datos.
 
 Garantías del flujo:
 
