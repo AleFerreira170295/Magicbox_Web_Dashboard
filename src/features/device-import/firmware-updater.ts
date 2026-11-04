@@ -278,13 +278,13 @@ export async function recoverMagicBoxFirmware({
     writeLine(data) { onLog?.(data); },
   };
   const loader = new ESPLoader({ transport, baudrate: 115200, terminal, debugLogging: false });
-  let connected = false;
   let requiresReconnect = false;
   let backupCreated = false;
   try {
-    const chip = await loader.main("no_reset");
-    connected = true;
-    if (chip !== "ESP32") throw new Error("Chip incompatible: se esperaba ESP32 y se detectó " + chip + ".");
+    // Recovery also starts from running legacy firmware or a blank board.
+    // Use esptool's bootloader reset instead of assuming download mode.
+    const chip = await loader.main();
+    if (!/^ESP32(?:[- ](?:D0WD|D2WD|D0WDR2|PICO|U4WDH)|$)/i.test(chip)) throw new Error("Chip incompatible: se esperaba ESP32 y se detectó " + chip + ".");
     const flashId = await loader.readFlashId();
     const capacityId = (flashId >>> 16) & 0xff;
     if (capacityId !== 0x16) {
@@ -360,9 +360,12 @@ export async function recoverMagicBoxFirmware({
     const resetCompleted = await settleWithin(resetMagicBoxToApplication(transport), 2_500);
     if (!resetCompleted) requiresReconnect = true;
   } finally {
-    if (connected) {
-      const disconnected = await settleWithin(transport.disconnect(), 2_500);
-      if (!disconnected) requiresReconnect = true;
+    // main() opens the serial port before syncing/detecting the chip. Even a
+    // failed handshake must cancel the reader and close the port for a retry.
+    const disconnected = await settleWithin(transport.disconnect(), 2_500);
+    if (!disconnected) {
+      requiresReconnect = true;
+      onLog?.("El puerto quedó pendiente de liberación; desconectá y reconectá el cable antes de continuar.");
     }
   }
   onProgress?.(100, "MagicBox " + release.hardwareTarget.toUpperCase() + " recuperada con " + release.version + ".");

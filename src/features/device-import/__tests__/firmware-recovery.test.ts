@@ -55,7 +55,7 @@ beforeEach(() => {
   Object.defineProperty(window, "isSecureContext", { configurable: true, value: true });
   Object.defineProperty(navigator, "serial", { configurable: true, value: { requestPort: mock.requestPort } });
   mock.requestPort.mockResolvedValue({});
-  mock.main.mockResolvedValue("ESP32");
+  mock.main.mockResolvedValue("ESP32-PICO-D4 (revision 1)");
   mock.readFlashId.mockResolvedValue(0x1640ef);
   mock.readFlash.mockResolvedValue(new Uint8Array(4 * 1024 * 1024));
   mock.eraseFlash.mockResolvedValue(0);
@@ -76,6 +76,8 @@ describe("full flash recovery", () => {
     expect(result).toEqual({ requiresReconnect: false, backupCreated: true });
     expect(onBackupReady).toHaveBeenCalledWith(expect.any(Uint8Array), expect.stringContaining("before-recovery"));
     expect(onBackupReady.mock.calls[0][0]).toHaveLength(4 * 1024 * 1024);
+    expect(mock.main).toHaveBeenCalledWith();
+    expect(mock.disconnect).toHaveBeenCalledOnce();
     expect(mock.eraseFlash).toHaveBeenCalledOnce();
     expect(mock.eraseFlash.mock.invocationCallOrder[0]).toBeLessThan(mock.writeFlash.mock.invocationCallOrder[0]);
     expect(mock.writeFlash).toHaveBeenCalledTimes(2);
@@ -123,6 +125,23 @@ describe("full flash recovery", () => {
     mock.readFlashId.mockResolvedValueOnce(0x1540ef);
     await expect(recoverMagicBoxFirmware({ release: resolveCableRecoveryRelease("v2")! })).rejects.toThrow("4 MB");
     expect(mock.readFlash).not.toHaveBeenCalled();
+    expect(mock.eraseFlash).not.toHaveBeenCalled();
+  });
+
+  it("releases the transport when the handshake fails before main returns", async () => {
+    mock.main.mockRejectedValueOnce(new Error("Failed to connect with the device"));
+    await expect(recoverMagicBoxFirmware({ release: resolveCableRecoveryRelease("v2")! }))
+      .rejects.toThrow("Failed to connect with the device");
+    expect(mock.disconnect).toHaveBeenCalledOnce();
+    expect(mock.eraseFlash).not.toHaveBeenCalled();
+    expect(mock.writeFlash).not.toHaveBeenCalled();
+  });
+
+  it("rejects another ESP32 family without erasing and releases the transport", async () => {
+    mock.main.mockResolvedValueOnce("ESP32-S3 (revision 0)");
+    await expect(recoverMagicBoxFirmware({ release: resolveCableRecoveryRelease("v2")! }))
+      .rejects.toThrow("Chip incompatible");
+    expect(mock.disconnect).toHaveBeenCalledOnce();
     expect(mock.eraseFlash).not.toHaveBeenCalled();
   });
 

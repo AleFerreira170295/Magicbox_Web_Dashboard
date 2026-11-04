@@ -405,6 +405,19 @@ describe("DeviceImportCenter cable actions", () => {
     expect((await screen.findAllByText("MagicBox recuperada correctamente")).length).toBeGreaterThan(0);
   });
 
+  it("explains an already-open recovery port without claiming the erase started", async () => {
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    mocks.recoverMagicBoxFirmware.mockRejectedValueOnce(new Error("Failed to execute 'open' on 'SerialPort': The port is already open."));
+    render(<DeviceImportCenter />);
+    fireEvent.change(screen.getByRole("combobox"), { target: { value: "v2" } });
+    fireEvent.click(screen.getByRole("checkbox", { name: /Confirmo que es una MagicBox V2/i }));
+    fireEvent.click(screen.getByRole("button", { name: "Borrar todo y grabar desde cero con V2.3.24" }));
+    const dialog = await screen.findByRole("dialog", { name: "No se pudo completar la recuperación" });
+    expect(dialog).toHaveTextContent("El puerto USB ya está abierto");
+    expect(dialog).toHaveTextContent("No se inició el borrado de la placa");
+    expect(dialog).not.toHaveTextContent("Si el borrado ya había comenzado");
+  });
+
   it("recovers from a cable loss during update and ignores late progress from device A", async () => {
     mocks.getDeviceInfo
       .mockResolvedValueOnce({ deviceId: "AABBCCDDEEFF", firmwareVersion: "V2.3.22", hardware: "MagicBox V3" })

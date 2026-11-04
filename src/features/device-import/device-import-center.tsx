@@ -436,12 +436,14 @@ export function DeviceImportCenter() {
     setIsUpdatingFirmware(true);
     setFirmwareProgress(0);
     setFirmwareStatus("Preparando recuperación completa…");
+    let eraseStarted = false;
     try {
       await client?.disconnect();
       if (!isCurrentSession(generation)) return;
       const result = await recoverMagicBoxFirmware({
         release,
         onProgress: (progress, message) => {
+          if (progress >= 27) eraseStarted = true;
           if (!isCurrentSession(generation)) return;
           setFirmwareProgress(Math.min(99, progress));
           setFirmwareStatus(message);
@@ -468,7 +470,11 @@ export function DeviceImportCenter() {
       const failed: Feedback = {
         kind: "error",
         title: "No se pudo completar la recuperación",
-        message: getErrorMessage(cause) + " Si el borrado ya había comenzado, mantené la placa conectada y repetí la recuperación completa.",
+        message: (/already open/i.test(getErrorMessage(cause))
+          ? "El puerto USB ya está abierto. Cerrá otras pestañas o aplicaciones que usen la MagicBox, desconectá el cable, recargá esta página y reconectalo antes de reintentar."
+          : getErrorMessage(cause)) + (eraseStarted
+          ? " Si el borrado ya había comenzado, mantené la placa conectada y repetí la recuperación completa."
+          : " No se inició el borrado de la placa."),
       };
       setFirmwareStatus("Recuperación no completada");
       setFirmwareResult(failed);
