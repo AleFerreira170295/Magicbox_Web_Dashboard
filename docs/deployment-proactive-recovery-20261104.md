@@ -63,3 +63,35 @@ The unchanged original `docker-compose.web-capability.yml` still selects
 To revert, run the activation command without the final
 `-f docker-compose.web-proactive-ee9ee13.yml` layer. Recheck route/assets/API and
 web image ID. Do not rebuild or restart other services for rollback.
+
+## Recovery port hotfix — 2026-11-04
+
+The operator reported `SerialPort: The port is already open` on recovery. Review
+found recovery skipped transport cleanup when `main()` failed after opening the
+port, used `no_reset` despite starting from running/blank boards, and compared
+chip descriptions to the literal `ESP32` instead of accepting classic PICO/D0WD
+models. Runtime hotfix `f3217ea` fixes these and clarifies pre-erase failures.
+
+- Regression uses actual ESPLoader.main/connect and Transport with a fake serial
+  device and failed hardware sync. Restoring the old conditional cleanup makes
+  it fail with the port still open; fixed code closes/unlocks it on both retries.
+- 67 import/firmware tests, TypeScript, focused lint and Linux build passed.
+- New image `magicbox-web-recovery-port:f3217ea`, ID
+  `sha256:5da10848ba463e80d9a308e5c345567e47f2e80edcecf9a0c0c1962fb4c4d8b6`.
+- Source `/opt/magicbox/releases/web-recovery-port-f3217ea`, archive SHA-256
+  `50876d07f4031b6fa32e0a1ff074c30ddcbbc2cde0828443a34785049527b28c`
+  matched before extraction.
+- Active Compose adds `docker-compose.web-port-f3217ea.yml` after all five
+  layers in the previous activation command. Only web recreated; other
+  container IDs unchanged. Web zero restarts and API healthy.
+- Candidate and public-hostname HTTPS-from-server checks passed: cable200,
+  16 JS chunks including both new error messages, all 12 firmware/manifest
+  hashes exact, withdrawn V2.3.18=404. No physical browser flashing performed.
+- Backup config under `backups/web-port-f3217ea/`. Gzip-verified off-host image
+  and evidence `/Users/macbook/dev/magicbox-release-backups/recovery-port-f3217ea/`.
+- Immediate rollback: omit only `docker-compose.web-port-f3217ea.yml` and run
+  the original five-layer activation above, selecting the prior `ee9ee13` image.
+
+For a port already retained by the previous JS session: disconnect USB, close
+that tab (and other serial users), reopen the cable page and reconnect. The open
+error occurs before erase; it does not establish any earlier attempt's state.
