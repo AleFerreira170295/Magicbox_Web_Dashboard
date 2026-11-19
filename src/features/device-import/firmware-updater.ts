@@ -3,7 +3,7 @@ import { resolveApiBaseUrl } from "@/lib/api/fetcher";
 
 import { APP0_ADDRESS, OTA_SELECTOR_ADDRESS, inspectEsp32Application, validateCablePartitionTable, validateInstalledDeviceForNormalUpdate } from "./firmware-image";
 const OTA_SELECTOR_URL = "/firmware/esp32/boot_app0.bin";
-const MINIMUM_CABLE_FIRMWARE_VERSION = "V2.3.23";
+const MINIMUM_CABLE_FIRMWARE_VERSION = "V2.3.24";
 
 export interface FirmwareReleaseInput {
   downloadUrl: string;
@@ -57,13 +57,13 @@ export function resolveCableRecoveryRelease(target: CableHardwareTarget) {
 }
 
 const VERIFIED_V3_CABLE_FIRMWARE: ResolvedCableFirmwareRelease = {
-  downloadUrl: "/firmware/esp32/magicbox-v3-V2.3.23.bin",
-  sha256: "74f36265d6d26dd1f0230622a5792747285e0ef4fab06033cff8c5fd11cfa27f",
-  sizeBytes: 1_349_920,
+  downloadUrl: "/firmware/esp32/magicbox-v3-V2.3.24.bin",
+  sha256: "c14cf6f7d4206bff8c1608f4d9ade18cfa3d3a64754293e168d6be31ecc89204",
+  sizeBytes: 1_339_520,
   version: MINIMUM_CABLE_FIRMWARE_VERSION,
   source: "bundled",
   hardwareTarget: "v3",
-  md5: "42b1e108d128e48ba8eddade02d5f123",
+  md5: "8781821cea15ce1242d8bdf9d4bc0a5c",
 };
 
 const VERIFIED_V2_CABLE_FIRMWARE: ResolvedCableFirmwareRelease = {
@@ -75,6 +75,12 @@ const VERIFIED_V2_CABLE_FIRMWARE: ResolvedCableFirmwareRelease = {
   hardwareTarget: "v2",
   md5: "a7d262ef06226499e3ba9fcd216413a0",
 };
+
+/** The eFuse MAC is unique to each physical board; chip type is not. */
+export function formatEfuseDeviceId(value: string) {
+  const normalized = value.replace(/[^a-fA-F0-9]/g, "").toUpperCase();
+  return normalized.length === 12 ? normalized : null;
+}
 
 function versionParts(value?: string | null) {
   return (value?.match(/\d+/g) || []).map(Number);
@@ -415,8 +421,18 @@ export async function flashMagicBoxFirmware({ release, onProgress, onLog }: Flas
     const partitionTable = await loader.readFlash(0x8000, 0xc00);
     const currentAppHeader = await loader.readFlash(APP0_ADDRESS, 64);
     validateInstalledDeviceForNormalUpdate({ bootloaderHeader, partitionTable, currentAppHeader, incomingImageSize: firmware.byteLength });
+
+    let deviceId: string | null = null;
+    try {
+      deviceId = formatEfuseDeviceId(await loader.chip.readMac(loader));
+      if (!deviceId) onLog?.("No se pudo normalizar la MAC eFuse de la MagicBox.");
+    } catch {
+      onLog?.("No se pudo leer la MAC eFuse; se continuará con la actualización verificada.");
+    }
     const totalBytes = firmware.byteLength + otaSelector.byteLength;
-    onProgress?.(18, "Dispositivo detectado: " + chip + ". Escribiendo aplicación…");
+    const deviceDescription = deviceId ? "MagicBox " + deviceId : chip;
+    onProgress?.(18, "Dispositivo detectado: " + deviceDescription + ". Escribiendo aplicación…");
+    if (deviceId) onLog?.("ID físico eFuse: " + deviceId);
     await loader.writeFlash({
       // La aplicación se escribe y verifica antes de tocar el selector OTA.
       fileArray: [{ data: firmware, address: APP0_ADDRESS }],

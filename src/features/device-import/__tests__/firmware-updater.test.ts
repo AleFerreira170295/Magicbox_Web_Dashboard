@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
-import { resetMagicBoxToApplication, resolveCableFirmwareRelease, resolveCableFirmwareReleaseForTarget, settleWithin, sha256Hex, validateFirmwareImage } from "@/features/device-import/firmware-updater";
+import { formatEfuseDeviceId, resetMagicBoxToApplication, resolveCableFirmwareRelease, resolveCableFirmwareReleaseForTarget, settleWithin, sha256Hex, validateFirmwareImage } from "@/features/device-import/firmware-updater";
 
 describe("firmware updater validation", () => {
   it("bounds serial cleanup waits", async () => {
@@ -19,8 +19,13 @@ describe("firmware updater validation", () => {
     expect(calls).toEqual(["DTR:false", "RTS:true", "RTS:false", "DTR:false"]);
   });
 
+  it("uses the unique eFuse MAC rather than the shared chip-family label", () => {
+    expect(formatEfuseDeviceId("f0:16:1d:2f:f3:3c")).toBe("F0161D2FF33C");
+    expect(formatEfuseDeviceId("ESP32")).toBeNull();
+  });
+
   it("validates published size and SHA-256", async () => {
-    const firmware = new Uint8Array(readFileSync(resolve("public/firmware/esp32/magicbox-v3-V2.3.23.bin")));
+    const firmware = new Uint8Array(readFileSync(resolve("public/firmware/esp32/magicbox-v3-V2.3.24.bin")));
     const hash = await sha256Hex(firmware);
 
     await expect(validateFirmwareImage(firmware, {
@@ -36,7 +41,7 @@ describe("firmware updater validation", () => {
       sha256: "a".repeat(64),
       sizeBytes: 123,
       version: "V2.3.23",
-    }, "v3")).toMatchObject({ downloadUrl: "/firmware/esp32/magicbox-v3-V2.3.23.bin", source: "bundled" });
+    }, "v3")).toMatchObject({ downloadUrl: "/firmware/esp32/magicbox-v3-V2.3.24.bin", source: "bundled" });
 
     expect(resolveCableFirmwareReleaseForTarget({
       downloadUrl: "/firmware/esp32/magicbox-v2-V2.3.24.bin",
@@ -57,7 +62,7 @@ describe("firmware updater validation", () => {
       sha256: "7f134519c761e299b50176248feeac4d818bb3be262318f11d087c104a874b0a",
       sizeBytes: 1_358_368,
       version: "V2.3.23",
-    })).toMatchObject({ downloadUrl: "/firmware/esp32/magicbox-v3-V2.3.23.bin", source: "bundled" });
+    })).toMatchObject({ downloadUrl: "/firmware/esp32/magicbox-v3-V2.3.24.bin", source: "bundled" });
   });
 
   it("rejects an empty or altered firmware image", async () => {
